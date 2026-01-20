@@ -172,8 +172,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         transition: left 0.3s ease !important;
         border-top-left-radius: 12px !important; /* Rounded top-left corner */
         overflow: hidden !important;
-        padding-left: var(--mantine-spacing-md) !important; /* Left padding for text */
-        padding-right: var(--mantine-spacing-md) !important;
+        padding-left: var(--mantine-spacing-sm) !important; /* Left padding for text */
+        padding-right: var(--mantine-spacing-sm) !important;
       }
       
       /* Page Sub Title Bar - Same position as title bar */
@@ -215,8 +215,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         width: calc(100% - 300px) !important;
         border-top-left-radius: 0 !important;
         border-top-right-radius: 12px !important;
-        padding-left: var(--mantine-spacing-md) !important;
-        padding-right: var(--mantine-spacing-md) !important;
+        padding-left: var(--mantine-spacing-sm) !important;
+        padding-right: var(--mantine-spacing-sm) !important;
         transition: right 0.3s ease, width 0.3s ease !important;
       }
       
@@ -258,7 +258,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       .page-title-bar .mantine-Title-root {
         margin: 0 !important;
         text-align: left !important;
-        padding-left: var(--mantine-spacing-md) !important;
+        padding-left: var(--mantine-spacing-sm) !important;
         padding-top: var(--mantine-spacing-sm) !important;
       }
       
@@ -267,7 +267,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       [dir="rtl"] .page-title-bar .mantine-Title-root {
         text-align: right !important;
         padding-left: 0 !important;
-        padding-right: var(--mantine-spacing-md) !important;
+        padding-right: var(--mantine-spacing-sm) !important;
       }
       
       /* Title bar button group alignment - align with content padding */
@@ -289,8 +289,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* Add top margin to main content to account for title bar */
       .mantine-AppShell-main {
         padding-top: calc(60px + var(--mantine-spacing-md)) !important;
-        padding-left: var(--mantine-spacing-md) !important;
-        padding-right: var(--mantine-spacing-md) !important;
+        padding-left: var(--mantine-spacing-sm) !important;
+        padding-right: var(--mantine-spacing-sm) !important;
         padding-bottom: var(--mantine-spacing-xl) !important;
       }
       

@@ -125,6 +125,26 @@ app/
       page.tsx        // Works as /dashboard/students
 ```
 
+### Dashboard Page Looked \"Invisible\" While Other Pages Rendered
+- ❌ `/dashboard` page had different layout wrapper/spacing than sibling pages (e.g., used a different container component/props), causing the title/description to appear missing under the global theme/layout CSS.
+- ✅ Keep all dashboard pages consistent: same wrapper (`Container size=\"lg\" py=\"xl\"`), same `Title`/`Text` pattern.
+
+**Why:** Global layout + injected theme CSS makes subtle wrapper differences show up as big visual issues (misalignment, overlap, or low contrast), even if the React tree renders fine.
+
+**Fix Pattern:**
+```tsx
+import { Container, Title, Text } from '@mantine/core';
+
+export default function Page() {
+  return (
+    <Container size="lg" py="xl">
+      <Title order={1} mb="md">Page Title</Title>
+      <Text c="dimmed">Description</Text>
+    </Container>
+  );
+}
+```
+
 ## Authentication & Session Management
 
 ### AuthGuard Checking Both Session and API Call

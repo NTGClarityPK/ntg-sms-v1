@@ -20,7 +20,7 @@ alwaysApply: false
 - NEVER use: Tailwind classes, inline styles for static values, vanilla CSS files
 
 ## Centralized Theme System - MANDATORY
-
+* BEFORE BUILDING ANY COMPONENT, REFER TO UI_UX_Design.md file in project root so out buttons and tables are design as per the file instructions.
 **CRITICAL**: All styling MUST use the centralized theme system. This is the SINGLE SOURCE OF TRUTH for all colors, fonts, and spacing.
 
 ### Theme Configuration Location

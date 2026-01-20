@@ -2,42 +2,49 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, zodResolver } from '@mantine/form';
-import { z } from 'zod';
+import { useForm } from '@mantine/form';
 import {
+  Box,
+  Title,
   TextInput,
   PasswordInput,
   Button,
-  Paper,
-  Title,
+  Stack,
   Text,
+  Anchor,
+  Divider,
   Alert,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+import { IconAlertCircle, IconBrandGoogle, IconMail, IconLock } from '@tabler/icons-react';
 import { signIn } from '@/lib/auth';
-
-const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
+import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
+import { useErrorColor } from '@/lib/hooks/use-theme-colors';
+import { useTheme } from '@/lib/hooks/use-theme';
+import { useThemeColor } from '@/lib/hooks/use-theme-color';
+import { generateThemeColors } from '@/lib/utils/themeColors';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const errorColor = useErrorColor();
+  const { isDark } = useTheme();
+  const primaryColor = useThemeColor();
+  const themeColors = generateThemeColors(primaryColor, isDark);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm<LoginFormValues>({
+  const form = useForm({
     initialValues: {
       email: '',
       password: '',
     },
-    validate: zodResolver(loginSchema),
+    validate: {
+      email: (value: string) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
+      password: (value: string) => (value.length < 6 ? 'Password must be at least 6 characters' : null),
+    },
   });
 
-  const handleSubmit = async (values: LoginFormValues) => {
-    setIsLoading(true);
+  const handleSubmit = async (values: typeof form.values) => {
+    setLoading(true);
     setError(null);
 
     try {
@@ -51,65 +58,130 @@ export default function LoginPage() {
         throw new Error('Session not created');
       }
       
-      notifications.show({
-        title: 'Success',
-        message: 'Logged in successfully',
-        color: 'blue',
-      });
-      
       // Use window.location instead of router.push to ensure full page reload
       window.location.href = '/dashboard';
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to login';
-      setError(errorMessage);
-      notifications.show({
-        title: 'Error',
-        message: errorMessage,
-        color: 'red',
-      });
+    } catch (err: any) {
+      // Extract error message from various possible response structures
+      let errorMsg = '';
+      
+      if (err.response?.data?.error?.message) {
+        errorMsg = err.response.data.error.message;
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      } else if (err.message) {
+        errorMsg = err.message;
+      } else {
+        errorMsg = 'Failed to login. Please check your credentials.';
+      }
+
+      setError(errorMsg);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
+  const handleGoogleLogin = () => {
+    // Redirect to backend Google OAuth endpoint
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/auth/google`;
+  };
+
   return (
-    <Paper p="xl" radius="md" withBorder style={{ width: '100%' }}>
-      <Title order={2} mb="md" ta="center">
-        School Management System
-      </Title>
-      <Text c="dimmed" size="sm" ta="center" mb="xl">
-        Sign in to your account
-      </Text>
+    <form onSubmit={form.onSubmit(handleSubmit)}>
+      <Stack gap="lg">
+        <Box>
+          <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
+            Sign In
+          </Title>
+          <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
+            Sign in to your account to continue
+          </Text>
+        </Box>
 
-      {error && (
-        <Alert color="red" mb="md">
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert
+            icon={<IconAlertCircle size={16} />}
+            style={{
+              backgroundColor: `${errorColor}15`,
+              borderColor: errorColor,
+              color: errorColor,
+            }}
+            variant="light"
+            radius="md"
+          >
+            {error}
+          </Alert>
+        )}
 
-      <form onSubmit={form.onSubmit(handleSubmit)}>
         <TextInput
           label="Email"
           placeholder="your@email.com"
           required
-          mb="md"
+          leftSection={<IconMail size={18} />}
+          size="lg"
+          radius="md"
+          autoComplete="email"
+          disabled={loading}
           {...form.getInputProps('email')}
         />
 
         <PasswordInput
           label="Password"
-          placeholder="Your password"
+          placeholder="Enter your password"
           required
-          mb="xl"
+          leftSection={<IconLock size={18} />}
+          size="lg"
+          radius="md"
+          autoComplete="current-password"
+          disabled={loading}
           {...form.getInputProps('password')}
         />
 
-        <Button type="submit" fullWidth loading={isLoading}>
-          Sign in
+        <Anchor
+          href="/forgot-password"
+          size="sm"
+          style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}
+        >
+          Forgot password?
+        </Anchor>
+
+        <Button
+          type="submit"
+          fullWidth
+          loading={loading}
+          size="lg"
+          radius="md"
+          style={{
+            backgroundColor: DEFAULT_THEME_COLOR,
+            color: 'white',
+          }}
+        >
+          Sign In
         </Button>
-      </form>
-    </Paper>
+
+        <Divider label="OR" labelPosition="center" />
+
+        <Button
+          variant="outline"
+          fullWidth
+          leftSection={<IconBrandGoogle size={16} />}
+          onClick={handleGoogleLogin}
+          size="lg"
+          radius="md"
+          style={{
+            borderColor: DEFAULT_THEME_COLOR,
+            color: DEFAULT_THEME_COLOR,
+          }}
+        >
+          Sign in with Google
+        </Button>
+
+        <Text ta="center" size="sm" style={{ color: themeColors.colorTextMedium }}>
+          Don't have an account?{' '}
+          <Anchor href="/signup" size="sm" style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}>
+            Sign up
+          </Anchor>
+        </Text>
+      </Stack>
+    </form>
   );
 }
-

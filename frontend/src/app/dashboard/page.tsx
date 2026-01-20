@@ -1,15 +1,13 @@
-'use client';
-
-import { Stack, Title, Text } from '@mantine/core';
+import { Container, Title, Text } from '@mantine/core';
 
 export default function DashboardPage() {
   return (
-    <Stack gap="md">
-      <Title order={1}>
+    <Container size="lg" py="xl">
+      <Title order={1} mb="md">
         Dashboard
       </Title>
       <Text c="dimmed">Dashboard coming soon</Text>
-    </Stack>
+    </Container>
   );
 }
 

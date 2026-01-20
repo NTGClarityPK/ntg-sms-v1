@@ -358,7 +358,7 @@ export function generateThemeConfig(
         bold: 700,
       },
       // Header text colors
-      pageHeaderColor: themeColors.primaryDark, // Page headers (Title)
+      pageHeaderColor: themeColors.colorTextDark, // Page headers (Title)
       navbarSectionHeaderColor: themeColors.colorTextDark, // Navbar section headers
       pageSectionHeaderColor: themeColors.colorTextLight, // Page section headers
       // Title font sizes (based on order prop)

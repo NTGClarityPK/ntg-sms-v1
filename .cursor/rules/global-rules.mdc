@@ -52,6 +52,8 @@ alwaysApply: true
 - Do NOT hardcode colors, fonts, or font sizes - ALWAYS use centralized theme system
 - Do NOT create custom CSS files for component styling - use theme config instead
 
+* BEFORE BUILDING ANY FRONTEND COMPONENT, REFER TO UI_UX_Design.md file in project root so out buttons and tables are design re das per the file instructions.
+
 ## Response Style
 - Provide concise, direct answers
 - Avoid verbose code - prefer clean and readable
