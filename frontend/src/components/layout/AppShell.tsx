@@ -21,7 +21,7 @@ export function AppShell({ children }: AppShellProps) {
         breakpoint: 'sm',
         collapsed: { mobile: !opened },
       }}
-      padding="md"
+      padding={0}
     >
       <MantineAppShell.Header>
         <Group h="100%" px="md">

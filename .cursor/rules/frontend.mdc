@@ -19,6 +19,237 @@ alwaysApply: false
 - CSS Modules ONLY when Mantine styling is insufficient
 - NEVER use: Tailwind classes, inline styles for static values, vanilla CSS files
 
+## Centralized Theme System - MANDATORY
+
+**CRITICAL**: All styling MUST use the centralized theme system. This is the SINGLE SOURCE OF TRUTH for all colors, fonts, and spacing.
+
+### Theme Configuration Location
+- Theme config: `frontend/src/lib/theme/themeConfig.ts`
+- Theme colors: `frontend/src/lib/utils/themeColors.ts`
+- Theme hooks: `frontend/src/lib/hooks/use-theme.ts`, `use-theme-color.ts`
+- Theme store: `frontend/src/lib/store/theme-store.ts`
+
+### Color Rules - STRICTLY ENFORCED
+- **NEVER hardcode colors** - All colors MUST come from `themeConfig`
+- **NEVER use** hex codes, rgb(), or color names directly in components
+- **ALWAYS use** theme config colors via:
+  - `themeConfig.components.{componentName}.{property}` (when accessing config)
+  - CSS variables set by `DynamicThemeProvider` (automatically applied)
+  - Theme hooks: `useThemeColor()` for primary color
+- **Component colors**: Each component has its own color config:
+  - `navbar.*` - Navigation sidebar colors
+  - `header.*` - Top header colors
+  - `button.*` - Button colors (includes actionIcon, headerButton, navButton)
+  - `table.*` - Table colors
+  - `input.*` - Input field colors
+  - `tabs.*` - Tab colors
+  - `card.*` - Card colors
+  - `badge.*` - Badge colors
+  - `filterChip.*` - Filter chip colors
+  - `switch.*`, `radio.*` - Form control colors
+  - `avatar.*` - Avatar colors
+
+### Typography Rules - STRICTLY ENFORCED
+- **Font Families**: 
+  - Primary: `var(--font-primary)` (Saira) - for body text, buttons, inputs
+  - Heading: `var(--font-heading)` (Rajdhani) - for titles and headings
+  - Mono: `var(--font-mono)` (JetBrains Mono) - for code
+  - **NEVER hardcode font names** - always use CSS variables or theme config
+- **Font Sizes**: Use theme config sizes:
+  - `xs: 0.75rem` (12px)
+  - `sm: 0.875rem` (14px)
+  - `md: 1rem` (16px)
+  - `lg: 1.125rem` (18px)
+  - `xl: 1.25rem` (20px)
+- **Title Sizes**: Use `Title` component with `order` prop:
+  - `order={1}` → h1: 2rem (32px) - Page titles
+  - `order={2}` → h2: 1.5rem (24px) - Section titles
+  - `order={3}` → h3: 1.25rem (20px) - Subsection titles
+  - `order={4}` → h4: 1.125rem (18px) - Minor section titles
+- **Font Weights**: Use theme config weights:
+  - `regular: 400`
+  - `medium: 500`
+  - `semibold: 600`
+  - `bold: 700`
+- **Text Colors**: Use theme config colors:
+  - `pageHeaderColor` - Page headers (Title components)
+  - `navbarSectionHeaderColor` - Navbar section headers
+  - `pageSectionHeaderColor` - Page section headers
+  - `text`, `textSecondary`, `textMuted` - Body text colors
+
+### Component Styling Patterns
+
+#### Buttons
+```tsx
+// ✅ CORRECT - Uses theme automatically via DynamicThemeProvider
+<Button>Click me</Button>
+
+// ✅ CORRECT - Variant uses theme colors
+<Button variant="light" color={primaryColor}>Click me</Button>
+
+// ❌ WRONG - Hardcoded color
+<Button style={{ backgroundColor: '#007bff' }}>Click me</Button>
+```
+
+#### Cards
+```tsx
+// ✅ CORRECT - Uses theme automatically
+<Card shadow={null} withBorder>
+  <Card.Section>...</Card.Section>
+  <Text>Content</Text>
+</Card>
+
+// ❌ WRONG - Hardcoded shadow or border
+<Card shadow="md" style={{ borderColor: '#ccc' }}>...</Card>
+```
+
+#### Tables
+```tsx
+// ✅ CORRECT - Uses theme automatically
+<Paper p="md" withBorder>
+  <Table>
+    <Table.Thead>...</Table.Thead>
+    <Table.Tbody>...</Table.Tbody>
+  </Table>
+</Paper>
+```
+
+#### Badges
+```tsx
+// ✅ CORRECT - Always use variant="light" for theme-aware styling
+<Badge variant="light" color={statusColor}>
+  {statusText}
+</Badge>
+
+// ❌ WRONG - Hardcoded colors
+<Badge style={{ backgroundColor: '#green' }}>Active</Badge>
+```
+
+#### Inputs
+```tsx
+// ✅ CORRECT - Uses theme automatically
+<TextInput
+  label="Name"
+  placeholder="Enter name"
+  {...form.getInputProps('name')}
+/>
+
+// ❌ WRONG - Hardcoded styles
+<TextInput style={{ backgroundColor: '#fff', color: '#000' }} />
+```
+
+#### Tabs
+```tsx
+// ✅ CORRECT - Uses theme automatically
+<Tabs value={activeTab} onChange={setActiveTab}>
+  <Tabs.List>
+    <Tabs.Tab value="tab1">Tab 1</Tabs.Tab>
+  </Tabs.List>
+  <Tabs.Panel value="tab1" pt="md" px="md" pb="md">
+    Content
+  </Tabs.Panel>
+</Tabs>
+```
+
+### Spacing Rules
+- **ALWAYS use Mantine spacing tokens**: `xs`, `sm`, `md`, `lg`, `xl`
+- **NEVER use** pixel values or rem values directly
+- Use props: `p="md"`, `m="sm"`, `px="lg"`, `py="xs"`, `gap="md"`
+- **Border Radius**: Use theme config `borderRadius: 'md'` (default)
+
+### Page Layout Structure
+Every page MUST follow this structure:
+```tsx
+<>
+  {/* Title Bar - Fixed at top */}
+  <div className="page-title-bar">
+    <Title order={1}>Page Title</Title>
+    <Group>
+      <Button>Action</Button>
+    </Group>
+  </div>
+  
+  {/* Optional Subtitle Bar */}
+  <div className="page-sub-title-bar">
+    {/* Filters, secondary navigation */}
+  </div>
+  
+  {/* Content Area - Has automatic padding and margin-top */}
+  <div style={{
+    marginTop: '60px',
+    paddingLeft: 'var(--mantine-spacing-md)',
+    paddingRight: 'var(--mantine-spacing-md)',
+    paddingTop: 'var(--mantine-spacing-sm)',
+    paddingBottom: 'var(--mantine-spacing-xl)',
+  }}>
+    {/* Page content */}
+  </div>
+</>
+```
+
+### Theme Hooks Usage
+```tsx
+// ✅ CORRECT - Get primary color from theme
+import { useThemeColor } from '@/lib/hooks/use-theme-color';
+import { useTheme } from '@/lib/hooks/use-theme';
+
+const primaryColor = useThemeColor();
+const { isDark, toggleTheme } = useTheme();
+
+// ✅ CORRECT - Access theme config from Mantine theme
+import { useMantineTheme } from '@mantine/core';
+import type { ThemeConfig } from '@/lib/theme/themeConfig';
+
+const theme = useMantineTheme();
+const themeConfig = (theme.other as any) as ThemeConfig | undefined;
+```
+
+### What NOT To Do - CRITICAL VIOLATIONS
+- ❌ **NEVER** hardcode colors: `#ff0000`, `rgb(255, 0, 0)`, `'red'`
+- ❌ **NEVER** hardcode font names: `'Arial'`, `'Helvetica'`
+- ❌ **NEVER** hardcode font sizes: `'14px'`, `'1.2rem'`
+- ❌ **NEVER** use inline styles for static values: `style={{ color: '#000' }}`
+- ❌ **NEVER** create custom CSS files for component styling
+- ❌ **NEVER** use Tailwind classes
+- ❌ **NEVER** override Mantine component styles with custom CSS unless absolutely necessary
+- ❌ **NEVER** use `!important` in custom styles (theme system handles this)
+
+### What TO Do - REQUIRED PATTERNS
+- ✅ **ALWAYS** use theme config colors via `DynamicThemeProvider` (automatic)
+- ✅ **ALWAYS** use Mantine components (they automatically use theme)
+- ✅ **ALWAYS** use Mantine spacing props: `p="md"`, `gap="sm"`, etc.
+- ✅ **ALWAYS** use `Title` component with `order` prop for headings
+- ✅ **ALWAYS** use `Badge` with `variant="light"` for status indicators
+- ✅ **ALWAYS** use `Card` with `shadow={null}` and `withBorder`
+- ✅ **ALWAYS** wrap tables in `Paper` with `withBorder`
+- ✅ **ALWAYS** follow page layout structure with title bar and content area
+
+### Theme System Architecture
+- **DynamicThemeProvider**: Applies theme via CSS variables, CSS injection, and DOM manipulation
+- **Theme Config**: Single source of truth in `themeConfig.ts`
+- **Theme Store**: Zustand store for primary color and theme version
+- **Theme Hooks**: React hooks for accessing theme values
+- **Mantine Theme**: Created via `createDynamicTheme()` and passed to `MantineProvider`
+
+### Changing Theme Values
+To change any theme value:
+1. Edit `frontend/src/lib/theme/themeConfig.ts`
+2. Modify the `generateThemeConfig()` function
+3. Changes apply globally automatically
+4. **NEVER** modify component styles directly - always update theme config
+
+### Verification Checklist
+Before submitting any feature, verify:
+- [ ] No hardcoded colors in components
+- [ ] No hardcoded font names or sizes
+- [ ] All components use Mantine spacing props
+- [ ] All badges use `variant="light"`
+- [ ] All cards use `shadow={null}` and `withBorder`
+- [ ] Page follows title bar + content area structure
+- [ ] All text uses theme typography settings
+- [ ] No inline styles for static values
+- [ ] No custom CSS files created
+
 ## Component Patterns
 - Server Components by default (no directive needed)
 - Add `'use client'` ONLY when using hooks, state, or event handlers

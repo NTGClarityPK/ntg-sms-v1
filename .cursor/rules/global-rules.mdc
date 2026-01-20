@@ -9,6 +9,7 @@ alwaysApply: true
 ## Tech Stack (Non-Negotiable)
 - **Frontend**: Next.js 14+ with App Router
 - **Styling**: Mantine UI v7+ ONLY (NO Tailwind, NO vanilla CSS, NO inline styles for static values)
+- **Theme System**: Centralized theme system - ALL colors, fonts, and spacing MUST come from `themeConfig.ts` (see frontend.mdc for detailed rules)
 - **Backend**: NestJS with TypeScript
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: Supabase Auth
@@ -24,7 +25,7 @@ alwaysApply: true
 
 ## Before Implementing ANY Feature
 1. Read `@overallcontext.md` for project scope and completed features
-2. Check `@docs/contracts.md` for API specifications
+2. Check `@contracts.md` for API specifications
 3. Review `@mistakes.md` for patterns to avoid
 4. Look for similar existing implementations to follow patterns
 
@@ -48,6 +49,8 @@ alwaysApply: true
 - Do NOT use deprecated APIs - always use current versions - see current system date
 - Do NOT skip error handling
 - Do NOT use Tailwind classes anywhere
+- Do NOT hardcode colors, fonts, or font sizes - ALWAYS use centralized theme system
+- Do NOT create custom CSS files for component styling - use theme config instead
 
 ## Response Style
 - Provide concise, direct answers
