@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
   { label: 'Students', href: '/dashboard/students', icon: IconUsers },
   { label: 'Attendance', href: '/dashboard/attendance', icon: IconCalendar },
   { label: 'Reports', href: '/dashboard/reports', icon: IconChartBar },
-  { label: 'Settings', href: '/dashboard/settings', icon: IconSettings },
+  { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 
 export function Sidebar() {

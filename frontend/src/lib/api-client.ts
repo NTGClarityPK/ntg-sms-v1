@@ -40,10 +40,21 @@ class ApiClient {
       (response) => response,
       async (error: AxiosError<ApiResponse<unknown>>) => {
         if (error.response?.status === 401) {
-          // Unauthorized - redirect to login
+          // Unauthorized:
+          // - If we *don't* have a Supabase session, force logout + redirect to login.
+          // - If we *do* have a session, do NOT auto-logout (prevents redirect loops during startup/race conditions).
           if (typeof window !== 'undefined') {
-            await supabase.auth.signOut();
-            window.location.href = '/login';
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+
+            const hasSession = Boolean(session?.access_token);
+            if (!hasSession) {
+              await supabase.auth.signOut();
+              if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+              }
+            }
           }
         }
 

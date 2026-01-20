@@ -5,24 +5,15 @@ import {
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-
-interface JwtPayload {
-  sub: string;
-  email: string;
-  role?: string;
-  [key: string]: unknown;
-}
+import { SupabaseConfig } from '../config/supabase.config';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
   constructor(
-    private jwtService: JwtService,
-    private configService: ConfigService,
+    private readonly supabaseConfig: SupabaseConfig,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -34,20 +25,24 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const jwtSecret = this.configService.get<string>('SUPABASE_JWT_SECRET');
-      if (!jwtSecret) {
-        throw new Error('SUPABASE_JWT_SECRET not configured');
+      const supabase = this.supabaseConfig.getClient();
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser(token);
+
+      if (error || !user) {
+        throw new UnauthorizedException('Invalid or expired token');
       }
 
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
-        secret: jwtSecret,
-      });
+      const email = user.email ?? '';
+      const roleFromClaims = typeof user.role === 'string' ? user.role : undefined;
 
       // Attach user info to request
       request['user'] = {
-        id: payload.sub,
-        email: payload.email,
-        roles: payload.role ? [payload.role] : [],
+        id: user.id,
+        email,
+        roles: roleFromClaims ? [roleFromClaims] : [],
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

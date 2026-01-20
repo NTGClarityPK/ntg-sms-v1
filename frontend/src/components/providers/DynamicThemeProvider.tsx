@@ -288,15 +288,46 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       
       /* Add top margin to main content to account for title bar */
       .mantine-AppShell-main {
-        padding-top: calc(60px + var(--mantine-spacing-md)) !important;
-        padding-left: var(--mantine-spacing-sm) !important;
+        /* Header (60px) + Title bar (60px) + spacing */
+        padding-top: calc(120px + var(--mantine-spacing-md)) !important;
+        /* Match title-bar offset so page content starts after sidebar */
+        padding-left: calc(300px + var(--mantine-spacing-sm)) !important;
         padding-right: var(--mantine-spacing-sm) !important;
         padding-bottom: var(--mantine-spacing-xl) !important;
+      }
+
+      /* Collapsed navbar (desktop) */
+      @media (min-width: 768px) {
+        body[data-navbar-collapsed="true"] .mantine-AppShell-main {
+          padding-left: calc(85px + var(--mantine-spacing-sm)) !important;
+        }
+      }
+
+      /* Mobile: navbar overlays, so content should start at left edge */
+      @media (max-width: 767px) {
+        .mantine-AppShell-main {
+          padding-left: var(--mantine-spacing-sm) !important;
+          padding-right: var(--mantine-spacing-sm) !important;
+        }
+      }
+
+      /* RTL: mirror padding to the right side */
+      html[dir="rtl"] .mantine-AppShell-main,
+      [dir="rtl"] .mantine-AppShell-main {
+        padding-left: var(--mantine-spacing-sm) !important;
+        padding-right: calc(300px + var(--mantine-spacing-sm)) !important;
+      }
+
+      @media (min-width: 768px) {
+        html[dir="rtl"] body[data-navbar-collapsed="true"] .mantine-AppShell-main,
+        [dir="rtl"] body[data-navbar-collapsed="true"] .mantine-AppShell-main {
+          padding-right: calc(85px + var(--mantine-spacing-sm)) !important;
+        }
       }
       
       /* Reduce margin-top for content div after title bar */
       .page-title-bar ~ div:not(.page-sub-title-bar) {
-        margin-top: 30px !important;
+        margin-top: 0 !important;
       }
       
       /* Remove padding from tabs component to align with title bar text */

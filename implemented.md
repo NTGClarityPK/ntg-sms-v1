@@ -230,6 +230,54 @@
 
 ---
 
+#### Phase 0.5: Centralized Theme System & UI Consistency ✅
+
+**Centralized Theme System (Mantine v7)**
+- ✅ Added centralized theme configuration (single source of truth):
+  - `frontend/src/lib/theme/themeConfig.ts` (`ThemeConfig`, `generateThemeConfig`)
+  - `frontend/src/lib/utils/themeColors.ts` (`generateThemeColors`, color utilities)
+  - `frontend/src/lib/utils/createDynamicTheme.ts` (`createDynamicTheme` → Mantine theme override)
+- ✅ Added theme state + hooks:
+  - `frontend/src/lib/store/theme-store.ts` (Zustand store for primary color + version)
+  - `frontend/src/lib/hooks/use-theme.ts` (light/dark mode hook)
+  - `frontend/src/lib/hooks/use-theme-color.ts` (primary color hook)
+  - `frontend/src/lib/hooks/use-theme-colors.ts` (theme-derived status colors: success/error/info/warning)
+  - `frontend/src/lib/utils/theme.ts` (theme helpers + `DEFAULT_THEME_COLOR`)
+- ✅ Added `DynamicThemeProvider`:
+  - `frontend/src/components/providers/DynamicThemeProvider.tsx`
+  - Applies theme via CSS variables + CSS injection for consistent component styling (AppShell, Buttons, Inputs, Tables, Tabs, Titles)
+- ✅ Integrated theme system into app providers:
+  - `frontend/src/app/providers.tsx` now builds Mantine theme via `createDynamicTheme()` and wraps app with `DynamicThemeProvider`
+
+**Fonts (Consistent with RMS reference)**
+- ✅ Updated root layout to load and apply fonts via Next.js `next/font/google`:
+  - Primary: Saira (`--font-primary`)
+  - Heading: Rajdhani (`--font-heading`)
+  - Mono: JetBrains Mono (`--font-mono`)
+  - Implemented in `frontend/src/app/layout.tsx`
+
+**Auth UI (RMS-style)**
+- ✅ Updated auth layout to RMS-style split gradient layout and card container:
+  - `frontend/src/app/(auth)/layout.tsx`
+- ✅ Updated login page UI to RMS-style (icons, spacing, alert styling, buttons/links):
+  - `frontend/src/app/(auth)/login/page.tsx`
+- ✅ Added placeholder language selector for auth UI header:
+  - `frontend/src/components/layout/LanguageSelector.tsx`
+
+**Dashboard Page Consistency / Layout Adjustments**
+- ✅ Fixed dashboard page title/description visibility by keeping page layout consistent with other dashboard pages:
+  - `frontend/src/app/dashboard/page.tsx`
+- ✅ Adjusted AppShell and main content padding alignment so content starts cleanly after sidebar:
+  - `frontend/src/components/layout/AppShell.tsx`
+  - `frontend/src/components/providers/DynamicThemeProvider.tsx`
+
+**Rules / Guardrails**
+- ✅ Added strict rules enforcing centralized theme usage for all future UI:
+  - `.cursor/rules/frontend.mdc` (detailed UI/theming rules)
+  - `.cursor/rules/global-rules.mdc` (global reminder: no hardcoded colors/fonts, no custom CSS files)
+
+---
+
 ### Additional Fixes & Improvements
 
 #### Next.js Middleware for Supabase SSR ✅
@@ -572,6 +620,7 @@ npm run dev
 - **API Client**: `frontend/src/lib/api-client.ts`
 - **Auth Guard**: `frontend/src/components/common/AuthGuard.tsx`
 - **Dashboard Layout**: `frontend/src/app/dashboard/layout.tsx`
+- **Theme System**: `frontend/src/lib/theme/themeConfig.ts`, `frontend/src/components/providers/DynamicThemeProvider.tsx`
 
 ---
 
