@@ -1,0 +1,55 @@
+---
+description: Global project rules for School Management System - applies to all files and contexts
+globs: 
+alwaysApply: true
+---
+
+# School Management System - Global Rules
+
+## Tech Stack (Non-Negotiable)
+- **Frontend**: Next.js 14+ with App Router
+- **Styling**: Mantine UI v7+ ONLY (NO Tailwind, NO vanilla CSS, NO inline styles for static values)
+- **Backend**: NestJS with TypeScript
+- **Database**: Supabase (PostgreSQL)
+- **Auth**: Supabase Auth
+- **Data Fetching**: React Query (TanStack Query)
+- **Validation**: Zod (frontend), class-validator (backend)
+
+## Architecture Rules
+- Frontend calls NestJS backend API, NEVER Supabase directly (except auth)
+- All API responses follow format: `{ data, meta, error }`
+- Use TypeScript strict mode - no `any` types allowed
+- One component per file, co-locate related files
+- Feature-based folder organization in both frontend and backend
+
+## Before Implementing ANY Feature
+1. Read `@overallcontext.md` for project scope and completed features
+2. Check `@docs/contracts.md` for API specifications
+3. Review `@mistakes.md` for patterns to avoid
+4. Look for similar existing implementations to follow patterns
+
+## Supabase MCP Connection
+* Remember you are always connected via MCP with Supabase
+* Via this MCP, do all the table and schema creation through cursor unless specifed otherwise
+
+## Code Quality Standards
+- Meaningful variable/function names
+- JSDoc comments for public functions
+- Handle all error states explicitly
+- No console.log in production code (use proper logging)
+- No hardcoded values - use environment variables or constants
+- Build less than 200 lines at a time
+- any function should NOT be that much lengthy which is difficult to review later
+
+## What NOT To Do
+- Do NOT add features not explicitly requested
+- Do NOT remove existing functionality without asking
+- Do NOT modify files not mentioned in the task
+- Do NOT use deprecated APIs - always use current versions - see current system date
+- Do NOT skip error handling
+- Do NOT use Tailwind classes anywhere
+
+## Response Style
+- Provide concise, direct answers
+- Avoid verbose code - prefer clean and readable
+- When unsure, ask for clarification instead of guessing

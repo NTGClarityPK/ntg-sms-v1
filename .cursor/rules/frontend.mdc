@@ -1,0 +1,133 @@
+---
+description: Frontend rules for Next.js and Mantine UI development - triggered when working on frontend files
+globs:
+  - "frontend/**/*"
+  - "src/app/**/*"
+  - "src/components/**/*"
+  - "src/hooks/**/*"
+  - "src/lib/**/*"
+  - "src/types/**/*"
+alwaysApply: false
+---
+
+# Frontend Development Rules (Next.js + Mantine UI)
+
+## Mantine UI - MANDATORY
+- Use ONLY Mantine components for all UI (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/notifications`)
+- Use Mantine's spacing props (p, m, px, py, mx, my) with values: xs, sm, md, lg, xl
+- Use Mantine's color scheme (blue, gray, red, green, etc.) - no custom colors unless in theme
+- CSS Modules ONLY when Mantine styling is insufficient
+- NEVER use: Tailwind classes, inline styles for static values, vanilla CSS files
+
+## Component Patterns
+- Server Components by default (no directive needed)
+- Add `'use client'` ONLY when using hooks, state, or event handlers
+- Keep client components as small as possible
+- Props interface defined above component
+- Export named functions, not default exports
+
+## File Structure
+```
+src/
+├── app/                    # App router pages
+│   └── (dashboard)/        # Layout groups
+├── components/
+│   ├── common/             # Button, Input, Modal wrappers
+│   ├── layout/             # Shell, Navbar, Sidebar
+│   └── features/           # Feature-specific components
+│       └── [feature]/
+├── hooks/                  # React Query hooks
+│   └── use[Feature].ts
+├── lib/
+│   ├── api/                # API client (axios instance)
+│   └── supabase/           # Supabase client (auth only)
+└── types/                  # TypeScript interfaces
+    └── [feature].ts
+```
+
+## Data Fetching (React Query)
+- Create custom hooks in `/hooks` for each data domain
+- Use `useQuery` for GET operations
+- Use `useMutation` for POST/PUT/DELETE operations
+- Always handle: loading, error, empty, and success states
+- Invalidate queries after mutations
+
+## State Management
+- **Zustand** for global/shared state (auth, theme, language, etc.)
+- **React useState** for local component state
+- **Custom hooks** (usePagination, useSettings, etc.) for reusable state logic
+- **Manual API state management** with useState + useEffect + useCallback (no React Query)
+- **Mantine's useDisclosure** can be used for modals/drawers, but useState pattern is also acceptable
+- **No Redux** - use Zustand instead
+- **No useReducer** - not used in this project
+
+
+## Form Handling
+- Use `@mantine/form` with useForm hook
+- Define validation inline or with Zod schema
+- Show field-level errors
+- Disable submit button while loading
+- Show success/error notifications after submission
+
+## Error & Loading States
+Every data-fetching component MUST handle:
+- Loading: Show Skeleton or Loader
+- Error: Show Alert with retry option
+- Empty: Show empty state message
+- Success: Show data
+
+## Notifications
+- Use `@mantine/notifications` for all user feedback
+- Do NOT use hardcoded colors such as Success: green, Error: red, Info: blue, Warning: yellow; Use   Theme Colors instead.
+- Keep messages concise and simple
+
+## Accessibility
+- Use semantic Mantine components
+- Add aria-labels where needed
+- Ensure keyboard navigation works
+- Maintain color contrast
+
+## Types
+- Define interfaces in `/types/[feature].ts`
+- Types MUST match backend DTOs exactly
+- Export all types from barrel file (index.ts)
+- Use strict typing - no `any`
+
+
+## Translation Management (Arabic)
+
+All user-facing text must be extracted and translated to Arabic.
+
+### Translation File
+`frontend/src/locales/strings.json`
+
+### During Development
+1. Extract all display text to strings.json
+2. Use English values while building
+3. Use key references in components, never hardcoded text
+
+### After Feature Complete
+Before marking feature done, run translation pass:
+1. Collect all new English strings added
+2. Translate each to Arabic
+3. Update strings.json with Arabic values
+
+### File Format
+```json
+{
+  "users.title": {
+    "en": "User Management",
+    "ar": "إدارة المستخدمين"
+  },
+  "users.addNew": {
+    "en": "Add New User", 
+    "ar": "إضافة مستخدم جديد"
+  }
+}
+```
+
+### Naming Convention
+- `[feature].[element]` - Feature specific
+- `common.[element]` - Shared across app
+- `[feature].form.[field]` - Form labels
+- `[feature].error.[type]` - Error messages
