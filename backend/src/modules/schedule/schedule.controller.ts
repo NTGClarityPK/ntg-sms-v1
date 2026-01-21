@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ScheduleService } from './schedule.service';
 import { UpdateSchoolDaysDto } from './dto/update-school-days.dto';
@@ -13,7 +14,7 @@ import { VacationDto } from './dto/vacation.dto';
 import { CreateVacationDto } from './dto/create-vacation.dto';
 import { UpdateVacationDto } from './dto/update-vacation.dto';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1')
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CoreLookupsService } from './core-lookups.service';
 import { QueryClassesDto } from './dto/query-classes.dto';
@@ -6,7 +7,7 @@ import { CreateClassDto } from './dto/create-class.dto';
 import { ClassDto } from './dto/class.dto';
 
 @Controller('api/v1/classes')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, BranchGuard)
 export class ClassesController {
   constructor(private readonly coreLookupsService: CoreLookupsService) {}
 

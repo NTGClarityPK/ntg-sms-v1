@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AssessmentService } from './assessment.service';
 import { QueryAssessmentTypesDto } from './dto/query-assessment-types.dto';
@@ -9,7 +10,7 @@ import { CreateGradeTemplateDto } from './dto/create-grade-template.dto';
 import { AssignGradeTemplateDto } from './dto/assign-grade-template.dto';
 import { ClassGradeAssignmentDto } from './dto/class-grade-assignment.dto';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1')
 export class AssessmentController {
   constructor(private readonly assessmentService: AssessmentService) {}

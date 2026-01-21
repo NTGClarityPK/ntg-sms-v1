@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CoreLookupsService } from './core-lookups.service';
 import { QueryLevelsDto } from './dto/query-levels.dto';
@@ -6,7 +7,7 @@ import { CreateLevelDto } from './dto/create-level.dto';
 import { LevelDto } from './dto/level.dto';
 
 @Controller('api/v1/levels')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, BranchGuard)
 export class LevelsController {
   constructor(private readonly coreLookupsService: CoreLookupsService) {}
 

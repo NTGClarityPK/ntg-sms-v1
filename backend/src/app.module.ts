@@ -12,6 +12,7 @@ import { CoreLookupsModule } from './modules/core-lookups/core-lookups.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { AssessmentModule } from './modules/assessment/assessment.module';
 import { SystemSettingsModule } from './modules/system-settings/system-settings.module';
+import { BranchesModule } from './modules/branches/branches.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SystemSettingsModule } from './modules/system-settings/system-settings.
     ScheduleModule,
     AssessmentModule,
     SystemSettingsModule,
+    BranchesModule,
   ],
   controllers: [AppController],
   providers: [

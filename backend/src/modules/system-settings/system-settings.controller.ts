@@ -1,10 +1,11 @@
 import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
+import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SystemSettingsService } from './system-settings.service';
 import { SystemSettingDto } from './dto/system-setting.dto';
 import { UpdateSystemSettingDto } from './dto/update-system-setting.dto';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/settings')
 export class SystemSettingsController {
   constructor(private readonly systemSettingsService: SystemSettingsService) {}
