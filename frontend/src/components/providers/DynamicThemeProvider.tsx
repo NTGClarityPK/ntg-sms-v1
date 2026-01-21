@@ -155,6 +155,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         background-color: ${config.components.header.backgroundColor} !important;
         border-bottom-color: ${config.components.header.borderColor} !important;
         color: ${config.components.header.textColor} !important;
+        border-bottom-left-radius: 12px !important; /* Outer rounded corner where header meets navbar */
+        overflow: hidden !important; /* Ensure rounded corner is visible */
       }
       
       /* Page Title Bar */

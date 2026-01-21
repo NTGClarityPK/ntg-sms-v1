@@ -9,6 +9,9 @@ import { AssignClassesDto } from './dto/assign-classes.dto';
 import { CreatePublicHolidayDto } from './dto/create-public-holiday.dto';
 import { UpdatePublicHolidayDto } from './dto/update-public-holiday.dto';
 import { PublicHolidayDto } from './dto/public-holiday.dto';
+import { VacationDto } from './dto/vacation.dto';
+import { CreateVacationDto } from './dto/create-vacation.dto';
+import { UpdateVacationDto } from './dto/update-vacation.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1')
@@ -66,6 +69,28 @@ export class ScheduleController {
   @Delete('public-holidays/:id')
   async deleteHoliday(@Param('id') id: string): Promise<{ data: { id: string } }> {
     return this.scheduleService.deletePublicHoliday(id);
+  }
+
+  @Get('vacations')
+  async listVacations(@Query('academicYearId') academicYearId: string): Promise<{ data: VacationDto[] }> {
+    return this.scheduleService.listVacations(academicYearId);
+  }
+
+  @Post('vacations')
+  async createVacation(@Body() body: CreateVacationDto): Promise<{ data: VacationDto }> {
+    const created = await this.scheduleService.createVacation(body);
+    return { data: created };
+  }
+
+  @Put('vacations/:id')
+  async updateVacation(@Param('id') id: string, @Body() body: UpdateVacationDto): Promise<{ data: VacationDto }> {
+    const updated = await this.scheduleService.updateVacation(id, body);
+    return { data: updated };
+  }
+
+  @Delete('vacations/:id')
+  async deleteVacation(@Param('id') id: string): Promise<{ data: { id: string } }> {
+    return this.scheduleService.deleteVacation(id);
   }
 }
 

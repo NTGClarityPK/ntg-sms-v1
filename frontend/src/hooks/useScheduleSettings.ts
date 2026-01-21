@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import type { PublicHoliday, TimingTemplate } from '@/types/settings';
+import type { PublicHoliday, TimingTemplate, Vacation } from '@/types/settings';
 
 const scheduleKeys = {
   schoolDays: ['schedule', 'schoolDays'] as const,
   timingTemplates: ['schedule', 'timingTemplates'] as const,
   holidays: (academicYearId: string) => ['schedule', 'holidays', academicYearId] as const,
+  vacations: (academicYearId: string) => ['schedule', 'vacations', academicYearId] as const,
 };
 
 export function useSchoolDays() {
@@ -80,6 +81,59 @@ export function useCreatePublicHoliday() {
       apiClient.post<PublicHoliday>('/api/v1/public-holidays', payload),
     onSuccess: async (_res, vars) => {
       await qc.invalidateQueries({ queryKey: scheduleKeys.holidays(vars.academicYearId) });
+    },
+  });
+}
+
+export function useVacations(academicYearId?: string) {
+  return useQuery({
+    queryKey: academicYearId ? scheduleKeys.vacations(academicYearId) : ['schedule', 'vacations', 'none'],
+    enabled: Boolean(academicYearId),
+    queryFn: async () =>
+      apiClient.get<Vacation[]>('/api/v1/vacations', { params: { academicYearId } }),
+  });
+}
+
+export function useCreateVacation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      name: string;
+      nameAr?: string;
+      startDate: string;
+      endDate: string;
+      academicYearId: string;
+    }) => apiClient.post<Vacation>('/api/v1/vacations', payload),
+    onSuccess: async (_res, vars) => {
+      await qc.invalidateQueries({ queryKey: scheduleKeys.vacations(vars.academicYearId) });
+    },
+  });
+}
+
+export function useUpdateVacation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, academicYearId, ...payload }: { id: string; academicYearId: string } & Partial<{
+      name: string;
+      nameAr?: string;
+      startDate: string;
+      endDate: string;
+    }>) => apiClient.put<Vacation>(`/api/v1/vacations/${id}`, payload),
+    onSuccess: async (_res, vars) => {
+      await qc.invalidateQueries({
+        queryKey: scheduleKeys.vacations(vars.academicYearId),
+      });
+    },
+  });
+}
+
+export function useDeleteVacation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, academicYearId }: { id: string; academicYearId: string }) =>
+      apiClient.delete<{ id: string }>(`/api/v1/vacations/${id}`),
+    onSuccess: async (_res, vars) => {
+      await qc.invalidateQueries({ queryKey: scheduleKeys.vacations(vars.academicYearId) });
     },
   });
 }

@@ -661,3 +661,154 @@ npm run dev
 **Last Updated**: Current Session  
 **Status**: ✅ Prompt 0 Complete - Ready for Prompt 1
 
+---
+
+### Prompt 1: System Configuration & Settings ✅
+
+#### Phase 1.1: Academic Year Management ✅
+
+- **Database**
+  - `academic_years` table with fields: `id`, `name`, `start_date`, `end_date`, `is_active`, `is_locked`, timestamps.
+  - Unique partial index enforcing a single active academic year at a time.
+  - RLS enabled.
+- **Backend**
+  - `AcademicYearsModule` with `academic-years.controller.ts`, `academic-years.service.ts`, DTOs for list/create/query.
+  - Endpoints:
+    - `GET /api/v1/academic-years` (paginated list).
+    - `GET /api/v1/academic-years/active` (current active year).
+    - `POST /api/v1/academic-years` (create year).
+    - `PATCH /api/v1/academic-years/:id/activate` (set active).
+    - `PATCH /api/v1/academic-years/:id/lock` (lock year).
+- **Frontend**
+  - Page: `app/settings/academic-years/page.tsx`.
+  - Components:
+    - `AcademicYearCard` – card view with active/locked badges and actions.
+    - `AcademicYearForm` – create/edit modal with validation.
+  - Hook: `useAcademicYears.ts` (React Query CRUD and active year).
+
+#### Phase 1.2: Core Lookup Tables (Subjects, Classes, Sections, Levels) ✅
+
+- **Database**
+  - `subjects`, `classes`, `sections`, `levels`, `level_classes` tables with sort order and timestamps.
+  - RLS enabled on all lookup tables.
+- **Backend**
+  - `CoreLookupsModule` with:
+    - `subjects.controller.ts`, `classes.controller.ts`, `sections.controller.ts`, `levels.controller.ts`.
+    - `core-lookups.service.ts` with paginated list + create methods and nested level→classes resolution.
+    - DTOs for query, create, and response types.
+  - Endpoints:
+    - `GET /api/v1/subjects`, `POST /api/v1/subjects`.
+    - `GET /api/v1/classes`, `POST /api/v1/classes` (optional `levelId` filter).
+    - `GET /api/v1/sections`, `POST /api/v1/sections`.
+    - `GET /api/v1/levels`, `POST /api/v1/levels` (with class assignment).
+- **Frontend**
+  - Page: `app/settings/academic/page.tsx` – tabbed view for Subjects, Classes, Sections, Levels.
+  - Components:
+    - `SubjectList` – list/reorder subjects.
+    - `ClassList` – class cards with sort order.
+    - `SectionList` – simple list with sort order.
+    - `LevelManager` – levels with class chip assignments.
+  - Hook: `useCoreLookups.ts` – subjects/classes/sections/levels queries + create mutations.
+- **Seed Data**
+  - Classes 1–10 with increasing `sort_order`.
+  - Core Egyptian-style subjects (Arabic, Mathematics, English, Science, Social Studies, Religious Education, Computer Studies, Art, PE, French).
+  - Sections A, B, C.
+  - Levels: Primary, Middle, Secondary.
+  - `level_classes` mapping:
+    - Primary → Classes 1–6.
+    - Middle → Classes 7–9.
+    - Secondary → Class 10.
+
+#### Phase 1.3: Timing & Schedule Settings ✅
+
+- **Database**
+  - `school_days`, `timing_templates`, `class_timing_assignments`, `public_holidays` tables with timestamps and constraints.
+  - RLS enabled.
+- **Backend**
+  - `ScheduleModule` with `schedule.controller.ts`, `schedule.service.ts`, DTOs.
+  - Endpoints:
+    - `GET /api/v1/settings/school-days`, `PUT /api/v1/settings/school-days`.
+    - `GET /api/v1/timing-templates`, `POST /api/v1/timing-templates`.
+    - `PUT /api/v1/timing-templates/:id/assign-classes`.
+    - `GET /api/v1/public-holidays`, `POST /api/v1/public-holidays`, `PUT /api/v1/public-holidays/:id`, `DELETE /api/v1/public-holidays/:id`.
+- **Frontend**
+  - Page: `app/settings/schedule/page.tsx`.
+  - Components:
+    - `SchoolDaysSelector` – checkbox matrix for days of week with Save.
+    - `TimingTemplateForm` + `TimingTemplateCard` – create and view templates with assigned classes.
+    - `HolidayCalendar` – CRUD for public holidays inside active academic year.
+  - Hook: `useScheduleSettings.ts` – school days, timing templates, assignments, holidays.
+- **Seed Data**
+  - School days configured.
+  - Timing templates:
+    - Primary Morning Schedule (shorter day, 40-min periods).
+    - Middle Morning Schedule (45-min periods).
+    - Secondary Morning Schedule (50-min periods).
+  - Template→class mapping aligned with levels.
+  - Iraqi-oriented 2026 public holidays for the 2026–2027 academic year (national + Islamic holidays).
+
+#### Phase 1.4: Assessment Types & Grade Templates ✅
+
+- **Database**
+  - `assessment_types`, `grade_templates`, `grade_ranges`, `class_grade_assignments`, `leave_settings` tables.
+  - RLS enabled.
+- **Backend**
+  - `AssessmentModule` with `assessment.controller.ts`, `assessment.service.ts`, DTOs.
+  - Endpoints:
+    - `GET /api/v1/assessment-types`, `POST /api/v1/assessment-types`.
+    - `GET /api/v1/grade-templates`, `POST /api/v1/grade-templates`, `PUT /api/v1/grade-templates/:id`.
+    - `PUT /api/v1/grade-templates/:id/assign-classes` (per-class grade template + minimum passing grade).
+    - `GET /api/v1/grade-templates/assignments` (class→template mapping with names).
+    - `GET /api/v1/settings/leave-quota`, `PUT /api/v1/settings/leave-quota`.
+  - Grade range validation to prevent overlaps and ensure consistent letters.
+- **Frontend**
+  - Page: `app/settings/assessment/page.tsx` with tabs:
+    - Assessment types.
+    - Grade templates.
+    - Assignments.
+    - Leave quota.
+  - Components:
+    - `AssessmentTypeList` – CRUD list for assessment types.
+    - `GradeTemplateBuilder` – modal + table for templates and ranges.
+    - `GradeTemplateAssignment` – form + table showing existing class assignments.
+    - `LeaveQuotaSetting` – per-academic-year quota.
+  - Hook: `useAssessmentSettings.ts` – assessment types, grade templates, assignments, leave quota.
+- **Seed Data**
+  - Assessment types suitable for our context: Classwork, Homework, Quizzes, Midterm Exam, Final Exam, Practical/Lab, Project, Participation.
+  - Grade templates:
+    - Template 1 (A/B/C/F) – 4 contiguous ranges.
+    - Template 2 (A/B/C/D/E/F) – 6 contiguous ranges.
+  - Class→template assignments:
+    - Classes 1–4 → Template 1, minimum passing grade **C**.
+    - Classes 5–10 → Template 2, minimum passing grade **D**.
+
+#### Phase 1.5: Communication & Behavior Settings ✅
+
+- **Database**
+  - `system_settings` table for flexible JSON-based system configuration (RLS enabled).
+- **Backend**
+  - `SystemSettingsModule` with `system-settings.controller.ts`, `system-settings.service.ts`.
+  - Endpoints:
+    - `GET /api/v1/settings` – list all settings.
+    - `GET /api/v1/settings/:key` – get by key.
+    - `PUT /api/v1/settings/:key` – upsert `{ key, value }`.
+  - Reused across:
+    - `communication_direction` – teacher↔student/parent messaging directions.
+    - `behavioral_assessment` – enable/mandatory/attributes.
+    - `leave_quota` and future settings.
+- **Frontend**
+  - Page: `app/settings/communication/page.tsx` (Communication + Library categories).
+  - Components:
+    - `CommunicationSettings` – messaging direction controls using Mantine checkboxes (teacher↔student, teacher↔parent).
+    - `LibraryCategoryEditor` – configurable library categories (for future use).
+  - Page: `app/settings/behavior/page.tsx`.
+  - Component:
+    - `BehaviorSettings` – toggle behavioral assessment, mandatory flag, dynamic attribute list.
+  - Hook: `useSystemSettings.ts` – get/update system settings by key.
+- **Seed Data**
+  - `communication_direction`:
+    - Teacher↔Student: `teacher_only`.
+    - Teacher↔Parent: `both`.
+  - `behavioral_assessment`:
+    - Initially disabled with empty attributes, ready for admin configuration.
+

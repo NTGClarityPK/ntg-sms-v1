@@ -4,6 +4,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { QueryTimingTemplatesDto } from './dto/query-timing-templates.dto';
 import { TimingTemplateDto } from './dto/timing-template.dto';
 import { PublicHolidayDto } from './dto/public-holiday.dto';
+import { VacationDto } from './dto/vacation.dto';
 
 type Meta = { total: number; page: number; limit: number; totalPages: number };
 
@@ -50,6 +51,17 @@ type PublicHolidayRow = {
   updated_at: string;
 };
 
+type VacationRow = {
+  id: string;
+  name: string;
+  name_ar: string | null;
+  start_date: string;
+  end_date: string;
+  academic_year_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
 function mapTimingTemplate(row: TimingTemplateRow, assignedClassIds: string[]): TimingTemplateDto {
   return new TimingTemplateDto({
     id: row.id,
@@ -78,6 +90,19 @@ function mapPublicHoliday(row: PublicHolidayRow): PublicHolidayDto {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
+}
+
+function mapVacation(row: VacationRow): VacationDto {
+  return {
+    id: row.id,
+    name: row.name,
+    nameAr: row.name_ar ?? undefined,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    academicYearId: row.academic_year_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 @Injectable()
@@ -355,6 +380,113 @@ export class ScheduleService {
   async deletePublicHoliday(id: string): Promise<{ data: { id: string } }> {
     const supabase = this.supabaseConfig.getClient();
     const { error } = await supabase.from('public_holidays').delete().eq('id', id);
+    throwIfDbError(error);
+    return { data: { id } };
+  }
+
+  async listVacations(academicYearId: string): Promise<{ data: VacationDto[] }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data, error } = await supabase
+      .from('vacations')
+      .select('*')
+      .eq('academic_year_id', academicYearId)
+      .order('start_date', { ascending: true });
+    throwIfDbError(error);
+
+    return { data: ((data as VacationRow[]) ?? []).map(mapVacation) };
+  }
+
+  async createVacation(input: {
+    name: string;
+    nameAr?: string;
+    startDate: string;
+    endDate: string;
+    academicYearId: string;
+  }): Promise<VacationDto> {
+    if (input.startDate > input.endDate) {
+      throw new BadRequestException('startDate must be on or before endDate');
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: year, error: yearError } = await supabase
+      .from('academic_years')
+      .select('id,start_date,end_date')
+      .eq('id', input.academicYearId)
+      .single();
+    throwIfDbError(yearError);
+
+    const yr = year as { start_date: string; end_date: string };
+    if (input.startDate < yr.start_date || input.endDate > yr.end_date) {
+      throw new BadRequestException('Vacation must be within the academic year date range');
+    }
+
+    const { data, error } = await supabase
+      .from('vacations')
+      .insert({
+        name: input.name,
+        name_ar: input.nameAr ?? null,
+        start_date: input.startDate,
+        end_date: input.endDate,
+        academic_year_id: input.academicYearId,
+      })
+      .select('*')
+      .single();
+    throwIfDbError(error);
+
+    return mapVacation(data as VacationRow);
+  }
+
+  async updateVacation(id: string, input: { name?: string; nameAr?: string; startDate?: string; endDate?: string }): Promise<VacationDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: existing, error: existingError } = await supabase
+      .from('vacations')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (existingError || !existing) throw new NotFoundException('Vacation not found');
+
+    const current = existing as VacationRow;
+    const startDate = input.startDate ?? current.start_date;
+    const endDate = input.endDate ?? current.end_date;
+
+    if (startDate > endDate) {
+      throw new BadRequestException('startDate must be on or before endDate');
+    }
+
+    // Ensure still inside academic year
+    const { data: year, error: yearError } = await supabase
+      .from('academic_years')
+      .select('start_date,end_date')
+      .eq('id', current.academic_year_id)
+      .single();
+    throwIfDbError(yearError);
+
+    const yr = year as { start_date: string; end_date: string };
+    if (startDate < yr.start_date || endDate > yr.end_date) {
+      throw new BadRequestException('Vacation must be within the academic year date range');
+    }
+
+    const { data, error } = await supabase
+      .from('vacations')
+      .update({
+        name: input.name ?? current.name,
+        name_ar: input.nameAr ?? current.name_ar,
+        start_date: startDate,
+        end_date: endDate,
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+    throwIfDbError(error);
+
+    return mapVacation(data as VacationRow);
+  }
+
+  async deleteVacation(id: string): Promise<{ data: { id: string } }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { error } = await supabase.from('vacations').delete().eq('id', id);
     throwIfDbError(error);
     return { data: { id } };
   }

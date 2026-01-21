@@ -8,6 +8,7 @@ import { SchoolDaysSelector } from '@/components/features/settings/SchoolDaysSel
 import { TimingTemplateForm, type TimingTemplateFormValues } from '@/components/features/settings/TimingTemplateForm';
 import { TimingTemplateCard } from '@/components/features/settings/TimingTemplateCard';
 import { HolidayCalendar } from '@/components/features/settings/HolidayCalendar';
+import { VacationManager } from '@/components/features/settings/VacationManager';
 import { useClasses } from '@/hooks/useCoreLookups';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import {
@@ -165,6 +166,10 @@ export default function ScheduleSettingsPage() {
                 onCreate={handleCreateHoliday}
               />
             )}
+          </Stack>
+
+          <Stack gap="md">
+            <VacationManager academicYearId={activeYearId} />
           </Stack>
         </Stack>
       )}

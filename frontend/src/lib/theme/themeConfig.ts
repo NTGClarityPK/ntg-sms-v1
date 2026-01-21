@@ -216,8 +216,8 @@ export function generateThemeConfig(
         backgroundColor: themeColors.colorCard, // Pure white/dark surface
         borderColor: 'transparent',
         textColor: themeColors.colorTextDark,
-        hoverBackground: themeColors.colorMedium, // Subtle surface variant
-        hoverTextColor: themeColors.primary, // Primary color on hover
+        hoverBackground: themeColors.primaryDarker, // Subtle surface variant
+        hoverTextColor: themeColors.colorDark, // Primary color on hover
         // Theme-aware active state: darker background in dark mode, lighter in light mode
         activeBackground: isDark 
           ? themeColors.primaryDark // Darker shade for dark mode (better contrast)

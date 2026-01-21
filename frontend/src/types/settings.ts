@@ -75,6 +75,17 @@ export interface PublicHoliday {
   updatedAt: string;
 }
 
+export interface Vacation {
+  id: string;
+  name: string;
+  nameAr?: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  academicYearId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AssessmentType {
   id: string;
   name: string;
