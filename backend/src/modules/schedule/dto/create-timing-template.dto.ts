@@ -1,5 +1,23 @@
-import { Transform } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsInt, IsNotEmpty, IsOptional, IsString, Min, IsArray, ValidateNested } from 'class-validator';
+
+export class CreateTimingSlotDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  startTime?: string;
+
+  @IsOptional()
+  @IsString()
+  endTime?: string;
+
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+}
 
 export class CreateTimingTemplateDto {
   @IsString()
@@ -20,25 +38,15 @@ export class CreateTimingTemplateDto {
   endTime!: string;
 
   @IsOptional()
-  @IsString()
-  assemblyStart?: string;
-
-  @IsOptional()
-  @IsString()
-  assemblyEnd?: string;
-
-  @IsOptional()
-  @IsString()
-  breakStart?: string;
-
-  @IsOptional()
-  @IsString()
-  breakEnd?: string;
-
-  @IsOptional()
   @IsInt()
   @Min(1)
   periodDurationMinutes?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateTimingSlotDto)
+  slots?: CreateTimingSlotDto[];
 }
 
 

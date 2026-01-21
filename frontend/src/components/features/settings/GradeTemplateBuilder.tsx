@@ -1,12 +1,28 @@
 'use client';
 
-import { Alert, Button, Group, Loader, Modal, NumberInput, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Group,
+  Loader,
+  Menu,
+  Modal,
+  NumberInput,
+  Paper,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
-import { useCreateGradeTemplate, useGradeTemplates } from '@/hooks/useAssessmentSettings';
+import { IconDotsVertical, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { useCreateGradeTemplate, useDeleteGradeTemplate, useGradeTemplates, useUpdateGradeTemplate } from '@/hooks/useAssessmentSettings';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
+import type { GradeTemplate } from '@/types/settings';
+import { useState } from 'react';
 
 interface RangeInput {
   letter: string;
@@ -19,8 +35,11 @@ export function GradeTemplateBuilder() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
   const [opened, { open, close }] = useDisclosure(false);
+  const [editingTemplate, setEditingTemplate] = useState<GradeTemplate | null>(null);
   const listQuery = useGradeTemplates();
   const createMutation = useCreateGradeTemplate();
+  const updateMutation = useUpdateGradeTemplate();
+  const deleteMutation = useDeleteGradeTemplate();
 
   const form = useForm<{ name: string; ranges: RangeInput[] }>({
     initialValues: {
@@ -56,17 +75,66 @@ export function GradeTemplateBuilder() {
     );
   };
 
-  const onCreate = form.onSubmit(async (values) => {
+  const openCreate = () => {
+    setEditingTemplate(null);
+    form.setValues({
+      name: '',
+      ranges: [{ letter: 'A', minPercentage: 90, maxPercentage: 100, sortOrder: 0 }],
+    });
+    open();
+  };
+
+  const openEdit = (template: GradeTemplate) => {
+    setEditingTemplate(template);
+    form.setValues({
+      name: template.name,
+      ranges: template.ranges
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((r) => ({
+          letter: r.letter,
+          minPercentage: r.minPercentage,
+          maxPercentage: r.maxPercentage,
+          sortOrder: r.sortOrder,
+        })),
+    });
+    open();
+  };
+
+  const handleSubmit = form.onSubmit(async (values) => {
     try {
-      await createMutation.mutateAsync(values);
-      notifications.show({ title: 'Success', message: 'Grade template created', color: notifyColors.success });
+      if (editingTemplate) {
+        await updateMutation.mutateAsync({
+          id: editingTemplate.id,
+          name: values.name,
+          ranges: values.ranges,
+        });
+        notifications.show({ title: 'Success', message: 'Grade template updated', color: notifyColors.success });
+      } else {
+        await createMutation.mutateAsync(values);
+        notifications.show({ title: 'Success', message: 'Grade template created', color: notifyColors.success });
+      }
       form.reset();
+      setEditingTemplate(null);
       close();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       notifications.show({ title: 'Error', message, color: notifyColors.error });
     }
   });
+
+  const handleDelete = async (template: GradeTemplate) => {
+    const confirmed = window.confirm(`Delete grade template "${template.name}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      await deleteMutation.mutateAsync(template.id);
+      notifications.show({ title: 'Success', message: 'Grade template deleted', color: notifyColors.success });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      notifications.show({ title: 'Error', message, color: notifyColors.error });
+    }
+  };
 
   if (listQuery.isLoading) {
     return (
@@ -94,7 +162,7 @@ export function GradeTemplateBuilder() {
   return (
     <>
       <Group justify="flex-end" mb="md">
-        <Button leftSection={<IconPlus size={16} />} onClick={open}>
+        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add template
         </Button>
       </Group>
@@ -110,6 +178,7 @@ export function GradeTemplateBuilder() {
               <Table.Tr>
                 <Table.Th>Name</Table.Th>
                 <Table.Th>Ranges</Table.Th>
+                <Table.Th w={80}>Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -125,6 +194,30 @@ export function GradeTemplateBuilder() {
                             .join(', ')}
                     </Text>
                   </Table.Td>
+                  <Table.Td>
+                    <Menu withinPortal position="bottom-end">
+                      <Menu.Target>
+                        <ActionIcon variant="subtle">
+                          <IconDotsVertical size={16} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item
+                          leftSection={<IconPencil size={14} />}
+                          onClick={() => openEdit(t)}
+                        >
+                          Edit
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconTrash size={14} />}
+                          color={colors.error}
+                          onClick={() => handleDelete(t)}
+                        >
+                          Delete
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -132,8 +225,8 @@ export function GradeTemplateBuilder() {
         )}
       </Paper>
 
-      <Modal opened={opened} onClose={close} title="Create grade template" size="lg">
-        <form onSubmit={onCreate}>
+      <Modal opened={opened} onClose={close} title={editingTemplate ? 'Edit grade template' : 'Create grade template'} size="lg">
+        <form onSubmit={handleSubmit}>
           <Stack gap="md">
             <TextInput label="Template name" placeholder="Primary grading" {...form.getInputProps('name')} />
 

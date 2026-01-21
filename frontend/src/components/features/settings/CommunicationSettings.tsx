@@ -6,7 +6,7 @@ import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-col
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
 import { useEffect, useState } from 'react';
 
-type Direction = 'both' | 'teacher_only' | 'student_only' | 'parent_only';
+type Direction = 'both' | 'teacher_only';
 
 interface CommunicationDirectionValue {
   teacher_student: Direction;
@@ -97,16 +97,6 @@ export function CommunicationSettings() {
                 }))
               }
             />
-            <Checkbox
-              label="Student can send only"
-              checked={value.teacher_student === 'student_only'}
-              onChange={() =>
-                setValue((prev) => ({
-                  ...(prev ?? DEFAULT_VALUE),
-                  teacher_student: 'student_only',
-                }))
-              }
-            />
           </Group>
         </Stack>
 
@@ -130,16 +120,6 @@ export function CommunicationSettings() {
                 setValue((prev) => ({
                   ...(prev ?? DEFAULT_VALUE),
                   teacher_parent: 'teacher_only',
-                }))
-              }
-            />
-            <Checkbox
-              label="Parent can send only"
-              checked={value.teacher_parent === 'parent_only'}
-              onChange={() =>
-                setValue((prev) => ({
-                  ...(prev ?? DEFAULT_VALUE),
-                  teacher_parent: 'parent_only',
                 }))
               }
             />

@@ -48,6 +48,33 @@ export function useCreateGradeTemplate() {
   });
 }
 
+export function useUpdateGradeTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      id: string;
+      name?: string;
+      ranges?: Array<{ letter: string; minPercentage: number; maxPercentage: number; sortOrder?: number }>;
+    }) => {
+      const { id, ...body } = payload;
+      return apiClient.put<GradeTemplate>(`/api/v1/grade-templates/${id}`, body);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: assessmentKeys.templates });
+    },
+  });
+}
+
+export function useDeleteGradeTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => apiClient.delete<{ id: string }>(`/api/v1/grade-templates/${id}`),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: assessmentKeys.templates });
+    },
+  });
+}
+
 export function useAssignGradeTemplateToClass() {
   const qc = useQueryClient();
   return useMutation({

@@ -49,19 +49,24 @@ export interface Level {
   classes: ClassEntity[];
 }
 
+export interface TimingSlot {
+  id: string;
+  name: string;
+  startTime?: string;
+  endTime?: string;
+  sortOrder: number;
+}
+
 export interface TimingTemplate {
   id: string;
   name: string;
   startTime: string;
   endTime: string;
-  assemblyStart?: string;
-  assemblyEnd?: string;
-  breakStart?: string;
-  breakEnd?: string;
   periodDurationMinutes: number;
   createdAt: string;
   updatedAt: string;
   assignedClassIds: string[];
+  slots: TimingSlot[];
 }
 
 export interface PublicHoliday {

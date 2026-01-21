@@ -1,10 +1,12 @@
 'use client';
 
-import { Alert, Button, Group, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Alert, Button, Group, Menu, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus } from '@tabler/icons-react';
+import { IconDotsVertical, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import type { PublicHoliday } from '@/types/settings';
 import { useForm } from '@mantine/form';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useState } from 'react';
 
 export interface CreateHolidayValues {
   name: string;
@@ -16,11 +18,15 @@ interface HolidayCalendarProps {
   holidays: PublicHoliday[];
   academicYearId: string;
   onCreate: (values: CreateHolidayValues & { academicYearId: string }) => Promise<void>;
+  onUpdate: (id: string, values: CreateHolidayValues & { academicYearId: string }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   isCreating: boolean;
 }
 
-export function HolidayCalendar({ holidays, academicYearId, onCreate, isCreating }: HolidayCalendarProps) {
+export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, onDelete, isCreating }: HolidayCalendarProps) {
+  const colors = useThemeColors();
   const [opened, { open, close }] = useDisclosure(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const form = useForm<CreateHolidayValues>({
     initialValues: { name: '', startDate: '', endDate: '' },
@@ -36,16 +42,43 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, isCreating
     transformValues: (v) => ({ name: v.name.trim(), startDate: v.startDate, endDate: v.endDate }),
   });
 
-  const submit = form.onSubmit(async (values) => {
-    await onCreate({ ...values, academicYearId });
+  const openCreate = () => {
+    setEditingId(null);
     form.reset();
+    open();
+  };
+
+  const openEdit = (holiday: PublicHoliday) => {
+    setEditingId(holiday.id);
+    form.setValues({
+      name: holiday.name,
+      startDate: holiday.startDate,
+      endDate: holiday.endDate,
+    });
+    open();
+  };
+
+  const submit = form.onSubmit(async (values) => {
+    if (editingId) {
+      await onUpdate(editingId, { ...values, academicYearId });
+    } else {
+      await onCreate({ ...values, academicYearId });
+    }
+    form.reset();
+    setEditingId(null);
     close();
   });
+
+  const handleDelete = async (id: string, name: string) => {
+    const confirmed = window.confirm(`Delete holiday "${name}"?`);
+    if (!confirmed) return;
+    await onDelete(id);
+  };
 
   return (
     <>
       <Group justify="flex-end" mb="md">
-        <Button leftSection={<IconPlus size={16} />} onClick={open}>
+        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add holiday
         </Button>
       </Group>
@@ -62,6 +95,7 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, isCreating
                 <Table.Th>Name</Table.Th>
                 <Table.Th>Start</Table.Th>
                 <Table.Th>End</Table.Th>
+                <Table.Th w={80}>Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -70,6 +104,27 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, isCreating
                   <Table.Td>{h.name}</Table.Td>
                   <Table.Td>{h.startDate}</Table.Td>
                   <Table.Td>{h.endDate}</Table.Td>
+                  <Table.Td>
+                    <Menu withinPortal position="bottom-end">
+                      <Menu.Target>
+                        <ActionIcon variant="subtle">
+                          <IconDotsVertical size={16} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openEdit(h)}>
+                          Edit
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconTrash size={14} />}
+                          color={colors.error}
+                          onClick={() => handleDelete(h.id, h.name)}
+                        >
+                          Delete
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -77,7 +132,7 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, isCreating
         )}
       </Paper>
 
-      <Modal opened={opened} onClose={close} title="Add holiday" size="md">
+      <Modal opened={opened} onClose={close} title={editingId ? 'Edit holiday' : 'Add holiday'} size="md">
         <form onSubmit={submit}>
           <Stack gap="md">
             <TextInput label="Name" placeholder="National Day" {...form.getInputProps('name')} />

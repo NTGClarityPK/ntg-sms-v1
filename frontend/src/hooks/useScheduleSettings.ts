@@ -42,11 +42,8 @@ export function useCreateTimingTemplate() {
       name: string;
       startTime: string;
       endTime: string;
-      assemblyStart?: string;
-      assemblyEnd?: string;
-      breakStart?: string;
-      breakEnd?: string;
       periodDurationMinutes?: number;
+      slots?: Array<{ name: string; startTime?: string; endTime?: string; sortOrder?: number }>;
     }) => apiClient.post<TimingTemplate>('/api/v1/timing-templates', payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: scheduleKeys.timingTemplates });
@@ -79,6 +76,30 @@ export function useCreatePublicHoliday() {
   return useMutation({
     mutationFn: async (payload: { name: string; startDate: string; endDate: string; academicYearId: string; nameAr?: string }) =>
       apiClient.post<PublicHoliday>('/api/v1/public-holidays', payload),
+    onSuccess: async (_res, vars) => {
+      await qc.invalidateQueries({ queryKey: scheduleKeys.holidays(vars.academicYearId) });
+    },
+  });
+}
+
+export function useUpdatePublicHoliday() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { id: string; academicYearId: string; name?: string; startDate?: string; endDate?: string }) => {
+      const { id, academicYearId, ...body } = payload;
+      return apiClient.put<PublicHoliday>(`/api/v1/public-holidays/${id}`, body);
+    },
+    onSuccess: async (_res, vars) => {
+      await qc.invalidateQueries({ queryKey: scheduleKeys.holidays(vars.academicYearId) });
+    },
+  });
+}
+
+export function useDeletePublicHoliday() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { id: string; academicYearId: string }) =>
+      apiClient.delete<{ id: string }>(`/api/v1/public-holidays/${payload.id}`),
     onSuccess: async (_res, vars) => {
       await qc.invalidateQueries({ queryKey: scheduleKeys.holidays(vars.academicYearId) });
     },

@@ -41,6 +41,7 @@ alwaysApply: true
 - No hardcoded values - use environment variables or constants
 - Build less than 200 lines at a time
 - any function should NOT be that much lengthy which is difficult to review later
+- When writing English copy (labels, messages, docs), use **British English** (e.g. “colour”, “organisation”, “programme”) instead of US spellings
 
 ## What NOT To Do
 - Do NOT add features not explicitly requested

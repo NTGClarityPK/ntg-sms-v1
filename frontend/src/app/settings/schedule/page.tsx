@@ -15,9 +15,11 @@ import {
   useAssignClassesToTimingTemplate,
   useCreatePublicHoliday,
   useCreateTimingTemplate,
+  useDeletePublicHoliday,
   usePublicHolidays,
   useSchoolDays,
   useTimingTemplates,
+  useUpdatePublicHoliday,
   useUpdateSchoolDays,
 } from '@/hooks/useScheduleSettings';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -39,6 +41,8 @@ export default function ScheduleSettingsPage() {
   const activeYearId = activeYearQuery.data?.data?.id;
   const holidaysQuery = usePublicHolidays(activeYearId);
   const createHoliday = useCreatePublicHoliday();
+  const updateHoliday = useUpdatePublicHoliday();
+  const deleteHoliday = useDeletePublicHoliday();
 
   const isLoading =
     schoolDaysQuery.isLoading ||
@@ -61,10 +65,7 @@ export default function ScheduleSettingsPage() {
         startTime: values.startTime,
         endTime: values.endTime,
         periodDurationMinutes: values.periodDurationMinutes,
-        assemblyStart: values.assemblyStart || undefined,
-        assemblyEnd: values.assemblyEnd || undefined,
-        breakStart: values.breakStart || undefined,
-        breakEnd: values.breakEnd || undefined,
+        slots: values.slots,
       });
       notifications.show({ title: 'Success', message: 'Timing template created', color: notifyColors.success });
       closeCreate();
@@ -88,6 +89,30 @@ export default function ScheduleSettingsPage() {
     try {
       await createHoliday.mutateAsync(values);
       notifications.show({ title: 'Success', message: 'Holiday created', color: notifyColors.success });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      notifications.show({ title: 'Error', message, color: notifyColors.error });
+    }
+  };
+
+  const handleUpdateHoliday = async (
+    id: string,
+    values: { name: string; startDate: string; endDate: string; academicYearId: string },
+  ) => {
+    try {
+      await updateHoliday.mutateAsync({ id, ...values });
+      notifications.show({ title: 'Success', message: 'Holiday updated', color: notifyColors.success });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      notifications.show({ title: 'Error', message, color: notifyColors.error });
+    }
+  };
+
+  const handleDeleteHoliday = async (id: string) => {
+    if (!activeYearId) return;
+    try {
+      await deleteHoliday.mutateAsync({ id, academicYearId: activeYearId });
+      notifications.show({ title: 'Success', message: 'Holiday deleted', color: notifyColors.success });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       notifications.show({ title: 'Error', message, color: notifyColors.error });
@@ -162,8 +187,10 @@ export default function ScheduleSettingsPage() {
               <HolidayCalendar
                 holidays={holidaysQuery.data?.data ?? []}
                 academicYearId={activeYearId}
-                isCreating={createHoliday.isPending}
+                isCreating={createHoliday.isPending || updateHoliday.isPending || deleteHoliday.isPending}
                 onCreate={handleCreateHoliday}
+                onUpdate={handleUpdateHoliday}
+                onDelete={handleDeleteHoliday}
               />
             )}
           </Stack>

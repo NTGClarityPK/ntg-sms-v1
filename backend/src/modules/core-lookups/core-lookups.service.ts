@@ -379,6 +379,45 @@ export class CoreLookupsService {
     classIds?: string[];
   }): Promise<LevelDto> {
     const supabase = this.supabaseConfig.getClient();
+
+    // Validate that classes are not already assigned to other levels
+    if (input.classIds && input.classIds.length > 0) {
+      const { data: existingAssignments, error: checkError } = await supabase
+        .from('level_classes')
+        .select('class_id, level_id')
+        .in('class_id', input.classIds);
+      throwIfDbError(checkError);
+
+      if (existingAssignments && existingAssignments.length > 0) {
+        // Fetch class names and level names for error message
+        const conflictingClassIds = existingAssignments.map((a: any) => a.class_id);
+        const conflictingLevelIds = Array.from(new Set(existingAssignments.map((a: any) => a.level_id)));
+
+        const { data: classes, error: classError } = await supabase
+          .from('classes')
+          .select('id, display_name')
+          .in('id', conflictingClassIds);
+        throwIfDbError(classError);
+
+        const { data: levels, error: levelError } = await supabase
+          .from('levels')
+          .select('id, name')
+          .in('id', conflictingLevelIds);
+        throwIfDbError(levelError);
+
+        const classMap = new Map((classes as any[]).map((c) => [c.id, c.display_name]));
+        const levelMap = new Map((levels as any[]).map((l) => [l.id, l.name]));
+
+        const conflicts = existingAssignments.map((a: any) => 
+          `${classMap.get(a.class_id)} (already in ${levelMap.get(a.level_id)})`
+        ).join(', ');
+
+        throw new BadRequestException(
+          `Cannot assign classes that are already in other levels: ${conflicts}`
+        );
+      }
+    }
+
     const { data: level, error } = await supabase
       .from('levels')
       .insert({

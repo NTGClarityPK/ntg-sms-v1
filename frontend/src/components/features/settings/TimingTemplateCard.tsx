@@ -30,6 +30,16 @@ export function TimingTemplateCard({ template, classes, isSavingAssignments, onA
           <Text c="dimmed" size="sm">
             {template.startTime} → {template.endTime} • {template.periodDurationMinutes} min
           </Text>
+          {template.slots && template.slots.length > 0 && (
+            <Group gap="xs" mt="xs">
+              {template.slots.map((slot) => (
+                <Badge key={slot.id} variant="dot" size="sm">
+                  {slot.name}
+                  {slot.startTime && slot.endTime && ` (${slot.startTime} - ${slot.endTime})`}
+                </Badge>
+              ))}
+            </Group>
+          )}
         </Stack>
         <Badge variant="light" color={colors.info}>
           {template.assignedClassIds.length} classes

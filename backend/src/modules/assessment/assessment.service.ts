@@ -294,6 +294,37 @@ export class AssessmentService {
     return mapGradeTemplate({ ...existingRow, name: input.name?.trim() ?? existingRow.name }, ((ranges as GradeRangeRow[]) ?? []).map(mapGradeRange));
   }
 
+  async deleteGradeTemplate(id: string): Promise<{ id: string }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Ensure template exists
+    const { data: existing, error: eError } = await supabase.from('grade_templates').select('id').eq('id', id).maybeSingle();
+    throwIfDbError(eError);
+    if (!existing) {
+      throw new NotFoundException('Grade template not found');
+    }
+
+    // Prevent deleting templates that are assigned to classes
+    const { data: assignments, error: aError } = await supabase
+      .from('class_grade_assignments')
+      .select('id')
+      .eq('grade_template_id', id)
+      .limit(1);
+    throwIfDbError(aError);
+
+    if (assignments && assignments.length > 0) {
+      throw new BadRequestException('Cannot delete a grade template that is assigned to classes');
+    }
+
+    const { error: delRangesError } = await supabase.from('grade_ranges').delete().eq('grade_template_id', id);
+    throwIfDbError(delRangesError);
+
+    const { error: delTemplateError } = await supabase.from('grade_templates').delete().eq('id', id);
+    throwIfDbError(delTemplateError);
+
+    return { id };
+  }
+
   async assignGradeTemplateToClass(input: { classId: string; gradeTemplateId: string; minimumPassingGrade: string }): Promise<{ data: ClassGradeAssignmentRow }> {
     const supabase = this.supabaseConfig.getClient();
 

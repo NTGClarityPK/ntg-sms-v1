@@ -5,6 +5,7 @@ import { QueryTimingTemplatesDto } from './dto/query-timing-templates.dto';
 import { TimingTemplateDto } from './dto/timing-template.dto';
 import { PublicHolidayDto } from './dto/public-holiday.dto';
 import { VacationDto } from './dto/vacation.dto';
+import { TimingSlotDto } from './dto/timing-slot.dto';
 
 type Meta = { total: number; page: number; limit: number; totalPages: number };
 
@@ -26,11 +27,18 @@ type TimingTemplateRow = {
   name: string;
   start_time: string;
   end_time: string;
-  assembly_start: string | null;
-  assembly_end: string | null;
-  break_start: string | null;
-  break_end: string | null;
   period_duration_minutes: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type TimingSlotRow = {
+  id: string;
+  timing_template_id: string;
+  name: string;
+  start_time: string | null;
+  end_time: string | null;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 };
@@ -62,20 +70,27 @@ type VacationRow = {
   updated_at: string;
 };
 
-function mapTimingTemplate(row: TimingTemplateRow, assignedClassIds: string[]): TimingTemplateDto {
+function mapTimingSlot(row: TimingSlotRow): TimingSlotDto {
+  return {
+    id: row.id,
+    name: row.name,
+    startTime: row.start_time ?? undefined,
+    endTime: row.end_time ?? undefined,
+    sortOrder: row.sort_order,
+  };
+}
+
+function mapTimingTemplate(row: TimingTemplateRow, assignedClassIds: string[], slots: TimingSlotDto[]): TimingTemplateDto {
   return new TimingTemplateDto({
     id: row.id,
     name: row.name,
     startTime: row.start_time,
     endTime: row.end_time,
-    assemblyStart: row.assembly_start ?? undefined,
-    assemblyEnd: row.assembly_end ?? undefined,
-    breakStart: row.break_start ?? undefined,
-    breakEnd: row.break_end ?? undefined,
     periodDurationMinutes: row.period_duration_minutes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     assignedClassIds,
+    slots,
   });
 }
 
@@ -204,8 +219,27 @@ export class ScheduleService {
       classesByTemplate.set(a.timing_template_id, arr);
     }
 
+    // Fetch slots for these templates
+    let slotRows: TimingSlotRow[] = [];
+    if (templateIds.length > 0) {
+      const { data: s, error: sError } = await supabase
+        .from('timing_template_slots')
+        .select('*')
+        .in('timing_template_id', templateIds)
+        .order('sort_order', { ascending: true });
+      throwIfDbError(sError);
+      slotRows = (s as TimingSlotRow[]) ?? [];
+    }
+
+    const slotsByTemplate = new Map<string, TimingSlotDto[]>();
+    for (const slot of slotRows) {
+      const arr = slotsByTemplate.get(slot.timing_template_id) ?? [];
+      arr.push(mapTimingSlot(slot));
+      slotsByTemplate.set(slot.timing_template_id, arr);
+    }
+
     return {
-      data: rows.map((r) => mapTimingTemplate(r, classesByTemplate.get(r.id) ?? [])),
+      data: rows.map((r) => mapTimingTemplate(r, classesByTemplate.get(r.id) ?? [], slotsByTemplate.get(r.id) ?? [])),
       meta: { total, page, limit, totalPages },
     };
   }
@@ -214,11 +248,8 @@ export class ScheduleService {
     name: string;
     startTime: string;
     endTime: string;
-    assemblyStart?: string;
-    assemblyEnd?: string;
-    breakStart?: string;
-    breakEnd?: string;
     periodDurationMinutes?: number;
+    slots?: Array<{ name: string; startTime?: string; endTime?: string; sortOrder?: number }>;
   }): Promise<TimingTemplateDto> {
     if (input.startTime >= input.endTime) {
       throw new BadRequestException('startTime must be before endTime');
@@ -231,17 +262,35 @@ export class ScheduleService {
         name: input.name,
         start_time: input.startTime,
         end_time: input.endTime,
-        assembly_start: input.assemblyStart ?? null,
-        assembly_end: input.assemblyEnd ?? null,
-        break_start: input.breakStart ?? null,
-        break_end: input.breakEnd ?? null,
         period_duration_minutes: input.periodDurationMinutes ?? 60,
       })
       .select('*')
       .single();
     throwIfDbError(error);
 
-    return mapTimingTemplate(data as TimingTemplateRow, []);
+    const template = data as TimingTemplateRow;
+    const createdSlots: TimingSlotDto[] = [];
+
+    // Create slots if provided
+    if (input.slots && input.slots.length > 0) {
+      const slotsToInsert = input.slots.map((slot, index) => ({
+        timing_template_id: template.id,
+        name: slot.name,
+        start_time: slot.startTime ?? null,
+        end_time: slot.endTime ?? null,
+        sort_order: slot.sortOrder ?? index,
+      }));
+
+      const { data: slotData, error: slotError } = await supabase
+        .from('timing_template_slots')
+        .insert(slotsToInsert)
+        .select('*');
+      throwIfDbError(slotError);
+
+      createdSlots.push(...((slotData as TimingSlotRow[]) ?? []).map(mapTimingSlot));
+    }
+
+    return mapTimingTemplate(template, [], createdSlots);
   }
 
   async assignClassesToTimingTemplate(timingTemplateId: string, classIds: string[]): Promise<{ data: string[] }> {

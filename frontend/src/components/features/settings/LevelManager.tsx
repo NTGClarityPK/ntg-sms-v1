@@ -67,7 +67,26 @@ export function LevelManager() {
   const levels = levelsQuery.data?.data ?? [];
   const classes = classesQuery.data?.data ?? [];
 
-  const classOptions = classes.map((c) => ({ value: c.id, label: c.displayName }));
+  // Build a map of which classes are already assigned to levels
+  const assignedClassIds = new Set<string>();
+  const classToLevelMap = new Map<string, string>();
+  levels.forEach((level) => {
+    level.classes.forEach((cls) => {
+      assignedClassIds.add(cls.id);
+      classToLevelMap.set(cls.id, level.name);
+    });
+  });
+
+  // Create options with labels showing if already assigned
+  const classOptions = classes.map((c) => {
+    const isAssigned = assignedClassIds.has(c.id);
+    const levelName = classToLevelMap.get(c.id);
+    return {
+      value: c.id,
+      label: isAssigned ? `${c.displayName} (in ${levelName})` : c.displayName,
+      disabled: isAssigned, // Disable classes that are already assigned
+    };
+  });
 
   return (
     <>

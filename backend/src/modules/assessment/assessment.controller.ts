@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AssessmentService } from './assessment.service';
 import { QueryAssessmentTypesDto } from './dto/query-assessment-types.dto';
@@ -59,6 +59,12 @@ export class AssessmentController {
       : undefined;
     const updated = await this.assessmentService.updateGradeTemplate(id, { name: body.name, ranges });
     return { data: updated };
+  }
+
+  @Delete('grade-templates/:id')
+  async deleteGradeTemplate(@Param('id') id: string): Promise<{ data: { id: string } }> {
+    const result = await this.assessmentService.deleteGradeTemplate(id);
+    return { data: result };
   }
 
   @Put('grade-templates/:id/assign-classes')
