@@ -85,4 +85,17 @@ export function useCreateLevel() {
   });
 }
 
+// Helper hook for generic core lookups
+export function useCoreLookups(type: 'subjects' | 'classes' | 'sections' | 'levels') {
+  switch (type) {
+    case 'subjects':
+      return useSubjects();
+    case 'classes':
+      return useClasses();
+    case 'sections':
+      return useSections();
+    case 'levels':
+      return useLevels();
+  }
+}
 

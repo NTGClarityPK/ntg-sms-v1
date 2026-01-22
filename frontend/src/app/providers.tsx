@@ -4,6 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
+import { ModalsProvider } from '@mantine/modals';
 import { queryClient } from '@/lib/query-client';
 import { createDynamicTheme } from '@/lib/utils/createDynamicTheme';
 import { DynamicThemeProvider } from '@/components/providers/DynamicThemeProvider';
@@ -17,9 +18,11 @@ function ThemeWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <MantineProvider theme={mantineTheme}>
-      <DynamicThemeProvider>
-        {children}
-      </DynamicThemeProvider>
+      <ModalsProvider>
+        <DynamicThemeProvider>
+          {children}
+        </DynamicThemeProvider>
+      </ModalsProvider>
     </MantineProvider>
   );
 }

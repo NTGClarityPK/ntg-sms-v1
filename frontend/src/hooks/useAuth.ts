@@ -20,6 +20,12 @@ export function useAuth() {
     queryFn: fetchCurrentUser,
     retry: false,
     refetchOnWindowFocus: false,
+    onSuccess: (data) => {
+      // Store branch ID in localStorage for API client to use
+      if (data?.currentBranch?.id && typeof window !== 'undefined') {
+        localStorage.setItem('currentBranchId', data.currentBranch.id);
+      }
+    },
   });
 
   return {

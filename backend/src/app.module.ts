@@ -13,6 +13,11 @@ import { ScheduleModule } from './modules/schedule/schedule.module';
 import { AssessmentModule } from './modules/assessment/assessment.module';
 import { SystemSettingsModule } from './modules/system-settings/system-settings.module';
 import { BranchesModule } from './modules/branches/branches.module';
+import { RolesModule } from './modules/roles/roles.module';
+import { UsersModule } from './modules/users/users.module';
+import { StudentsModule } from './modules/students/students.module';
+import { ParentsModule } from './modules/parents/parents.module';
+import { StaffModule } from './modules/staff/staff.module';
 
 @Module({
   imports: [
@@ -28,6 +33,11 @@ import { BranchesModule } from './modules/branches/branches.module';
     AssessmentModule,
     SystemSettingsModule,
     BranchesModule,
+    RolesModule,
+    UsersModule,
+    StudentsModule,
+    ParentsModule,
+    StaffModule,
   ],
   controllers: [AppController],
   providers: [

@@ -78,4 +78,6 @@ export function useLockAcademicYear() {
 // Type helper (keeps hooks strongly typed)
 export type AcademicYearsListResponse = ApiResponse<AcademicYear[]>;
 
+// Alias for backward compatibility
+export const useAcademicYears = useAcademicYearsList;
 

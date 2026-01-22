@@ -812,3 +812,97 @@ npm run dev
   - `behavioral_assessment`:
     - Initially disabled with empty attributes, ready for admin configuration.
 
+---
+
+### Prompt 2: Multi-Branch Support – Backend ✅ (Frontend ⏳)
+
+#### Phase 2.0 & 2.1: Tenants (Schools) & Branch Management ✅ (Backend)
+
+- **Database**
+  - `tenants` table created to represent each school/customer:
+    - Columns: `id`, `name`, `code`, `domain`, `is_active`, `created_at`, `updated_at` (RLS enabled).
+  - `branches` table created and linked to tenants:
+    - Columns: `id`, `tenant_id`, `name`, `name_ar`, `code`, `address`, `phone`, `email`, `storage_quota_gb`, `storage_used_bytes`, `is_active`, timestamps.
+    - Index on `tenant_id` for efficient tenant filtering.
+  - `user_branches` table created for many-to-many user↔branch mapping:
+    - Columns: `user_id`, `branch_id`, `is_primary`, `created_at`.
+    - PK `(user_id, branch_id)` plus RLS so users see only their own rows.
+  - `profiles.current_branch_id` column added for storing the user’s currently selected branch.
+  - Tenant + branch columns added to Prompt 1 “settings” tables:
+    - `subjects`, `classes`, `sections`, `levels`.
+    - `timing_templates`, `public_holidays`.
+    - `assessment_types`, `grade_templates`.
+    - Each has `tenant_id` and `branch_id` FKs to `tenants`/`branches` with supporting indexes.
+
+- **Backend – Branches Module**
+  - New `BranchesModule` added and wired into `AppModule`.
+  - `branches.controller.ts`:
+    - `GET /api/v1/branches` – paginated list with search on `name`/`code`.
+    - `GET /api/v1/branches/:id` – single branch details.
+    - `POST /api/v1/branches` – create branch (name, optional code/address/etc.).
+    - `PUT /api/v1/branches/:id` – update branch fields.
+    - `GET /api/v1/branches/:id/storage` – returns quota, used bytes, and percentage.
+  - `branches.service.ts`:
+    - Implements list/get/create/update/storage logic using Supabase service role client.
+    - Maps DB rows to `BranchDto` with strict typing.
+  - DTOs in `branches/dto`:
+    - `BranchDto`, `CreateBranchDto`, `UpdateBranchDto`, `QueryBranchesDto` (extends `BasePaginationDto`).
+
+#### Phase 2.2: User-Branch Assignment & Auth Context ✅ (Backend)
+
+- **Database**
+  - `user_branches` and `profiles.current_branch_id` used as source of truth for branch assignment and current branch selection.
+
+- **Backend – Auth Module Extensions**
+  - `UserResponseDto` extended with:
+    - `branches: BranchSummaryDto[]`.
+    - `currentBranch: BranchSummaryDto | null`.
+  - New `BranchSummaryDto` introduced for lightweight branch info in auth responses.
+  - `AuthService`:
+    - `getCurrentUser(userId)` now:
+      - Fetches Supabase `auth.users` + `profiles`.
+      - Joins `user_branches` → `branches` to build `branches` list.
+      - Reads `profiles.current_branch_id` and resolves `currentBranch`.
+    - `getMyBranches(userId)` – returns branches assigned to user.
+    - `selectBranch(userId, branchId)` – validates access via `user_branches` then updates `profiles.current_branch_id`.
+    - `getCurrentBranch(userId)` – returns the currently selected branch or `null`.
+  - `AuthController`:
+    - Existing:
+      - `GET /api/v1/auth/me` – now returns user + branches + currentBranch.
+      - `POST /api/v1/auth/validate` – unchanged contract, enriched payload.
+    - New endpoints:
+      - `GET /api/v1/auth/my-branches` – list of branches for current user.
+      - `POST /api/v1/auth/select-branch` – body `{ branchId }`, sets current branch if user has access.
+      - `GET /api/v1/auth/current-branch` – returns current branch context.
+
+#### Phase 2.3: Tenant- & Branch-Scoped Data Foundation ✅ (Backend)
+
+- **BranchGuard & CurrentBranch Decorator**
+  - New `BranchGuard` (`common/guards/branch.guard.ts`):
+    - Reads `X-Branch-Id` header or falls back to `profiles.current_branch_id` for the authenticated user.
+    - Verifies:
+      - The user is assigned to the branch via `user_branches`.
+      - The branch exists and has a valid `tenant_id`.
+    - Attaches `{ branchId, tenantId }` onto the Express request as `request.branch`.
+  - New `@CurrentBranch()` decorator (`common/decorators/current-branch.decorator.ts`) to inject `{ branchId, tenantId }` into controllers when needed.
+
+- **Guard Application (Configuration/Settings APIs)**
+  - `JwtAuthGuard` remains the primary auth guard; `BranchGuard` is layered on top for tenant/branch isolation:
+    - `CoreLookups` controllers:
+      - `SubjectsController`, `ClassesController`, `SectionsController`, `LevelsController` now use `@UseGuards(JwtAuthGuard, BranchGuard)`.
+    - `ScheduleController` (`/api/v1/...` for school days, timing templates, holidays, vacations).
+    - `AssessmentController` (`/api/v1/...` for assessment types, grade templates, leave quota).
+    - `SystemSettingsController` (`/api/v1/settings/...`).
+  - Result:
+    - Any call to these configuration endpoints requires:
+      - Valid JWT.
+      - Valid branch context accessible to the user (branch/tenant enforced).
+
+- **Tenant + Branch Columns on Prompt 1 Tables**
+  - Migrations (`prompt2_01_tenants_and_branches`, `prompt2_02_add_tenant_and_branch_to_prompt1_tables`) ensure:
+    - Tenant root (`tenants`) and `branches` exist.
+    - Prompt 1 tables now carry `tenant_id` and `branch_id` where they represent tenant-specific configuration.
+  - This prepares the ground for full RLS hardening so that all settings data is isolated per tenant + branch.
+
+> **Note:** Frontend branch selection UI, header branch switcher, and branch-aware React Query hooks for Prompt 2 are still pending and will be documented once implemented.
+

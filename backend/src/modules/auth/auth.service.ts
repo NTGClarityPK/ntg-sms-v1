@@ -154,5 +154,77 @@ export class AuthService {
     const branches = await this.listUserBranches(userId);
     return branches.find((b) => b.id === currentBranchId) ?? null;
   }
+
+  async selectChild(userId: string, studentId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Verify user has access to this student (via parent_students)
+    const { data: link } = await supabase
+      .from('parent_students')
+      .select('student_id')
+      .eq('parent_user_id', userId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    if (!link) {
+      throw new BadRequestException('You do not have access to this student');
+    }
+
+    // Update profile
+    const { error } = await supabase
+      .from('profiles')
+      .update({ current_student_id: studentId })
+      .eq('id', userId);
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  async getCurrentChild(userId: string): Promise<{
+    id: string;
+    studentId: string;
+    fullName: string;
+  } | null> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('current_student_id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!profile || !(profile as { current_student_id: string | null }).current_student_id) {
+      return null;
+    }
+
+    const currentStudentId = (profile as { current_student_id: string }).current_student_id;
+
+    const { data: student } = await supabase
+      .from('students')
+      .select('id, student_id, profiles:user_id(full_name)')
+      .eq('id', currentStudentId)
+      .single();
+
+    if (!student) {
+      return null;
+    }
+
+    const studentData = student as unknown as {
+      id: string;
+      student_id: string;
+      profiles: { full_name: string } | { full_name: string }[] | null;
+    };
+
+    const profileData = Array.isArray(studentData.profiles)
+      ? studentData.profiles[0]
+      : studentData.profiles;
+
+    return {
+      id: studentData.id,
+      studentId: studentData.student_id,
+      fullName: profileData?.full_name || '',
+    };
+  }
 }
 

@@ -6,6 +6,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 @Module({
   controllers: [AcademicYearsController],
   providers: [AcademicYearsService, SupabaseConfig],
+  exports: [AcademicYearsService],
 })
 export class AcademicYearsModule {}
 

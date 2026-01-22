@@ -14,6 +14,13 @@ export default function SettingsPage() {
         <Text c="dimmed">Configure the core system settings used across the application.</Text>
 
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <Card component={Link} href="/settings/permissions" withBorder p="md">
+            <Title order={3}>Permissions</Title>
+            <Text c="dimmed" size="sm">
+              Configure role-based permissions for each feature.
+            </Text>
+          </Card>
+
           <Card component={Link} href="/settings/academic-years" withBorder p="md">
             <Title order={3}>Academic years</Title>
             <Text c="dimmed" size="sm">

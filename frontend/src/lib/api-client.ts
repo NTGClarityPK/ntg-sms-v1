@@ -17,7 +17,7 @@ class ApiClient {
   }
 
   private setupInterceptors(): void {
-    // Request interceptor - inject auth token
+    // Request interceptor - inject auth token and branch header
     this.client.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
         const {
@@ -26,6 +26,14 @@ class ApiClient {
 
         if (session?.access_token) {
           config.headers.Authorization = `Bearer ${session.access_token}`;
+        }
+
+        // Get branch ID from localStorage (set by auth flow) or from query cache
+        if (typeof window !== 'undefined') {
+          const branchId = localStorage.getItem('currentBranchId');
+          if (branchId) {
+            config.headers['X-Branch-Id'] = branchId;
+          }
         }
 
         return config;
