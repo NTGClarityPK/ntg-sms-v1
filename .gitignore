@@ -49,3 +49,27 @@ coverage/
 
 # Reference files (if needed)
 rmsreference/*
+
+# Cursor IDE
+.cursor/
+.cursorignore
+
+# Project documentation and guides
+developmentguide/
+documentations/
+myfiles/
+scripts/
+
+# Documentation files (not to be committed)
+arabicdict.md
+mistakes.md
+overallcontext.md
+prompts.md
+
+# Seed files
+**/seed*.sql
+**/seed*.ts
+**/seed*.js
+seed-*.sql
+seed-*.ts
+seed-*.js
