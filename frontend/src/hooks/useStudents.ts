@@ -7,10 +7,14 @@ import { notifications } from '@mantine/notifications';
 interface QueryStudentsParams {
   page?: number;
   limit?: number;
-  classId?: string;
-  sectionId?: string;
+  classId?: string; // Deprecated: use classIds instead
+  classIds?: string[]; // Array of class IDs
+  sectionId?: string; // Deprecated: use sectionIds instead
+  sectionIds?: string[]; // Array of section IDs
   isActive?: boolean;
   search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export function useStudents(params?: QueryStudentsParams) {
@@ -24,10 +28,21 @@ export function useStudents(params?: QueryStudentsParams) {
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
-      if (params?.classId) queryParams.append('classId', params.classId);
-      if (params?.sectionId) queryParams.append('sectionId', params.sectionId);
+      // Support both single (backward compatibility) and multiple filters
+      if (params?.classIds && params.classIds.length > 0) {
+        params.classIds.forEach((classId) => queryParams.append('classIds', classId));
+      } else if (params?.classId) {
+        queryParams.append('classId', params.classId);
+      }
+      if (params?.sectionIds && params.sectionIds.length > 0) {
+        params.sectionIds.forEach((sectionId) => queryParams.append('sectionIds', sectionId));
+      } else if (params?.sectionId) {
+        queryParams.append('sectionId', params.sectionId);
+      }
       if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
       if (params?.search) queryParams.append('search', params.search);
+      if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
       // Backend service returns { data: StudentDto[], meta: {...} }
       // Controller returns it directly: { data: StudentDto[], meta: {...} }

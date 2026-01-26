@@ -67,49 +67,6 @@ your-project/
 
 ---
 
-## 3. Initial Cursor Configuration
-
-### Global Rules (Cursor Settings → Rules for AI)
-
-Put this in your global settings - applies to ALL projects:
-
-```
-- Use TypeScript strict mode, no `any` types
-- Provide concise answers, avoid verbose code
-- Use current APIs (today's date: mention it)
-- Include error handling in all code
-- Don't add features I didn't request
-- Don't remove existing functionality without asking
-```
-
-### Project Rules (.cursor/rules/)
-
-Create `.mdc` files with this structure:
-
-**global.mdc** (alwaysApply: true)
-- Define your tech stack clearly
-- State that Mantine UI is the ONLY styling solution (no Tailwind, no vanilla CSS)
-- Point to reference files: overallcontext.txt, contracts.md, mistakes.md
-- State that frontend calls backend API, not Supabase directly (except auth)
-
-**frontend.mdc** (globs: frontend/**/*)
-- Mantine component patterns
-- React Query for data fetching
-- Handle loading/error/empty states
-- 'use client' only when needed
-
-**backend.mdc** (globs: backend/**/*)
-- NestJS module structure
-- DTO validation with class-validator
-- Supabase client injection pattern
-- Error handling with NestJS exceptions
-
-**database.mdc** (globs: **/migrations/**, **/entities/**)
-- RLS policies required on all tables
-- Naming conventions (snake_case)
-- Required fields (id, created_at, updated_at)
-
----
 
 ## 4. The overallcontext.txt Strategy
 

@@ -58,22 +58,48 @@ export class UsersService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // Step 1: Get user IDs that have roles in this branch
+    // Step 0: Get student role ID to exclude students from staff list
+    const { data: studentRole } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', 'student')
+      .maybeSingle();
+    
+    const studentRoleId = studentRole?.id;
+
+    // Step 1: Get all user IDs that have roles in this branch
     let userRolesQuery = supabase
       .from('user_roles')
-      .select('user_id', { count: 'exact' })
+      .select('user_id, role_id')
       .eq('branch_id', branchId);
 
-    if (query.role) {
+    // Support both single role (backward compatibility) and multiple roles
+    if (query.roles && query.roles.length > 0) {
+      userRolesQuery = userRolesQuery.in('role_id', query.roles);
+    } else if (query.role) {
       userRolesQuery = userRolesQuery.eq('role_id', query.role);
     }
 
-    const { data: userRolesData, error: userRolesError, count } = await userRolesQuery;
+    const { data: userRolesData, error: userRolesError } = await userRolesQuery;
     throwIfDbError(userRolesError);
 
-    const userIds = Array.from(
+    // Filter out users who have the student role (even if they have other roles)
+    let userIds = Array.from(
       new Set((userRolesData || []).map((ur: { user_id: string }) => ur.user_id)),
     );
+
+    // Exclude users who have the student role
+    if (studentRoleId && userRolesData) {
+      const usersWithStudentRole = new Set(
+        (userRolesData as Array<{ user_id: string; role_id: string }>)
+          .filter((ur) => ur.role_id === studentRoleId)
+          .map((ur) => ur.user_id),
+      );
+      userIds = userIds.filter((userId) => !usersWithStudentRole.has(userId));
+    }
+
+    // Recalculate count after filtering out students
+    const total = userIds.length;
 
     if (userIds.length === 0) {
       return {
@@ -85,24 +111,42 @@ export class UsersService {
     // Step 2: Fetch profiles for these users
     let profilesQuery = supabase
       .from('profiles')
-      .select('*', { count: 'exact' })
-      .in('id', userIds)
-      .range(from, to);
+      .select('*')
+      .in('id', userIds);
 
     if (query.isActive !== undefined) {
       profilesQuery = profilesQuery.eq('is_active', query.isActive);
     }
 
+    // Note: Search by email will be handled client-side after fetching auth users
+    // For now, only search by full_name in profiles
     if (query.search) {
-      profilesQuery = profilesQuery.or(
-        `full_name.ilike.%${query.search}%,email.ilike.%${query.search}%`,
-      );
+      profilesQuery = profilesQuery.ilike('full_name', `%${query.search}%`);
     }
+
+    // Apply sorting
+    const sortBy = query.sortBy || 'created_at';
+    const sortOrder = query.sortOrder || 'desc';
+    const ascending = sortOrder === 'asc';
+    
+    // Map frontend sortBy to database columns
+    const sortColumnMap: Record<string, string> = {
+      fullName: 'full_name',
+      email: 'created_at', // Will sort by created_at, email filtered client-side
+      isActive: 'is_active',
+      createdAt: 'created_at',
+      created_at: 'created_at',
+    };
+    
+    const dbSortColumn = sortColumnMap[sortBy] || 'created_at';
+    profilesQuery = profilesQuery.order(dbSortColumn, { ascending });
+
+    profilesQuery = profilesQuery.range(from, to);
 
     const { data: profilesData, error: profilesError } = await profilesQuery;
     throwIfDbError(profilesError);
 
-    const total = count ?? 0;
+    // Calculate total pages based on filtered user count
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     // Step 3: Fetch user_roles for these users in this branch
@@ -142,8 +186,22 @@ export class UsersService {
         .map((u) => [u.id, u.email || '']),
     );
 
-    // Step 6: Combine the data
-    const users = (profilesData || []).map((profile: ProfileRow) => {
+    // Step 6: Filter by email search if needed (client-side after fetching emails)
+    let filteredProfiles = profilesData || [];
+    if (query.search) {
+      // Filter by email if search term doesn't match full_name (already filtered in query)
+      const searchLower = query.search.toLowerCase();
+      filteredProfiles = (profilesData || []).filter((profile: ProfileRow) => {
+        const email = emailMap.get(profile.id) || '';
+        return (
+          profile.full_name.toLowerCase().includes(searchLower) ||
+          email.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+
+    // Step 7: Combine the data
+    const users = filteredProfiles.map((profile: ProfileRow) => {
       const userRolesForUser = (userRolesForBranch || []).filter(
         (ur: { user_id: string; role_id: string; branch_id: string }) =>
           ur.user_id === profile.id,

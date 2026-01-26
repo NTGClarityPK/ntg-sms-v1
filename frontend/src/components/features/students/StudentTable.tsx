@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core';
-import { IconEdit } from '@tabler/icons-react';
+import { IconEdit, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import type { Student } from '@/types/students';
 import { StudentForm } from './StudentForm';
@@ -16,9 +16,12 @@ interface StudentTableProps {
     totalPages: number;
   };
   onPageChange?: (page: number) => void;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  onSort?: (field: string) => void;
 }
 
-export function StudentTable({ students, meta, onPageChange }: StudentTableProps) {
+export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, onSort }: StudentTableProps) {
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
@@ -27,16 +30,35 @@ export function StudentTable({ students, meta, onPageChange }: StudentTableProps
     open();
   };
 
+  const SortableHeader = ({ field, children }: { field: string; children: React.ReactNode }) => {
+    const isSorted = sortBy === field;
+    const isAsc = isSorted && sortOrder === 'asc';
+    
+    return (
+      <Table.Th
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => onSort?.(field)}
+      >
+        <Group gap="xs" wrap="nowrap">
+          <Text fw={500}>{children}</Text>
+          {isSorted && (
+            isAsc ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+          )}
+        </Group>
+      </Table.Th>
+    );
+  };
+
   return (
     <>
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Student ID</Table.Th>
-            <Table.Th>Name</Table.Th>
-            <Table.Th>Class</Table.Th>
-            <Table.Th>Section</Table.Th>
-            <Table.Th>Status</Table.Th>
+            <SortableHeader field="studentId">Student ID</SortableHeader>
+            <SortableHeader field="fullName">Name</SortableHeader>
+            <SortableHeader field="className">Class</SortableHeader>
+            <SortableHeader field="sectionName">Section</SortableHeader>
+            <SortableHeader field="isActive">Status</SortableHeader>
             <Table.Th>Actions</Table.Th>
           </Table.Tr>
         </Table.Thead>

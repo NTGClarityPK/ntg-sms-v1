@@ -3,6 +3,7 @@
 import { Group, Text, ActionIcon } from '@mantine/core';
 import { IconBell } from '@tabler/icons-react';
 import { UserMenu } from './UserMenu';
+import { BranchSwitcher } from '@/components/features/branches/BranchSwitcher';
 
 export function Header() {
   return (
@@ -12,6 +13,7 @@ export function Header() {
       </Text>
 
       <Group gap="md">
+        <BranchSwitcher />
         <ActionIcon variant="subtle" size="lg">
           <IconBell size={20} />
         </ActionIcon>

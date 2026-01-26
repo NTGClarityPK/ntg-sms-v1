@@ -58,7 +58,7 @@ export default function LoginPage() {
         throw new Error('Session not created');
       }
       
-      // Use window.location instead of router.push to ensure full page reload
+      // Redirect to dashboard
       window.location.href = '/dashboard';
     } catch (err: any) {
       // Extract error message from various possible response structures

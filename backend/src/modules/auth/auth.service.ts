@@ -10,40 +10,56 @@ export class AuthService {
   private async listUserBranches(userId: string): Promise<BranchSummaryDto[]> {
     const supabase = this.supabaseConfig.getClient();
 
-    const { data, error } = await supabase
+    // First get the branch IDs for this user
+    const { data: userBranches, error: userBranchesError } = await supabase
       .from('user_branches')
-      .select('branch_id, branches:branches(id, tenant_id, name, code)')
+      .select('branch_id')
       .eq('user_id', userId);
 
-    if (error) {
-      throw new BadRequestException(error.message);
+    if (userBranchesError) {
+      console.error('Error fetching user_branches:', userBranchesError);
+      throw new BadRequestException(`Failed to fetch user branches: ${userBranchesError.message}`);
     }
 
-    const rowsUnknown = data ?? [];
-    const rows = rowsUnknown as unknown as Array<{
-      branch_id: string;
-      branches:
-        | { id: string; tenant_id: string | null; name: string; code: string | null }
-        | { id: string; tenant_id: string | null; name: string; code: string | null }[]
-        | null;
-    }>;
+    console.log('User branches query result:', { userId, userBranches });
 
-    return rows
-      .map((r) => {
-        const b = r.branches;
-        if (!b) return null;
-        return Array.isArray(b) ? b[0] ?? null : b;
-      })
-      .filter((b): b is NonNullable<typeof b> => Boolean(b))
-      .map(
-        (b) =>
-          new BranchSummaryDto({
-            id: b.id,
-            tenantId: b.tenant_id,
-            name: b.name,
-            code: b.code,
-          }),
-      );
+    if (!userBranches || userBranches.length === 0) {
+      console.log('No user_branches found for user:', userId);
+      return [];
+    }
+
+    // Then fetch the branch details
+    const branchIds = userBranches.map((ub) => ub.branch_id);
+    console.log('Fetching branch details for IDs:', branchIds);
+    
+    const { data: branches, error: branchesError } = await supabase
+      .from('branches')
+      .select('id, tenant_id, name, code')
+      .in('id', branchIds);
+
+    if (branchesError) {
+      console.error('Error fetching branches:', branchesError);
+      throw new BadRequestException(`Failed to fetch branches: ${branchesError.message}`);
+    }
+
+    console.log('Branches query result:', branches);
+
+    if (!branches) {
+      return [];
+    }
+
+    const result = branches.map(
+      (b) =>
+        new BranchSummaryDto({
+          id: b.id,
+          tenantId: b.tenant_id,
+          name: b.name,
+          code: b.code,
+        }),
+    );
+    
+    console.log('Final branches result:', result);
+    return result;
   }
 
   private async getProfileCurrentBranchId(userId: string): Promise<string | null> {
@@ -95,15 +111,56 @@ export class AuthService {
       ? branches.find((b) => b.id === currentBranchId) ?? null
       : null;
 
-    return new UserResponseDto({
+    // Fetch user roles - use two-step approach for reliability
+    const { data: userRolesData, error: userRolesError } = await supabase
+      .from('user_roles')
+      .select('role_id, branch_id')
+      .eq('user_id', userId);
+
+    let roles: Array<{ roleId: string; roleName: string; branchId: string }> = [];
+    
+    if (userRolesData && userRolesData.length > 0) {
+      // Get unique role IDs
+      const roleIds = Array.from(new Set(userRolesData.map((ur) => ur.role_id)));
+      
+      // Fetch role details
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('roles')
+        .select('id, name')
+        .in('id', roleIds);
+
+      if (rolesError) {
+        console.error('Error fetching roles:', rolesError);
+      } else {
+        // Create a map of role ID to role name
+        const roleMap = new Map(
+          (rolesData || []).map((r) => [r.id, r.name])
+        );
+
+        // Build roles array
+        roles = userRolesData.map((ur) => ({
+          roleId: ur.role_id,
+          roleName: roleMap.get(ur.role_id) || '',
+          branchId: ur.branch_id,
+        }));
+      }
+    }
+
+    const userResponse = new UserResponseDto({
       id: user.id,
       email: user.email || '',
       fullName: profile?.full_name || user.email || 'User',
       avatarUrl: profile?.avatar_url || undefined,
-      roles: [], // Placeholder - will be populated later with role management
+      roles,
       branches,
       currentBranch,
     });
+
+    console.log('getCurrentUser - roles:', roles);
+    console.log('getCurrentUser - branches:', branches);
+    console.log('getCurrentUser - currentBranch:', currentBranch);
+    
+    return userResponse;
   }
 
   async validateToken(token: string): Promise<UserResponseDto> {

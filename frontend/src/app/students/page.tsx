@@ -1,8 +1,8 @@
 'use client';
 
-import { Group, Title, Loader, Stack, Alert, Text, Button, TextInput, Select } from '@mantine/core';
+import { Group, Title, Loader, Stack, Alert, Text, Button, TextInput, MultiSelect } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
 import { StudentTable } from '@/components/features/students/StudentTable';
 import { StudentForm } from '@/components/features/students/StudentForm';
@@ -15,8 +15,16 @@ export default function StudentsPage() {
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [classFilter, setClassFilter] = useState<string | undefined>(undefined);
-  const [sectionFilter, setSectionFilter] = useState<string | undefined>(undefined);
+  const [debouncedSearch] = useDebouncedValue(search, 300); // Debounce search by 300ms
+  const [classFilter, setClassFilter] = useState<string[]>([]);
+  const [sectionFilter, setSectionFilter] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = () => {
+    setPage(1);
+  };
 
   const { data: classesData } = useCoreLookups('classes');
   const { data: sectionsData } = useCoreLookups('sections');
@@ -26,9 +34,11 @@ export default function StudentsPage() {
   const studentsQuery = useStudents({
     page,
     limit: 20,
-    classId: classFilter,
-    sectionId: sectionFilter,
-    search: search || undefined,
+    classIds: classFilter.length > 0 ? classFilter : undefined,
+    sectionIds: sectionFilter.length > 0 ? sectionFilter : undefined,
+    search: debouncedSearch || undefined,
+    sortBy,
+    sortOrder,
   });
 
   return (
@@ -48,25 +58,42 @@ export default function StudentsPage() {
             placeholder="Search students..."
             leftSection={<IconSearch size={16} />}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              handleFilterChange();
+            }}
             style={{ flex: 1 }}
           />
-          <Select
-            placeholder="Filter by class"
-            data={classes.map((c) => ({ value: c.id, label: c.displayName }))}
-            value={classFilter}
-            onChange={(value) => setClassFilter(value || undefined)}
-            clearable
-            w={200}
-          />
-          <Select
-            placeholder="Filter by section"
-            data={sections.map((s) => ({ value: s.id, label: s.name }))}
-            value={sectionFilter}
-            onChange={(value) => setSectionFilter(value || undefined)}
-            clearable
-            w={200}
-          />
+          <div style={{ width: 200, flexShrink: 0 }}>
+            <MultiSelect
+              placeholder="Filter by class"
+              data={classes.map((c) => ({ value: c.id, label: c.displayName }))}
+              value={classFilter}
+              onChange={(value) => {
+                setClassFilter(value);
+                handleFilterChange();
+              }}
+              clearable
+              searchable
+              maxDisplayedValues={2}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ width: 180, flexShrink: 0 }}>
+            <MultiSelect
+              placeholder="Filter by section"
+              data={sections.map((s) => ({ value: s.id, label: s.name }))}
+              value={sectionFilter}
+              onChange={(value) => {
+                setSectionFilter(value);
+                handleFilterChange();
+              }}
+              clearable
+              searchable
+              maxDisplayedValues={2}
+              style={{ width: '100%' }}
+            />
+          </div>
         </Group>
 
         {studentsQuery.isLoading ? (
@@ -95,6 +122,17 @@ export default function StudentsPage() {
             students={studentsQuery.data.data}
             meta={studentsQuery.data.meta}
             onPageChange={setPage}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSort={(field) => {
+              if (sortBy === field) {
+                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              } else {
+                setSortBy(field);
+                setSortOrder('asc');
+              }
+              setPage(1); // Reset to first page when sorting changes
+            }}
           />
         )}
       </Stack>

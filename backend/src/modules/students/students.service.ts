@@ -58,15 +58,18 @@ export class StudentsService {
         '*, classes:class_id(name, display_name), sections:section_id(name)',
         { count: 'exact' },
       )
-      .eq('branch_id', branchId)
-      .range(from, to)
-      .order('created_at', { ascending: false });
+      .eq('branch_id', branchId);
 
-    if (query.classId) {
+    // Support both single (backward compatibility) and multiple filters
+    if (query.classIds && query.classIds.length > 0) {
+      dbQuery = dbQuery.in('class_id', query.classIds);
+    } else if (query.classId) {
       dbQuery = dbQuery.eq('class_id', query.classId);
     }
 
-    if (query.sectionId) {
+    if (query.sectionIds && query.sectionIds.length > 0) {
+      dbQuery = dbQuery.in('section_id', query.sectionIds);
+    } else if (query.sectionId) {
       dbQuery = dbQuery.eq('section_id', query.sectionId);
     }
 
@@ -74,29 +77,55 @@ export class StudentsService {
       dbQuery = dbQuery.eq('is_active', query.isActive);
     }
 
-    if (query.search) {
-      // For search, we'll filter after fetching profiles
-      dbQuery = dbQuery.ilike('student_id', `%${query.search}%`);
-    }
+    // Apply sorting
+    const sortBy = query.sortBy || 'created_at';
+    const sortOrder = query.sortOrder || 'desc';
+    const ascending = sortOrder === 'asc';
+    
+    // Map frontend sortBy to database columns
+    const sortColumnMap: Record<string, string> = {
+      studentId: 'student_id',
+      className: 'class_id',
+      sectionName: 'section_id',
+      isActive: 'is_active',
+      createdAt: 'created_at',
+      created_at: 'created_at',
+    };
+    
+    const dbSortColumn = sortColumnMap[sortBy] || 'created_at';
+    dbQuery = dbQuery.order(dbSortColumn, { ascending });
 
-    const { data, error, count } = await dbQuery;
+    // Don't filter by student_id in DB query when searching - we'll filter by name client-side
+    // This allows searching by both student_id and full_name
+    // Note: We fetch more records than needed when searching, then filter client-side
+    const searchQuery = query.search;
+    const fetchLimit = searchQuery ? 1000 : limit; // Fetch more when searching to allow client-side filtering
+    const fetchTo = searchQuery ? from + fetchLimit - 1 : to;
+
+    let dbQueryWithLimit = dbQuery.range(from, fetchTo);
+
+    const { data, error, count } = await dbQueryWithLimit;
 
     throwIfDbError(error);
-
-    const total = count ?? 0;
-    const totalPages = Math.max(1, Math.ceil(total / limit));
 
     // Get user IDs and fetch profiles separately
     const userIds = (data as unknown as Array<{ user_id: string }>)
       .map((s) => s.user_id)
       .filter((id): id is string => !!id);
 
-    // Fetch profiles
+    // Fetch profiles - if searching, also filter by full_name in DB
+    let profilesQuery = supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', userIds);
+
+    if (searchQuery && userIds.length > 0) {
+      // Filter profiles by full_name in database for better performance
+      profilesQuery = profilesQuery.ilike('full_name', `%${searchQuery}%`);
+    }
+
     const { data: profilesData } = userIds.length > 0
-      ? await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', userIds)
+      ? await profilesQuery
       : { data: [] };
 
     const profileMap = new Map(
@@ -127,39 +156,59 @@ export class StudentsService {
       updated_at: string;
       classes: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
       sections: { name: string } | { name: string }[] | null;
-    }>).map((row) => {
-      const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
-      const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
-      const fullName = profileMap.get(row.user_id);
+    }>)
+      .filter((row) => {
+        // Filter by profile match when searching (profiles already filtered in DB)
+        if (searchQuery && !profileMap.has(row.user_id)) {
+          return false;
+        }
+        return true;
+      })
+      .map((row) => {
+        const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
+        const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
+        const fullName = profileMap.get(row.user_id);
 
-      return new StudentDto({
-        id: row.id,
-        userId: row.user_id,
-        branchId: row.branch_id,
-        studentId: row.student_id,
-        classId: row.class_id ?? undefined,
-        sectionId: row.section_id ?? undefined,
-        bloodGroup: row.blood_group ?? undefined,
-        medicalNotes: row.medical_notes ?? undefined,
-        admissionDate: row.admission_date ?? undefined,
-        academicYearId: row.academic_year_id ?? undefined,
-        isActive: row.is_active,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        fullName: fullName,
-        email: emailMap.get(row.user_id),
-        className: classData?.display_name ?? classData?.name,
-        sectionName: sectionData?.name,
+        return new StudentDto({
+          id: row.id,
+          userId: row.user_id,
+          branchId: row.branch_id,
+          studentId: row.student_id,
+          classId: row.class_id ?? undefined,
+          sectionId: row.section_id ?? undefined,
+          bloodGroup: row.blood_group ?? undefined,
+          medicalNotes: row.medical_notes ?? undefined,
+          admissionDate: row.admission_date ?? undefined,
+          academicYearId: row.academic_year_id ?? undefined,
+          isActive: row.is_active,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          fullName: fullName,
+          email: emailMap.get(row.user_id),
+          className: classData?.display_name ?? classData?.name,
+          sectionName: sectionData?.name,
+        });
       });
-    });
 
-    // Apply search filter on full name if needed
-    if (query.search) {
+    // Apply search filter on student_id and full_name (case-insensitive)
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
       students = students.filter(
         (s) =>
-          s.studentId.toLowerCase().includes(query.search!.toLowerCase()) ||
-          s.fullName?.toLowerCase().includes(query.search!.toLowerCase()),
+          s.studentId.toLowerCase().includes(searchLower) ||
+          s.fullName?.toLowerCase().includes(searchLower) ||
+          s.email?.toLowerCase().includes(searchLower),
       );
+    }
+
+    // Calculate total and pagination
+    // When searching, total is the filtered count; otherwise use DB count
+    const total = searchQuery ? students.length : (count ?? 0);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    // Apply pagination to filtered results when searching
+    if (searchQuery) {
+      students = students.slice(from, from + limit);
     }
 
     return {

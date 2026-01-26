@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core';
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import type { User } from '@/types/users';
@@ -19,9 +19,12 @@ interface UserTableProps {
     totalPages: number;
   };
   onPageChange?: (page: number) => void;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  onSort?: (field: string) => void;
 }
 
-export function UserTable({ users, meta, onPageChange }: UserTableProps) {
+export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort }: UserTableProps) {
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { data: rolesData } = useRoles();
@@ -65,15 +68,34 @@ export function UserTable({ users, meta, onPageChange }: UserTableProps) {
     );
   };
 
+  const SortableHeader = ({ field, children }: { field: string; children: React.ReactNode }) => {
+    const isSorted = sortBy === field;
+    const isAsc = isSorted && sortOrder === 'asc';
+    
+    return (
+      <Table.Th
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => onSort?.(field)}
+      >
+        <Group gap="xs" wrap="nowrap">
+          <Text fw={500}>{children}</Text>
+          {isSorted && (
+            isAsc ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />
+          )}
+        </Group>
+      </Table.Th>
+    );
+  };
+
   return (
     <>
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Name</Table.Th>
-            <Table.Th>Email</Table.Th>
+            <SortableHeader field="fullName">Name</SortableHeader>
+            <SortableHeader field="email">Email</SortableHeader>
             <Table.Th>Roles</Table.Th>
-            <Table.Th>Status</Table.Th>
+            <SortableHeader field="isActive">Status</SortableHeader>
             <Table.Th>Actions</Table.Th>
           </Table.Tr>
         </Table.Thead>

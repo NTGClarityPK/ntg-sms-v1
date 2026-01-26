@@ -62,24 +62,49 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
   const form = useForm({
     initialValues: {
-      email: student?.email || '',
+      email: '',
       password: '',
-      fullName: student?.fullName || '',
-      phone: student?.phone || '',
-      address: student?.address || '',
-      dateOfBirth: student?.dateOfBirth || '',
-      gender: student?.gender || undefined,
-      studentId: student?.studentId || '',
-      classId: student?.classId || '',
-      sectionId: student?.sectionId || '',
-      bloodGroup: student?.bloodGroup || '',
-      medicalNotes: student?.medicalNotes || '',
-      admissionDate: student?.admissionDate || '',
-      academicYearId: student?.academicYearId || '',
-      isActive: student?.isActive ?? true,
+      fullName: '',
+      phone: '',
+      address: '',
+      dateOfBirth: '',
+      gender: undefined as 'male' | 'female' | undefined,
+      studentId: '',
+      classId: '',
+      sectionId: '',
+      bloodGroup: '',
+      medicalNotes: '',
+      admissionDate: '',
+      academicYearId: '',
+      isActive: true,
     },
     validate: zodResolver(isEdit ? updateStudentSchema : createStudentSchema),
   });
+
+  // Reset form when student prop changes (for edit mode)
+  useEffect(() => {
+    if (student) {
+      form.setValues({
+        email: student.email || '',
+        password: '',
+        fullName: student.fullName || '',
+        phone: student.phone || '',
+        address: student.address || '',
+        dateOfBirth: student.dateOfBirth || '',
+        gender: student.gender || undefined,
+        studentId: student.studentId || '',
+        classId: student.classId || '',
+        sectionId: student.sectionId || '',
+        bloodGroup: student.bloodGroup || '',
+        medicalNotes: student.medicalNotes || '',
+        admissionDate: student.admissionDate || '',
+        academicYearId: student.academicYearId || '',
+        isActive: student.isActive ?? true,
+      });
+    } else {
+      form.reset();
+    }
+  }, [student]);
 
   // Generate student ID when class/section/year changes
   useEffect(() => {
@@ -139,7 +164,9 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         await createStudent.mutateAsync(createData);
       }
 
-      form.reset();
+      if (!isEdit) {
+        form.reset();
+      }
       onClose();
     } catch (error) {
       // Error handling is done in the mutation hooks

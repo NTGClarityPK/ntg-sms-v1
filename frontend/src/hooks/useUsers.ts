@@ -7,9 +7,12 @@ import { notifications } from '@mantine/notifications';
 interface QueryUsersParams {
   page?: number;
   limit?: number;
-  role?: string;
+  role?: string; // Deprecated: use roles instead
+  roles?: string[]; // Array of role IDs
   isActive?: boolean;
   search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export function useUsers(params?: QueryUsersParams) {
@@ -23,15 +26,25 @@ export function useUsers(params?: QueryUsersParams) {
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
-      if (params?.role) queryParams.append('role', params.role);
+      // Support both single role (backward compatibility) and multiple roles
+      if (params?.roles && params.roles.length > 0) {
+        params.roles.forEach((roleId) => queryParams.append('roles', roleId));
+      } else if (params?.role) {
+        queryParams.append('role', params.role);
+      }
       if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
       if (params?.search) queryParams.append('search', params.search);
+      if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
-      const response = await apiClient.get<{
-        data: User[];
-        meta: { total: number; page: number; limit: number; totalPages: number };
-      }>(`/api/v1/users?${queryParams.toString()}`);
-      return response.data;
+      // Backend service returns { data: UserDto[], meta: {...} }
+      // Controller returns it directly: { data: UserDto[], meta: {...} }
+      // ResponseInterceptor sees it has 'data' property and returns as-is: { data: UserDto[], meta: {...} }
+      // apiClient.get() returns response.data, which is { data: UserDto[], meta: {...} }
+      const response = await apiClient.get<User[]>(`/api/v1/users?${queryParams.toString()}`);
+      // response is ApiResponse<User[]>, which is { data: User[], meta?: {...}, error?: {...} }
+      // But the actual HTTP response is { data: UserDto[], meta: {...} }, so response = { data: UserDto[], meta: {...} }
+      return response;
     },
     enabled: !!branchId,
   });

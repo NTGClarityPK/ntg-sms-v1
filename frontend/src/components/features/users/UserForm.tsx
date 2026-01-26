@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
@@ -44,18 +45,37 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
 
   const form = useForm({
     initialValues: {
-      email: user?.email || '',
+      email: '',
       password: '',
-      fullName: user?.fullName || '',
-      phone: user?.phone || '',
-      address: user?.address || '',
-      dateOfBirth: user?.dateOfBirth || '',
-      gender: user?.gender || undefined,
-      roleIds: user?.roles?.map((r) => r.roleId) || [],
-      isActive: user?.isActive ?? true,
+      fullName: '',
+      phone: '',
+      address: '',
+      dateOfBirth: '',
+      gender: undefined as 'male' | 'female' | undefined,
+      roleIds: [] as string[],
+      isActive: true,
     },
     validate: zodResolver(isEdit ? updateUserSchema : createUserSchema),
   });
+
+  // Reset form when user prop changes (for edit mode)
+  useEffect(() => {
+    if (user) {
+      form.setValues({
+        email: user.email || '',
+        password: '',
+        fullName: user.fullName || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        dateOfBirth: user.dateOfBirth || '',
+        gender: user.gender || undefined,
+        roleIds: user.roles?.map((r) => r.roleId) || [],
+        isActive: user.isActive ?? true,
+      });
+    } else {
+      form.reset();
+    }
+  }, [user]);
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
@@ -94,7 +114,9 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
         await createUser.mutateAsync(createData);
       }
 
-      form.reset();
+      if (!isEdit) {
+        form.reset();
+      }
       onClose();
     } catch (error) {
       // Error handling is done in the mutation hooks
@@ -105,7 +127,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Edit User' : 'Create User'}
+      title={isEdit ? 'Edit Staff' : 'Create Staff'}
       size="lg"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>

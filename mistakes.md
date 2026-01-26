@@ -378,3 +378,49 @@ return response;
 
 **Lesson:** When the backend service already returns `{ data: T[], meta: {...} }`, the ResponseInterceptor passes it through unchanged. Use `apiClient.get<T[]>()` (not `apiClient.get<{ data: T[], meta: {...} }>()`) to get `ApiResponse<T[]>` = `{ data: T[], meta: {...} }`. Always trace the response flow: Service → Controller → Interceptor → HTTP → Axios → apiClient → Hook → Component.
 
+### Database Query Searching Non-Existent Columns
+- ❌ **Issue**: Users list API returns empty results even though users exist in the database, or query fails silently
+- 🔍 **Cause**: Query attempts to search/filter by columns that don't exist in the queried table. For example, trying to search by `email` in the `profiles` table using `.or('full_name.ilike.%search%,email.ilike.%search%')`, but `email` column doesn't exist in `profiles` (it exists in `auth.users` table)
+- ✅ **Solution**: 
+  1. Only search by columns that exist in the queried table (e.g., `full_name` in `profiles`)
+  2. For columns in other tables (like `email` in `auth.users`), fetch the related data separately and filter client-side after fetching
+  3. Use separate queries for data in different tables, then combine and filter in application code
+- **Lesson**: Always verify that all columns referenced in Supabase queries actually exist in the target table. Check the table schema before writing queries. If you need to search across multiple tables, fetch data separately and filter client-side. Never assume a column exists - check the database schema or migration files first.
+
+### Edit Forms Not Pre-Populated and Single Filter Limitations
+- ❌ **Issue**: When implementing edit functionality for entities (users, students, etc.), the edit form opens with empty fields instead of pre-populating with existing data. Also, filter dropdowns only support single selection, limiting users' ability to filter by multiple values simultaneously.
+- 🔍 **Cause**: 
+  1. Form components use `initialValues` in `useForm` hook, but these values are only set once when the component mounts. When the `user`/`student` prop changes (e.g., when opening edit modal), the form doesn't reset with new values.
+  2. Filter dropdowns use `Select` component (single selection) instead of `MultiSelect` component (multiple selection).
+  3. Backend DTOs and services only accept single filter values (e.g., `role?: string`) instead of arrays (e.g., `roles?: string[]`).
+- ✅ **Solution**: 
+  1. **Edit Form Pre-Population**: Add a `useEffect` hook that watches the entity prop (e.g., `user`, `student`) and calls `form.setValues()` when it changes. Reset form when prop is null (for create mode).
+  2. **Multiple Filters**: 
+     - Change `Select` to `MultiSelect` component in the UI
+     - Update state from `string | undefined` to `string[]`
+     - Update backend DTO to accept arrays with proper validation: `@IsArray()`, `@IsUUID(undefined, { each: true })`, and `@Transform` decorator to handle both single values and arrays
+     - Update backend service to use `.in('field', array)` instead of `.eq('field', value)`
+     - Update frontend hooks to send multiple values as query parameters
+     - Maintain backward compatibility with single filter parameter
+- **Lesson**: When implementing CRUD forms, always ensure edit forms pre-populate with existing data using `useEffect` to sync form state with prop changes. When implementing filters, consider whether users might want to filter by multiple values simultaneously. Use `MultiSelect` for filters that benefit from multiple selections (roles, classes, sections, etc.). Always implement both frontend (UI state) and backend (DTO validation, service logic) changes together. Create a checklist when implementing similar features across multiple screens: "Edit form pre-population ✓, Multiple filters support ✓, Backend DTO updated ✓, Service logic updated ✓".
+
+### Missing UI Components Despite Backend Implementation
+- ❌ **Issue**: Backend API endpoints and data structures are implemented (e.g., branch selection endpoints, user data includes branches), but the corresponding UI components are missing, making the feature unusable from the frontend
+- 🔍 **Cause**: 
+  1. Implementation focused on backend API endpoints and data flow, but forgot to create the frontend UI components
+  2. Plan documents mention UI components (e.g., "BranchSwitcher.tsx should be integrated into Header.tsx"), but these were not implemented
+  3. No visual verification that UI components exist after backend implementation
+  4. Assumed that if backend works, frontend will automatically have UI (false assumption)
+- ✅ **Solution**: 
+  1. **Always create UI components in parallel with backend**: When implementing a feature, create both backend endpoints AND frontend UI components together
+  2. **Reference plan documents during implementation**: Check the plan file to ensure ALL mentioned components are created (backend + frontend)
+  3. **Visual verification checklist**: After implementing a feature, manually verify:
+     - Can I see the UI element? (e.g., branch switcher in header)
+     - Can I interact with it? (e.g., click to switch branches)
+     - Does it work end-to-end? (e.g., switching branch updates data)
+  4. **Component inventory**: Before marking a feature as "completed", verify all components mentioned in the plan exist:
+     - Backend endpoints ✓
+     - Frontend hooks ✓
+     - Frontend UI components ✓
+     - Integration into layouts ✓
+- **Lesson**: Backend implementation alone is not enough - users need UI to interact with features. Always implement backend AND frontend together. When following a plan, check off each component (backend service, controller, frontend hook, frontend component, layout integration) as you implement it. Before marking a feature complete, do a visual walkthrough: "Can I see it? Can I click it? Does it work?" If the plan mentions a UI component (like "BranchSwitcher.tsx"), it MUST exist in the codebase. Create a feature completion checklist: "Backend API ✓, Frontend Hook ✓, UI Component ✓, Integration ✓, Manual Test ✓".
