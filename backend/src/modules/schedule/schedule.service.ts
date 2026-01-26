@@ -174,6 +174,7 @@ export class ScheduleService {
 
   async listTimingTemplates(
     query: QueryTimingTemplatesDto,
+    branchId: string,
   ): Promise<{ data: TimingTemplateDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
@@ -186,6 +187,7 @@ export class ScheduleService {
     let dbQuery = supabase
       .from('timing_templates')
       .select('*', { count: 'exact' })
+      .eq('branch_id', branchId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -244,13 +246,17 @@ export class ScheduleService {
     };
   }
 
-  async createTimingTemplate(input: {
-    name: string;
-    startTime: string;
-    endTime: string;
-    periodDurationMinutes?: number;
-    slots?: Array<{ name: string; startTime?: string; endTime?: string; sortOrder?: number }>;
-  }): Promise<TimingTemplateDto> {
+  async createTimingTemplate(
+    input: {
+      name: string;
+      startTime: string;
+      endTime: string;
+      periodDurationMinutes?: number;
+      slots?: Array<{ name: string; startTime?: string; endTime?: string; sortOrder?: number }>;
+    },
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<TimingTemplateDto> {
     if (input.startTime >= input.endTime) {
       throw new BadRequestException('startTime must be before endTime');
     }
@@ -263,6 +269,8 @@ export class ScheduleService {
         start_time: input.startTime,
         end_time: input.endTime,
         period_duration_minutes: input.periodDurationMinutes ?? 60,
+        branch_id: branchId,
+        tenant_id: tenantId,
       })
       .select('*')
       .single();
@@ -326,26 +334,31 @@ export class ScheduleService {
     return { data: unique };
   }
 
-  async listPublicHolidays(academicYearId: string): Promise<{ data: PublicHolidayDto[] }> {
+  async listPublicHolidays(academicYearId: string, branchId: string): Promise<{ data: PublicHolidayDto[] }> {
     const supabase = this.supabaseConfig.getClient();
 
     const { data, error } = await supabase
       .from('public_holidays')
       .select('*')
       .eq('academic_year_id', academicYearId)
+      .eq('branch_id', branchId)
       .order('start_date', { ascending: true });
     throwIfDbError(error);
 
     return { data: ((data as PublicHolidayRow[]) ?? []).map(mapPublicHoliday) };
   }
 
-  async createPublicHoliday(input: {
-    name: string;
-    nameAr?: string;
-    startDate: string;
-    endDate: string;
-    academicYearId: string;
-  }): Promise<PublicHolidayDto> {
+  async createPublicHoliday(
+    input: {
+      name: string;
+      nameAr?: string;
+      startDate: string;
+      endDate: string;
+      academicYearId: string;
+    },
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<PublicHolidayDto> {
     if (input.startDate > input.endDate) {
       throw new BadRequestException('startDate must be on or before endDate');
     }
@@ -371,6 +384,8 @@ export class ScheduleService {
         start_date: input.startDate,
         end_date: input.endDate,
         academic_year_id: input.academicYearId,
+        branch_id: branchId,
+        tenant_id: tenantId,
       })
       .select('*')
       .single();

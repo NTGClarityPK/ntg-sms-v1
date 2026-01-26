@@ -143,6 +143,7 @@ export class AssessmentService {
 
   async listAssessmentTypes(
     query: QueryAssessmentTypesDto,
+    branchId: string,
   ): Promise<{ data: AssessmentTypeDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
@@ -155,6 +156,7 @@ export class AssessmentService {
     let dbQuery = supabase
       .from('assessment_types')
       .select('*', { count: 'exact' })
+      .eq('branch_id', branchId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -170,7 +172,11 @@ export class AssessmentService {
     return { data: ((data as AssessmentTypeRow[]) ?? []).map(mapAssessmentType), meta: { total, page, limit, totalPages } };
   }
 
-  async createAssessmentType(input: { name: string; nameAr?: string; isActive?: boolean; sortOrder?: number }): Promise<AssessmentTypeDto> {
+  async createAssessmentType(
+    input: { name: string; nameAr?: string; isActive?: boolean; sortOrder?: number },
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<AssessmentTypeDto> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('assessment_types')
@@ -179,6 +185,8 @@ export class AssessmentService {
         name_ar: input.nameAr ?? null,
         is_active: input.isActive ?? true,
         sort_order: input.sortOrder ?? 0,
+        branch_id: branchId,
+        tenant_id: tenantId,
       })
       .select('*')
       .single();
@@ -186,11 +194,12 @@ export class AssessmentService {
     return mapAssessmentType(data as AssessmentTypeRow);
   }
 
-  async listGradeTemplates(): Promise<{ data: GradeTemplateDto[] }> {
+  async listGradeTemplates(branchId: string): Promise<{ data: GradeTemplateDto[] }> {
     const supabase = this.supabaseConfig.getClient();
     const { data: templates, error: tError } = await supabase
       .from('grade_templates')
       .select('*')
+      .eq('branch_id', branchId)
       .order('created_at', { ascending: false });
     throwIfDbError(tError);
 
@@ -216,13 +225,17 @@ export class AssessmentService {
     return { data: templateRows.map((t) => mapGradeTemplate(t, rangesByTemplate.get(t.id) ?? [])) };
   }
 
-  async createGradeTemplate(input: { name: string; ranges: Array<{ letter: string; minPercentage: number; maxPercentage: number; sortOrder: number }> }): Promise<GradeTemplateDto> {
+  async createGradeTemplate(
+    input: { name: string; ranges: Array<{ letter: string; minPercentage: number; maxPercentage: number; sortOrder: number }> },
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<GradeTemplateDto> {
     validateRanges(input.ranges);
 
     const supabase = this.supabaseConfig.getClient();
     const { data: template, error: tError } = await supabase
       .from('grade_templates')
-      .insert({ name: input.name })
+      .insert({ name: input.name, branch_id: branchId, tenant_id: tenantId })
       .select('*')
       .single();
     throwIfDbError(tError);

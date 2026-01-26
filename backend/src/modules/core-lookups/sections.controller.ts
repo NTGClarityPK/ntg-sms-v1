@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CoreLookupsService } from './core-lookups.service';
 import { QuerySectionsDto } from './dto/query-sections.dto';
 import { CreateSectionDto } from './dto/create-section.dto';
@@ -14,16 +15,20 @@ export class SectionsController {
   @Get()
   async list(
     @Query() query: QuerySectionsDto,
+    @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{
     data: SectionDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
-    return this.coreLookupsService.listSections(query);
+    return this.coreLookupsService.listSections(query, branch.branchId);
   }
 
   @Post()
-  async create(@Body() body: CreateSectionDto): Promise<{ data: SectionDto }> {
-    const created = await this.coreLookupsService.createSection(body);
+  async create(
+    @Body() body: CreateSectionDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: SectionDto }> {
+    const created = await this.coreLookupsService.createSection(body, branch.branchId, branch.tenantId);
     return { data: created };
   }
 }

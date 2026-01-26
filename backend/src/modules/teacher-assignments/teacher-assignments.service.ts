@@ -225,15 +225,15 @@ export class TeacherAssignmentsService {
       throw new NotFoundException('Staff member not found or does not belong to this branch');
     }
 
+    // Validate subject exists (subjects are global, not branch-specific)
     const { data: subjectData, error: subjectError } = await supabase
       .from('subjects')
       .select('id')
       .eq('id', input.subjectId)
-      .eq('branch_id', branchId)
       .maybeSingle();
     throwIfDbError(subjectError);
     if (!subjectData) {
-      throw new NotFoundException('Subject not found or does not belong to this branch');
+      throw new NotFoundException('Subject not found');
     }
 
     const { data: classSectionData, error: classSectionError } = await supabase

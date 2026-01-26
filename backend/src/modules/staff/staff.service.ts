@@ -196,7 +196,7 @@ export class StaffService {
         }
         userRolesMap.get(ur.user_id)!.push({
           roleId: ur.role_id,
-          roleName: role.display_name,
+          roleName: role.name,
           branchId: ur.branch_id,
         });
       }
@@ -332,7 +332,7 @@ export class StaffService {
         return role
           ? {
               roleId: ur.role_id,
-              roleName: role.display_name,
+              roleName: role.name,
               branchId: ur.branch_id,
             }
           : null;

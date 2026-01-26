@@ -93,8 +93,16 @@ export function CreateAssignmentModal({
     label: s.name,
   }));
 
+  // Filter to only include active staff with teacher roles (class_teacher or subject_teacher)
   const staffOptions = staff
-    .filter((s) => s.isActive)
+    .filter((s) => {
+      if (!s.isActive) return false;
+      // Check if staff has teacher roles
+      const hasTeacherRole = s.roles?.some(
+        (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
+      );
+      return hasTeacherRole;
+    })
     .map((s) => ({
       value: s.id,
       label: s.fullName || s.employeeId || 'Unknown',

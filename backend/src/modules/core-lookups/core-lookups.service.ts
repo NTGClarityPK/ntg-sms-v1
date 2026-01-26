@@ -26,6 +26,8 @@ type SubjectRow = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  branch_id: string | null;
+  tenant_id: string | null;
 };
 
 type ClassRow = {
@@ -36,6 +38,8 @@ type ClassRow = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  branch_id: string | null;
+  tenant_id: string | null;
 };
 
 type SectionRow = {
@@ -45,6 +49,8 @@ type SectionRow = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  branch_id: string | null;
+  tenant_id: string | null;
 };
 
 type LevelRow = {
@@ -54,6 +60,8 @@ type LevelRow = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  branch_id: string | null;
+  tenant_id: string | null;
 };
 
 type LevelClassRow = {
@@ -113,7 +121,7 @@ function mapLevel(row: LevelRow, classes: ClassDto[]): LevelDto {
 export class CoreLookupsService {
   constructor(private readonly supabaseConfig: SupabaseConfig) {}
 
-  async listSubjects(query: QuerySubjectsDto): Promise<{ data: SubjectDto[]; meta: Meta }> {
+  async listSubjects(query: QuerySubjectsDto, branchId: string): Promise<{ data: SubjectDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -125,6 +133,7 @@ export class CoreLookupsService {
     let dbQuery = supabase
       .from('subjects')
       .select('*', { count: 'exact' })
+      .eq('branch_id', branchId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -143,13 +152,17 @@ export class CoreLookupsService {
     };
   }
 
-  async createSubject(input: {
-    name: string;
-    nameAr?: string;
-    code?: string;
-    isActive?: boolean;
-    sortOrder?: number;
-  }): Promise<SubjectDto> {
+  async createSubject(
+    input: {
+      name: string;
+      nameAr?: string;
+      code?: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<SubjectDto> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('subjects')
@@ -159,6 +172,8 @@ export class CoreLookupsService {
         code: input.code ?? null,
         is_active: input.isActive ?? true,
         sort_order: input.sortOrder ?? 0,
+        branch_id: branchId,
+        tenant_id: tenantId,
       })
       .select('*')
       .single();
@@ -166,7 +181,7 @@ export class CoreLookupsService {
     return mapSubject(data as SubjectRow);
   }
 
-  async listClasses(query: QueryClassesDto): Promise<{ data: ClassDto[]; meta: Meta }> {
+  async listClasses(query: QueryClassesDto, branchId: string): Promise<{ data: ClassDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -176,7 +191,19 @@ export class CoreLookupsService {
     const sortOrder = query.sortOrder ?? 'desc';
 
     if (query.levelId) {
-      // Filter by level via junction table
+      // Filter by level via junction table - but ensure level belongs to branch
+      const { data: level, error: levelError } = await supabase
+        .from('levels')
+        .select('id')
+        .eq('id', query.levelId)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(levelError);
+
+      if (!level) {
+        return { data: [], meta: { total: 0, page, limit, totalPages: 1 } };
+      }
+
       const { data: lc, error: lcError } = await supabase
         .from('level_classes')
         .select('class_id')
@@ -192,6 +219,7 @@ export class CoreLookupsService {
         .from('classes')
         .select('*', { count: 'exact' })
         .in('id', classIds)
+        .eq('branch_id', branchId)
         .range(from, to)
         .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -212,6 +240,7 @@ export class CoreLookupsService {
     let dbQuery = supabase
       .from('classes')
       .select('*', { count: 'exact' })
+      .eq('branch_id', branchId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -230,12 +259,16 @@ export class CoreLookupsService {
     };
   }
 
-  async createClass(input: {
-    name: string;
-    displayName: string;
-    sortOrder: number;
-    isActive?: boolean;
-  }): Promise<ClassDto> {
+  async createClass(
+    input: {
+      name: string;
+      displayName: string;
+      sortOrder: number;
+      isActive?: boolean;
+    },
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<ClassDto> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('classes')
@@ -244,6 +277,8 @@ export class CoreLookupsService {
         display_name: input.displayName,
         sort_order: input.sortOrder,
         is_active: input.isActive ?? true,
+        branch_id: branchId,
+        tenant_id: tenantId,
       })
       .select('*')
       .single();
@@ -251,7 +286,7 @@ export class CoreLookupsService {
     return mapClass(data as ClassRow);
   }
 
-  async listSections(query: QuerySectionsDto): Promise<{ data: SectionDto[]; meta: Meta }> {
+  async listSections(query: QuerySectionsDto, branchId: string): Promise<{ data: SectionDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -263,6 +298,7 @@ export class CoreLookupsService {
     let dbQuery = supabase
       .from('sections')
       .select('*', { count: 'exact' })
+      .eq('branch_id', branchId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -281,11 +317,15 @@ export class CoreLookupsService {
     };
   }
 
-  async createSection(input: {
-    name: string;
-    isActive?: boolean;
-    sortOrder?: number;
-  }): Promise<SectionDto> {
+  async createSection(
+    input: {
+      name: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<SectionDto> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('sections')
@@ -293,6 +333,8 @@ export class CoreLookupsService {
         name: input.name,
         is_active: input.isActive ?? true,
         sort_order: input.sortOrder ?? 0,
+        branch_id: branchId,
+        tenant_id: tenantId,
       })
       .select('*')
       .single();
@@ -300,7 +342,7 @@ export class CoreLookupsService {
     return mapSection(data as SectionRow);
   }
 
-  async listLevels(query: QueryLevelsDto): Promise<{ data: LevelDto[]; meta: Meta }> {
+  async listLevels(query: QueryLevelsDto, branchId: string): Promise<{ data: LevelDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -312,6 +354,7 @@ export class CoreLookupsService {
     let levelsQuery = supabase
       .from('levels')
       .select('*', { count: 'exact' })
+      .eq('branch_id', branchId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -346,7 +389,8 @@ export class CoreLookupsService {
       const { data: classes, error: classesError } = await supabase
         .from('classes')
         .select('*')
-        .in('id', classIds);
+        .in('id', classIds)
+        .eq('branch_id', branchId);
       throwIfDbError(classesError);
       classesById = new Map((classes as ClassRow[]).map((c) => [c.id, mapClass(c)]));
     }
@@ -372,16 +416,32 @@ export class CoreLookupsService {
     };
   }
 
-  async createLevel(input: {
-    name: string;
-    nameAr?: string;
-    sortOrder?: number;
-    classIds?: string[];
-  }): Promise<LevelDto> {
+  async createLevel(
+    input: {
+      name: string;
+      nameAr?: string;
+      sortOrder?: number;
+      classIds?: string[];
+    },
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<LevelDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Validate that classes are not already assigned to other levels
+    // Validate that classes belong to the same branch and are not already assigned to other levels
     if (input.classIds && input.classIds.length > 0) {
+      // First verify all classes belong to this branch
+      const { data: classes, error: classError } = await supabase
+        .from('classes')
+        .select('id, display_name')
+        .in('id', input.classIds)
+        .eq('branch_id', branchId);
+      throwIfDbError(classError);
+
+      if (!classes || classes.length !== input.classIds.length) {
+        throw new BadRequestException('Some classes do not exist or do not belong to this branch');
+      }
+
       const { data: existingAssignments, error: checkError } = await supabase
         .from('level_classes')
         .select('class_id, level_id')
@@ -389,15 +449,8 @@ export class CoreLookupsService {
       throwIfDbError(checkError);
 
       if (existingAssignments && existingAssignments.length > 0) {
-        // Fetch class names and level names for error message
-        const conflictingClassIds = existingAssignments.map((a: any) => a.class_id);
+        // Fetch level names for error message
         const conflictingLevelIds = Array.from(new Set(existingAssignments.map((a: any) => a.level_id)));
-
-        const { data: classes, error: classError } = await supabase
-          .from('classes')
-          .select('id, display_name')
-          .in('id', conflictingClassIds);
-        throwIfDbError(classError);
 
         const { data: levels, error: levelError } = await supabase
           .from('levels')
@@ -424,6 +477,8 @@ export class CoreLookupsService {
         name: input.name,
         name_ar: input.nameAr ?? null,
         sort_order: input.sortOrder ?? 0,
+        branch_id: branchId,
+        tenant_id: tenantId,
       })
       .select('*')
       .single();
@@ -450,7 +505,11 @@ export class CoreLookupsService {
     const classIds = Array.from(new Set(((lc as LevelClassRow[]) ?? []).map((p) => p.class_id)));
     let classes: ClassDto[] = [];
     if (classIds.length > 0) {
-      const { data: clsRows, error: clsError } = await supabase.from('classes').select('*').in('id', classIds);
+      const { data: clsRows, error: clsError } = await supabase
+        .from('classes')
+        .select('*')
+        .in('id', classIds)
+        .eq('branch_id', branchId);
       throwIfDbError(clsError);
       classes = (clsRows as ClassRow[]).map(mapClass).sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name));
     }

@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { ScheduleService } from './schedule.service';
 import { UpdateSchoolDaysDto } from './dto/update-school-days.dto';
 import { QueryTimingTemplatesDto } from './dto/query-timing-templates.dto';
@@ -32,13 +33,17 @@ export class ScheduleController {
   @Get('timing-templates')
   async listTimingTemplates(
     @Query() query: QueryTimingTemplatesDto,
+    @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{ data: TimingTemplateDto[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
-    return this.scheduleService.listTimingTemplates(query);
+    return this.scheduleService.listTimingTemplates(query, branch.branchId);
   }
 
   @Post('timing-templates')
-  async createTimingTemplate(@Body() body: CreateTimingTemplateDto): Promise<{ data: TimingTemplateDto }> {
-    const created = await this.scheduleService.createTimingTemplate(body);
+  async createTimingTemplate(
+    @Body() body: CreateTimingTemplateDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: TimingTemplateDto }> {
+    const created = await this.scheduleService.createTimingTemplate(body, branch.branchId, branch.tenantId);
     return { data: created };
   }
 
@@ -51,13 +56,19 @@ export class ScheduleController {
   }
 
   @Get('public-holidays')
-  async listHolidays(@Query('academicYearId') academicYearId: string): Promise<{ data: PublicHolidayDto[] }> {
-    return this.scheduleService.listPublicHolidays(academicYearId);
+  async listHolidays(
+    @Query('academicYearId') academicYearId: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: PublicHolidayDto[] }> {
+    return this.scheduleService.listPublicHolidays(academicYearId, branch.branchId);
   }
 
   @Post('public-holidays')
-  async createHoliday(@Body() body: CreatePublicHolidayDto): Promise<{ data: PublicHolidayDto }> {
-    const created = await this.scheduleService.createPublicHoliday(body);
+  async createHoliday(
+    @Body() body: CreatePublicHolidayDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: PublicHolidayDto }> {
+    const created = await this.scheduleService.createPublicHoliday(body, branch.branchId, branch.tenantId);
     return { data: created };
   }
 

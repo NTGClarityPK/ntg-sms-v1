@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { AssessmentService } from './assessment.service';
 import { QueryAssessmentTypesDto } from './dto/query-assessment-types.dto';
 import { AssessmentTypeDto } from './dto/assessment-type.dto';
@@ -18,30 +19,41 @@ export class AssessmentController {
   @Get('assessment-types')
   async listAssessmentTypes(
     @Query() query: QueryAssessmentTypesDto,
+    @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{ data: AssessmentTypeDto[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
-    return this.assessmentService.listAssessmentTypes(query);
+    return this.assessmentService.listAssessmentTypes(query, branch.branchId);
   }
 
   @Post('assessment-types')
-  async createAssessmentType(@Body() body: CreateAssessmentTypeDto): Promise<{ data: AssessmentTypeDto }> {
-    const created = await this.assessmentService.createAssessmentType(body);
+  async createAssessmentType(
+    @Body() body: CreateAssessmentTypeDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: AssessmentTypeDto }> {
+    const created = await this.assessmentService.createAssessmentType(body, branch.branchId, branch.tenantId);
     return { data: created };
   }
 
   @Get('grade-templates')
-  async listGradeTemplates(): Promise<{ data: GradeTemplateDto[] }> {
-    return this.assessmentService.listGradeTemplates();
+  async listGradeTemplates(@CurrentBranch() branch: CurrentBranchContext): Promise<{ data: GradeTemplateDto[] }> {
+    return this.assessmentService.listGradeTemplates(branch.branchId);
   }
 
   @Post('grade-templates')
-  async createGradeTemplate(@Body() body: CreateGradeTemplateDto): Promise<{ data: GradeTemplateDto }> {
+  async createGradeTemplate(
+    @Body() body: CreateGradeTemplateDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: GradeTemplateDto }> {
     const ranges = body.ranges.map((r, idx) => ({
       letter: r.letter,
       minPercentage: r.minPercentage,
       maxPercentage: r.maxPercentage,
       sortOrder: r.sortOrder ?? idx,
     }));
-    const created = await this.assessmentService.createGradeTemplate({ name: body.name, ranges });
+    const created = await this.assessmentService.createGradeTemplate(
+      { name: body.name, ranges },
+      branch.branchId,
+      branch.tenantId,
+    );
     return { data: created };
   }
 

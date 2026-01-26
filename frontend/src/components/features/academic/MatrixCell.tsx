@@ -28,7 +28,15 @@ export function MatrixCell({
   const colors = useThemeColors();
 
   const staff = staffData?.data || [];
-  const availableStaff = staff.filter((s) => s.isActive);
+  // Filter to only include active staff with teacher roles (class_teacher or subject_teacher)
+  const availableStaff = staff.filter((s) => {
+    if (!s.isActive) return false;
+    // Check if staff has teacher roles
+    const hasTeacherRole = s.roles?.some(
+      (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
+    );
+    return hasTeacherRole;
+  });
 
   const staffOptions = availableStaff.map((s) => ({
     value: s.id,

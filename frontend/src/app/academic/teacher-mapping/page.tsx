@@ -20,19 +20,21 @@ export default function TeacherMappingPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Teacher Mapping</Title>
-          <Group>
-            <SegmentedControl
-              value={viewMode}
-              onChange={(value) => setViewMode(value as ViewMode)}
-              data={[
-                { label: 'List View', value: 'list' },
-                { label: 'Matrix View', value: 'matrix' },
-              ]}
-            />
-            <Button leftSection={<IconPlus size={16} />} onClick={open}>
-              Create Assignment
-            </Button>
+          <Group justify="space-between" w="100%" mt="xs">
+            <Title order={1}>Teacher Mapping</Title>
+            <Group>
+              <SegmentedControl
+                value={viewMode}
+                onChange={(value) => setViewMode(value as ViewMode)}
+                data={[
+                  { label: 'List View', value: 'list' },
+                  { label: 'Matrix View', value: 'matrix' },
+                ]}
+              />
+              <Button leftSection={<IconPlus size={16} />} onClick={open}>
+                Create Assignment
+              </Button>
+            </Group>
           </Group>
         </div>
         <div
@@ -56,19 +58,21 @@ export default function TeacherMappingPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Teacher Mapping</Title>
-          <Group>
-            <SegmentedControl
-              value={viewMode}
-              onChange={(value) => setViewMode(value as ViewMode)}
-              data={[
-                { label: 'List View', value: 'list' },
-                { label: 'Matrix View', value: 'matrix' },
-              ]}
-            />
-            <Button leftSection={<IconPlus size={16} />} onClick={open}>
-              Create Assignment
-            </Button>
+          <Group justify="space-between" w="100%" mt="xs">
+            <Title order={1}>Teacher Mapping</Title>
+            <Group>
+              <SegmentedControl
+                value={viewMode}
+                onChange={(value) => setViewMode(value as ViewMode)}
+                data={[
+                  { label: 'List View', value: 'list' },
+                  { label: 'Matrix View', value: 'matrix' },
+                ]}
+              />
+              <Button leftSection={<IconPlus size={16} />} onClick={open}>
+                Create Assignment
+              </Button>
+            </Group>
           </Group>
         </div>
         <div
@@ -94,19 +98,21 @@ export default function TeacherMappingPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Title order={1}>Teacher Mapping</Title>
-        <Group>
-          <SegmentedControl
-            value={viewMode}
-            onChange={(value) => setViewMode(value as ViewMode)}
-            data={[
-              { label: 'List View', value: 'list' },
-              { label: 'Matrix View', value: 'matrix' },
-            ]}
-          />
-          <Button leftSection={<IconPlus size={16} />} onClick={open}>
-            Create Assignment
-          </Button>
+        <Group justify="space-between" w="100%" mt="xs">
+          <Title order={1}>Teacher Mapping</Title>
+          <Group>
+            <SegmentedControl
+              value={viewMode}
+              onChange={(value) => setViewMode(value as ViewMode)}
+              data={[
+                { label: 'List View', value: 'list' },
+                { label: 'Matrix View', value: 'matrix' },
+              ]}
+            />
+            <Button leftSection={<IconPlus size={16} />} onClick={open}>
+              Create Assignment
+            </Button>
+          </Group>
         </Group>
       </div>
       <div
