@@ -27,11 +27,17 @@ export function useStaff(params?: QueryStaffParams) {
       if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
       if (params?.search) queryParams.append('search', params.search);
 
+      // Backend service returns { data: StaffDto[], meta: {...} }
+      // Controller returns it directly: { data: StaffDto[], meta: {...} }
+      // ResponseInterceptor sees it has 'data' property and returns as-is: { data: StaffDto[], meta: {...} }
+      // HTTP response body: { data: StaffDto[], meta: {...} }
+      // Axios response.data: { data: StaffDto[], meta: {...} }
+      // apiClient.get() returns response.data, which is { data: StaffDto[], meta: {...} }
       const response = await apiClient.get<{
         data: Staff[];
         meta: { total: number; page: number; limit: number; totalPages: number };
       }>(`/api/v1/staff?${queryParams.toString()}`);
-      return response.data;
+      return response;
     },
     enabled: !!branchId,
   });

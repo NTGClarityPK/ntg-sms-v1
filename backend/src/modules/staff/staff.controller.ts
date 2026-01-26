@@ -48,6 +48,15 @@ export class StaffController {
     return { data };
   }
 
+  @Get(':id/schedule')
+  async getSchedule(
+    @Param('id') id: string,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const data = await this.staffService.getAssignments(id, branch.branchId);
+    return { data };
+  }
+
   @Post()
   async createStaff(
     @Body() input: CreateStaffDto,

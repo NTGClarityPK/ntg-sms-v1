@@ -8,6 +8,7 @@ import {
   IconCalendar,
   IconChartBar,
   IconSettings,
+  IconSchool,
   type IconProps,
 } from '@tabler/icons-react';
 
@@ -19,10 +20,16 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: IconHome },
-  { label: 'Staff', href: '/users', icon: IconUsers },
+  { label: 'Users', href: '/users', icon: IconUsers },
   { label: 'Students', href: '/students', icon: IconUsers },
+  { label: 'Staff', href: '/staff', icon: IconUsers },
+  {
+    label: 'Academic',
+    href: '/academic/class-sections',
+    icon: IconSchool,
+  },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
-  { label: 'Reports', href: '/dashboard/reports', icon: IconChartBar },
+  { label: 'Reports', href: '/reports', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 
@@ -32,15 +39,19 @@ export function Sidebar() {
 
   return (
     <Stack gap="xs">
-      {navItems.map((item) => (
-        <NavLink
-          key={item.href}
-          label={item.label}
-          leftSection={<item.icon size={20} />}
-          active={pathname === item.href}
-          onClick={() => router.push(item.href)}
-        />
-      ))}
+      {navItems.map((item) => {
+        // Check if pathname starts with the href for nested routes
+        const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+        return (
+          <NavLink
+            key={item.href}
+            label={item.label}
+            leftSection={<item.icon size={20} />}
+            active={isActive}
+            onClick={() => router.push(item.href)}
+          />
+        );
+      })}
     </Stack>
   );
 }

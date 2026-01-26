@@ -424,3 +424,43 @@ return response;
      - Frontend UI components ✓
      - Integration into layouts ✓
 - **Lesson**: Backend implementation alone is not enough - users need UI to interact with features. Always implement backend AND frontend together. When following a plan, check off each component (backend service, controller, frontend hook, frontend component, layout integration) as you implement it. Before marking a feature complete, do a visual walkthrough: "Can I see it? Can I click it? Does it work?" If the plan mentions a UI component (like "BranchSwitcher.tsx"), it MUST exist in the codebase. Create a feature completion checklist: "Backend API ✓, Frontend Hook ✓, UI Component ✓, Integration ✓, Manual Test ✓".
+
+### CORS Error Blocking Specific Endpoints Despite Configuration
+- ❌ **Issue**: CORS error blocking `/api/v1/auth/me` endpoint even though CORS was configured for `http://localhost:3000` and other API endpoints appeared to be working fine
+- 🔍 **Cause**: 
+  1. CORS configuration was too restrictive - it only allowed the exact origin `http://localhost:3000` as a string, not using a function to handle dynamic origins
+  2. Browser preflight (OPTIONS) requests might have been failing silently for some endpoints but not others, depending on request complexity (headers, methods)
+  3. The `/auth/me` endpoint is typically the first API call made after login, so it's the first to hit CORS issues
+  4. Other endpoints might have been cached or not yet called, giving the false impression they were working
+  5. Missing `X-Branch-Id` header in `allowedHeaders` list, which could cause preflight failures for requests that include this header
+  6. CORS errors can be inconsistent - some requests might succeed if they don't trigger preflight, while others fail
+- ✅ **Solution**: 
+  1. Changed CORS configuration to use a function-based origin check that allows any localhost port for development:
+     ```typescript
+     origin: (origin, callback) => {
+       if (!origin) return callback(null, true);
+       if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+         return callback(null, true);
+       }
+       if (origin === frontendUrl) {
+         return callback(null, true);
+       }
+       callback(new Error('Not allowed by CORS'));
+     }
+     ```
+  2. Added `X-Branch-Id` to `allowedHeaders` array
+  3. Added `exposedHeaders` configuration for better compatibility
+  4. Added logging to verify CORS configuration is active
+- **Lesson**: CORS configuration must be flexible for development environments. Use function-based origin checking instead of static strings to allow localhost on any port. Always include all custom headers (like `X-Branch-Id`) in the `allowedHeaders` list. CORS errors can be misleading - if one endpoint fails, check if it's the first request (which triggers preflight) or if it includes custom headers. Don't assume other endpoints are working just because you haven't tested them yet. When debugging CORS issues, check the Network tab for OPTIONS (preflight) requests and their responses. Always test the first API call after authentication, as it's most likely to expose CORS issues. For development, allow all localhost origins; for production, use strict origin matching.
+
+### Missing SupabaseConfig Provider in NestJS Modules
+- ❌ **Issue**: NestJS dependency injection error: `Nest can't resolve dependencies of the ClassSectionsService (?, AcademicYearsService). Please make sure that the argument SupabaseConfig at index [0] is available in the ClassSectionsModule context.` Similar error for `TeacherAssignmentsService`.
+- 🔍 **Cause**: 
+  1. When creating new NestJS modules that use `SupabaseConfig` in their services, the `SupabaseConfig` provider was not added to the module's `providers` array
+  2. NestJS dependency injection requires all dependencies to be explicitly provided in the module context
+  3. Even though `SupabaseConfig` is used in the service constructor, it must be declared as a provider in the module for NestJS to inject it
+- ✅ **Solution**: 
+  1. Import `SupabaseConfig` from `'../../common/config/supabase.config'` in the module file
+  2. Add `SupabaseConfig` to the `providers` array in the `@Module` decorator
+  3. Follow the same pattern used in other modules like `AcademicYearsModule` and `StudentsModule`
+- **Lesson**: When creating new NestJS modules that inject `SupabaseConfig` (or any other service/provider) in their services, ALWAYS add that provider to the module's `providers` array. NestJS dependency injection requires explicit provider declarations. Before marking a module as complete, verify all injected dependencies are listed in the `providers` array. Check existing modules (like `AcademicYearsModule`, `StudentsModule`, `StaffModule`) as reference for the correct pattern. Create a checklist when creating new modules: "Service created ✓, Controller created ✓, Module created ✓, All dependencies in providers array ✓".

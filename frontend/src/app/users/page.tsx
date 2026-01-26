@@ -48,9 +48,14 @@ export default function UsersPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Staff</Title>
+          <div>
+            <Title order={1}>User Management</Title>
+            <Text size="sm" c="dimmed" mt={4}>
+              Manage user accounts, roles, and permissions (excludes students)
+            </Text>
+          </div>
           <Button leftSection={<IconPlus size={16} />} onClick={open}>
-            Create Staff
+            Create User
           </Button>
         </Group>
       </div>
@@ -58,7 +63,7 @@ export default function UsersPage() {
       <Stack gap="md">
         <Group>
           <TextInput
-            placeholder="Search staff..."
+            placeholder="Search users..."
             leftSection={<IconSearch size={16} />}
             value={search}
             onChange={(e) => {
@@ -122,8 +127,8 @@ export default function UsersPage() {
             </Group>
           </Alert>
         ) : !usersQuery.data || !usersQuery.data.data || usersQuery.data.data.length === 0 ? (
-          <Alert color={colors.info} title="No staff found">
-            <Text size="sm">No staff members have been created yet. Click "Create Staff" to add one.</Text>
+          <Alert color={colors.info} title="No users found">
+            <Text size="sm">No users have been created yet. Click "Create User" to add one.</Text>
           </Alert>
         ) : (
           <UserTable

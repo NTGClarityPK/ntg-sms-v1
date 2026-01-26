@@ -1,6 +1,6 @@
 'use client';
 
-import { Modal, TextInput, Select, Button, Stack, MultiSelect } from '@mantine/core';
+import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';

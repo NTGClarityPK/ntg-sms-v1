@@ -18,6 +18,8 @@ import { UsersModule } from './modules/users/users.module';
 import { StudentsModule } from './modules/students/students.module';
 import { ParentsModule } from './modules/parents/parents.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { ClassSectionsModule } from './modules/class-sections/class-sections.module';
+import { TeacherAssignmentsModule } from './modules/teacher-assignments/teacher-assignments.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { StaffModule } from './modules/staff/staff.module';
     StudentsModule,
     ParentsModule,
     StaffModule,
+    ClassSectionsModule,
+    TeacherAssignmentsModule,
   ],
   controllers: [AppController],
   providers: [

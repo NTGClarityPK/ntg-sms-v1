@@ -45,7 +45,12 @@ export default function StudentsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Students</Title>
+          <div>
+            <Title order={1}>Student Management</Title>
+            <Text size="sm" c="dimmed" mt={4}>
+              Manage students with academic details (student ID, class, section, enrollment)
+            </Text>
+          </div>
           <Button leftSection={<IconPlus size={16} />} onClick={open}>
             Create Student
           </Button>

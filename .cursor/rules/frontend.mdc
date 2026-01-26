@@ -261,7 +261,21 @@ Before submitting any feature, verify:
 ```
 src/
 ├── app/                    # App router pages
-│   └── (dashboard)/        # Layout groups
+│   ├── (auth)/             # Route group for auth pages (doesn't affect URL)
+│   │   ├── login/
+│   │   └── select-branch/
+│   ├── students/           # Route: /students (NOT /dashboard/students)
+│   ├── users/              # Route: /users (NOT /dashboard/users)
+│   ├── staff/              # Route: /staff (NOT /dashboard/staff)
+│   ├── academic/           # Route: /academic/class-sections
+│   │   ├── class-sections/
+│   │   └── teacher-mapping/
+│   ├── attendance/         # Route: /attendance
+│   ├── reports/            # Route: /reports (NOT /dashboard/reports)
+│   ├── settings/           # Route: /settings (NOT /dashboard/settings)
+│   ├── dashboard/          # Route: /dashboard (main dashboard page ONLY)
+│   │   └── page.tsx
+│   └── layout.tsx          # Root layout
 ├── components/
 │   ├── common/             # Button, Input, Modal wrappers
 │   ├── layout/             # Shell, Navbar, Sidebar
@@ -275,6 +289,15 @@ src/
 └── types/                  # TypeScript interfaces
     └── [feature].ts
 ```
+
+**CRITICAL ROUTING RULES:**
+- **Route groups `(folder)` are for layout organization ONLY** - they do NOT create URL paths
+- **ALL functional routes MUST be at root level** (e.g., `/students`, `/users`, `/academic/class-sections`)
+- **NEVER nest routes under `/dashboard`** - `/dashboard` is only for the main dashboard page
+- **Each route should have its own layout.tsx** if it needs AppShell (e.g., `students/layout.tsx`, `academic/layout.tsx`)
+- **Route groups like `(auth)` or `(dashboard)`** are only for shared layouts, not URL structure
+- **Example of WRONG structure**: `app/dashboard/students/page.tsx` → Creates `/dashboard/students` (BAD)
+- **Example of CORRECT structure**: `app/students/page.tsx` → Creates `/students` (GOOD)
 
 ## Data Fetching (React Query)
 - Create custom hooks in `/hooks` for each data domain

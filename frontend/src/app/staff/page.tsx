@@ -31,7 +31,12 @@ export default function StaffPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Staff</Title>
+          <div>
+            <Title order={1}>Staff Management</Title>
+            <Text size="sm" c="dimmed" mt={4}>
+              Manage staff members with employment details (employee ID, department, join date)
+            </Text>
+          </div>
           <Button leftSection={<IconPlus size={16} />} onClick={open}>
             Create Staff
           </Button>
@@ -74,10 +79,29 @@ export default function StaffPage() {
               </Button>
             </Group>
           </Alert>
+        ) : !staffQuery.data || !staffQuery.data.data || staffQuery.data.data.length === 0 ? (
+          <Alert color={colors.info} title="No staff records found">
+            <Stack gap="xs" mt="sm">
+              <Text size="sm">
+                No staff members with employment records have been created yet.
+              </Text>
+              <Text size="sm" c="dimmed">
+                Note: Staff records are separate from user accounts. Users with staff roles exist in User Management, but they need employment records (employee ID, department, etc.) to appear here.
+              </Text>
+              <Button
+                variant="light"
+                leftSection={<IconPlus size={16} />}
+                onClick={open}
+                mt="xs"
+              >
+                Create Staff Record
+              </Button>
+            </Stack>
+          </Alert>
         ) : (
           <StaffTable
-            staff={staffQuery.data?.data || []}
-            meta={staffQuery.data?.meta}
+            staff={staffQuery.data.data}
+            meta={staffQuery.data.meta}
             onPageChange={setPage}
           />
         )}
