@@ -1,6 +1,6 @@
 'use client';
 
-import { Modal, Table, Text, Loader, Paper } from '@mantine/core';
+import { Modal, Table, Text, Loader, Paper, Group } from '@mantine/core';
 import { useClassSectionStudents } from '@/hooks/useClassSections';
 
 interface ClassSectionStudentsModalProps {

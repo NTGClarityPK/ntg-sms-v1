@@ -71,6 +71,21 @@ export function useCreateStaff() {
   });
 }
 
+export function useMyStaff() {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['staff', 'me', branchId],
+    queryFn: async () => {
+      if (!branchId) return null;
+      const response = await apiClient.get<{ data: Staff | null }>('/api/v1/staff/me');
+      return response.data;
+    },
+    enabled: !!branchId,
+  });
+}
+
 export function useUpdateStaff() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

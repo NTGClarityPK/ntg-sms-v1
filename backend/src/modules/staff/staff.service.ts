@@ -242,6 +242,24 @@ export class StaffService {
     };
   }
 
+  async getStaffByUserId(userId: string, branchId: string): Promise<StaffDto | null> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data, error } = await supabase
+      .from('staff')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    throwIfDbError(error);
+    if (!data) {
+      return null;
+    }
+
+    return this.getStaffById((data as StaffRow).id, branchId);
+  }
+
   async getStaffById(id: string, branchId: string): Promise<StaffDto> {
     const supabase = this.supabaseConfig.getClient();
 

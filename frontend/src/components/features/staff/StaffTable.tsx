@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core';
-import { IconEdit } from '@tabler/icons-react';
+import { IconEdit, IconCalendar } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
+import { useRouter } from 'next/navigation';
 import type { Staff } from '@/types/staff';
 import type { Role } from '@/types/permissions';
 import { StaffForm } from './StaffForm';
@@ -25,6 +26,7 @@ export function StaffTable({ staff, meta, onPageChange }: StaffTableProps) {
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const { data: rolesData } = useRoles();
   const roles = rolesData?.data || [];
+  const router = useRouter();
 
   const handleEdit = (staffMember: Staff) => {
     setSelectedStaff(staffMember);
@@ -81,9 +83,19 @@ export function StaffTable({ staff, meta, onPageChange }: StaffTableProps) {
                 </Badge>
               </Table.Td>
               <Table.Td>
-                <ActionIcon variant="light" onClick={() => handleEdit(staffMember)}>
-                  <IconEdit size={16} />
-                </ActionIcon>
+                <Group gap="xs">
+                  <ActionIcon
+                    variant="light"
+                    color="blue"
+                    onClick={() => router.push(`/staff/${staffMember.id}/schedule`)}
+                    title="View Schedule"
+                  >
+                    <IconCalendar size={16} />
+                  </ActionIcon>
+                  <ActionIcon variant="light" onClick={() => handleEdit(staffMember)} title="Edit">
+                    <IconEdit size={16} />
+                  </ActionIcon>
+                </Group>
               </Table.Td>
             </Table.Tr>
           ))}

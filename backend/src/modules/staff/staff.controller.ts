@@ -12,6 +12,7 @@ import { StaffService } from './staff.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { QueryStaffDto } from './dto/query-staff.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
@@ -28,6 +29,18 @@ export class StaffController {
     @CurrentBranch() branch: { branchId: string },
   ) {
     return this.staffService.listStaff(query, branch.branchId);
+  }
+
+  @Get('me')
+  async getMyStaff(
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const data = await this.staffService.getStaffByUserId(user.id, branch.branchId);
+    if (!data) {
+      return { data: null };
+    }
+    return { data };
   }
 
   @Get(':id')

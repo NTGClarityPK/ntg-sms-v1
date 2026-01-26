@@ -8,9 +8,12 @@ import {
   IconCalendar,
   IconChartBar,
   IconSettings,
-  IconSchool,
+  IconUsersGroup,
+  IconUserCheck,
+  IconCalendarEvent,
   type IconProps,
 } from '@tabler/icons-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface NavItem {
   label: string;
@@ -23,11 +26,8 @@ const navItems: NavItem[] = [
   { label: 'Users', href: '/users', icon: IconUsers },
   { label: 'Students', href: '/students', icon: IconUsers },
   { label: 'Staff', href: '/staff', icon: IconUsers },
-  {
-    label: 'Academic',
-    href: '/academic/class-sections',
-    icon: IconSchool,
-  },
+  { label: 'Class Sections', href: '/academic/class-sections', icon: IconUsersGroup },
+  { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconUserCheck },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
   { label: 'Reports', href: '/reports', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
@@ -36,6 +36,12 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  // Check if user has teacher roles (class_teacher or subject_teacher)
+  const hasTeacherRole = user?.roles?.some(
+    (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
+  );
 
   return (
     <Stack gap="xs">
@@ -52,6 +58,14 @@ export function Sidebar() {
           />
         );
       })}
+      {hasTeacherRole && (
+        <NavLink
+          label="My Schedule"
+          leftSection={<IconCalendarEvent size={20} />}
+          active={pathname === '/my-schedule' || pathname?.startsWith('/my-schedule/')}
+          onClick={() => router.push('/my-schedule')}
+        />
+      )}
     </Stack>
   );
 }
