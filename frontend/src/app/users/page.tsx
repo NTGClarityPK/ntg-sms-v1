@@ -109,7 +109,7 @@ export default function UsersPage() {
           />
         </Group>
 
-        {usersQuery.isLoading ? (
+        {usersQuery.isLoading || !usersQuery.data ? (
           <Group justify="center" py="xl">
             <Loader color={colors.primary} />
           </Group>
@@ -126,7 +126,7 @@ export default function UsersPage() {
               </Button>
             </Group>
           </Alert>
-        ) : !usersQuery.data || !usersQuery.data.data || usersQuery.data.data.length === 0 ? (
+        ) : !usersQuery.data.data || usersQuery.data.data.length === 0 ? (
           <Alert color={colors.info} title="No users found">
             <Text size="sm">No users have been created yet. Click "Create User" to add one.</Text>
           </Alert>

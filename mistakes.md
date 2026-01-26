@@ -464,3 +464,59 @@ return response;
   2. Add `SupabaseConfig` to the `providers` array in the `@Module` decorator
   3. Follow the same pattern used in other modules like `AcademicYearsModule` and `StudentsModule`
 - **Lesson**: When creating new NestJS modules that inject `SupabaseConfig` (or any other service/provider) in their services, ALWAYS add that provider to the module's `providers` array. NestJS dependency injection requires explicit provider declarations. Before marking a module as complete, verify all injected dependencies are listed in the `providers` array. Check existing modules (like `AcademicYearsModule`, `StudentsModule`, `StaffModule`) as reference for the correct pattern. Create a checklist when creating new modules: "Service created ✓, Controller created ✓, Module created ✓, All dependencies in providers array ✓".
+
+### React Query Loading State vs Empty State - Preventing Flash of Empty Messages
+- ✅ **Good Design Pattern**: Properly distinguish between "data is still loading" and "data loaded but empty" to prevent confusing UX flashes
+- 🔍 **Issue**: When navigating between tabs/pages, users see a brief flash of "No records found" or "No staff found" messages before the actual data loads and displays. This creates a poor user experience where it appears there's no data, then suddenly data appears.
+- 🔍 **Cause**: 
+  1. React Query can have `isLoading: false` while `data` is still `undefined` (especially during initial load or when query key changes)
+  2. The conditional logic checks `isLoading` first, but if `isLoading` is false and `data` is undefined, it falls through to the empty state check
+  3. The empty state condition `!query.data || !query.data.data || query.data.data.length === 0` evaluates to `true` when `data` is `undefined`, showing "No records found" prematurely
+  4. This happens because `!query.data` is `true` when data hasn't loaded yet, not just when it's empty
+- ✅ **Solution**: 
+  1. Check for `isLoading || !query.data` to show loader (covers both initial load and when data is undefined)
+  2. Only show empty state when `query.data` exists but `query.data.data.length === 0` (data loaded but actually empty)
+  3. This ensures loader shows during initial load, and empty state only shows after data has been fetched and confirmed to be empty
+
+**Why:** React Query's `isLoading` can be `false` even when data hasn't loaded yet (e.g., when query is enabled conditionally, or during query key changes). The key distinction is: `data === undefined` means "still loading", while `data !== undefined && data.data.length === 0` means "loaded but empty". Users should never see "No records found" before data has actually been fetched.
+
+**Example:**
+```typescript
+// ❌ Wrong - Shows empty state when data is undefined
+{query.isLoading ? (
+  <Loader />
+) : query.error ? (
+  <Error />
+) : !query.data || !query.data.data || query.data.data.length === 0 ? (
+  <EmptyState /> // ❌ Shows when data is undefined!
+) : (
+  <Table />
+)}
+
+// ✅ Correct - Distinguish between loading and empty
+{query.isLoading || !query.data ? ( // ✅ Show loader when data is undefined
+  <Loader />
+) : query.error ? (
+  <Error />
+) : query.data.data.length === 0 ? ( // ✅ Only check length when data exists
+  <EmptyState />
+) : (
+  <Table />
+)}
+```
+
+**Alternative (Even Smoother):**
+```typescript
+// ✅ Best - Also handles refetching state smoothly
+{query.isLoading || (query.isFetching && !query.data) ? (
+  <Loader />
+) : query.error ? (
+  <Error />
+) : query.data && query.data.data.length === 0 ? (
+  <EmptyState />
+) : (
+  <Table />
+)}
+```
+
+**Lesson**: Always distinguish between "no data yet" (loading state) and "data loaded but empty" (empty state). When using React Query, check `isLoading || !data` to show loader, and only show empty state when `data` exists but is empty (`data.data.length === 0`). This prevents confusing flashes of "No records found" messages before data actually loads. The key principle: `data === undefined` = still loading, `data !== undefined && data.data.length === 0` = actually empty. Apply this pattern consistently across all list pages (staff, users, students, etc.) for a smooth user experience.

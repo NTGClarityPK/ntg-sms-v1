@@ -101,7 +101,7 @@ export default function StudentsPage() {
           </div>
         </Group>
 
-        {studentsQuery.isLoading ? (
+        {studentsQuery.isLoading || !studentsQuery.data ? (
           <Group justify="center" py="xl">
             <Loader color={colors.primary} />
           </Group>
@@ -118,7 +118,7 @@ export default function StudentsPage() {
               </Button>
             </Group>
           </Alert>
-        ) : !studentsQuery.data || !studentsQuery.data.data || studentsQuery.data.data.length === 0 ? (
+        ) : !studentsQuery.data.data || studentsQuery.data.data.length === 0 ? (
           <Alert color={colors.info} title="No students found">
             <Text size="sm">No students have been created yet. Click "Create Student" to add one.</Text>
           </Alert>

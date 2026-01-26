@@ -62,7 +62,7 @@ export default function StaffPage() {
           />
         </Group>
 
-        {staffQuery.isLoading ? (
+        {staffQuery.isLoading || !staffQuery.data ? (
           <Group justify="center" py="xl">
             <Loader color={colors.primary} />
           </Group>
@@ -79,7 +79,7 @@ export default function StaffPage() {
               </Button>
             </Group>
           </Alert>
-        ) : !staffQuery.data || !staffQuery.data.data || staffQuery.data.data.length === 0 ? (
+        ) : !staffQuery.data.data || staffQuery.data.data.length === 0 ? (
           <Alert color={colors.info} title="No staff records found">
             <Stack gap="xs" mt="sm">
               <Text size="sm">

@@ -10,3 +10,5 @@ Remember DO NOT translate irrelevant backend or db things/labels. For example us
 DO NOT read frontend codebase JUST TO translate irrelvant things like createTimingTemplatetitle or timingTemplateNameLabel. What is NOT written anywhere in my website SHOULD NOT be translated. 
 
 You are reading a frontend codebase to look for relevant displayed text.For example, text displayed in frontend such as Dashboard, Settings, Assessment, Time Table. 
+
+Important note: ALWAYS Log after the end of file. I see previouisly, agent appeneded it in between the file. 

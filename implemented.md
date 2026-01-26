@@ -906,3 +906,248 @@ npm run dev
 
 > **Note:** Frontend branch selection UI, header branch switcher, and branch-aware React Query hooks for Prompt 2 are still pending and will be documented once implemented.
 
+---
+
+### Prompt 4: Academic Structure & Teacher Mapping ✅
+
+#### Phase 4.1: Class-Section Management ✅
+
+**Database**
+- ✅ `class_sections` table created with:
+  - `id` (UUID, PK), `class_id` (FK to `classes`), `section_id` (FK to `sections`)
+  - `branch_id` (FK to `branches`), `academic_year_id` (FK to `academic_years`)
+  - `capacity` (INT, default 30), `is_active` (BOOLEAN, default TRUE)
+  - Unique constraint: `(class_id, section_id, branch_id, academic_year_id)`
+  - Index on `(branch_id, academic_year_id)`
+  - RLS enabled with branch isolation policy
+- ✅ Migration: `1706000000004_create_class_sections_table.sql`
+
+**Backend**
+- ✅ `ClassSectionsModule` created with:
+  - `class-sections.service.ts`: CRUD operations, student counting, bulk create support
+  - `class-sections.controller.ts`: REST endpoints with pagination, filtering
+  - DTOs: `ClassSectionDto`, `CreateClassSectionDto`, `BulkCreateClassSectionDto`, `UpdateClassSectionDto`, `QueryClassSectionsDto`
+- ✅ Endpoints:
+  - `GET /api/v1/class-sections` - Paginated list with filters (classId, sectionId, isActive, academicYearId)
+  - `GET /api/v1/class-sections/:id` - Get single with student count
+  - `POST /api/v1/class-sections` - Create single or bulk (accepts both `CreateClassSectionDto` and `BulkCreateClassSectionDto`)
+  - `PUT /api/v1/class-sections/:id` - Update capacity/isActive
+  - `DELETE /api/v1/class-sections/:id` - Delete (validates no students enrolled)
+  - `GET /api/v1/class-sections/:id/students` - List students in class-section
+- ✅ All endpoints use `@UseGuards(JwtAuthGuard, BranchGuard)` and `@CurrentBranch()`
+
+**Frontend**
+- ✅ Page: `frontend/src/app/academic/class-sections/page.tsx` (moved from `/dashboard/academic/class-sections`)
+- ✅ Components:
+  - `ClassSectionGrid.tsx` - Visual grid (classes as rows, sections as columns)
+  - `ClassSectionCard.tsx` - Card with class-section name, student count/capacity, class teacher name, actions
+  - `CreateClassSectionModal.tsx` - Modal for single/bulk creation with pre-population support
+  - `ClassSectionStudentsModal.tsx` - Modal listing students in class-section
+- ✅ Hook: `useClassSections.ts` - React Query hooks for CRUD operations
+- ✅ Bulk create functionality: "Create All" button to create all missing class-section combinations at once
+
+#### Phase 4.2: Class Teacher Assignment ✅
+
+**Database**
+- ✅ `class_teacher_id` column added to `class_sections` table
+- ✅ Migration: `1706000000005_add_class_teacher_id_to_class_sections.sql`
+
+**Backend**
+- ✅ `class-sections.service.ts` updated:
+  - `assignClassTeacher(classSectionId, staffId, branchId)` - Assign teacher
+  - `unassignClassTeacher(classSectionId, branchId)` - Remove teacher assignment
+  - `getClassSectionById` includes teacher info (joins with `staff` and `profiles`)
+- ✅ `class-sections.controller.ts` updated:
+  - `PUT /api/v1/class-sections/:id/class-teacher` - Body: `{ staffId: string | null }`
+- ✅ `staff.service.ts` updated:
+  - `getAssignments(staffId, branchId)` - Returns `{ classTeacherOf: Array<...>, subjectAssignments: Array<...> }`
+
+**Frontend**
+- ✅ `ClassSectionCard.tsx` updated to display class teacher name
+- ✅ `AssignClassTeacherModal.tsx` - Modal for assigning/unassigning class teacher with staff dropdown
+
+#### Phase 4.3: Subject-Teacher Mapping (List View) ✅
+
+**Database**
+- ✅ `teacher_assignments` table created with:
+  - `id` (UUID, PK), `staff_id` (FK to `staff`), `subject_id` (FK to `subjects`)
+  - `class_section_id` (FK to `class_sections`), `academic_year_id` (FK to `academic_years`)
+  - `branch_id` (FK to `branches`), `created_at` (TIMESTAMPTZ)
+  - Unique constraint: `(subject_id, class_section_id, staff_id, academic_year_id)` - **Supports co-teaching**
+  - Indexes on `staff_id` and `class_section_id`
+  - RLS enabled with branch isolation policy
+- ✅ Migration: `1706000000006_create_teacher_assignments_table.sql`
+- ✅ Migration: `1706000000008_update_teacher_assignments_unique_constraint.sql` - Updated to support co-teaching
+
+**Backend**
+- ✅ `TeacherAssignmentsModule` created with:
+  - `teacher-assignments.service.ts`: CRUD operations, validation (subjects are global, not branch-specific)
+  - `teacher-assignments.controller.ts`: REST endpoints
+  - DTOs: `TeacherAssignmentDto`, `CreateTeacherAssignmentDto`, `UpdateTeacherAssignmentDto`, `QueryTeacherAssignmentsDto`
+- ✅ Endpoints:
+  - `GET /api/v1/teacher-assignments` - Paginated list with filters (staffId, classSectionId, subjectId, academicYearId)
+  - `POST /api/v1/teacher-assignments` - Create assignment (validates co-teaching uniqueness)
+  - `PUT /api/v1/teacher-assignments/:id` - Update assignment
+  - `DELETE /api/v1/teacher-assignments/:id` - Remove assignment
+  - `GET /api/v1/teacher-assignments/by-teacher/:staffId` - Get teacher's assignments
+  - `GET /api/v1/teacher-assignments/by-class/:classSectionId` - Get class's subjects/teachers
+
+**Frontend**
+- ✅ Page: `frontend/src/app/academic/teacher-mapping/page.tsx` (moved from `/dashboard/academic/teacher-mapping`)
+- ✅ Components:
+  - `TeacherMappingList.tsx` - List view with pagination
+  - `CreateAssignmentModal.tsx` - Modal for creating assignments (filters to only teacher roles)
+- ✅ Hook: `useTeacherAssignments.ts` - React Query hooks for CRUD operations
+
+#### Phase 4.4: Subject-Teacher Mapping (Matrix View) ✅
+
+**Frontend**
+- ✅ `TeacherMappingMatrix.tsx` - Matrix view (class-sections as rows, subjects as columns)
+- ✅ `MatrixCell.tsx` - Editable cell component supporting:
+  - Multiple teachers per cell (co-teaching)
+  - Click assigned teacher → "Unassign" option only
+  - Dotted "+ Assign" button below assigned teachers to add more
+  - Filters out already-assigned teachers from dropdown
+  - Only shows teachers with `class_teacher` or `subject_teacher` roles
+- ✅ Toggle between List View and Matrix View on teacher mapping page
+
+#### Phase 4.5: Teacher Schedule View ✅
+
+**Backend**
+- ✅ `staff.service.ts` updated:
+  - `getAssignments(staffId, branchId)` - Returns full schedule with class teacher and subject assignments
+- ✅ `staff.controller.ts` updated:
+  - `GET /api/v1/staff/:id/schedule` - Get teacher's full schedule
+  - `GET /api/v1/staff/me` - Get current user's staff record (placed before `/:id` to avoid route conflicts)
+
+**Frontend**
+- ✅ Page: `frontend/src/app/staff/[id]/schedule/page.tsx` (moved from `/dashboard/staff/[id]/schedule`)
+- ✅ Page: `frontend/src/app/my-schedule/page.tsx` - "My Schedule" page for logged-in teachers
+- ✅ Hook: `useStaffSchedule.ts` - React Query hook for fetching staff schedule
+- ✅ Hook: `useMyStaff.ts` - React Query hook for fetching current user's staff record
+- ✅ "View Schedule" button (calendar icon) added to Staff table for all staff members
+- ✅ "My Schedule" navigation tab added to Sidebar (visible only to users with `class_teacher` or `subject_teacher` roles)
+
+#### Navigation Updates ✅
+
+- ✅ Sidebar updated:
+  - Removed nested "Academic" menu item
+  - Added top-level "Class Sections" link (`/academic/class-sections`)
+  - Added top-level "Teacher Mapping" link (`/academic/teacher-mapping`)
+  - Added conditional "My Schedule" link (`/my-schedule`) for teachers only
+  - All routes moved from `/dashboard/*` to root level (e.g., `/staff`, `/users`, `/students`, `/academic/*`)
+
+---
+
+### Post-Implementation Improvements & Fixes (Prompt 4)
+
+#### Route Structure Fix ✅
+- ✅ **Issue**: Routes were incorrectly nested under `/dashboard` (e.g., `/dashboard/academic/class-sections`)
+- ✅ **Fix**: Moved all functional routes to root level:
+  - `/academic/class-sections` (was `/dashboard/academic/class-sections`)
+  - `/academic/teacher-mapping` (was `/dashboard/academic/teacher-mapping`)
+  - `/staff/[id]/schedule` (was `/dashboard/staff/[id]/schedule`)
+  - `/staff`, `/users`, `/students`, `/reports` (all moved to root level)
+- ✅ **Reason**: Route groups `(folder)` are for layout organization only, not URL paths. Functional routes should be at root level.
+- ✅ **Files Updated**: All page files moved, `Sidebar.tsx` updated with new routes
+
+#### User/Staff/Student Separation ✅
+- ✅ **Clarification**: Clear separation between:
+  - `/users` - Generic user accounts (non-students) with roles and permissions
+  - `/staff` - Staff-specific employment records (employee ID, department, join date)
+  - `/students` - Student-specific academic records (student ID, class, section, enrollment)
+- ✅ **Implementation**: 
+  - `staff` table populated from existing users with staff roles via migration `1706000000007_populate_staff_from_existing_users.sql`
+  - Staff service refactored to fetch `user_roles` and `profiles` separately (Supabase relationship limitations)
+  - Updated page descriptions to clarify purpose of each section
+
+#### Database Validation Fixes ✅
+- ✅ **Issue**: Backend was validating that `classes` and `sections` belong to the current branch
+- ✅ **Fix**: Classes and sections are **global entities**, not branch-specific
+  - Removed `branch_id` check from `class-sections.service.ts` when validating `classId` and `sectionId`
+  - Updated error messages to reflect global nature
+- ✅ **Issue**: Backend was validating that `subjects` belong to the current branch
+- ✅ **Fix**: Subjects are **global entities**, not branch-specific
+  - Removed `branch_id` check from `teacher-assignments.service.ts` when validating `subjectId`
+  - Updated error messages to reflect global nature
+
+#### UI Improvements ✅
+- ✅ **Class Sections Page**:
+  - Fixed "Create Class-Section" button spacing (moved to right end, properly spaced from heading)
+  - Added "Create All" button to bulk create all missing class-section combinations
+  - Pre-population of class and section fields when clicking "Create" on specific grid card
+  - Form resets on modal close
+- ✅ **Teacher Mapping Page**:
+  - Fixed "List View/Matrix View" toggle and "Create Assignment" button spacing (moved to right end, lowered slightly)
+- ✅ **Staff Table**:
+  - Added "View Schedule" button (calendar icon) for all staff members
+  - Initially restricted to teachers only, then restored for all staff (school admins may need to view any schedule)
+
+#### Teacher Role Filtering ✅
+- ✅ **Issue**: Teacher assignment dropdowns showed non-teacher roles (e.g., "school admin")
+- ✅ **Fix**: 
+  - Backend: Updated `staff.service.ts` to return `role.name` instead of `role.display_name` for consistency
+  - Frontend: Filtered staff options to only include active staff with `class_teacher` or `subject_teacher` roles
+  - Applied in: `MatrixCell.tsx`, `CreateAssignmentModal.tsx`
+
+#### Co-Teaching Support ✅
+- ✅ **Feature**: Allow multiple teachers to be assigned to the same subject-class-section combination
+- ✅ **Database**: Updated unique constraint on `teacher_assignments` to include `staff_id`:
+  - Old: `UNIQUE(subject_id, class_section_id, academic_year_id)`
+  - New: `UNIQUE(subject_id, class_section_id, staff_id, academic_year_id)`
+- ✅ **Backend**: Updated `teacher-assignments.service.ts` to check if the *specific teacher* is already assigned (not just if any teacher is assigned)
+- ✅ **Frontend**: 
+  - `TeacherMappingMatrix.tsx` updated to store arrays of assignments per cell
+  - `MatrixCell.tsx` updated to:
+    - Display multiple assigned teachers as separate buttons
+    - Clicking assigned teacher shows only "Unassign" option
+    - Dotted "+ Assign" button appears below assigned teachers to add more
+    - Filters out already-assigned teachers from assign menu
+
+#### "My Schedule" Feature for Teachers ✅
+- ✅ **Backend**: 
+  - Added `getStaffByUserId(userId, branchId)` method to `staff.service.ts`
+  - Added `GET /api/v1/staff/me` endpoint to get current user's staff record
+- ✅ **Frontend**:
+  - Added `useMyStaff()` hook in `useStaff.ts`
+  - Created `/my-schedule/page.tsx` for logged-in teachers to view their own schedule
+  - Added conditional "My Schedule" navigation tab in Sidebar (visible only to teachers)
+  - Shows class teacher assignments and subject assignments
+
+#### Loading State Improvements ✅
+- ✅ **Issue**: "No records found" message flashed briefly when navigating between tabs before data loaded
+- ✅ **Fix**: Updated conditional rendering logic to distinguish between "no data yet" (loading) and "data loaded but empty" (empty state)
+- ✅ **Pattern Applied**:
+  ```typescript
+  // ✅ Correct - Show loader when data is undefined
+  {query.isLoading || !query.data ? (
+    <Loader />
+  ) : query.error ? (
+    <Error />
+  ) : query.data.data.length === 0 ? (
+    <EmptyState />
+  ) : (
+    <Table />
+  )}
+  ```
+- ✅ **Files Updated**: `staff/page.tsx`, `users/page.tsx`, `students/page.tsx`
+
+#### Staff Service Refactoring ✅
+- ✅ **Issue**: Supabase relationship syntax failed for indirect relationships (`staff` → `user_roles` → `roles`, `staff` → `profiles`)
+- ✅ **Fix**: Refactored `listStaff` and `getStaffById` to:
+  - Fetch `staff` data first
+  - Fetch `user_roles` and `profiles` separately using extracted `user_id` values
+  - Combine data in application code using Maps for efficient lookups
+  - Client-side filtering for `full_name` search (database only searches `employee_id`)
+- ✅ **Reason**: Supabase relationship syntax only works for direct foreign key relationships recognized in schema cache
+
+#### Missing Component Imports Fixed ✅
+- ✅ Fixed `ReferenceError: Group is not defined` in:
+  - `StaffForm.tsx` - Added `Group` to imports
+  - `ClassSectionStudentsModal.tsx` - Added `Group` to imports
+
+---
+
+**Last Updated**: Current Session  
+**Status**: ✅ Prompt 4 Complete - All phases implemented with post-implementation improvements
+
