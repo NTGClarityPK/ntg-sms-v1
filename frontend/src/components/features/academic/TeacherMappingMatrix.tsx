@@ -21,12 +21,15 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
   const classSections = classSectionsData?.data || [];
   const subjects = subjectsData?.data || [];
 
-  // Create a map of assignments by class-section and subject
+  // Create a map of assignments by class-section and subject (supporting multiple teachers)
   const assignmentMap = useMemo(() => {
-    const map = new Map<string, TeacherAssignment>();
+    const map = new Map<string, TeacherAssignment[]>();
     assignments.forEach((assignment) => {
       const key = `${assignment.classSectionId}-${assignment.subjectId}`;
-      map.set(key, assignment);
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(assignment);
     });
     return map;
   }, [assignments]);
@@ -93,11 +96,11 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
                 </Table.Td>
                 {uniqueSubjects.map((subject) => {
                   const key = `${classSection.id}-${subject.id}`;
-                  const assignment = assignmentMap.get(key);
+                  const cellAssignments = assignmentMap.get(key) || [];
                   return (
                     <Table.Td key={subject.id}>
                       <MatrixCell
-                        assignment={assignment}
+                        assignments={cellAssignments}
                         classSectionId={classSection.id}
                         subjectId={subject.id}
                         onCreate={createAssignment.mutateAsync}

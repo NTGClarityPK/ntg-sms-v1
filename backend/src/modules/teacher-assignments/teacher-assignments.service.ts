@@ -247,18 +247,19 @@ export class TeacherAssignmentsService {
       throw new NotFoundException('Class section not found or does not belong to this branch');
     }
 
-    // Check if assignment already exists (unique constraint)
+    // Check if this specific teacher is already assigned (unique constraint includes staff_id)
     const { data: existing, error: existingError } = await supabase
       .from('teacher_assignments')
       .select('id')
       .eq('subject_id', input.subjectId)
       .eq('class_section_id', input.classSectionId)
+      .eq('staff_id', input.staffId)
       .eq('academic_year_id', activeYearId)
       .maybeSingle();
     throwIfDbError(existingError);
     if (existing) {
       throw new ConflictException(
-        'Teacher assignment already exists for this subject-class-section combination',
+        'This teacher is already assigned to this subject-class-section combination',
       );
     }
 
