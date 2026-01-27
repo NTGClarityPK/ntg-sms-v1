@@ -164,6 +164,12 @@ export default function ScheduleSettingsPage() {
                 New template
               </Button>
             </Group>
+            {(templatesQuery.data?.data ?? []).length === 0 && (
+              <Alert color={colors.warning} title="School start and end times are set in timing templates">
+                Create at least one timing template and provide <strong>school start time</strong> and{' '}
+                <strong>school end time</strong>.
+              </Alert>
+            )}
             <Stack gap="md">
               {(templatesQuery.data?.data ?? []).map((t) => (
                 <TimingTemplateCard

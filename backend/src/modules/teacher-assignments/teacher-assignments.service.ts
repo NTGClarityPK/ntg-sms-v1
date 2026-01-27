@@ -61,7 +61,7 @@ export class TeacherAssignmentsService {
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
     if (!activeYearId) {
-      const activeYear = await this.academicYearsService.getActive();
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
         throw new BadRequestException('No active academic year found');
       }
@@ -206,7 +206,7 @@ export class TeacherAssignmentsService {
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
     if (!activeYearId) {
-      const activeYear = await this.academicYearsService.getActive();
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
         throw new BadRequestException('No active academic year found');
       }

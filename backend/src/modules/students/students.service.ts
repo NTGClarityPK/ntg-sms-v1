@@ -294,7 +294,7 @@ export class StudentsService {
     // Get active academic year if not provided
     let academicYearId = input.academicYearId;
     if (!academicYearId) {
-      const activeYear = await this.academicYearsService.getActive();
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
         throw new BadRequestException('No active academic year found');
       }
@@ -383,7 +383,7 @@ export class StudentsService {
     // Get active academic year if not provided
     let academicYearId = input.academicYearId;
     if (!academicYearId) {
-      const activeYear = await this.academicYearsService.getActive();
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
         throw new BadRequestException('No active academic year found');
       }

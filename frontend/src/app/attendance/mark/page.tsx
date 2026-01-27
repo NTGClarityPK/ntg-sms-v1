@@ -9,13 +9,27 @@ import { useClassSections } from '@/hooks/useClassSections';
 import { AttendanceSheet } from '@/components/features/attendance/AttendanceSheet';
 import { AttendanceStats } from '@/components/features/attendance/AttendanceStats';
 import { useAcademicYearsList } from '@/hooks/useAcademicYears';
+import { useMyStaff } from '@/hooks/useStaff';
+import { useAuth } from '@/hooks/useAuth';
+import type { User } from '@/types/auth';
 import '@mantine/dates/styles.css';
 
 export default function MarkAttendancePage() {
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const { user } = useAuth();
+  const userTyped = user as User | undefined;
+  const { data: myStaffData } = useMyStaff();
+  const staffData = myStaffData?.data;
 
-  const { data: classSectionsData } = useClassSections({ isActive: true });
+  // Check if user is a class teacher
+  const isClassTeacher = userTyped?.roles?.some((r) => r.roleName === 'class_teacher');
+  
+  // Filter class sections by class teacher if user is a class teacher
+  const { data: classSectionsData } = useClassSections({ 
+    isActive: true,
+    classTeacherId: isClassTeacher && staffData?.id ? staffData.id : undefined,
+  });
   const classSections = classSectionsData?.data || [];
 
   const { data: academicYearsData } = useAcademicYearsList({ page: 1, limit: 10 });
@@ -122,4 +136,5 @@ export default function MarkAttendancePage() {
     </>
   );
 }
+
 

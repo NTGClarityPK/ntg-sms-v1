@@ -33,8 +33,8 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
   const form = useForm<TimingTemplateFormValues>({
     initialValues: {
       name: '',
-      startTime: '',
-      endTime: '',
+      startTime: '08:00',
+      endTime: '14:00',
       periodDurationMinutes: 60,
       slots: [],
     },
@@ -83,8 +83,8 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
         <Stack gap="md">
           <TextInput label="Name" placeholder="Primary Morning Schedule" {...form.getInputProps('name')} />
           <Group grow>
-            <TextInput label="Start time" type="time" {...form.getInputProps('startTime')} />
-            <TextInput label="End time" type="time" {...form.getInputProps('endTime')} />
+            <TextInput label="School start time" type="time" {...form.getInputProps('startTime')} />
+            <TextInput label="School end time" type="time" {...form.getInputProps('endTime')} />
           </Group>
           <NumberInput label="Period duration (minutes)" min={1} {...form.getInputProps('periodDurationMinutes')} />
 

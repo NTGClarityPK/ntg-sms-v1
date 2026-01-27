@@ -50,9 +50,6 @@ export default function UsersPage() {
         <Group justify="space-between" w="100%">
           <div>
             <Title order={1}>User Management</Title>
-            <Text size="sm" c="dimmed" mt={4}>
-              Manage user accounts, roles, and permissions (excludes students)
-            </Text>
           </div>
           <Button leftSection={<IconPlus size={16} />} onClick={open}>
             Create User

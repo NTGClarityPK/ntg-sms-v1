@@ -184,6 +184,37 @@ export class BranchesService {
       usedPercentage,
     };
   }
+
+  async listByTenant(tenantId: string | null, userId: string): Promise<{ data: BranchDto[] }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Get all branches for the tenant that the user has access to
+    const { data: userBranches, error: userBranchesError } = await supabase
+      .from('user_branches')
+      .select('branch_id')
+      .eq('user_id', userId);
+
+    throwIfDbError(userBranchesError);
+
+    if (!userBranches || userBranches.length === 0) {
+      return { data: [] };
+    }
+
+    const branchIds = userBranches.map((ub) => ub.branch_id);
+
+    const { data: branches, error: branchesError } = await supabase
+      .from('branches')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .in('id', branchIds)
+      .order('name', { ascending: true });
+
+    throwIfDbError(branchesError);
+
+    return {
+      data: ((branches as BranchRow[]) ?? []).map(mapBranch),
+    };
+  }
 }
 
 

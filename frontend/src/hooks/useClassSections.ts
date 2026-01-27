@@ -24,6 +24,7 @@ interface QueryClassSectionsParams {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  classTeacherId?: string;
 }
 
 export function useClassSections(params?: QueryClassSectionsParams) {
@@ -46,6 +47,7 @@ export function useClassSections(params?: QueryClassSectionsParams) {
       if (params?.search) queryParams.append('search', params.search);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+      if (params?.classTeacherId) queryParams.append('classTeacherId', params.classTeacherId);
 
       const response = await apiClient.get<ClassSection[]>(
         `/api/v1/class-sections?${queryParams.toString()}`,

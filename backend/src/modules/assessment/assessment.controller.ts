@@ -94,8 +94,8 @@ export class AssessmentController {
   }
 
   @Get('grade-templates/assignments')
-  async listClassGradeAssignments(): Promise<{ data: ClassGradeAssignmentDto[] }> {
-    const result = await this.assessmentService.listClassGradeAssignments();
+  async listClassGradeAssignments(@CurrentBranch() branch: CurrentBranchContext): Promise<{ data: ClassGradeAssignmentDto[] }> {
+    const result = await this.assessmentService.listClassGradeAssignments(branch.branchId);
     return {
       data: result.data.map(
         (row) =>

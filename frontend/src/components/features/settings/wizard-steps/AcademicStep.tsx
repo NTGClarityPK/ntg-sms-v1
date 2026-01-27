@@ -1,9 +1,10 @@
 'use client';
 
-import { Button, Group, Stack, Text, TextInput, NumberInput, MultiSelect } from '@mantine/core';
+import { ActionIcon, Button, Group, Stack, Text, TextInput, NumberInput, MultiSelect } from '@mantine/core';
 import { useState } from 'react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { AcademicData } from './types';
+import { IconX } from '@tabler/icons-react';
 
 interface AcademicStepProps {
   data: AcademicData;
@@ -18,6 +19,44 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
   const [newClass, setNewClass] = useState({ name: '', displayName: '', sortOrder: 0 });
   const [newSection, setNewSection] = useState({ name: '', sortOrder: 0 });
   const [newLevel, setNewLevel] = useState({ name: '', classIds: [] as string[] });
+
+  const removeSubject = (index: number) => {
+    onChange({
+      ...data,
+      subjects: data.subjects.filter((_, i) => i !== index),
+    });
+  };
+
+  const removeClass = (index: number) => {
+    const classNameToRemove = data.classes[index]?.name;
+
+    onChange({
+      ...data,
+      classes: data.classes.filter((_, i) => i !== index),
+      levels: data.levels.map((lvl) => ({
+        ...lvl,
+        classIds: lvl.classIds.filter((cn) => cn !== classNameToRemove),
+      })),
+      levelClasses: data.levelClasses.filter((lc) => lc.classId !== classNameToRemove),
+    });
+  };
+
+  const removeSection = (index: number) => {
+    onChange({
+      ...data,
+      sections: data.sections.filter((_, i) => i !== index),
+    });
+  };
+
+  const removeLevel = (index: number) => {
+    const levelNameToRemove = data.levels[index]?.name;
+
+    onChange({
+      ...data,
+      levels: data.levels.filter((_, i) => i !== index),
+      levelClasses: data.levelClasses.filter((lc) => lc.levelId !== levelNameToRemove),
+    });
+  };
 
   const handleAddSubject = () => {
     if (newSubject.name.trim()) {
@@ -76,7 +115,15 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
     onNext();
   };
 
-  const classOptions = data.classes.map((c) => ({ value: c.name, label: c.displayName || c.name }));
+  // Classes already assigned to an existing level should not be available for new levels
+  const assignedClassNames = new Set<string>();
+  data.levels.forEach((lvl) => {
+    lvl.classIds.forEach((name) => assignedClassNames.add(name));
+  });
+
+  const classOptions = data.classes
+    .filter((c) => !assignedClassNames.has(c.name))
+    .map((c) => ({ value: c.name, label: c.displayName || c.name }));
 
   return (
     <Stack gap="md">
@@ -118,9 +165,19 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           {data.subjects.length > 0 && (
             <Stack gap="xs">
               {data.subjects.map((s, idx) => (
-                <Text key={idx} size="sm">
-                  {s.name} {s.code && `(${s.code})`}
-                </Text>
+                <Group key={`${s.name}-${s.code ?? ''}-${idx}`} justify="space-between" gap="xs" wrap="nowrap">
+                  <Text size="sm">
+                    {s.name} {s.code && `(${s.code})`}
+                  </Text>
+                  <ActionIcon
+                    variant="subtle"
+                    color={colors.error}
+                    onClick={() => removeSubject(idx)}
+                    aria-label={`Remove subject ${s.name}`}
+                  >
+                    <IconX size={16} />
+                  </ActionIcon>
+                </Group>
               ))}
             </Stack>
           )}
@@ -156,9 +213,17 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           {data.classes.length > 0 && (
             <Stack gap="xs">
               {data.classes.map((c, idx) => (
-                <Text key={idx} size="sm">
-                  {c.displayName || c.name}
-                </Text>
+                <Group key={`${c.name}-${idx}`} justify="space-between" gap="xs" wrap="nowrap">
+                  <Text size="sm">{c.displayName || c.name}</Text>
+                  <ActionIcon
+                    variant="subtle"
+                    color={colors.error}
+                    onClick={() => removeClass(idx)}
+                    aria-label={`Remove class ${c.displayName || c.name}`}
+                  >
+                    <IconX size={16} />
+                  </ActionIcon>
+                </Group>
               ))}
             </Stack>
           )}
@@ -188,9 +253,17 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           {data.sections.length > 0 && (
             <Stack gap="xs">
               {data.sections.map((s, idx) => (
-                <Text key={idx} size="sm">
-                  {s.name}
-                </Text>
+                <Group key={`${s.name}-${idx}`} justify="space-between" gap="xs" wrap="nowrap">
+                  <Text size="sm">{s.name}</Text>
+                  <ActionIcon
+                    variant="subtle"
+                    color={colors.error}
+                    onClick={() => removeSection(idx)}
+                    aria-label={`Remove section ${s.name}`}
+                  >
+                    <IconX size={16} />
+                  </ActionIcon>
+                </Group>
               ))}
             </Stack>
           )}
@@ -221,9 +294,19 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           {data.levels.length > 0 && (
             <Stack gap="xs">
               {data.levels.map((l, idx) => (
-                <Text key={idx} size="sm">
-                  {l.name} - Classes: {l.classIds.length}
-                </Text>
+                <Group key={`${l.name}-${idx}`} justify="space-between" gap="xs" wrap="nowrap">
+                  <Text size="sm">
+                    {l.name} - Classes: {l.classIds.length}
+                  </Text>
+                  <ActionIcon
+                    variant="subtle"
+                    color={colors.error}
+                    onClick={() => removeLevel(idx)}
+                    aria-label={`Remove level ${l.name}`}
+                  >
+                    <IconX size={16} />
+                  </ActionIcon>
+                </Group>
               ))}
             </Stack>
           )}
@@ -241,4 +324,5 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
     </Stack>
   );
 }
+
 

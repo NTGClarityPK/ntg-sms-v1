@@ -13,6 +13,7 @@ type AcademicYearRow = {
   is_locked: boolean;
   created_at: string;
   updated_at: string;
+  tenant_id: string | null;
 };
 
 function mapAcademicYear(row: AcademicYearRow): AcademicYearDto {
@@ -37,7 +38,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class AcademicYearsService {
   constructor(private readonly supabaseConfig: SupabaseConfig) {}
 
-  async list(query: QueryAcademicYearsDto): Promise<{
+  async list(
+    query: QueryAcademicYearsDto,
+    tenantId: string | null,
+  ): Promise<{
     data: AcademicYearDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
@@ -54,6 +58,7 @@ export class AcademicYearsService {
     let dbQuery = supabase
       .from('academic_years')
       .select('*', { count: 'exact' })
+      .eq('tenant_id', tenantId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -74,11 +79,12 @@ export class AcademicYearsService {
     };
   }
 
-  async getActive(): Promise<AcademicYearDto | null> {
+  async getActive(tenantId: string | null): Promise<AcademicYearDto | null> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('academic_years')
       .select('*')
+      .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .maybeSingle();
 
@@ -86,18 +92,53 @@ export class AcademicYearsService {
     return data ? mapAcademicYear(data as AcademicYearRow) : null;
   }
 
-  async create(input: { name: string; startDate: string; endDate: string }): Promise<AcademicYearDto> {
+  /**
+   * Convenience helper for branch-scoped modules that only have branchId.
+   * Resolves tenant_id via branches, then returns that tenant's active academic year.
+   */
+  async getActiveForBranch(branchId: string): Promise<AcademicYearDto | null> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: branchRow, error: branchError } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    throwIfDbError(branchError);
+
+    const tenantId = (branchRow as { tenant_id: string | null } | null)?.tenant_id ?? null;
+    return this.getActive(tenantId);
+  }
+
+  async create(
+    input: { name: string; startDate: string; endDate: string },
+    tenantId: string | null,
+  ): Promise<AcademicYearDto> {
     if (input.startDate >= input.endDate) {
       throw new BadRequestException('startDate must be before endDate');
     }
 
     const supabase = this.supabaseConfig.getClient();
+
+    // Idempotent behaviour: if a year with the same name already exists for this tenant, return it.
+    if (tenantId) {
+      const { data: existing, error: existingError } = await supabase
+        .from('academic_years')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('name', input.name)
+        .maybeSingle();
+      throwIfDbError(existingError);
+      if (existing) return mapAcademicYear(existing as AcademicYearRow);
+    }
+
     const { data, error } = await supabase
       .from('academic_years')
       .insert({
         name: input.name,
         start_date: input.startDate,
         end_date: input.endDate,
+        tenant_id: tenantId,
       })
       .select('*')
       .single();
@@ -106,7 +147,7 @@ export class AcademicYearsService {
     return mapAcademicYear(data as AcademicYearRow);
   }
 
-  async activate(id: string): Promise<AcademicYearDto> {
+  async activate(id: string, tenantId: string | null): Promise<AcademicYearDto> {
     const supabase = this.supabaseConfig.getClient();
 
     // Ensure it exists and not locked
@@ -114,6 +155,7 @@ export class AcademicYearsService {
       .from('academic_years')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single();
     if (existingError || !existing) throw new NotFoundException('Academic year not found');
     if ((existing as AcademicYearRow).is_locked) throw new BadRequestException('Academic year is locked');
@@ -122,6 +164,7 @@ export class AcademicYearsService {
     const { error: deactivateError } = await supabase
       .from('academic_years')
       .update({ is_active: false })
+      .eq('tenant_id', tenantId)
       .eq('is_active', true);
     throwIfDbError(deactivateError);
 
@@ -129,6 +172,7 @@ export class AcademicYearsService {
       .from('academic_years')
       .update({ is_active: true })
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .select('*')
       .single();
 
@@ -136,13 +180,14 @@ export class AcademicYearsService {
     return mapAcademicYear(data as AcademicYearRow);
   }
 
-  async lock(id: string): Promise<AcademicYearDto> {
+  async lock(id: string, tenantId: string | null): Promise<AcademicYearDto> {
     const supabase = this.supabaseConfig.getClient();
 
     const { data: existing, error: existingError } = await supabase
       .from('academic_years')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single();
     if (existingError || !existing) throw new NotFoundException('Academic year not found');
 
@@ -150,6 +195,7 @@ export class AcademicYearsService {
       .from('academic_years')
       .update({ is_locked: true })
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .select('*')
       .single();
 

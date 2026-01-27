@@ -373,7 +373,7 @@ export class AssessmentService {
     return { data: data as ClassGradeAssignmentRow };
   }
 
-  async listClassGradeAssignments(): Promise<{
+  async listClassGradeAssignments(branchId: string): Promise<{
     data: Array<{
       id: string;
       classId: string;
@@ -387,7 +387,23 @@ export class AssessmentService {
   }> {
     const supabase = this.supabaseConfig.getClient();
 
-    const { data: assignments, error: aError } = await supabase.from('class_grade_assignments').select('*');
+    // First, get all classes for this branch
+    const { data: branchClasses, error: bcError } = await supabase
+      .from('classes')
+      .select('id')
+      .eq('branch_id', branchId);
+    throwIfDbError(bcError);
+
+    const branchClassIds = ((branchClasses as { id: string }[]) ?? []).map(c => c.id);
+    if (branchClassIds.length === 0) {
+      return { data: [] };
+    }
+
+    // Now get assignments only for those classes
+    const { data: assignments, error: aError } = await supabase
+      .from('class_grade_assignments')
+      .select('*')
+      .in('class_id', branchClassIds);
     throwIfDbError(aError);
 
     const rows = (assignments as ClassGradeAssignmentRow[]) ?? [];

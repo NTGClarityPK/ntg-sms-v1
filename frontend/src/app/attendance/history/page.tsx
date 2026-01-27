@@ -10,6 +10,7 @@ import {
   Paper,
   Tabs,
   MultiSelect,
+  Pagination,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { IconCalendar, IconTable, IconChartBar } from '@tabler/icons-react';
@@ -17,6 +18,9 @@ import { useAttendance } from '@/hooks/useAttendance';
 import { useClassSections } from '@/hooks/useClassSections';
 import { AttendanceCalendar } from '@/components/features/attendance/AttendanceCalendar';
 import { AttendanceReport } from '@/components/features/attendance/AttendanceReport';
+import { useMyStaff } from '@/hooks/useStaff';
+import { useAuth } from '@/hooks/useAuth';
+import type { User } from '@/types/auth';
 import '@mantine/dates/styles.css';
 
 export default function AttendanceHistoryPage() {
@@ -25,14 +29,28 @@ export default function AttendanceHistoryPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const { user } = useAuth();
+  const userTyped = user as User | undefined;
+  const { data: myStaffData } = useMyStaff();
+  const staffData = myStaffData?.data;
 
-  const { data: classSectionsData } = useClassSections({ isActive: true });
+  // Check if user is a class teacher
+  const isClassTeacher = userTyped?.roles?.some((r) => r.roleName === 'class_teacher');
+  const isAdmin = userTyped?.roles?.some((r) => r.roleName === 'school_admin' || r.roleName === 'principal');
+
+  // Filter class sections by class teacher if user is a class teacher (not admin)
+  const { data: classSectionsData } = useClassSections({ 
+    isActive: true,
+    classTeacherId: isClassTeacher && !isAdmin && staffData?.id ? staffData.id : undefined,
+  });
   const classSections = classSectionsData?.data || [];
 
+  const [page, setPage] = useState(1);
   const { data: attendanceData, isLoading } = useAttendance({
     classSectionIds: selectedClassSectionIds.length > 0 ? selectedClassSectionIds : undefined,
     statuses: selectedStatuses.length > 0 ? (selectedStatuses as any) : undefined,
-    limit: 1000, // Get all records for history view
+    page,
+    limit: 100, // Maximum allowed limit per backend validation
   });
 
   // Filter by date range on frontend (backend doesn't support date ranges yet)

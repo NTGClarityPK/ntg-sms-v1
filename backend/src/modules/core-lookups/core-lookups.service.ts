@@ -164,12 +164,26 @@ export class CoreLookupsService {
     tenantId: string | null,
   ): Promise<SubjectDto> {
     const supabase = this.supabaseConfig.getClient();
+
+    // Idempotent behaviour for onboarding: if subject code already exists in this branch, return it.
+    const code = (input.code ?? '').trim();
+    if (code) {
+      const { data: existing, error: existingError } = await supabase
+        .from('subjects')
+        .select('*')
+        .eq('branch_id', branchId)
+        .eq('code', code)
+        .maybeSingle();
+      throwIfDbError(existingError);
+      if (existing) return mapSubject(existing as SubjectRow);
+    }
+
     const { data, error } = await supabase
       .from('subjects')
       .insert({
         name: input.name,
         name_ar: input.nameAr ?? null,
-        code: input.code ?? null,
+        code: code || null,
         is_active: input.isActive ?? true,
         sort_order: input.sortOrder ?? 0,
         branch_id: branchId,

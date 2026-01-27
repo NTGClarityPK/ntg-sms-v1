@@ -23,5 +23,9 @@ export class QueryClassSectionsDto extends BasePaginationDto {
     return undefined;
   })
   isActive?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  classTeacherId?: string;
 }
 

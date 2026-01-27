@@ -185,6 +185,7 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
             data={wizardData}
             onBack={handleBack}
             onConfirm={handleComplete}
+            isSaving={saveWizard.isPending}
           />
         );
       default:

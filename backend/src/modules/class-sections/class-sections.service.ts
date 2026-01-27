@@ -57,7 +57,7 @@ export class ClassSectionsService {
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
     if (!activeYearId) {
-      const activeYear = await this.academicYearsService.getActive();
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
         throw new BadRequestException('No active academic year found');
       }
@@ -88,6 +88,10 @@ export class ClassSectionsService {
 
     if (query.isActive !== undefined) {
       dbQuery = dbQuery.eq('is_active', query.isActive);
+    }
+
+    if (query.classTeacherId) {
+      dbQuery = dbQuery.eq('class_teacher_id', query.classTeacherId);
     }
 
     // Apply sorting
@@ -201,7 +205,7 @@ export class ClassSectionsService {
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
     if (!activeYearId) {
-      const activeYear = await this.academicYearsService.getActive();
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
         throw new BadRequestException('No active academic year found');
       }
@@ -269,7 +273,7 @@ export class ClassSectionsService {
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
     if (!activeYearId) {
-      const activeYear = await this.academicYearsService.getActive();
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
         throw new BadRequestException('No active academic year found');
       }

@@ -78,7 +78,7 @@ export function CommunicationSettings() {
           <Text fw={500}>Teacher ↔ Student</Text>
           <Group gap="md" wrap="wrap">
             <Checkbox
-              label="Both directions"
+              label="Both ways"
               checked={value.teacher_student === 'both'}
               onChange={() =>
                 setValue((prev) => ({
@@ -104,7 +104,7 @@ export function CommunicationSettings() {
           <Text fw={500}>Teacher ↔ Parent</Text>
           <Group gap="md" wrap="wrap">
             <Checkbox
-              label="Both directions"
+              label="Both ways"
               checked={value.teacher_parent === 'both'}
               onChange={() =>
                 setValue((prev) => ({

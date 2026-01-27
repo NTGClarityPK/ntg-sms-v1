@@ -47,6 +47,35 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class UsersService {
   constructor(private readonly supabaseConfig: SupabaseConfig) {}
 
+  /**
+   * Ensure a basic staff record exists for a user in a given branch.
+   * Used when assigning staff roles (subject_teacher / class_teacher) via Users module.
+   */
+  private async ensureStaffForUser(userId: string, branchId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Check if staff already exists
+    const { data: existing, error: existingError } = await supabase
+      .from('staff')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(existingError);
+    if (existing) return;
+
+    // Create a minimal staff record
+    const { error: staffError } = await supabase.from('staff').insert({
+      user_id: userId,
+      branch_id: branchId,
+      employee_id: null,
+      department: null,
+      join_date: new Date().toISOString().slice(0, 10),
+      is_active: true,
+    });
+    throwIfDbError(staffError);
+  }
+
   async listUsers(query: QueryUsersDto, branchId: string): Promise<{
     data: UserDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
@@ -178,7 +207,7 @@ export class UsersService {
     throwIfDbError(rolesError);
     const roleMap = new Map((rolesData || []).map((r: RoleRow) => [r.id, r]));
 
-    // Step 5: Get user emails from auth.users
+    // Step 5: Get user emails from auth.users via admin API
     const { data: authUsers } = await supabase.auth.admin.listUsers();
     const emailMap = new Map(
       authUsers.users
@@ -394,6 +423,23 @@ export class UsersService {
         if (rolesError) {
           throw new BadRequestException(rolesError.message);
         }
+
+        // If any of the assigned roles are staff roles, ensure a staff record exists
+        const { data: rolesData, error: rolesLookupError } = await supabase
+          .from('roles')
+          .select('id,name')
+          .in('id', input.roleIds);
+        throwIfDbError(rolesLookupError);
+
+        const hasStaffRole =
+          (rolesData || []).some(
+            (r: { id: string; name: string }) =>
+              r.name === 'subject_teacher' || r.name === 'class_teacher',
+          );
+
+        if (hasStaffRole) {
+          await this.ensureStaffForUser(user.id, branchId);
+        }
       }
 
       return this.getUserById(user.id, branchId);
@@ -459,6 +505,23 @@ export class UsersService {
       const { error: insertError } = await supabase.from('user_roles').insert(roleAssignments);
 
       throwIfDbError(insertError);
+
+      // If any of the new roles are staff roles, ensure a staff record exists
+      const { data: rolesData, error: rolesLookupError } = await supabase
+        .from('roles')
+        .select('id,name')
+        .in('id', input.roleIds);
+      throwIfDbError(rolesLookupError);
+
+      const hasStaffRole =
+        (rolesData || []).some(
+          (r: { id: string; name: string }) =>
+            r.name === 'subject_teacher' || r.name === 'class_teacher',
+        );
+
+      if (hasStaffRole) {
+        await this.ensureStaffForUser(id, branchId);
+      }
     }
 
     return this.getUserById(id, branchId);

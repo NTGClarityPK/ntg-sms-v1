@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Checkbox, Group, Stack, Text } from '@mantine/core';
+import { Button, Group, SegmentedControl, Stack, Text } from '@mantine/core';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { CommunicationData } from './types';
 
@@ -15,25 +15,18 @@ export function CommunicationStep({ data, onChange, onNext, onBack }: Communicat
   const colors = useThemeColors();
 
   const formData = data || {
-    teacherStudent: 'none' as const,
-    teacherParent: 'none' as const,
+    teacherStudent: 'both' as const,
+    teacherParent: 'both' as const,
   };
 
-  const teacherCanSendToStudent = formData.teacherStudent === 'teacher_only' || formData.teacherStudent === 'both';
-  const teacherCanSendToParent = formData.teacherParent === 'teacher_only' || formData.teacherParent === 'both';
-
-  const handleTeacherStudentChange = (checked: boolean) => {
-    onChange({
-      ...formData,
-      teacherStudent: checked ? 'teacher_only' : 'none',
-    });
+  const handleTeacherStudentChange = (value: string | null) => {
+    if (!value) return;
+    onChange({ ...formData, teacherStudent: value as CommunicationData['teacherStudent'] });
   };
 
-  const handleTeacherParentChange = (checked: boolean) => {
-    onChange({
-      ...formData,
-      teacherParent: checked ? 'teacher_only' : 'none',
-    });
+  const handleTeacherParentChange = (value: string | null) => {
+    if (!value) return;
+    onChange({ ...formData, teacherParent: value as CommunicationData['teacherParent'] });
   };
 
   const handleNext = () => {
@@ -55,26 +48,30 @@ export function CommunicationStep({ data, onChange, onNext, onBack }: Communicat
           <Text size="sm" fw={500} mb="xs">
             Teacher ↔ Student Messaging
           </Text>
-          <Stack gap="xs">
-            <Checkbox
-              label="Teacher can send to student"
-              checked={teacherCanSendToStudent}
-              onChange={(e) => handleTeacherStudentChange(e.currentTarget.checked)}
-            />
-          </Stack>
+          <SegmentedControl
+            value={formData.teacherStudent}
+            onChange={handleTeacherStudentChange}
+            data={[
+              { value: 'teacher_only', label: 'Teacher only' },
+              { value: 'both', label: 'Both ways' },
+            ]}
+            fullWidth
+          />
         </div>
 
         <div>
           <Text size="sm" fw={500} mb="xs">
             Teacher ↔ Parent Messaging
           </Text>
-          <Stack gap="xs">
-            <Checkbox
-              label="Teacher can send to parent"
-              checked={teacherCanSendToParent}
-              onChange={(e) => handleTeacherParentChange(e.currentTarget.checked)}
-            />
-          </Stack>
+          <SegmentedControl
+            value={formData.teacherParent}
+            onChange={handleTeacherParentChange}
+            data={[
+              { value: 'teacher_only', label: 'Teacher only' },
+              { value: 'both', label: 'Both ways' },
+            ]}
+            fullWidth
+          />
         </div>
       </Stack>
 

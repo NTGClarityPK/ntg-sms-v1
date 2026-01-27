@@ -93,8 +93,8 @@ export interface AssessmentData {
 }
 
 export interface CommunicationData {
-  teacherStudent: 'teacher_only' | 'student_only' | 'both' | 'none';
-  teacherParent: 'teacher_only' | 'parent_only' | 'both' | 'none';
+  teacherStudent: 'teacher_only' | 'both';
+  teacherParent: 'teacher_only' | 'both';
 }
 
 export interface BehaviorData {

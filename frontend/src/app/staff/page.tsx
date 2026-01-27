@@ -38,9 +38,6 @@ export default function StaffPage() {
         <Group justify="space-between" w="100%">
           <div>
             <Title order={1}>Staff Management</Title>
-            <Text size="sm" c="dimmed" mt={4}>
-              Manage staff members with employment details (employee ID, department, join date)
-            </Text>
           </div>
           <Button leftSection={<IconPlus size={16} />} onClick={open}>
             Create Staff

@@ -15,11 +15,9 @@ import { IconCalendarCheck, IconEye } from '@tabler/icons-react';
 import { useAttendanceSummaryByClass } from '@/hooks/useAttendance';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useAuth } from '@/hooks/useAuth';
-import type { User } from '@/types/auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
+import { useMyStaff } from '@/hooks/useStaff';
 
 interface ClassSection {
   id: string;
@@ -33,28 +31,18 @@ export function AttendanceWidget() {
   const { user } = useAuth();
   const notifyColors = useThemeColors();
 
-  // Get class-sections where this user is the class teacher
-  // We need to find staff by user_id, then find class-sections where staff.id = class_teacher_id
-  const userTyped = user as User | undefined;
-  const { data: staffData } = useQuery({
-    queryKey: ['staff-by-user', userTyped?.id, userTyped?.currentBranch?.id],
-    queryFn: async () => {
-      if (!userTyped?.id || !userTyped?.currentBranch?.id) return null;
-      // Get all staff in the branch and find the one matching user_id
-      const response = await apiClient.get<{ data: Array<{ id: string; userId: string }> }>(
-        `/api/v1/staff?limit=1000`,
-      );
-      return response.data?.data?.find((s) => s.userId === userTyped.id);
-    },
-    enabled: !!userTyped?.id && !!userTyped?.currentBranch?.id,
-  });
+  // Get current user's staff record
+  const { data: myStaffData } = useMyStaff();
+  const staffData = myStaffData?.data;
 
   // Get class-sections where this staff is the class teacher
-  const { data: classSectionsData } = useClassSections({ isActive: true });
+  const { data: classSectionsData } = useClassSections({ 
+    isActive: true,
+    classTeacherId: staffData?.id,
+  });
   const classSections = classSectionsData?.data || [];
-  const teacherClassSection = classSections.find(
-    (cs) => cs.classTeacherId === staffData?.id,
-  );
+  // Should only be one class section for this teacher, but use first if multiple
+  const teacherClassSection = classSections[0];
 
   // Get today's date
   const today = new Date().toISOString().split('T')[0];

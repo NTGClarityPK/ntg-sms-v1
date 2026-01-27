@@ -9,9 +9,10 @@ interface SetupReviewFormProps {
   data: SetupWizardData;
   onBack: () => void;
   onConfirm: () => void;
+  isSaving?: boolean;
 }
 
-export function SetupReviewForm({ data, onBack, onConfirm }: SetupReviewFormProps) {
+export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupReviewFormProps) {
   const colors = useThemeColors();
   const [consentChecked, setConsentChecked] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -335,7 +336,12 @@ export function SetupReviewForm({ data, onBack, onConfirm }: SetupReviewFormProp
         <Button variant="light" onClick={onBack}>
           Go Back
         </Button>
-        <Button onClick={onConfirm} color={colors.primary} disabled={!consentChecked}>
+        <Button
+          onClick={onConfirm}
+          color={colors.primary}
+          disabled={!consentChecked || isSaving}
+          loading={isSaving}
+        >
           Confirm & Save
         </Button>
       </Group>

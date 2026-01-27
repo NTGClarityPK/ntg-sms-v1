@@ -14,9 +14,11 @@ import {
   Anchor,
   Divider,
   Alert,
+  Modal,
+  Group,
 } from '@mantine/core';
-import { IconAlertCircle, IconBrandGoogle, IconMail, IconLock } from '@tabler/icons-react';
-import { signIn } from '@/lib/auth';
+import { IconAlertCircle, IconBrandGoogle, IconMail, IconLock, IconCheck } from '@tabler/icons-react';
+import { signIn, resetPasswordForEmail } from '@/lib/auth';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
@@ -31,6 +33,10 @@ export default function LoginPage() {
   const themeColors = generateThemeColors(primaryColor, isDark);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotPasswordOpened, setForgotPasswordOpened] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const form = useForm({
     initialValues: {
@@ -40,6 +46,15 @@ export default function LoginPage() {
     validate: {
       email: (value: string) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
       password: (value: string) => (value.length < 6 ? 'Password must be at least 6 characters' : null),
+    },
+  });
+
+  const forgotPasswordForm = useForm({
+    initialValues: {
+      email: '',
+    },
+    validate: {
+      email: (value: string) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
     },
   });
 
@@ -83,6 +98,27 @@ export default function LoginPage() {
   const handleGoogleLogin = () => {
     // Redirect to backend Google OAuth endpoint
     window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/auth/google`;
+  };
+
+  const handleForgotPassword = async (values: { email: string }) => {
+    setResetLoading(true);
+    setResetError(null);
+
+    try {
+      await resetPasswordForEmail(values.email);
+      setResetEmailSent(true);
+    } catch (err: any) {
+      setResetError(err.message || 'Failed to send reset email. Please try again.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleCloseForgotPassword = () => {
+    setForgotPasswordOpened(false);
+    setResetEmailSent(false);
+    setResetError(null);
+    forgotPasswordForm.reset();
   };
 
   return (
@@ -137,8 +173,10 @@ export default function LoginPage() {
         />
 
         <Anchor
-          href="/forgot-password"
+          component="button"
+          type="button"
           size="sm"
+          onClick={() => setForgotPasswordOpened(true)}
           style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}
         >
           Forgot password?
@@ -182,6 +220,93 @@ export default function LoginPage() {
           </Anchor>
         </Text>
       </Stack>
+
+      <Modal
+        opened={forgotPasswordOpened}
+        onClose={handleCloseForgotPassword}
+        title="Reset Password"
+        centered
+      >
+        {resetEmailSent ? (
+          <Stack gap="md">
+            <Alert
+              icon={<IconCheck size={16} />}
+              color="green"
+              variant="light"
+              radius="md"
+            >
+              <Text size="sm">
+                Password reset email has been sent to <strong>{forgotPasswordForm.values.email}</strong>.
+                Please check your inbox and click the link to reset your password.
+              </Text>
+            </Alert>
+            <Button
+              onClick={handleCloseForgotPassword}
+              fullWidth
+              style={{
+                backgroundColor: DEFAULT_THEME_COLOR,
+                color: 'white',
+              }}
+            >
+              Close
+            </Button>
+          </Stack>
+        ) : (
+          <form onSubmit={forgotPasswordForm.onSubmit(handleForgotPassword)}>
+            <Stack gap="md">
+              <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
+                Enter your email address and we'll send you a link to reset your password.
+              </Text>
+
+              {resetError && (
+                <Alert
+                  icon={<IconAlertCircle size={16} />}
+                  style={{
+                    backgroundColor: `${errorColor}15`,
+                    borderColor: errorColor,
+                    color: errorColor,
+                  }}
+                  variant="light"
+                  radius="md"
+                >
+                  {resetError}
+                </Alert>
+              )}
+
+              <TextInput
+                label="Email"
+                placeholder="your@email.com"
+                required
+                leftSection={<IconMail size={18} />}
+                size="lg"
+                radius="md"
+                disabled={resetLoading}
+                {...forgotPasswordForm.getInputProps('email')}
+              />
+
+              <Group justify="flex-end" mt="md">
+                <Button
+                  variant="light"
+                  onClick={handleCloseForgotPassword}
+                  disabled={resetLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  loading={resetLoading}
+                  style={{
+                    backgroundColor: DEFAULT_THEME_COLOR,
+                    color: 'white',
+                  }}
+                >
+                  Send Reset Link
+                </Button>
+              </Group>
+            </Stack>
+          </form>
+        )}
+      </Modal>
     </form>
   );
 }

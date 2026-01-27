@@ -20,6 +20,10 @@ import { ParentsModule } from './modules/parents/parents.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { ClassSectionsModule } from './modules/class-sections/class-sections.module';
 import { TeacherAssignmentsModule } from './modules/teacher-assignments/teacher-assignments.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SettingsStatusModule } from './modules/settings-status/settings-status.module';
+import { RegistrationModule } from './modules/registration/registration.module';
 
 @Module({
   imports: [
@@ -42,6 +46,10 @@ import { TeacherAssignmentsModule } from './modules/teacher-assignments/teacher-
     StaffModule,
     ClassSectionsModule,
     TeacherAssignmentsModule,
+    AttendanceModule,
+    NotificationsModule,
+    SettingsStatusModule,
+    RegistrationModule,
   ],
   controllers: [AppController],
   providers: [
