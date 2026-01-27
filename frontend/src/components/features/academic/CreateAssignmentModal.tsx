@@ -40,7 +40,8 @@ export function CreateAssignmentModal({
 
   const classSections = classSectionsData?.data || [];
   const subjects = subjectsData?.data || [];
-  const staff = staffData?.data || [];
+  const staffResponse = staffData;
+  const staff = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as any[];
 
   const form = useForm({
     initialValues: {
@@ -99,7 +100,7 @@ export function CreateAssignmentModal({
       if (!s.isActive) return false;
       // Check if staff has teacher roles
       const hasTeacherRole = s.roles?.some(
-        (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
+        (r: any) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
       );
       return hasTeacherRole;
     })

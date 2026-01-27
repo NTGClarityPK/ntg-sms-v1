@@ -26,7 +26,7 @@ interface QueryTeacherAssignmentsParams {
 export function useTeacherAssignments(params?: QueryTeacherAssignmentsParams) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useQuery({
     queryKey: ['teacher-assignments', branchId, params],
@@ -70,7 +70,7 @@ export function useCreateTeacherAssignment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
     mutationFn: async (input: CreateTeacherAssignmentInput) => {
@@ -102,7 +102,7 @@ export function useUpdateTeacherAssignment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
     mutationFn: async ({ id, input }: { id: string; input: UpdateTeacherAssignmentInput }) => {
@@ -135,7 +135,7 @@ export function useDeleteTeacherAssignment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
     mutationFn: async (id: string) => {

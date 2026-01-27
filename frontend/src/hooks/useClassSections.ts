@@ -29,7 +29,7 @@ interface QueryClassSectionsParams {
 export function useClassSections(params?: QueryClassSectionsParams) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useQuery({
     queryKey: ['class-sections', branchId, params],
@@ -72,7 +72,7 @@ export function useCreateClassSection() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
     mutationFn: async (input: CreateClassSectionInput) => {
@@ -104,7 +104,7 @@ export function useBulkCreateClassSections() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
     mutationFn: async (input: BulkCreateClassSectionInput) => {
@@ -112,13 +112,13 @@ export function useBulkCreateClassSections() {
         '/api/v1/class-sections',
         input,
       );
-      return response.data;
+      return response.data?.data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['class-sections', branchId] });
       notifications.show({
         title: 'Success',
-        message: `${data.length} class section(s) created successfully`,
+        message: `${data?.length || 0} class section(s) created successfully`,
         color: successColor,
       });
     },
@@ -136,7 +136,7 @@ export function useUpdateClassSection() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
     mutationFn: async ({ id, input }: { id: string; input: UpdateClassSectionInput }) => {
@@ -169,7 +169,7 @@ export function useDeleteClassSection() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -211,7 +211,7 @@ export function useAssignClassTeacher() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { successColor, errorColor } = useThemeColors();
+  const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
     mutationFn: async ({ id, input }: { id: string; input: AssignClassTeacherInput }) => {

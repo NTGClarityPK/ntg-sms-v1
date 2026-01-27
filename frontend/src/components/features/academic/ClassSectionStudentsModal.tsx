@@ -18,7 +18,7 @@ export function ClassSectionStudentsModal({
     opened ? classSectionId : null,
   );
 
-  const students = data || [];
+  const students = (data && 'data' in data ? data.data : (Array.isArray(data) ? data : [])) as any[];
 
   return (
     <Modal

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Select, Loader } from '@mantine/core';
 import { IconBuilding } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
+import type { User } from '@/types/auth';
 import { useBranchSwitcher } from '@/hooks/useBranchSwitcher';
 
 export function BranchSwitcher() {
@@ -11,9 +12,10 @@ export function BranchSwitcher() {
   const { switchBranch, isSwitching } = useBranchSwitcher();
 
   // Calculate derived values (before any returns)
-  const isSchoolAdmin = user?.roles?.some((r) => r.roleName === 'school_admin');
-  const branches = user?.branches || [];
-  const currentBranch = user?.currentBranch;
+  const userTyped = user as User | undefined;
+  const isSchoolAdmin = userTyped?.roles?.some((r) => r.roleName === 'school_admin');
+  const branches = userTyped?.branches || [];
+  const currentBranch = userTyped?.currentBranch;
 
   // Auto-select first branch if user has branches but no current branch selected
   // This hook must be called unconditionally, before any returns
@@ -26,7 +28,7 @@ export function BranchSwitcher() {
   // Debug logging
   console.log('BranchSwitcher - user:', user);
   console.log('BranchSwitcher - isSchoolAdmin:', isSchoolAdmin);
-  console.log('BranchSwitcher - roles:', user?.roles);
+  console.log('BranchSwitcher - roles:', userTyped?.roles);
   console.log('BranchSwitcher - branches:', branches);
   console.log('BranchSwitcher - currentBranch:', currentBranch);
 

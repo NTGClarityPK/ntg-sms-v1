@@ -16,8 +16,8 @@ export default function StaffSchedulePage() {
   const { data: classSectionsData } = useClassSections();
   const colors = useThemeColors();
 
-  const staff = staffData?.data?.find((s) => s.id === staffId);
-  const schedule = scheduleData;
+  const staff = staffData?.data?.data?.find((s) => s.id === staffId);
+  const schedule = scheduleData?.data;
   const classSections = classSectionsData?.data || [];
 
   // Create a map of class-section IDs to names

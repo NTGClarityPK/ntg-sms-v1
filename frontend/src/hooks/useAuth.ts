@@ -41,25 +41,20 @@ export function useAuth() {
     queryFn: fetchCurrentUser,
     retry: false,
     refetchOnWindowFocus: false,
-    enabled: true, // Explicitly enable the query
-    staleTime: 0, // Always fetch fresh data
-    gcTime: 0, // Don't cache
-    onSuccess: (data) => {
-      console.log('useAuth - onSuccess - data:', data);
-      // Store branch ID in localStorage for API client to use
-      if (data?.currentBranch?.id && typeof window !== 'undefined') {
-        localStorage.setItem('currentBranchId', data.currentBranch.id);
-      }
-    },
-    onError: (error) => {
-      console.error('useAuth - onError:', error);
-    },
+    enabled: true,
+    staleTime: 0,
+    gcTime: 0,
   });
+
+  // Store branch ID in localStorage when user data changes
+  if (user?.currentBranch?.id && typeof window !== 'undefined') {
+    localStorage.setItem('currentBranchId', user.currentBranch.id);
+  }
 
   console.log('useAuth - Hook state - user:', user, 'isLoading:', isLoading, 'isFetching:', isFetching, 'status:', status, 'error:', error);
 
   return {
-    user,
+    user: user as User | undefined,
     isLoading,
     isAuthenticated: !!user && !error,
     error,

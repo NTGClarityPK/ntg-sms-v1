@@ -5,7 +5,7 @@ import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
 import { useCreateStudent, useUpdateStudent, useGenerateStudentId } from '@/hooks/useStudents';
-import { useCoreLookups } from '@/hooks/useCoreLookups';
+import { useClasses, useSections } from '@/hooks/useCoreLookups';
 import { useAcademicYearsList } from '@/hooks/useAcademicYears';
 import type { Student, CreateStudentInput, UpdateStudentInput } from '@/types/students';
 import { useEffect } from 'react';
@@ -53,11 +53,11 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const updateStudent = useUpdateStudent();
   const generateId = useGenerateStudentId();
 
-  const { data: classesData } = useCoreLookups('classes');
-  const { data: sectionsData } = useCoreLookups('sections');
+  const { data: classesData } = useClasses();
+  const { data: sectionsData } = useSections();
   const { data: academicYearsData } = useAcademicYearsList({ page: 1, limit: 50 });
-  const classes = classesData?.data || [];
-  const sections = sectionsData?.data || [];
+  const classes = classesData?.data ?? [];
+  const sections = sectionsData?.data ?? [];
   const academicYears = academicYearsData?.data || [];
 
   const form = useForm({

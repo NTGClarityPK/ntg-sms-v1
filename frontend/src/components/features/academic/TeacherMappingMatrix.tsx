@@ -103,7 +103,10 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
                         assignments={cellAssignments}
                         classSectionId={classSection.id}
                         subjectId={subject.id}
-                        onCreate={createAssignment.mutateAsync}
+                        onCreate={async (input) => {
+                          const result = await createAssignment.mutateAsync(input);
+                          return result.data;
+                        }}
                         onDelete={deleteAssignment.mutateAsync}
                       />
                     </Table.Td>

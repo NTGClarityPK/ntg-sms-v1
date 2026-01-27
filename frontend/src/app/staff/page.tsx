@@ -9,6 +9,7 @@ import { StaffForm } from '@/components/features/staff/StaffForm';
 import { useStaff } from '@/hooks/useStaff';
 import { useRoles } from '@/hooks/useRoles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import type { Staff } from '@/types/staff';
 
 export default function StaffPage() {
   const colors = useThemeColors();
@@ -26,6 +27,10 @@ export default function StaffPage() {
     role: roleFilter,
     search: search || undefined,
   });
+
+  const staffResponse = staffQuery.data;
+  const staffData = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as Staff[];
+  const staffMeta = staffResponse && 'meta' in staffResponse ? staffResponse.meta : undefined;
 
   return (
     <>
@@ -79,7 +84,7 @@ export default function StaffPage() {
               </Button>
             </Group>
           </Alert>
-        ) : !staffQuery.data.data || staffQuery.data.data.length === 0 ? (
+        ) : staffData.length === 0 ? (
           <Alert color={colors.info} title="No staff records found">
             <Stack gap="xs" mt="sm">
               <Text size="sm">
@@ -100,8 +105,8 @@ export default function StaffPage() {
           </Alert>
         ) : (
           <StaffTable
-            staff={staffQuery.data.data}
-            meta={staffQuery.data.meta}
+            staff={staffData}
+            meta={staffMeta}
             onPageChange={setPage}
           />
         )}

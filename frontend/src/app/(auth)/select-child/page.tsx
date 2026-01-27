@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { notifications } from '@mantine/notifications';
+import type { User } from '@/types/auth';
 
 interface Child {
   id: string;
@@ -17,14 +18,16 @@ export default function SelectChildPage() {
   const { user } = useAuth();
   const router = useRouter();
 
+  const userId = (user as User | undefined)?.id;
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['parent-children', user?.id],
+    queryKey: ['parent-children', userId],
     queryFn: async () => {
-      if (!user?.id) return null;
-      const response = await apiClient.get<{ data: Child[] }>(`/parents/${user.id}/children`);
+      if (!userId) return null;
+      const response = await apiClient.get<{ data: Child[] }>(`/api/v1/parents/${userId}/children`);
       return response.data;
     },
-    enabled: !!user?.id,
+    enabled: !!userId,
   });
 
   const selectChild = useMutation({

@@ -83,7 +83,6 @@ export default function UsersPage() {
               }}
               clearable
               searchable
-              maxDisplayedValues={3}
               style={{ width: '100%' }}
             />
           </div>

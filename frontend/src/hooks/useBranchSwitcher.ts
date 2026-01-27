@@ -17,7 +17,7 @@ export function useBranchSwitcher() {
       const response = await apiClient.post<{ data: Branch }>('/api/v1/auth/select-branch', {
         branchId,
       });
-      return response.data;
+      return response.data?.data;
     },
     onSuccess: (data) => {
       // Update localStorage with new branch ID
@@ -33,7 +33,7 @@ export function useBranchSwitcher() {
 
       notifications.show({
         title: 'Success',
-        message: `Switched to ${data.name || data.code || 'branch'}`,
+        message: `Switched to ${data?.name || data?.code || 'branch'}`,
         color: 'green',
       });
     },

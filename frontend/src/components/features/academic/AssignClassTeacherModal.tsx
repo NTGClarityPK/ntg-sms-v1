@@ -23,7 +23,8 @@ export function AssignClassTeacherModal({
   const { data: rolesData } = useRoles();
 
   const roles = rolesData?.data || [];
-  const staff = staffData?.data || [];
+  const staffResponse = staffData;
+  const staff = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as any[];
 
   // Find class_teacher role ID
   const classTeacherRole = roles.find((r) => r.name === 'class_teacher');

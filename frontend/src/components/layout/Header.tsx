@@ -1,9 +1,9 @@
 'use client';
 
-import { Group, Text, ActionIcon } from '@mantine/core';
-import { IconBell } from '@tabler/icons-react';
+import { Group, Text } from '@mantine/core';
 import { UserMenu } from './UserMenu';
 import { BranchSwitcher } from '@/components/features/branches/BranchSwitcher';
+import { NotificationBell } from './NotificationBell';
 
 export function Header() {
   return (
@@ -14,9 +14,7 @@ export function Header() {
 
       <Group gap="md">
         <BranchSwitcher />
-        <ActionIcon variant="subtle" size="lg">
-          <IconBell size={20} />
-        </ActionIcon>
+        <NotificationBell />
         <UserMenu />
       </Group>
     </Group>

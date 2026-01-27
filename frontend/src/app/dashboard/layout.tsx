@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AuthGuard } from '@/components/common/AuthGuard';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/hooks/useAuth';
+import type { User } from '@/types/auth';
 
 export default function DashboardLayout({
   children,

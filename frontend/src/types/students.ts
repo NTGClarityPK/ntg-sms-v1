@@ -14,6 +14,10 @@ export interface Student {
   updatedAt: string;
   fullName?: string;
   email?: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female';
   className?: string;
   sectionName?: string;
 }

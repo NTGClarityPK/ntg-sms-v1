@@ -16,7 +16,7 @@ export default function MySchedulePage() {
   const { data: classSectionsData } = useClassSections();
   const colors = useThemeColors();
 
-  const schedule = scheduleData;
+  const schedule = scheduleData?.data;
   const classSections = classSectionsData?.data || [];
 
   // Create a map of class-section IDs to names

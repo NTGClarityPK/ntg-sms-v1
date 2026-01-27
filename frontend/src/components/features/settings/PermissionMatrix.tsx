@@ -8,6 +8,7 @@ import type { Role, Feature, PermissionMatrix, Permission, UpdatePermissionsPayl
 import { useAuth } from '@/hooks/useAuth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useState, useEffect } from 'react';
+import type { User } from '@/types/auth';
 
 interface PermissionMatrixProps {
   roles: Role[];
@@ -18,7 +19,8 @@ interface PermissionMatrixProps {
 export function PermissionMatrix({ roles, features, permissions }: PermissionMatrixProps) {
   const colors = useThemeColors();
   const { user } = useAuth();
-  const branchId = user?.currentBranch?.id;
+  const userTyped = user as User | undefined;
+  const branchId = userTyped?.currentBranch?.id;
   const queryClient = useQueryClient();
 
   // State to track changes
@@ -47,9 +49,9 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['permissions', branchId] });
       // Update local state with the returned data to ensure sync
-      if (response?.data) {
+      if (response?.data?.data) {
         const newMap = new Map<string, Permission>();
-        response.data.forEach((p) => {
+        response.data.data.forEach((p) => {
           const key = `${p.roleId}-${p.featureId}`;
           newMap.set(key, p.permission);
         });

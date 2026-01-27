@@ -26,13 +26,14 @@ export function MatrixCell({
   const [unassignMenuOpened, setUnassignMenuOpened] = useState<{ [key: string]: boolean }>({});
   const { data: staffData } = useStaff();
 
-  const staff = staffData?.data || [];
+  const staffResponse = staffData;
+  const staff = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as any[];
   // Filter to only include active staff with teacher roles (class_teacher or subject_teacher)
   const availableStaff = staff.filter((s) => {
     if (!s.isActive) return false;
     // Check if staff has teacher roles
     const hasTeacherRole = s.roles?.some(
-      (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
+      (r: any) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
     );
     return hasTeacherRole;
   });

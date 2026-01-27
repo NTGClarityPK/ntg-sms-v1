@@ -9,6 +9,7 @@ import { StudentForm } from '@/components/features/students/StudentForm';
 import { useStudents } from '@/hooks/useStudents';
 import { useCoreLookups } from '@/hooks/useCoreLookups';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import type { ClassEntity } from '@/types/settings';
 
 export default function StudentsPage() {
   const colors = useThemeColors();
@@ -72,7 +73,10 @@ export default function StudentsPage() {
           <div style={{ width: 200, flexShrink: 0 }}>
             <MultiSelect
               placeholder="Filter by class"
-              data={classes.map((c) => ({ value: c.id, label: c.displayName }))}
+              data={classes.map((c) => {
+                const classEntity = c as ClassEntity;
+                return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
+              })}
               value={classFilter}
               onChange={(value) => {
                 setClassFilter(value);
@@ -80,7 +84,6 @@ export default function StudentsPage() {
               }}
               clearable
               searchable
-              maxDisplayedValues={2}
               style={{ width: '100%' }}
             />
           </div>
@@ -95,7 +98,6 @@ export default function StudentsPage() {
               }}
               clearable
               searchable
-              maxDisplayedValues={2}
               style={{ width: '100%' }}
             />
           </div>

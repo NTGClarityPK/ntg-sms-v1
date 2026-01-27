@@ -14,6 +14,7 @@ import {
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
+import type { User } from '@/types/auth';
 
 interface NavItem {
   label: string;
@@ -37,9 +38,10 @@ export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
+  const userTyped = user as User | undefined;
 
   // Check if user has teacher roles (class_teacher or subject_teacher)
-  const hasTeacherRole = user?.roles?.some(
+  const hasTeacherRole = userTyped?.roles?.some(
     (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
   );
 
