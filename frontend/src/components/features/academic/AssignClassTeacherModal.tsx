@@ -5,7 +5,6 @@ import { useForm } from '@mantine/form';
 import { useAssignClassTeacher } from '@/hooks/useClassSections';
 import type { ClassSection } from '@/types/class-sections';
 import { useStaff } from '@/hooks/useStaff';
-import { useRoles } from '@/hooks/useRoles';
 
 interface AssignClassTeacherModalProps {
   opened: boolean;
@@ -20,19 +19,13 @@ export function AssignClassTeacherModal({
 }: AssignClassTeacherModalProps) {
   const assignClassTeacher = useAssignClassTeacher();
   const { data: staffData } = useStaff();
-  const { data: rolesData } = useRoles();
-
-  const roles = rolesData?.data || [];
   const staffResponse = staffData;
   const staff = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as any[];
 
-  // Find class_teacher role ID
-  const classTeacherRole = roles.find((r) => r.name === 'class_teacher');
-  const classTeacherRoleId = classTeacherRole?.id;
-
-  // Filter staff by class_teacher role (if we have role assignments, filter by that)
-  // For now, show all active staff - the backend will validate the role
-  const availableStaff = staff.filter((s) => s.isActive);
+  // Only allow staff who have the class_teacher role and are active
+  const availableStaff = staff.filter(
+    (s) => s.isActive && s.roles?.some((r: any) => r.roleName === 'class_teacher'),
+  );
 
   const form = useForm({
     initialValues: {
