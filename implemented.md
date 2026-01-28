@@ -1170,3 +1170,71 @@ npm run dev
     - `ParentAssociationTable`, `CreateParentAssociationModal`
   - Added Sidebar link: “Parent Associations” → `/parent-associations`
 
+---
+
+### Prompt 5.4: Parent Attendance View & Notifications – Notification UI/UX Fixes ✅
+
+> This session focused on stabilising and polishing the **notifications experience for parents**, especially for attendance alerts, after the core Prompt 5.4 plan was implemented.
+
+- **Backend – Notifications Filtering Fix**
+  - Updated `backend/src/modules/notifications/dto/query-notifications.dto.ts`:
+    - **Issue**: With global `ValidationPipe` configured as:
+      - `transform: true` and `transformOptions.enableImplicitConversion = true`,
+      - query param `?isRead=false` was being implicitly converted to `false` *before* the DTO `@Transform` ran.
+      - The original transform only handled string values `'true'/'false'`, so a boolean `false` became `undefined` and the `is_read` filter was **skipped**, returning all notifications.
+    - **Fix**: Transform now handles both booleans and strings:
+      - `if (value === true || value === 'true') return true;`
+      - `if (value === false || value === 'false') return false;`
+      - Ensures `isRead` is correctly set to `true`/`false` and `listNotifications` always applies `.eq('is_read', query.isRead)` when provided.
+
+- **Frontend – Notifications Dropdown & Layout**
+  - `NotificationBell.tsx`:
+    - Adjusted bell popover dropdown sizing to avoid “View All Notifications” button overflowing:
+      - Increased width to `380px`, added `maxHeight: '500px'` and `overflow: 'hidden'`.
+    - Bell badge (`useUnreadCount`) now shows a **true unread count**, not just the size of a filtered list.
+  - `NotificationDropdown.tsx`:
+    - Wrapped content Stack with flex + maxHeight to keep header, list, and footer button within popover bounds.
+    - Reduced `ScrollArea` height (approx. `350px`) and made it flex-fill so the “View All Notifications” button stays visible.
+    - Made “View All Notifications” button compact (`size="sm"`) and ensured it routes to `/notifications` then closes the dropdown.
+
+- **Frontend – `/notifications` Page Integration & Tabs**
+  - Added `frontend/src/app/notifications/layout.tsx`:
+    - Wraps notifications page in `AuthGuard` + `AppShell`, so `/notifications` opens inside the main layout with sidebar (same behaviour as `/dashboard`).
+  - `Sidebar.tsx`:
+    - Added a dedicated **“Notifications”** nav item with `IconBell`, pointing to `/notifications`.
+  - `frontend/src/app/notifications/page.tsx`:
+    - Ensured the header bar uses the standard `page-title-bar` pattern with proper spacing from content.
+    - Implemented **four tabs** with consistent counts:
+      - **All** – all notifications (single query via `useNotifications({ limit: 100 })`).
+      - **Unread** – derived on the client: `allNotifications.filter(n => !n.isRead)`.
+      - **Read** – derived on the client: `allNotifications.filter(n => n.isRead)`.
+      - **Attendance** – still uses `useNotifications({ type: 'attendance', limit: 100 })`.
+    - All three core tabs (`All`, `Unread`, `Read`) share the **same loading state** (`isLoadingAll`), ensuring consistent UX.
+
+- **Frontend – Unread Count (Bell Badge)**
+  - `useNotifications.ts` → `useUnreadCount()`:
+    - **Issue**: Previously fetched `/api/v1/notifications?isRead=false&limit=...` and used `response.data.length`, which broke when backend filtering failed or when limits changed.
+    - **Fix**: Unread count now uses backend **totals**:
+      - Fetch total notifications with `?limit=1` and read `meta.total` (fallback to `data.length` if meta missing).
+      - Fetch total **read** notifications with `?isRead=true&limit=1` and read `meta.total`.
+      - Compute `unread = total - read`, clamped at `>= 0`.
+    - This makes the bell badge robust to page size and consistent with database truth (e.g., All 27, Read 1 → Unread badge 26).
+  - **React Query invalidation**:
+    - `useMarkAsRead` and `useMarkAllAsRead` now invalidate:
+      - `['notifications']` – covers all list queries (`useNotifications` with different params).
+      - `['notifications', 'unread-count']` – keeps bell badge in sync.
+
+- **Behaviour Summary for Parent User (e.g., `parent1@parents.alahmar.edu`)**
+  - `/notifications` page:
+    - **All**: 27.
+    - **Read**: 1 (after marking a notification as read).
+    - **Unread**: 26, derived from the All list.
+    - **Attendance**: 27 (all notifications of type `attendance`).
+  - Bell badge:
+    - Shows **26**, matching `All − Read`.
+  - Notification dropdown:
+    - Shows the latest unread notifications with “Mark all read” and a “View All Notifications” button that correctly navigates into the AppShell-wrapped `/notifications` page.
+
+> These changes ensure the notifications experience is **numerically consistent**, **layout-safe**, and aligned with multi-tenant backend truth, especially important for Prompt 5.4 parent attendance notifications.
+
+
