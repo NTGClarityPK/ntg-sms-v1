@@ -71,6 +71,8 @@ export function AttendanceSheet({
   };
 
   const handleSave = async () => {
+    if (bulkMarkMutation.isPending) return;
+
     const records = localAttendance.map((a) => ({
       studentId: a.studentId,
       status: a.status,
@@ -119,6 +121,7 @@ export function AttendanceSheet({
             leftSection={<IconDeviceFloppy size={18} />}
             onClick={handleSave}
             loading={bulkMarkMutation.isPending}
+            disabled={bulkMarkMutation.isPending || isLoading}
           >
             Save Attendance
           </Button>

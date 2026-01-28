@@ -608,131 +608,142 @@ export class AttendanceService {
     // has separate columns, not class_section_id. This is a limitation we need to work with.
     // For now, we'll just verify students belong to the branch.
 
-    const results: AttendanceDto[] = [];
+    // PERF: avoid N+1 queries by upserting all records in one request
+    const nowIso = new Date().toISOString();
+    const upsertRows = input.records.map((record) => ({
+      student_id: record.studentId,
+      class_section_id: input.classSectionId,
+      date: input.date,
+      status: record.status,
+      entry_time: record.entryTime || null,
+      exit_time: record.exitTime || null,
+      notes: record.notes || null,
+      marked_by: userId,
+      branch_id: branchId,
+      academic_year_id: academicYearId,
+      updated_at: nowIso,
+    }));
 
-    for (const record of input.records) {
-      // Check if attendance already exists
-      const { data: existing } = await supabase
-        .from('attendance')
-        .select('id')
-        .eq('student_id', record.studentId)
-        .eq('date', input.date)
-        .eq('academic_year_id', academicYearId)
-        .single();
+    const { data: upserted, error: upsertError } = await supabase
+      .from('attendance')
+      .upsert(upsertRows, { onConflict: 'student_id,date,academic_year_id' })
+      .select(
+        'id, student_id, class_section_id, date, status, entry_time, exit_time, notes, marked_by, branch_id, academic_year_id, created_at, updated_at',
+      );
 
-      if (existing) {
-        // Update existing
-        const { data: updated, error: updateError } = await supabase
-          .from('attendance')
-          .update({
-            status: record.status,
-            entry_time: record.entryTime || null,
-            exit_time: record.exitTime || null,
-            notes: record.notes || null,
-            marked_by: userId,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id)
-          .select()
-          .single();
+    throwIfDbError(upsertError);
 
-        throwIfDbError(updateError);
-        if (updated) {
-          // Fetch full attendance record with relations
-          const attendanceList = await this.listAttendance(
-            {
-              page: 1,
-              limit: 1,
-            } as QueryAttendanceDto,
-            branchId,
-            academicYearId,
-          );
-          const found = attendanceList.data.find((a) => a.id === updated.id);
-          if (found) {
-            results.push(found);
-          }
-
-          // Create notification for parents (don't fail if this fails)
-          try {
-            await this.notificationsService.createAttendanceNotification(
-              record.studentId,
-              {
-                date: input.date,
-                status: record.status,
-                attendanceId: updated.id,
-              },
-              branchId,
-            );
-          } catch (error) {
-            // Log error but don't fail the entire operation
-            const errorMessage =
-              error instanceof Error ? error.message : 'Unknown error';
-            console.error(
-              `Failed to create notification for student ${record.studentId}:`,
-              errorMessage,
-            );
-          }
-        }
-      } else {
-        // Create new
-        const { data: created, error: createError } = await supabase
-          .from('attendance')
-          .insert({
-            student_id: record.studentId,
-            class_section_id: input.classSectionId,
-            date: input.date,
-            status: record.status,
-            entry_time: record.entryTime || null,
-            exit_time: record.exitTime || null,
-            notes: record.notes || null,
-            marked_by: userId,
-            branch_id: branchId,
-            academic_year_id: academicYearId,
-          })
-          .select()
-          .single();
-
-        throwIfDbError(createError);
-        if (created) {
-          // Fetch full attendance record with relations
-          const attendanceList = await this.listAttendance(
-            {
-              page: 1,
-              limit: 1,
-            } as QueryAttendanceDto,
-            branchId,
-            academicYearId,
-          );
-          const found = attendanceList.data.find((a) => a.id === created.id);
-          if (found) {
-            results.push(found);
-          }
-
-          // Create notification for parents (don't fail if this fails)
-          try {
-            await this.notificationsService.createAttendanceNotification(
-              record.studentId,
-              {
-                date: input.date,
-                status: record.status,
-                attendanceId: created.id,
-              },
-              branchId,
-            );
-          } catch (error) {
-            // Log error but don't fail the entire operation
-            const errorMessage =
-              error instanceof Error ? error.message : 'Unknown error';
-            console.error(
-              `Failed to create notification for student ${record.studentId}:`,
-              errorMessage,
-            );
-          }
-        }
-      }
+    const upsertedRows = (upserted || []) as AttendanceRow[];
+    if (upsertedRows.length === 0) {
+      return [];
     }
 
-    return results;
+    const classSection = classSectionData as { class_id: string; section_id: string };
+
+    const { data: classRows, error: classError } = await supabase
+      .from('classes')
+      .select('id, name, display_name')
+      .eq('id', classSection.class_id)
+      .maybeSingle();
+    throwIfDbError(classError);
+
+    const { data: sectionRows, error: sectionError } = await supabase
+      .from('sections')
+      .select('id, name')
+      .eq('id', classSection.section_id)
+      .maybeSingle();
+    throwIfDbError(sectionError);
+
+    const className = (classRows as { display_name?: string | null; name?: string | null } | null)
+      ? (classRows as { display_name?: string | null; name?: string | null }).display_name ||
+        (classRows as { display_name?: string | null; name?: string | null }).name ||
+        'Unknown'
+      : 'Unknown';
+    const sectionName = (sectionRows as { name?: string | null } | null)
+      ? (sectionRows as { name?: string | null }).name || 'Unknown'
+      : 'Unknown';
+
+    // Best-effort notifications: do not block API response
+    for (const row of upsertedRows) {
+      void this.notificationsService
+        .createAttendanceNotification(
+          row.student_id,
+          {
+            date: row.date,
+            status: row.status,
+            attendanceId: row.id,
+          },
+          branchId,
+        )
+        .catch(() => {
+          // intentionally swallow (notifications are non-critical)
+        });
+    }
+
+    // Return hydrated DTOs in one go (no per-student listAttendance calls)
+    const attendanceMap = new Map(upsertedRows.map((r) => [r.student_id, r]));
+    const uniqueStudentIds = [...new Set(upsertedRows.map((r) => r.student_id))];
+
+    const { data: studentRows, error: studentFetchError } = await supabase
+      .from('students')
+      .select('id, user_id, student_id')
+      .in('id', uniqueStudentIds);
+    throwIfDbError(studentFetchError);
+
+    const studentUserIds = (studentRows || [])
+      .map((s) => (s as { user_id: string | null }).user_id)
+      .filter((id): id is string => !!id);
+
+    const { data: profileRows, error: profileError } =
+      studentUserIds.length > 0
+        ? await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', studentUserIds)
+        : { data: [], error: null };
+    throwIfDbError(profileError);
+
+    const profileNameById = new Map(
+      (profileRows || []).map((p) => [
+        (p as { id: string }).id,
+        (p as { full_name: string }).full_name,
+      ]),
+    );
+
+    const studentById = new Map(
+      (studentRows || []).map((s) => [(s as { id: string }).id, s as { id: string; user_id: string | null; student_id: string }]),
+    );
+
+    return uniqueStudentIds
+      .map((studentId) => {
+        const row = attendanceMap.get(studentId);
+        if (!row) return null;
+        const student = studentById.get(studentId);
+        const studentName = student?.user_id
+          ? profileNameById.get(student.user_id) || 'Unknown'
+          : 'Unknown';
+
+        return new AttendanceDto({
+          id: row.id,
+          studentId: row.student_id,
+          studentIdNumber: student?.student_id,
+          studentName,
+          classSectionId: row.class_section_id,
+          className,
+          sectionName,
+          date: row.date,
+          status: row.status,
+          entryTime: row.entry_time ?? undefined,
+          exitTime: row.exit_time ?? undefined,
+          notes: row.notes ?? undefined,
+          markedById: row.marked_by ?? undefined,
+          branchId: row.branch_id,
+          academicYearId: row.academic_year_id,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        });
+      })
+      .filter((x): x is AttendanceDto => !!x);
   }
 
   async updateAttendance(

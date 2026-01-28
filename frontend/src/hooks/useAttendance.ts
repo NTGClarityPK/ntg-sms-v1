@@ -129,11 +129,14 @@ export function useBulkMarkAttendance() {
       const response = await apiClient.post<Attendance[]>(
         '/api/v1/attendance/bulk',
         input,
+        // Bulk attendance can take longer than normal requests (large class sizes, extra server work).
+        { timeout: 30000 },
       );
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', branchId] });
+      // Invalidate broadly to refresh both list and class/date views.
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
       notifications.show({
         title: 'Success',
         message: 'Attendance marked successfully',
@@ -141,8 +144,25 @@ export function useBulkMarkAttendance() {
       });
     },
     onError: (error: unknown) => {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const isTimeout =
+        typeof errorMessage === 'string' &&
+        (errorMessage.includes('timeout') ||
+          errorMessage.includes('ECONNABORTED'));
+
+      if (isTimeout) {
+        notifications.show({
+          title: 'Saving is taking longer than expected',
+          message:
+            'Your attendance may still have been saved. Refreshing data…',
+          color: notifyColors.warning,
+        });
+        // Best-effort refresh shortly after; backend may still be finishing.
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['attendance'] });
+        }, 1500);
+        return;
+      }
       notifications.show({
         title: 'Error',
         message: errorMessage || 'Failed to mark attendance',
