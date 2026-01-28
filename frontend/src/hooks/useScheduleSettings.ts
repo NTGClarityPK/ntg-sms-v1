@@ -13,6 +13,7 @@ export function useSchoolDays() {
   return useQuery({
     queryKey: scheduleKeys.schoolDays,
     queryFn: async () => apiClient.get<number[]>('/api/v1/settings/school-days'),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -32,6 +33,7 @@ export function useTimingTemplates() {
     queryKey: scheduleKeys.timingTemplates,
     queryFn: async () =>
       apiClient.get<TimingTemplate[]>('/api/v1/timing-templates', { params: { page: 1, limit: 100 } }),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -68,6 +70,7 @@ export function usePublicHolidays(academicYearId?: string) {
     enabled: Boolean(academicYearId),
     queryFn: async () =>
       apiClient.get<PublicHoliday[]>('/api/v1/public-holidays', { params: { academicYearId } }),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -112,6 +115,7 @@ export function useVacations(academicYearId?: string) {
     enabled: Boolean(academicYearId),
     queryFn: async () =>
       apiClient.get<Vacation[]>('/api/v1/vacations', { params: { academicYearId } }),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

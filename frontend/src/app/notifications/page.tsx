@@ -30,15 +30,10 @@ export default function NotificationsPage() {
     limit: 100,
   });
 
-  const { data: attendanceNotificationsData, isLoading: isLoadingAttendance } = useNotifications({
-    type: 'attendance',
-    limit: 100,
-  });
-
   const allNotifications = allNotificationsData?.data || [];
   const unreadNotifications = allNotifications.filter((n) => !n.isRead);
   const readNotifications = allNotifications.filter((n) => n.isRead);
-  const attendanceNotifications = attendanceNotificationsData?.data || [];
+  const attendanceNotifications = allNotifications.filter((n) => n.type === 'attendance');
 
   const getTypeColor = (type: Notification['type']) => {
     switch (type) {
@@ -215,7 +210,7 @@ export default function NotificationsPage() {
             </Tabs.Panel>
 
             <Tabs.Panel value="attendance" pt="md">
-              {renderNotificationsTable(attendanceNotifications, isLoadingAttendance)}
+              {renderNotificationsTable(attendanceNotifications, isLoadingAll)}
             </Tabs.Panel>
           </Tabs>
         </Paper>

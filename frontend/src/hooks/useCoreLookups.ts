@@ -13,6 +13,7 @@ export function useSubjects() {
   return useQuery({
     queryKey: coreKeys.subjects,
     queryFn: async () => apiClient.get<Subject[]>('/api/v1/subjects', { params: { page: 1, limit: 100 } }),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -34,6 +35,7 @@ export function useClasses(params?: { levelId?: string }) {
       apiClient.get<ClassEntity[]>('/api/v1/classes', {
         params: { page: 1, limit: 100, levelId: params?.levelId },
       }),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -53,6 +55,7 @@ export function useSections() {
   return useQuery({
     queryKey: coreKeys.sections,
     queryFn: async () => apiClient.get<Section[]>('/api/v1/sections', { params: { page: 1, limit: 100 } }),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -71,6 +74,7 @@ export function useLevels() {
   return useQuery({
     queryKey: coreKeys.levels,
     queryFn: async () => apiClient.get<Level[]>('/api/v1/levels', { params: { page: 1, limit: 100 } }),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

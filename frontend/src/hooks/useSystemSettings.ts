@@ -17,6 +17,7 @@ export function useSystemSetting<TValue = unknown>(key: string) {
   return useQuery({
     queryKey: settingsKeys.byKey(key),
     queryFn: async () => apiClient.get<SystemSetting<TValue>>(`/api/v1/settings/${key}`),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

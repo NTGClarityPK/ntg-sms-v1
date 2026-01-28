@@ -33,6 +33,7 @@ export function useNotifications(params?: QueryNotificationsParams) {
       return response;
     },
     enabled: !!userId,
+    staleTime: 30 * 1000,
   });
 }
 
@@ -62,19 +63,11 @@ export function useUnreadCount() {
     queryFn: async () => {
       if (!userId) return 0;
 
-      // Fetch total notifications (any status), but limit data payload
-      const allResponse = await apiClient.get<Notification[]>(
-        `/api/v1/notifications?limit=1`,
+      const response = await apiClient.get<{ unreadCount: number }>(
+        `/api/v1/notifications/unread-count`,
       );
-      const totalCount = allResponse.meta?.total ?? allResponse.data?.length ?? 0;
 
-      // Fetch total read notifications (isRead=true), again using meta.total
-      const readResponse = await apiClient.get<Notification[]>(
-        `/api/v1/notifications?isRead=true&limit=1`,
-      );
-      const readCount = readResponse.meta?.total ?? readResponse.data?.length ?? 0;
-
-      const unreadCount = totalCount - readCount;
+      const unreadCount = response.data?.unreadCount ?? 0;
       return unreadCount > 0 ? unreadCount : 0;
     },
     enabled: !!userId,

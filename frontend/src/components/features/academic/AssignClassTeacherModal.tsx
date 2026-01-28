@@ -19,8 +19,19 @@ export function AssignClassTeacherModal({
 }: AssignClassTeacherModalProps) {
   const assignClassTeacher = useAssignClassTeacher();
   const { data: staffData } = useStaff();
-  const staffResponse = staffData;
-  const staff = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as any[];
+  const staffResponse = staffData as
+    | {
+        data?: Array<{
+          id: string;
+          fullName?: string | null;
+          employeeId?: string | null;
+          isActive: boolean;
+          roles?: Array<{ roleName: string }>;
+        }>;
+      }
+    | null
+    | undefined;
+  const staff = staffResponse?.data || [];
 
   // Only allow staff who have the class_teacher role and are active
   const availableStaff = staff.filter(

@@ -37,7 +37,7 @@ export default function ParentAssociationsPage() {
   const { data: studentsData } = useStudents({ page: 1, limit: 100 });
 
   const parents = usersData?.data || [];
-  const students = studentsData?.data || [];
+  const students = (studentsData as { data?: Array<{ id: string; fullName?: string | null; studentId: string }> } | null | undefined)?.data || [];
 
   // Filter by search term
   const filteredParentId = useMemo(() => {

@@ -289,26 +289,25 @@ export class AttendanceService {
       activeYearId = activeYear.id;
     }
 
-    // Fetch existing attendance
-    const { data: attendanceData, error: attendanceError } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('class_section_id', classSectionId)
-      .eq('date', date)
-      .eq('branch_id', branchId)
-      .eq('academic_year_id', activeYearId);
+    // Fetch existing attendance and class-section details in parallel where possible
+    const [{ data: attendanceData, error: attendanceError }, { data: classSectionDetails, error: classSectionDetailsError }] =
+      await Promise.all([
+        supabase
+          .from('attendance')
+          .select('*')
+          .eq('class_section_id', classSectionId)
+          .eq('date', date)
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', activeYearId),
+        supabase
+          .from('class_sections')
+          .select('class_id, section_id')
+          .eq('id', classSectionId)
+          .eq('branch_id', branchId)
+          .single(),
+      ]);
 
     throwIfDbError(attendanceError);
-
-    // Fetch class-section details to get class_id and section_id
-    const { data: classSectionDetails, error: classSectionDetailsError } =
-      await supabase
-        .from('class_sections')
-        .select('class_id, section_id')
-        .eq('id', classSectionId)
-        .eq('branch_id', branchId)
-        .single();
-
     throwIfDbError(classSectionDetailsError);
     if (!classSectionDetails) {
       throw new NotFoundException('Class section not found');
@@ -329,34 +328,33 @@ export class AttendanceService {
 
     throwIfDbError(studentsError);
 
-    // Fetch related data
+    // Fetch related data (profiles, class, section) in parallel
     const studentUserIds = (studentsData || [])
       .map((s) => s.user_id)
       .filter((id): id is string => !!id);
 
-    const { data: profilesData } =
+    const [{ data: profilesData }, { data: classData }, { data: sectionData }] = await Promise.all([
       studentUserIds.length > 0
-        ? await supabase
+        ? supabase
             .from('profiles')
             .select('id, full_name')
             .in('id', studentUserIds)
-        : { data: [] };
+        : Promise.resolve({ data: [] as Array<{ id: string; full_name: string }> }),
+      supabase
+        .from('classes')
+        .select('id, name, display_name')
+        .eq('id', classSectionDetails.class_id)
+        .single(),
+      supabase
+        .from('sections')
+        .select('id, name')
+        .eq('id', classSectionDetails.section_id)
+        .single(),
+    ]);
 
     const profileMap = new Map(
       (profilesData || []).map((p) => [p.id, p.full_name]),
     );
-
-    const { data: classData } = await supabase
-      .from('classes')
-      .select('id, name, display_name')
-      .eq('id', classSectionDetails.class_id)
-      .single();
-
-    const { data: sectionData } = await supabase
-      .from('sections')
-      .select('id, name')
-      .eq('id', classSectionDetails.section_id)
-      .single();
 
     const attendanceMap = new Map(
       (attendanceData || []).map((a) => [a.student_id, a as AttendanceRow]),
@@ -797,21 +795,9 @@ export class AttendanceService {
       throw new NotFoundException('Failed to update attendance');
     }
 
-    // Fetch full attendance record with relations
-    const attendanceList = await this.listAttendance(
-      {
-        page: 1,
-        limit: 1,
-      } as QueryAttendanceDto,
-      branchId,
-      existing.academic_year_id,
-    );
-    const found = attendanceList.data.find((a) => a.id === updated.id);
-    if (!found) {
-      throw new NotFoundException('Failed to fetch updated attendance');
-    }
-
-    return found;
+    // Hydrate the updated attendance record with related data
+    const hydrated = await this.hydrateSingleAttendanceRow(updated as AttendanceRow);
+    return hydrated;
   }
 
   async getAttendanceSummaryByStudent(
@@ -856,31 +842,39 @@ export class AttendanceService {
       throw new NotFoundException('Academic year not found');
     }
 
-    // Count attendance by status
-    const { data: attendanceData, error: attendanceError } = await supabase
-      .from('attendance')
-      .select('status')
-      .eq('student_id', studentId)
-      .eq('branch_id', branchId)
-      .eq('academic_year_id', activeYearId)
-      .gte('date', academicYear.start_date)
-      .lte('date', academicYear.end_date);
+    // Count attendance by status using database-level aggregation
+    const buildBaseQuery = () =>
+      supabase
+        .from('attendance')
+        .select('id', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', activeYearId)
+        .gte('date', academicYear.start_date)
+        .lte('date', academicYear.end_date);
 
-    throwIfDbError(attendanceError);
+    const [
+      { count: presentCount, error: presentError },
+      { count: absentCount, error: absentError },
+      { count: lateCount, error: lateError },
+      { count: excusedCount, error: excusedError },
+    ] = await Promise.all([
+      buildBaseQuery().eq('status', 'present'),
+      buildBaseQuery().eq('status', 'absent'),
+      buildBaseQuery().eq('status', 'late'),
+      buildBaseQuery().eq('status', 'excused'),
+    ]);
 
-    const presentDays = (attendanceData || []).filter(
-      (a) => a.status === 'present',
-    ).length;
-    const absentDays = (attendanceData || []).filter(
-      (a) => a.status === 'absent',
-    ).length;
-    const lateDays = (attendanceData || []).filter(
-      (a) => a.status === 'late',
-    ).length;
-    const excusedDays = (attendanceData || []).filter(
-      (a) => a.status === 'excused',
-    ).length;
-    const totalDays = (attendanceData || []).length;
+    throwIfDbError(presentError);
+    throwIfDbError(absentError);
+    throwIfDbError(lateError);
+    throwIfDbError(excusedError);
+
+    const presentDays = presentCount || 0;
+    const absentDays = absentCount || 0;
+    const lateDays = lateCount || 0;
+    const excusedDays = excusedCount || 0;
+    const totalDays = presentDays + absentDays + lateDays + excusedDays;
     const percentage =
       totalDays > 0
         ? Math.round(
@@ -930,36 +924,46 @@ export class AttendanceService {
       throw new NotFoundException('Class section not found');
     }
 
-    let dbQuery = supabase
-      .from('attendance')
-      .select('status')
-      .eq('class_section_id', classSectionId)
-      .eq('branch_id', branchId)
-      .eq('academic_year_id', activeYearId);
+    const buildBaseQuery = () => {
+      let query = supabase
+        .from('attendance')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_section_id', classSectionId)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', activeYearId);
 
-    if (startDate) {
-      dbQuery = dbQuery.gte('date', startDate);
-    }
-    if (endDate) {
-      dbQuery = dbQuery.lte('date', endDate);
-    }
+      if (startDate) {
+        query = query.gte('date', startDate);
+      }
+      if (endDate) {
+        query = query.lte('date', endDate);
+      }
 
-    const { data: attendanceData, error: attendanceError } = await dbQuery;
-    throwIfDbError(attendanceError);
+      return query;
+    };
 
-    const presentDays = (attendanceData || []).filter(
-      (a) => a.status === 'present',
-    ).length;
-    const absentDays = (attendanceData || []).filter(
-      (a) => a.status === 'absent',
-    ).length;
-    const lateDays = (attendanceData || []).filter(
-      (a) => a.status === 'late',
-    ).length;
-    const excusedDays = (attendanceData || []).filter(
-      (a) => a.status === 'excused',
-    ).length;
-    const totalDays = (attendanceData || []).length;
+    const [
+      { count: presentCount, error: presentError },
+      { count: absentCount, error: absentError },
+      { count: lateCount, error: lateError },
+      { count: excusedCount, error: excusedError },
+    ] = await Promise.all([
+      buildBaseQuery().eq('status', 'present'),
+      buildBaseQuery().eq('status', 'absent'),
+      buildBaseQuery().eq('status', 'late'),
+      buildBaseQuery().eq('status', 'excused'),
+    ]);
+
+    throwIfDbError(presentError);
+    throwIfDbError(absentError);
+    throwIfDbError(lateError);
+    throwIfDbError(excusedError);
+
+    const presentDays = presentCount || 0;
+    const absentDays = absentCount || 0;
+    const lateDays = lateCount || 0;
+    const excusedDays = excusedCount || 0;
+    const totalDays = presentDays + absentDays + lateDays + excusedDays;
     const percentage =
       totalDays > 0
         ? Math.round(
@@ -1034,6 +1038,98 @@ export class AttendanceService {
       sectionName,
       summary,
       records: attendanceList.data,
+    });
+  }
+
+  private async hydrateSingleAttendanceRow(row: AttendanceRow): Promise<AttendanceDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const [{ data: studentRow, error: studentError }, { data: classSectionRow, error: classSectionError }] =
+      await Promise.all([
+        supabase
+          .from('students')
+          .select('id, user_id, student_id')
+          .eq('id', row.student_id)
+          .maybeSingle(),
+        supabase
+          .from('class_sections')
+          .select('id, class_id, section_id')
+          .eq('id', row.class_section_id)
+          .maybeSingle(),
+      ]);
+
+    throwIfDbError(studentError);
+    throwIfDbError(classSectionError);
+
+    const student = studentRow as { id: string; user_id: string | null; student_id: string } | null;
+    const classSection = classSectionRow as { class_id: string | null; section_id: string | null } | null;
+
+    const studentUserId = student?.user_id;
+    const [profilesResult, classesResult, sectionsResult, markedByResult] = await Promise.all([
+      studentUserId
+        ? supabase
+            .from('profiles')
+            .select('id, full_name')
+            .eq('id', studentUserId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      classSection?.class_id
+        ? supabase
+            .from('classes')
+            .select('id, name, display_name')
+            .eq('id', classSection.class_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      classSection?.section_id
+        ? supabase
+            .from('sections')
+            .select('id, name')
+            .eq('id', classSection.section_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      row.marked_by
+        ? supabase
+            .from('profiles')
+            .select('id, full_name')
+            .eq('id', row.marked_by)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    throwIfDbError((profilesResult as { error: PostgrestError | null }).error ?? null);
+    throwIfDbError((classesResult as { error: PostgrestError | null }).error ?? null);
+    throwIfDbError((sectionsResult as { error: PostgrestError | null }).error ?? null);
+    throwIfDbError((markedByResult as { error: PostgrestError | null }).error ?? null);
+
+    const profileData = profilesResult.data as { full_name: string } | null;
+    const classData = classesResult.data as { name?: string | null; display_name?: string | null } | null;
+    const sectionData = sectionsResult.data as { name?: string | null } | null;
+    const markedByProfile = markedByResult.data as { full_name: string } | null;
+
+    const className = classData?.display_name || classData?.name || 'Unknown';
+    const sectionName = sectionData?.name || 'Unknown';
+    const studentName = profileData?.full_name || 'Unknown';
+    const markedByName = markedByProfile?.full_name;
+
+    return new AttendanceDto({
+      id: row.id,
+      studentId: row.student_id,
+      studentIdNumber: student?.student_id,
+      studentName,
+      classSectionId: row.class_section_id,
+      className,
+      sectionName,
+      date: row.date,
+      status: row.status,
+      entryTime: row.entry_time ?? undefined,
+      exitTime: row.exit_time ?? undefined,
+      notes: row.notes ?? undefined,
+      markedById: row.marked_by ?? undefined,
+      markedByName: markedByName ?? undefined,
+      branchId: row.branch_id,
+      academicYearId: row.academic_year_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     });
   }
 }

@@ -26,8 +26,19 @@ export function MatrixCell({
   const [unassignMenuOpened, setUnassignMenuOpened] = useState<{ [key: string]: boolean }>({});
   const { data: staffData } = useStaff();
 
-  const staffResponse = staffData;
-  const staff = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as any[];
+  const staffResponse = staffData as
+    | {
+        data?: Array<{
+          id: string;
+          fullName?: string | null;
+          employeeId?: string | null;
+          isActive: boolean;
+          roles?: Array<{ roleName: string }>;
+        }>;
+      }
+    | null
+    | undefined;
+  const staff = staffResponse?.data || [];
   // Filter to only include active staff with teacher roles (class_teacher or subject_teacher)
   const availableStaff = staff.filter((s) => {
     if (!s.isActive) return false;

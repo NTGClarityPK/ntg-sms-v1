@@ -54,8 +54,18 @@ export function TeacherMappingList({
 
   const classSections = classSectionsData?.data || [];
   const subjects = subjectsData?.data || [];
-  const staffResponse = staffData;
-  const staff = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as any[];
+  const staffResponse = staffData as
+    | {
+        data?: Array<{
+          id: string;
+          fullName?: string | null;
+          employeeId?: string | null;
+          isActive: boolean;
+        }>;
+      }
+    | null
+    | undefined;
+  const staff = staffResponse?.data || [];
 
   // Get unique values for filters
   const classOptions = Array.from(

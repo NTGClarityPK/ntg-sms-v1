@@ -50,8 +50,7 @@ export function CreateParentAssociationModal({
   const { data: studentsData } = useStudents({ page: 1, limit: 100 });
 
   const parents = usersData?.data || [];
-
-  const students = studentsData?.data || [];
+  const students = (studentsData as { data?: Array<{ id: string; fullName?: string | null; studentId: string }> } | null | undefined)?.data || [];
 
   const handleSubmit = async (values: typeof form.values) => {
     try {

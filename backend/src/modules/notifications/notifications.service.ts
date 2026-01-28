@@ -103,6 +103,20 @@ export class NotificationsService {
     };
   }
 
+  async getUnreadCount(userId: string): Promise<{ unreadCount: number }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+
+    throwIfDbError(error as PostgrestError | null);
+
+    return { unreadCount: count || 0 };
+  }
+
   async getNotificationById(id: string, userId: string): Promise<NotificationDto> {
     const supabase = this.supabaseConfig.getClient();
 

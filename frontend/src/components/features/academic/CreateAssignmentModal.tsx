@@ -40,8 +40,19 @@ export function CreateAssignmentModal({
 
   const classSections = classSectionsData?.data || [];
   const subjects = subjectsData?.data || [];
-  const staffResponse = staffData;
-  const staff = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as any[];
+  const staffResponse = staffData as
+    | {
+        data?: Array<{
+          id: string;
+          fullName?: string | null;
+          employeeId?: string | null;
+          isActive: boolean;
+          roles?: Array<{ roleName: string }>;
+        }>;
+      }
+    | null
+    | undefined;
+  const staff = staffResponse?.data || [];
 
   const form = useForm({
     initialValues: {

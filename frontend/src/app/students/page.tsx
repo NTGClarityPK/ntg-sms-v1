@@ -10,6 +10,7 @@ import { useStudents } from '@/hooks/useStudents';
 import { useCoreLookups } from '@/hooks/useCoreLookups';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { ClassEntity } from '@/types/settings';
+import type { Student } from '@/types/students';
 
 export default function StudentsPage() {
   const colors = useThemeColors();
@@ -41,6 +42,14 @@ export default function StudentsPage() {
     sortBy,
     sortOrder,
   });
+
+  const studentsResponse = studentsQuery.data as
+    | {
+        data?: Student[];
+        meta?: { total: number; page: number; limit: number; totalPages: number };
+      }
+    | null
+    | undefined;
 
   return (
     <>
@@ -100,7 +109,7 @@ export default function StudentsPage() {
           </div>
         </Group>
 
-        {studentsQuery.isLoading || !studentsQuery.data ? (
+        {studentsQuery.isLoading || !studentsResponse ? (
           <Group justify="center" py="xl">
             <Loader color={colors.primary} />
           </Group>
@@ -117,14 +126,14 @@ export default function StudentsPage() {
               </Button>
             </Group>
           </Alert>
-        ) : !studentsQuery.data.data || studentsQuery.data.data.length === 0 ? (
+        ) : !studentsResponse?.data || studentsResponse.data.length === 0 ? (
           <Alert color={colors.info} title="No students found">
             <Text size="sm">No students have been created yet. Click "Create Student" to add one.</Text>
           </Alert>
         ) : (
           <StudentTable
-            students={studentsQuery.data.data}
-            meta={studentsQuery.data.meta}
+            students={studentsResponse.data}
+            meta={studentsResponse.meta}
             onPageChange={setPage}
             sortBy={sortBy}
             sortOrder={sortOrder}

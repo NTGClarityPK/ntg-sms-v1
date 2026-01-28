@@ -25,6 +25,12 @@ export class NotificationsController {
     return this.notificationsService.listNotifications(user.id, query);
   }
 
+  @Get('unread-count')
+  async getUnreadCount(@CurrentUser() user: { id: string }) {
+    const data = await this.notificationsService.getUnreadCount(user.id);
+    return { data };
+  }
+
   @Get(':id')
   async getNotificationById(
     @Param('id') id: string,

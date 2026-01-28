@@ -23,6 +23,7 @@ export function useAcademicYearsList(params?: Partial<{ page: number; limit: num
       });
       return res;
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -33,6 +34,7 @@ export function useActiveAcademicYear() {
       const res = await apiClient.get<AcademicYear | null>('/api/v1/academic-years/active');
       return res;
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 

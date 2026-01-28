@@ -2,7 +2,7 @@
 
 import { Group, Title, Loader, Stack, Alert, Text, Button, TextInput, Select } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
 import { StaffTable } from '@/components/features/staff/StaffTable';
 import { StaffForm } from '@/components/features/staff/StaffForm';
@@ -16,6 +16,7 @@ export default function StaffPage() {
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [debouncedSearch] = useDebouncedValue(search, 300);
   const [roleFilter, setRoleFilter] = useState<string | undefined>(undefined);
 
   const { data: rolesData } = useRoles();
@@ -25,12 +26,19 @@ export default function StaffPage() {
     page,
     limit: 20,
     role: roleFilter,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
   });
 
-  const staffResponse = staffQuery.data;
-  const staffData = (staffResponse && 'data' in staffResponse ? staffResponse.data : []) as Staff[];
-  const staffMeta = staffResponse && 'meta' in staffResponse ? staffResponse.meta : undefined;
+  const staffResponse = staffQuery.data as
+    | {
+        data?: Staff[];
+        meta?: { total: number; page: number; limit: number; totalPages: number };
+      }
+    | null
+    | undefined;
+
+  const staffData = staffResponse?.data || [];
+  const staffMeta = staffResponse?.meta;
 
   return (
     <>
@@ -51,7 +59,10 @@ export default function StaffPage() {
             placeholder="Search staff..."
             leftSection={<IconSearch size={16} />}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             style={{ flex: 1 }}
           />
           <Select

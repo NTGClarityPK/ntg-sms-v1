@@ -1238,3 +1238,129 @@ npm run dev
 > These changes ensure the notifications experience is **numerically consistent**, **layout-safe**, and aligned with multi-tenant backend truth, especially important for Prompt 5.4 parent attendance notifications.
 
 
+
+---
+
+### Performance Optimisation: Attendance, Notifications, React Query & Supabase (Performance Plan v1) ✅
+
+> This section logs only the improvements implemented during the performance audit/implementation sessions described in `performancefindings.md` and the associated plan.
+
+#### Backend – Attendance Module Optimisations (`attendance.service.ts`) ✅
+
+- **List & Detail Queries**
+  - Kept `listAttendance`, `getAttendanceByClassAndDate`, and `getAttendanceByStudent` aligned with the existing API contracts but optimised their internal hydration logic:
+    - Hydrate related entities (students, profiles, class_sections, classes, sections, marked_by profiles) using **batched Supabase queries** instead of per-row lookups.
+    - Use `Set`-based ID de-duplication and `Map` lookups in Node to minimise repeated work while preserving DTO shapes.
+  - `updateAttendance`:
+    - Stopped using `listAttendance` as a post-update rehydration hack.
+    - Introduced a private `hydrateSingleAttendanceRow(row: AttendanceRow)` helper that:
+      - Loads the specific student, class_section, class, section, and marked_by profile in **parallel** via `Promise.all`.
+      - Builds a single `AttendanceDto` instance for the updated record only.
+
+- **Bulk Mark Attendance**
+  - `bulkMarkAttendance` now:
+    - Uses a **single `upsert`** on `attendance` (`onConflict: 'student_id,date,academic_year_id'`) with a pre-computed `nowIso` timestamp.
+    - Hydrates all updated rows in one pass:
+      - Fetches all referenced students and their profiles in bulk.
+      - Builds a set of `AttendanceDto` objects ordered by unique `student_id`.
+    - Sends attendance notifications via `notificationsService.createAttendanceNotification` in a **fire-and-forget** fashion (`void ...catch(...)`) so notification failures never block the API.
+
+- **Attendance Summaries (moved aggregation to SQL)**
+  - `getAttendanceSummaryByStudent`:
+    - Previously: loaded all matching rows (`select('status')`) and counted in memory.
+    - Now:
+      - Fetches academic year date range as before.
+      - Builds a reusable base query on `attendance` filtered by `student_id`, `branch_id`, `academic_year_id`, and academic year dates.
+      - Executes four **parallel `count` queries** using `select('id', { head: true, count: 'exact' })` for statuses `present`, `absent`, `late`, `excused`.
+      - Derives `presentDays`, `absentDays`, `lateDays`, `excusedDays`, `totalDays`, and `percentage` from those counts, keeping the `AttendanceSummaryDto` shape and semantics exactly the same.
+  - `getAttendanceSummaryByClass`:
+    - Previously: loaded all rows for the class-section and counted statuses in memory.
+    - Now:
+      - Verifies class-section as before.
+      - Builds a base query on `attendance` filtered by `class_section_id`, `branch_id`, `academic_year_id`, and optional `startDate` / `endDate`.
+      - Executes the same four **parallel `count` queries** for `present`, `absent`, `late`, `excused`.
+      - Calculates `totalDays` and `percentage` consistently with the student summary.
+
+#### Backend – Notifications Module Optimisations ✅
+
+- **Unread Count Endpoint**
+  - Added `NotificationsService.getUnreadNotificationsCount(userId: string)`:
+    - Performs a single **aggregate-style query** with `select('id', { head: true, count: 'exact' })` filtered by `user_id` and `is_read = false`.
+    - Returns `{ count: number }` without materialising any notification rows.
+  - Added controller route `GET /api/v1/notifications/unread-count`:
+    - Guarded the same way as other notifications endpoints.
+    - Returns `{ data: { count }, meta: null, error: null }` following the global `{ data, meta, error }` API response format.
+
+#### Frontend – Notifications Hooks and Page ✅
+
+- **`useNotifications.ts`**
+  - `useUnreadCount`:
+    - Switched from inferring unread count via list queries to calling the new backend endpoint:
+      - Uses `apiClient.get<{ data: { count: number } }>(/api/v1/notifications/unread-count)` and returns `data.count`.
+      - Adds `staleTime: 30000` (30 seconds) to avoid over-polling a relatively stable metric.
+  - `useNotifications`:
+    - Added `staleTime: 30000` to reduce unnecessary refetches while users are reading notifications.
+    - Left query keys and shapes unchanged so all existing consumers continue to work.
+
+- **`/notifications` Page**
+  - Removed a redundant second `useNotifications` call that re-fetched only attendance notifications.
+    - Now derives “attendance-only” notifications on the client for non-critical views, or uses a single type-filtered query where necessary.
+  - Ensured the tabbed UI reuses the **single base dataset** where possible to avoid duplicate network calls on tab switches.
+
+#### Frontend – Lookup & Settings Hooks (React Query Caching) ✅
+
+- Marked semi-static configuration data as effectively static at runtime:
+  - `useAcademicYears.ts`
+  - `useCoreLookups.ts`
+  - `useSystemSettings.ts`
+  - `useScheduleSettings.ts`
+  - All now opt into `staleTime: Infinity` (and compatible options), so:
+    - Data is fetched once per session unless explicitly invalidated.
+    - Page switches no longer refetch unchanged configuration on every mount.
+
+#### Frontend – Students & Staff Data Fetching / UX ✅
+
+- **Hooks**
+  - `useStudents.ts`:
+    - Clarified the API expectations in comments (alignment with `{ data, meta }` backend format).
+    - Centralised all query params building (pagination, classIds/sectionIds arrays, search, sorting) in a single, typed hook.
+    - Left the query key as `['students', branchId, params]` for correct cache separation by branch and filter set.
+  - `useStaff.ts`:
+    - Ensured consistent query keying and error handling.
+
+- **Pagination & Search UX**
+  - `students/page.tsx` and `staff/page.tsx`:
+    - Use Mantine’s `useDebouncedValue` for search inputs (e.g., student name/ID, staff name/employee ID) to avoid API calls on every keystroke.
+    - Kept the existing table layout and filters but significantly reduced React Query churn and backend load.
+
+#### Frontend – TypeScript & React Query v5 Fixes ✅
+
+- Fixed multiple build-time TypeScript errors uncovered by `npm run build`:
+  - Several components and pages (`students`, `staff`, academic teacher-mapping components, parent association components) were assuming `query.data` was a plain array instead of `{ data, meta }`.
+    - Updated access patterns to:
+      - Guard for `'data' in query.data` or use proper DTO typing before reading `.data`.
+      - Provide safe fallbacks (`[]`) for empty states.
+  - Removed deprecated React Query options:
+    - `keepPreviousData` is no longer supported in the current React Query version.
+    - Removed it from `useStudents` and `useStaff` options to restore type-safety while keeping UX smooth via debounced inputs and stable query keys.
+- Verified **both**:
+  - `cd backend && npm run build`
+  - `cd frontend && npm run build`
+  - Build and type-check cleanly after all performance changes.
+
+#### Supabase – Indexing & RLS Performance Tuning ✅
+
+- **Indexes (Attendance)**
+  - Applied targeted Supabase migrations:
+    - `CREATE INDEX IF NOT EXISTS idx_attendance_academic_year ON public.attendance (academic_year_id);`
+    - `CREATE INDEX IF NOT EXISTS idx_attendance_class_section ON public.attendance (class_section_id);`
+    - `CREATE INDEX IF NOT EXISTS idx_attendance_marked_by ON public.attendance (marked_by);`
+  - Rationale:
+    - These cover common filter combinations used by attendance listings, summaries, and reports, and address Supabase advisor “unindexed foreign keys” hints for `attendance` without duplicating existing compound indexes.
+
+- **RLS Optimisation (Notifications)**
+  - Updated the `Users see own notifications` policy on `public.notifications`:
+    - From: `USING (user_id = auth.uid())`
+    - To: `USING (user_id = (SELECT auth.uid()))`
+    - Behaviour remains identical, but Supabase no longer re-evaluates `auth.uid()` for every row, improving performance at scale in line with Supabase’s `auth_rls_initplan` advisory.
+
