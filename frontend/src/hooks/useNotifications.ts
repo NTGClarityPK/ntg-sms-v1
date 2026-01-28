@@ -71,7 +71,6 @@ export function useUnreadCount() {
       return unreadCount > 0 ? unreadCount : 0;
     },
     enabled: !!userId,
-    refetchInterval: 30000, // Refetch every 30 seconds
   });
 }
 
