@@ -71,7 +71,7 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
   };
 
   return (
-    <Stack gap={0} p="md">
+    <Stack gap={0} p="md" style={{ maxHeight: '500px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <Group justify="space-between" mb="sm">
         <Group gap="xs">
           <IconBell size={18} />
@@ -116,7 +116,7 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
           </Text>
         </Stack>
       ) : (
-        <ScrollArea style={{ maxHeight: '400px' }}>
+        <ScrollArea style={{ maxHeight: '350px', flex: 1 }}>
           <Stack gap="xs">
             {notifications.map((notification) => (
               <Paper
@@ -183,6 +183,7 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
           <Button
             variant="light"
             fullWidth
+            size="sm"
             onClick={() => {
               router.push('/notifications');
               onClose();

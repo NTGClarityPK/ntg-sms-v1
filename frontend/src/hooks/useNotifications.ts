@@ -61,10 +61,21 @@ export function useUnreadCount() {
     queryKey: ['notifications', 'unread-count', userId],
     queryFn: async () => {
       if (!userId) return 0;
-      const response = await apiClient.get<Notification[]>(
-        `/api/v1/notifications?isRead=false&limit=100`,
+
+      // Fetch total notifications (any status), but limit data payload
+      const allResponse = await apiClient.get<Notification[]>(
+        `/api/v1/notifications?limit=1`,
       );
-      return response.data?.length || 0;
+      const totalCount = allResponse.meta?.total ?? allResponse.data?.length ?? 0;
+
+      // Fetch total read notifications (isRead=true), again using meta.total
+      const readResponse = await apiClient.get<Notification[]>(
+        `/api/v1/notifications?isRead=true&limit=1`,
+      );
+      const readCount = readResponse.meta?.total ?? readResponse.data?.length ?? 0;
+
+      const unreadCount = totalCount - readCount;
+      return unreadCount > 0 ? unreadCount : 0;
     },
     enabled: !!userId,
     refetchInterval: 30000, // Refetch every 30 seconds
@@ -86,7 +97,10 @@ export function useMarkAsRead() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+      // Invalidate all notification queries
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      // Also explicitly invalidate unread count query
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
     },
     onError: (error: unknown) => {
       const errorMessage =
@@ -111,7 +125,10 @@ export function useMarkAllAsRead() {
       await apiClient.put(`/api/v1/notifications/read-all`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+      // Invalidate all notification queries
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      // Also explicitly invalidate unread count query
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
       notifications.show({
         title: 'Success',
         message: 'All notifications marked as read',

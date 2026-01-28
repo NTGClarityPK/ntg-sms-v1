@@ -49,7 +49,7 @@ export function NotificationBell() {
           )}
         </ActionIcon>
       </Popover.Target>
-      <Popover.Dropdown p={0} style={{ width: '360px', maxHeight: '500px' }}>
+      <Popover.Dropdown p={0} style={{ width: '380px', maxHeight: '500px', overflow: 'hidden' }}>
         <NotificationDropdown onClose={close} />
       </Popover.Dropdown>
     </Popover>

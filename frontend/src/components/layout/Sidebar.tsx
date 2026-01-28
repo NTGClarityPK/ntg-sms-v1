@@ -11,6 +11,7 @@ import {
   IconUsersGroup,
   IconUserCheck,
   IconCalendarEvent,
+  IconBell,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { label: 'Class Sections', href: '/academic/class-sections', icon: IconUsersGroup },
   { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconUserCheck },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
+  { label: 'Notifications', href: '/notifications', icon: IconBell },
   { label: 'Reports', href: '/reports', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];

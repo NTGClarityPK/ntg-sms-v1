@@ -30,18 +30,14 @@ export default function NotificationsPage() {
     limit: 100,
   });
 
-  const { data: unreadNotificationsData, isLoading: isLoadingUnread } = useNotifications({
-    isRead: false,
-    limit: 100,
-  });
-
   const { data: attendanceNotificationsData, isLoading: isLoadingAttendance } = useNotifications({
     type: 'attendance',
     limit: 100,
   });
 
   const allNotifications = allNotificationsData?.data || [];
-  const unreadNotifications = unreadNotificationsData?.data || [];
+  const unreadNotifications = allNotifications.filter((n) => !n.isRead);
+  const readNotifications = allNotifications.filter((n) => n.isRead);
   const attendanceNotifications = attendanceNotificationsData?.data || [];
 
   const getTypeColor = (type: Notification['type']) => {
@@ -179,6 +175,7 @@ export default function NotificationsPage() {
           )}
         </Group>
       </div>
+
       <div
         style={{
           marginTop: '60px',
@@ -197,6 +194,9 @@ export default function NotificationsPage() {
               <Tabs.Tab value="unread">
                 Unread ({unreadNotifications.length})
               </Tabs.Tab>
+              <Tabs.Tab value="read">
+                Read ({readNotifications.length})
+              </Tabs.Tab>
               <Tabs.Tab value="attendance">
                 Attendance ({attendanceNotifications.length})
               </Tabs.Tab>
@@ -207,7 +207,11 @@ export default function NotificationsPage() {
             </Tabs.Panel>
 
             <Tabs.Panel value="unread" pt="md">
-              {renderNotificationsTable(unreadNotifications, isLoadingUnread)}
+              {renderNotificationsTable(unreadNotifications, isLoadingAll)}
+            </Tabs.Panel>
+
+            <Tabs.Panel value="read" pt="md">
+              {renderNotificationsTable(readNotifications, isLoadingAll)}
             </Tabs.Panel>
 
             <Tabs.Panel value="attendance" pt="md">
