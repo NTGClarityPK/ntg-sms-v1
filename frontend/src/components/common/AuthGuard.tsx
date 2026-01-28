@@ -24,8 +24,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
         } else {
           router.push('/login');
         }
-      } catch (error) {
-        console.error('Session check error:', error);
+      } catch {
         router.push('/login');
       } finally {
         setCheckingSession(false);

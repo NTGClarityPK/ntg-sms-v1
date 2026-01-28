@@ -9,8 +9,8 @@ import { useMemo } from 'react';
 import { IconRefresh } from '@tabler/icons-react';
 
 export default function MySchedulePage() {
-  const { data: myStaffData, isLoading: isLoadingStaff } = useMyStaff();
-  const myStaff = myStaffData?.data;
+  const { data: myStaffData, isLoading: isLoadingStaff, error: staffError } = useMyStaff();
+  const myStaff = myStaffData?.data || null;
   const staffId = myStaff?.id || null;
   const { data: scheduleData, isLoading: isLoadingSchedule, error, refetch } = useStaffSchedule(staffId);
   const { data: classSectionsData } = useClassSections();

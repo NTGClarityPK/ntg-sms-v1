@@ -73,14 +73,23 @@ export function useCreateStaff() {
 
 export function useMyStaff() {
   const { user } = useAuth();
-  const branchId = user?.currentBranch?.id;
+  const branchId = user?.currentBranch?.id || (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
 
   return useQuery({
     queryKey: ['staff', 'me', branchId],
     queryFn: async () => {
-      if (!branchId) return null;
-      const response = await apiClient.get<{ data: Staff | null }>('/api/v1/staff/me');
-      return response.data;
+      if (!branchId) {
+        return null;
+      }
+      // Backend controller returns { data: StaffDto | null }
+      // ResponseInterceptor sees it has 'data' property and returns as-is: { data: StaffDto | null }
+      // HTTP response body: { data: StaffDto | null }
+      // Axios response.data: { data: StaffDto | null }
+      // apiClient.get() returns response.data, which is { data: StaffDto | null }
+      // Component expects: myStaffData?.data where myStaffData is { data: Staff | null }
+      // So we return the response as-is
+      const response = await apiClient.get<Staff | null>('/api/v1/staff/me');
+      return response;
     },
     enabled: !!branchId,
   });

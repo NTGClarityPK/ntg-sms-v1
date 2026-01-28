@@ -7,8 +7,7 @@ class ApiClient {
 
   constructor() {
     const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    console.log('ApiClient - Base URL:', baseURL);
-    
+
     this.client = axios.create({
       baseURL,
       headers: {

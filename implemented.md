@@ -1151,3 +1151,22 @@ npm run dev
 **Last Updated**: Current Session  
 **Status**: ✅ Prompt 4 Complete - All phases implemented with post-implementation improvements
 
+---
+
+### Parent–Student Associations (Admin Screen) ✅
+
+- **Database**
+  - `parent_students` table seeded via Supabase MCP to enable parent-facing features testing.
+- **Backend**
+  - Parents module endpoints used:
+    - `GET /api/v1/parents/associations` (paginated list with branch scope)
+    - `POST /api/v1/parents/:id/children` (link child)
+    - `DELETE /api/v1/parents/:id/children/:studentId` (unlink child)
+  - Refactored parent-student reads to **avoid Supabase relationship syntax** for `parent_students` (schema cache FK issues) by fetching related `profiles`/`students` separately and hydrating in code.
+- **Frontend**
+  - New admin page: `/parent-associations` (old route `/users/parent-associations` redirects)
+  - New hooks/components:
+    - `useParentAssociations.ts`
+    - `ParentAssociationTable`, `CreateParentAssociationModal`
+  - Added Sidebar link: “Parent Associations” → `/parent-associations`
+

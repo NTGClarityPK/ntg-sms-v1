@@ -25,10 +25,17 @@ export function useStaffSchedule(staffId: string | null) {
     queryKey: ['staff-schedule', staffId, branchId],
     queryFn: async () => {
       if (!staffId || !branchId) return null;
-      const response = await apiClient.get<{ data: StaffSchedule }>(
+      // Backend controller returns { data: { classTeacherOf: [...], subjectAssignments: [...] } }
+      // ResponseInterceptor sees it has 'data' property and returns as-is: { data: StaffSchedule }
+      // HTTP response body: { data: StaffSchedule }
+      // Axios response.data: { data: StaffSchedule }
+      // apiClient.get<StaffSchedule>() returns ApiResponse<StaffSchedule> = { data: StaffSchedule, meta?: {...} }
+      // Component expects: scheduleData?.data where scheduleData is { data: StaffSchedule }
+      const response = await apiClient.get<StaffSchedule>(
         `/api/v1/staff/${staffId}/schedule`,
       );
-      return response.data;
+      // Return response as-is so component can access scheduleData?.data
+      return response;
     },
     enabled: !!staffId && !!branchId,
   });

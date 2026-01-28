@@ -11,3 +11,4 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 export class NotificationsModule {}
 
 
+

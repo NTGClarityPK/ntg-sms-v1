@@ -21,7 +21,7 @@ export default function MarkAttendancePage() {
   const userTyped = user as User | undefined;
   const { data: myStaffData } = useMyStaff();
   const staffData = myStaffData?.data;
-
+  
   // Check if user is a class teacher
   const isClassTeacher = userTyped?.roles?.some((r) => r.roleName === 'class_teacher');
   

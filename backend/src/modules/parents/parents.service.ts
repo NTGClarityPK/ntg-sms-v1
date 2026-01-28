@@ -15,6 +15,13 @@ type ParentStudentRow = {
   created_at: string;
 };
 
+type StudentRowLite = {
+  id: string;
+  student_id: string;
+  user_id: string | null;
+  branch_id?: string;
+};
+
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
   throw new BadRequestException(error.message);
@@ -24,45 +31,70 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class ParentsService {
   constructor(private readonly supabaseConfig: SupabaseConfig) {}
 
-  async getChildren(parentUserId: string): Promise<ParentStudentDto[]> {
+  private async hydrateAssociations(
+    rows: ParentStudentRow[],
+  ): Promise<ParentStudentDto[]> {
     const supabase = this.supabaseConfig.getClient();
 
-    const { data, error } = await supabase
-      .from('parent_students')
-      .select(
-        '*, profiles:parent_user_id(full_name), students:student_id(id, student_id, profiles:user_id(full_name))',
-      )
-      .eq('parent_user_id', parentUserId)
-      .order('created_at', { ascending: false });
+    if (rows.length === 0) return [];
 
-    throwIfDbError(error);
+    const parentUserIds = [...new Set(rows.map((r) => r.parent_user_id))];
+    const studentIds = [...new Set(rows.map((r) => r.student_id))];
 
-    return (data as unknown as Array<{
-      id: string;
-      parent_user_id: string;
-      student_id: string;
-      relationship: 'father' | 'mother' | 'guardian';
-      is_primary: boolean;
-      can_approve: boolean;
-      created_at: string;
-      profiles: { full_name: string } | { full_name: string }[] | null;
-      students: {
-        id: string;
-        student_id: string;
-        profiles: { full_name: string } | { full_name: string }[] | null;
-      } | {
-        id: string;
-        student_id: string;
-        profiles: { full_name: string } | { full_name: string }[] | null;
-      }[] | null;
-    }>).map((row) => {
-      const parentProfile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-      const studentData = Array.isArray(row.students) ? row.students[0] : row.students;
-      const studentProfile = studentData
-        ? Array.isArray(studentData.profiles)
-          ? studentData.profiles[0]
-          : studentData.profiles
-        : null;
+    const { data: parentProfiles, error: parentProfilesError } =
+      parentUserIds.length > 0
+        ? await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', parentUserIds)
+        : { data: [], error: null };
+    throwIfDbError(parentProfilesError);
+
+    const parentNameById = new Map(
+      (parentProfiles || []).map((p) => [
+        (p as { id: string }).id,
+        (p as { full_name: string }).full_name,
+      ]),
+    );
+
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('id, student_id, user_id')
+      .in('id', studentIds);
+    throwIfDbError(studentsError);
+
+    const studentRows = (students || []) as unknown as StudentRowLite[];
+    const studentUserIds = [
+      ...new Set(
+        studentRows
+          .map((s) => s.user_id)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+
+    const { data: studentProfiles, error: studentProfilesError } =
+      studentUserIds.length > 0
+        ? await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', studentUserIds)
+        : { data: [], error: null };
+    throwIfDbError(studentProfilesError);
+
+    const studentNameByUserId = new Map(
+      (studentProfiles || []).map((p) => [
+        (p as { id: string }).id,
+        (p as { full_name: string }).full_name,
+      ]),
+    );
+
+    const studentById = new Map(studentRows.map((s) => [s.id, s]));
+
+    return rows.map((row) => {
+      const student = studentById.get(row.student_id);
+      const studentName = student?.user_id
+        ? studentNameByUserId.get(student.user_id)
+        : undefined;
 
       return new ParentStudentDto({
         id: row.id,
@@ -72,11 +104,25 @@ export class ParentsService {
         isPrimary: row.is_primary,
         canApprove: row.can_approve,
         createdAt: row.created_at,
-        parentName: parentProfile?.full_name,
-        studentName: studentProfile?.full_name,
-        studentStudentId: studentData?.student_id,
+        parentName: parentNameById.get(row.parent_user_id),
+        studentName,
+        studentStudentId: student?.student_id,
       });
     });
+  }
+
+  async getChildren(parentUserId: string): Promise<ParentStudentDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data, error } = await supabase
+      .from('parent_students')
+      .select('*')
+      .eq('parent_user_id', parentUserId)
+      .order('created_at', { ascending: false });
+
+    throwIfDbError(error);
+
+    return this.hydrateAssociations((data || []) as unknown as ParentStudentRow[]);
   }
 
   async linkChild(parentUserId: string, input: LinkChildDto): Promise<ParentStudentDto> {
@@ -186,55 +232,96 @@ export class ParentsService {
 
     const currentStudentId = (profile as { current_student_id: string }).current_student_id;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('parent_students')
-      .select(
-        '*, profiles:parent_user_id(full_name), students:student_id(id, student_id, profiles:user_id(full_name))',
-      )
+      .select('*')
       .eq('parent_user_id', userId)
       .eq('student_id', currentStudentId)
       .maybeSingle();
 
-    if (!data) {
-      return null;
+    throwIfDbError(error);
+
+    if (!data) return null;
+
+    const hydrated = await this.hydrateAssociations([data as unknown as ParentStudentRow]);
+    return hydrated[0] ?? null;
+  }
+
+  async listAssociations(
+    query: {
+      page: number;
+      limit: number;
+      parentId?: string;
+      studentId?: string;
+    },
+    branchId: string,
+  ): Promise<{
+    data: ParentStudentDto[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Build query - avoid relationship syntax; schema cache might not have FKs for parent_students
+    let dbQuery = supabase.from('parent_students').select('*', { count: 'exact' });
+
+    // Filter by branch via students
+    if (branchId) {
+      // First get all students in this branch
+      const { data: branchStudents } = await supabase
+        .from('students')
+        .select('id')
+        .eq('branch_id', branchId);
+
+      const studentIds = branchStudents?.map((s) => s.id) || [];
+      if (studentIds.length === 0) {
+        return {
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 0 },
+        };
+      }
+      dbQuery = dbQuery.in('student_id', studentIds);
     }
 
-    const row = data as unknown as {
-      id: string;
-      parent_user_id: string;
-      student_id: string;
-      relationship: 'father' | 'mother' | 'guardian';
-      is_primary: boolean;
-      can_approve: boolean;
-      created_at: string;
-      profiles: { full_name: string } | { full_name: string }[] | null;
-      students: {
-        id: string;
-        student_id: string;
-        profiles: { full_name: string } | { full_name: string }[] | null;
-      } | null;
+    // Filter by parent if provided
+    if (query.parentId) {
+      dbQuery = dbQuery.eq('parent_user_id', query.parentId);
+    }
+
+    // Filter by student if provided
+    if (query.studentId) {
+      dbQuery = dbQuery.eq('student_id', query.studentId);
+    }
+
+    // Apply pagination
+    const { data, error, count } = await dbQuery
+      .range(from, to)
+      .order('created_at', { ascending: false });
+
+    throwIfDbError(error);
+
+    const total = count ?? 0;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    if (!data || data.length === 0) {
+      return {
+        data: [],
+        meta: { total, page, limit, totalPages },
+      };
+    }
+
+    const associations = await this.hydrateAssociations(
+      (data || []) as unknown as ParentStudentRow[],
+    );
+
+    return {
+      data: associations,
+      meta: { total, page, limit, totalPages },
     };
-
-    const parentProfile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-    const studentData = row.students;
-    const studentProfile = studentData
-      ? Array.isArray(studentData.profiles)
-        ? studentData.profiles[0]
-        : studentData.profiles
-      : null;
-
-    return new ParentStudentDto({
-      id: row.id,
-      parentUserId: row.parent_user_id,
-      studentId: row.student_id,
-      relationship: row.relationship,
-      isPrimary: row.is_primary,
-      canApprove: row.can_approve,
-      createdAt: row.created_at,
-      parentName: parentProfile?.full_name,
-      studentName: studentProfile?.full_name,
-      studentStudentId: studentData?.student_id,
-    });
   }
 }
 

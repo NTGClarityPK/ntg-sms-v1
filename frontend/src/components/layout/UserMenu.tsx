@@ -11,8 +11,8 @@ export function UserMenu() {
   const handleLogout = async () => {
     try {
       await signOut();
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
+      // Intentionally swallow; auth util handles redirect/session cleanup
     }
   };
 

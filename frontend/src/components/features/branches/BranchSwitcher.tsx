@@ -25,34 +25,23 @@ export function BranchSwitcher() {
     }
   }, [branches, currentBranch, isSwitching, switchBranch, isSchoolAdmin]);
 
-  // Debug logging
-  console.log('BranchSwitcher - user:', user);
-  console.log('BranchSwitcher - isSchoolAdmin:', isSchoolAdmin);
-  console.log('BranchSwitcher - roles:', userTyped?.roles);
-  console.log('BranchSwitcher - branches:', branches);
-  console.log('BranchSwitcher - currentBranch:', currentBranch);
-
   // Show loading state while user data is loading
   if (isLoading) {
-    console.log('BranchSwitcher - Still loading user data');
     return null;
   }
 
   // If there's an error, try to refetch once
   if (error && !user) {
-    console.log('BranchSwitcher - Error loading user, attempting refetch:', error);
     // Don't refetch here to avoid infinite loops - let user manually refresh
   }
 
   // Only show for school_admin users
   if (!isSchoolAdmin) {
-    console.log('BranchSwitcher - Not showing: user is not school_admin');
     return null;
   }
 
   // Don't show if user has no branches
   if (branches.length === 0) {
-    console.log('BranchSwitcher - Not showing: no branches available');
     return null;
   }
 

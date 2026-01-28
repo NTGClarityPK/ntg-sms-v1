@@ -198,14 +198,7 @@ export function generateThemeConfig(
 ): ThemeConfig {
   const themeColors = generateThemeColors(primaryColor, isDark);
   
-  // Debug: Log primary color values
-  if (typeof window !== 'undefined') {
-    console.log('🎨 Theme Config Debug:', {
-      primaryColorInput: primaryColor,
-      primaryColorOutput: themeColors.primary,
-      navbarHoverBackground: themeColors.primary,
-    });
-  }
+  // No console logging (keep build/runtime output clean)
   
   return {
     colors: themeColors,

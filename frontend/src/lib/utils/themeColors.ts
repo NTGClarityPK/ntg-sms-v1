@@ -108,7 +108,6 @@ export function generateThemeColors(primaryColor: string, isDark: boolean = fals
 export function setPrimaryColor(color: string): string {
   // Validate hex color
   if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color)) {
-    console.warn(`Invalid color format: ${color}, using default`);
     return DEFAULT_PRIMARY_COLOR;
   }
   return color;

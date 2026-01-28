@@ -27,6 +27,7 @@ const navItems: NavItem[] = [
   { label: 'Users', href: '/users', icon: IconUsers },
   { label: 'Students', href: '/students', icon: IconUsers },
   { label: 'Staff', href: '/staff', icon: IconUsers },
+  { label: 'Parent Associations', href: '/parent-associations', icon: IconUsersGroup },
   { label: 'Class Sections', href: '/academic/class-sections', icon: IconUsersGroup },
   { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconUserCheck },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
