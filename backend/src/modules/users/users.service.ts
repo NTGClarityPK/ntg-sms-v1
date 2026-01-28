@@ -208,12 +208,35 @@ export class UsersService {
     const roleMap = new Map((rolesData || []).map((r: RoleRow) => [r.id, r]));
 
     // Step 5: Get user emails from auth.users via admin API
-    const { data: authUsers } = await supabase.auth.admin.listUsers();
-    const emailMap = new Map(
-      authUsers.users
-        .filter((u) => profileIds.includes(u.id))
-        .map((u) => [u.id, u.email || '']),
-    );
+    // Try listUsers first, fallback to individual lookups if it fails
+    const emailMap = new Map<string, string>();
+    try {
+      const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
+      if (!listError && authUsers?.users) {
+        authUsers.users
+          .filter((u) => profileIds.includes(u.id))
+          .forEach((u) => {
+            if (u.email) emailMap.set(u.id, u.email);
+          });
+      }
+    } catch (error) {
+      // If listUsers fails, fetch emails individually
+      console.warn('Failed to list users, fetching individually:', error);
+    }
+    
+    // Fill in any missing emails by fetching individually
+    for (const profileId of profileIds) {
+      if (!emailMap.has(profileId)) {
+        try {
+          const { data: authUser } = await supabase.auth.admin.getUserById(profileId);
+          if (authUser?.user?.email) {
+            emailMap.set(profileId, authUser.user.email);
+          }
+        } catch (error) {
+          // Silently continue if individual fetch fails
+        }
+      }
+    }
 
     // Step 6: Filter by email search if needed (client-side after fetching emails)
     let filteredProfiles = profilesData || [];

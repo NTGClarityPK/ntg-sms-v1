@@ -55,7 +55,6 @@ export function StaffTable({ staff, meta, onPageChange }: StaffTableProps) {
             <Table.Th>Name</Table.Th>
             <Table.Th>Email</Table.Th>
             <Table.Th>Employee ID</Table.Th>
-            <Table.Th>Department</Table.Th>
             <Table.Th>Roles</Table.Th>
             <Table.Th>Status</Table.Th>
             <Table.Th>Actions</Table.Th>
@@ -72,9 +71,6 @@ export function StaffTable({ staff, meta, onPageChange }: StaffTableProps) {
               </Table.Td>
               <Table.Td>
                 <Text size="sm">{staffMember.employeeId || 'N/A'}</Text>
-              </Table.Td>
-              <Table.Td>
-                <Text size="sm">{staffMember.department || 'N/A'}</Text>
               </Table.Td>
               <Table.Td>{getRoleBadges(staffMember.roles)}</Table.Td>
               <Table.Td>

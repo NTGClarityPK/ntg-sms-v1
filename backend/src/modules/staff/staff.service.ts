@@ -120,12 +120,36 @@ export class StaffService {
 
     // Get user emails and profiles
     const userIds = (data as unknown as Array<{ user_id: string }>).map((s) => s.user_id);
-    const { data: authUsers } = await supabase.auth.admin.listUsers();
-    const emailMap = new Map(
-      authUsers.users
-        .filter((u) => userIds.includes(u.id))
-        .map((u) => [u.id, u.email || '']),
-    );
+    
+    // Fetch emails using admin API - try listUsers first, fallback to individual lookups
+    const emailMap = new Map<string, string>();
+    try {
+      const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
+      if (!listError && authUsers?.users) {
+        authUsers.users
+          .filter((u) => userIds.includes(u.id))
+          .forEach((u) => {
+            if (u.email) emailMap.set(u.id, u.email);
+          });
+      }
+    } catch (error) {
+      // If listUsers fails, fetch emails individually
+      console.warn('Failed to list users, fetching individually:', error);
+    }
+    
+    // Fill in any missing emails by fetching individually
+    for (const userId of userIds) {
+      if (!emailMap.has(userId)) {
+        try {
+          const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+          if (authUser?.user?.email) {
+            emailMap.set(userId, authUser.user.email);
+          }
+        } catch (error) {
+          // Silently continue if individual fetch fails
+        }
+      }
+    }
 
     // Fetch profiles separately
     const { data: profilesData } = await supabase
