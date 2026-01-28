@@ -117,7 +117,10 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         },
         {
           onSuccess: (data) => {
-            form.setFieldValue('studentId', data.data.studentId);
+            // useGenerateStudentId returns { studentId }, not { data: { studentId } }
+            if (data?.studentId) {
+              form.setFieldValue('studentId', data.studentId);
+            }
           },
         },
       );
