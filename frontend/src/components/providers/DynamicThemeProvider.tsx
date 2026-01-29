@@ -191,13 +191,14 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       }
       
       /* Adjust for collapsed navbar (desktop) - use data attribute for reliable targeting */
+      /* Title bar positioned exactly at sidebar width - gap comes from AppShell padding */
       @media (min-width: 768px) {
         body[data-navbar-collapsed="true"] .page-title-bar {
-          left: 85px !important;
+          left: 100px !important;
         }
         
         body[data-navbar-collapsed="true"] .page-sub-title-bar {
-          left: 85px !important;
+          left: 100px !important;
         }
       }
       
@@ -231,17 +232,18 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       }
       
       /* RTL - Collapsed navbar */
+      /* Title bar positioned exactly at sidebar width - gap comes from AppShell padding */
       @media (min-width: 768px) {
         html[dir="rtl"] body[data-navbar-collapsed="true"] .page-title-bar,
         [dir="rtl"] body[data-navbar-collapsed="true"] .page-title-bar {
-          right: 85px !important;
-          width: calc(100% - 85px) !important;
+          right: 100px !important;
+          width: calc(100% - 100px) !important;
         }
         
         html[dir="rtl"] body[data-navbar-collapsed="true"] .page-sub-title-bar,
         [dir="rtl"] body[data-navbar-collapsed="true"] .page-sub-title-bar {
-          right: 85px !important;
-          width: calc(100% - 85px) !important;
+          right: 100px !important;
+          width: calc(100% - 100px) !important;
         }
       }
       
@@ -289,42 +291,10 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       }
       
       /* Add top margin to main content to account for title bar */
+      /* Note: Horizontal padding comes from AppShell padding="md" prop (like RMS) */
       .mantine-AppShell-main {
         /* Header (60px) + Title bar (60px) + spacing */
         padding-top: calc(120px + var(--mantine-spacing-md)) !important;
-        /* Match title-bar offset so page content starts after sidebar */
-        padding-left: calc(300px + var(--mantine-spacing-sm)) !important;
-        padding-right: var(--mantine-spacing-sm) !important;
-        padding-bottom: var(--mantine-spacing-xl) !important;
-      }
-
-      /* Collapsed navbar (desktop) */
-      @media (min-width: 768px) {
-        body[data-navbar-collapsed="true"] .mantine-AppShell-main {
-          padding-left: calc(85px + var(--mantine-spacing-sm)) !important;
-        }
-      }
-
-      /* Mobile: navbar overlays, so content should start at left edge */
-      @media (max-width: 767px) {
-        .mantine-AppShell-main {
-          padding-left: var(--mantine-spacing-sm) !important;
-          padding-right: var(--mantine-spacing-sm) !important;
-        }
-      }
-
-      /* RTL: mirror padding to the right side */
-      html[dir="rtl"] .mantine-AppShell-main,
-      [dir="rtl"] .mantine-AppShell-main {
-        padding-left: var(--mantine-spacing-sm) !important;
-        padding-right: calc(300px + var(--mantine-spacing-sm)) !important;
-      }
-
-      @media (min-width: 768px) {
-        html[dir="rtl"] body[data-navbar-collapsed="true"] .mantine-AppShell-main,
-        [dir="rtl"] body[data-navbar-collapsed="true"] .mantine-AppShell-main {
-          padding-right: calc(85px + var(--mantine-spacing-sm)) !important;
-        }
       }
       
       /* Reduce margin-top for content div after title bar */
