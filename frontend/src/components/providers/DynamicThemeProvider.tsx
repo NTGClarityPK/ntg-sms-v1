@@ -158,6 +158,31 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         border-bottom-left-radius: 12px !important; /* Outer rounded corner where header meets navbar */
         overflow: hidden !important; /* Ensure rounded corner is visible */
       }
+
+      /* Ensure the header's immediate content wrapper doesn't visually square the corner */
+      .mantine-AppShell-header > .mantine-Group-root {
+        background-color: ${config.components.header.backgroundColor} !important;
+        border-bottom-left-radius: 12px !important;
+        overflow: hidden !important;
+      }
+
+      /*
+        Global rounded junction:
+        Some pages (e.g. Settings) appear rounded because the page title bar has a rounded corner.
+        Pages without a title bar need the main surface itself rounded so the junction looks consistent.
+      */
+      .mantine-AppShell-main {
+        background-color: ${config.components.page.backgroundColor} !important;
+        border-top-left-radius: 12px !important;
+        overflow: hidden !important;
+      }
+
+      /* RTL - mirror the main rounded corner */
+      html[dir="rtl"] .mantine-AppShell-main,
+      [dir="rtl"] .mantine-AppShell-main {
+        border-top-left-radius: 0 !important;
+        border-top-right-radius: 12px !important;
+      }
       
       /* Page Title Bar */
       .page-title-bar {
