@@ -9,7 +9,9 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
+import { DatePickerInput } from '@mantine/dates';
+import '@mantine/dates/styles.css';
+import { IconCalendar } from '@tabler/icons-react';
 import { useForm, zodResolver } from '@mantine/form';
 import { z } from 'zod';
 import { notifications } from '@mantine/notifications';
@@ -67,7 +69,12 @@ export function EarlyDepartureForm({ student }: EarlyDepartureFormProps) {
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Text fw={600}>Request early departure</Text>
-          <DateInput label="Date" {...form.getInputProps('date')} />
+          <DatePickerInput
+            label="Date"
+            {...form.getInputProps('date')}
+            placeholder="Select date"
+            leftSection={<IconCalendar size={16} />}
+          />
           <TextInput
             label="Departure time"
             placeholder="11:00"

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import {
   Button,
   Group,
@@ -8,7 +9,9 @@ import {
   Text,
   Textarea,
 } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
+import { DatePickerInput } from '@mantine/dates';
+import '@mantine/dates/styles.css';
+import { IconCalendar } from '@tabler/icons-react';
 import { useForm, zodResolver } from '@mantine/form';
 import { z } from 'zod';
 import { notifications } from '@mantine/notifications';
@@ -47,6 +50,13 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
     validate: zodResolver(schema),
   });
 
+  // Update form when student changes
+  useEffect(() => {
+    if (student?.id) {
+      form.setFieldValue('studentId', student.id);
+    }
+  }, [student?.id, form]);
+
   const handleSubmit = async (values: typeof form.values) => {
     try {
       await createLeave.mutateAsync({
@@ -80,8 +90,20 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
               {quota.remainingDays} remaining)
             </Text>
           )}
-          <DateInput label="Start date" {...form.getInputProps('startDate')} />
-          <DateInput label="End date" {...form.getInputProps('endDate')} />
+          <DatePickerInput
+            label="Start date"
+            {...form.getInputProps('startDate')}
+            placeholder="Select start date"
+            leftSection={<IconCalendar size={16} />}
+            maxDate={form.values.endDate || undefined}
+          />
+          <DatePickerInput
+            label="End date"
+            {...form.getInputProps('endDate')}
+            placeholder="Select end date"
+            leftSection={<IconCalendar size={16} />}
+            minDate={form.values.startDate || undefined}
+          />
           <Textarea
             label="Reason"
             minRows={3}
