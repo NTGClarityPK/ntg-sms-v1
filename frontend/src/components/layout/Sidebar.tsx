@@ -10,6 +10,7 @@ import {
   ActionIcon,
   Text,
   Divider,
+  useMantineTheme,
 } from '@mantine/core';
 import {
   IconHome,
@@ -26,6 +27,7 @@ import {
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
+import type { ThemeConfig } from '@/lib/theme/themeConfig';
 
 interface NavItem {
   label: string;
@@ -73,7 +75,13 @@ export function Sidebar({
 }: SidebarProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
+  const theme = useMantineTheme();
   const { user } = useAuth();
+  
+  // Get theme config for navbar styling
+  const themeConfig = (theme.other as any) as ThemeConfig | undefined;
+  const navbarConfig = themeConfig?.components?.navbar;
+  const navButtonConfig = themeConfig?.components?.navButton;
 
   // Check if user is a teacher
   const isTeacher = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'teacher') || false;
@@ -114,6 +122,10 @@ export function Sidebar({
 
   const renderNavItem = (item: NavItem) => {
     const active = isActive(item.href);
+    
+    // Apply active styling ONLY when collapsed (like RMS)
+    const shouldShowActive = collapsed && active;
+    
     const content = (
       <Button
         component="button"
@@ -128,6 +140,26 @@ export function Sidebar({
         onClick={() => {
           router.push(item.href);
           onMobileClose?.();
+        }}
+        style={{
+          backgroundColor: shouldShowActive 
+            ? navbarConfig?.activeBackground 
+            : navButtonConfig?.backgroundColor || 'transparent',
+          color: shouldShowActive 
+            ? navbarConfig?.activeTextColor 
+            : navButtonConfig?.textColor || navbarConfig?.textColor,
+        }}
+        styles={{
+          root: {
+            '&:hover:not(:disabled)': {
+              backgroundColor: shouldShowActive 
+                ? navbarConfig?.activeBackground 
+                : navbarConfig?.hoverBackground,
+              color: shouldShowActive 
+                ? navbarConfig?.activeTextColor 
+                : navbarConfig?.hoverTextColor,
+            },
+          },
         }}
       >
         {collapsed ? <item.icon size={NAV_ICON_SIZE} /> : item.label}
