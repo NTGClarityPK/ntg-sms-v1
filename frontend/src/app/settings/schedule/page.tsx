@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, Loader, Stack, Title } from '@mantine/core';
+import { Alert, Button, Group, Skeleton, Stack, Title } from '@mantine/core';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -127,11 +127,15 @@ export default function ScheduleSettingsPage() {
         </Group>
       </div>
 
-      {isLoading ? (
-        <Group justify="center" py="xl">
-          <Loader color={colors.primary} />
-        </Group>
-      ) : hasError ? (
+      <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
+        {isLoading ? (
+          <Stack gap="md">
+            <Skeleton height={40} width="30%" />
+            <Skeleton height={200} />
+            <Skeleton height={200} />
+            <Skeleton height={200} />
+          </Stack>
+        ) : hasError ? (
         <Alert color={colors.error} title="Failed to load schedule settings">
           <Group justify="flex-end" mt="sm">
             <Button
@@ -205,7 +209,8 @@ export default function ScheduleSettingsPage() {
             <VacationManager academicYearId={activeYearId} />
           </Stack>
         </Stack>
-      )}
+        )}
+      </div>
 
       <TimingTemplateForm
         opened={createOpened}

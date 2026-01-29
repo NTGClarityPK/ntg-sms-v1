@@ -1,6 +1,6 @@
 'use client';
 
-import { Group, Title, Loader, Stack, Alert, Text, Button } from '@mantine/core';
+import { Group, Title, Skeleton, Stack, Alert, Text, Button } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
 import { PermissionMatrix } from '@/components/features/settings/PermissionMatrix';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -24,12 +24,14 @@ export default function PermissionsPage() {
         </Group>
       </div>
 
-      <Stack gap="md">
-        {isLoading ? (
-          <Group justify="center" py="xl">
-            <Loader color={colors.primary} />
-          </Group>
-        ) : error ? (
+      <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
+        <Stack gap="md">
+          {isLoading ? (
+            <Stack gap="md">
+              <Skeleton height={40} width="30%" />
+              <Skeleton height={400} />
+            </Stack>
+          ) : error ? (
           <Alert color={colors.error} title="Failed to load permissions">
             <Group justify="space-between" mt="sm">
               <Text size="sm">Please try again.</Text>
@@ -41,7 +43,8 @@ export default function PermissionsPage() {
         ) : (
           <PermissionMatrix roles={roles} features={features} permissions={permissions} />
         )}
-      </Stack>
+        </Stack>
+      </div>
     </>
   );
 }

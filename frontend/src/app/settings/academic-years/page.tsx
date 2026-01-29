@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Alert, Button, Group, Skeleton, Stack, Text, Title } from '@mantine/core';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { AcademicYearForm, type AcademicYearFormValues } from '@/components/features/settings/AcademicYearForm';
@@ -54,12 +54,15 @@ export default function AcademicYearsPage() {
         </Group>
       </div>
 
-      <Stack gap="md">
-        {listQuery.isLoading ? (
-          <Group justify="center" py="xl">
-            <Loader color={colors.primary} />
-          </Group>
-        ) : listQuery.error ? (
+      <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
+        <Stack gap="md">
+          {listQuery.isLoading ? (
+            <Stack gap="md">
+              <Skeleton height={40} width="30%" />
+              <Skeleton height={200} />
+              <Skeleton height={200} />
+            </Stack>
+          ) : listQuery.error ? (
           <Alert color={colors.error} title="Failed to load academic years">
             <Group justify="space-between" mt="sm">
               <Text size="sm">Please try again.</Text>
@@ -86,7 +89,8 @@ export default function AcademicYearsPage() {
             ))}
           </Stack>
         )}
-      </Stack>
+        </Stack>
+      </div>
 
       <AcademicYearForm
         opened={opened}
