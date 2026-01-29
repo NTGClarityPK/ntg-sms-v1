@@ -8,28 +8,54 @@ import {
   Box,
   ScrollArea,
   ActionIcon,
+  Text,
+  Divider,
 } from '@mantine/core';
 import {
   IconHome,
   IconUsers,
+  IconUser,
   IconCalendar,
   IconChartBar,
   IconSettings,
   IconChevronLeft,
   IconChevronRight,
+  IconBook,
+  IconSchool,
+  IconClock,
   type IconProps,
 } from '@tabler/icons-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<IconProps>;
+  showCondition?: () => boolean;
 }
 
-const navItems: NavItem[] = [
+const NAV_ICON_SIZE = 22;
+
+// All navigation items
+const allNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: IconHome },
   { label: 'Students', href: '/students', icon: IconUsers },
+  { label: 'Staff', href: '/staff', icon: IconUser },
+  { label: 'Users', href: '/users', icon: IconUsers },
+  { label: 'Class Sections', href: '/academic/class-sections', icon: IconSchool },
+  { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconBook },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
+  { 
+    label: 'My Schedule', 
+    href: '/my-schedule', 
+    icon: IconClock,
+    showCondition: () => {
+      // Show only for teachers - check if user has teacher role
+      if (typeof window === 'undefined') return false;
+      // This will be checked in the component using useAuth
+      return true; // Will be filtered in render
+    }
+  },
   { label: 'Reports', href: '/reports', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
@@ -47,6 +73,41 @@ export function Sidebar({
 }: SidebarProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  // Check if user is a teacher
+  const isTeacher = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'teacher') || false;
+
+  // Filter navigation items based on conditions
+  const navItems = allNavItems.filter((item) => {
+    // Check showCondition if it exists
+    if (item.showCondition) {
+      // For "My Schedule", show only if user is a teacher
+      if (item.href === '/my-schedule') {
+        return isTeacher;
+      }
+      return item.showCondition();
+    }
+    return true;
+  });
+
+  // Group items like RMS: Main and Management
+  const mainItems = navItems.filter(
+    (item) =>
+      item.href === '/dashboard' ||
+      item.href === '/students' ||
+      item.href === '/attendance' ||
+      item.href === '/my-schedule'
+  );
+  const managementItems = navItems.filter(
+    (item) =>
+      item.href === '/staff' ||
+      item.href === '/users' ||
+      item.href === '/academic/class-sections' ||
+      item.href === '/academic/teacher-mapping' ||
+      item.href === '/reports' ||
+      item.href === '/settings'
+  );
 
   const isActive = (href: string) =>
     pathname === href || pathname?.startsWith(`${href}/`);
@@ -60,7 +121,7 @@ export function Sidebar({
         variant="subtle"
         size="md"
         fullWidth={!collapsed}
-        leftSection={collapsed ? undefined : <item.icon size={20} />}
+        leftSection={collapsed ? undefined : <item.icon size={NAV_ICON_SIZE} />}
         className="nav-item-button"
         data-active={active}
         data-collapsed={collapsed}
@@ -69,7 +130,7 @@ export function Sidebar({
           onMobileClose?.();
         }}
       >
-        {collapsed ? <item.icon size={20} /> : item.label}
+        {collapsed ? <item.icon size={NAV_ICON_SIZE} /> : item.label}
       </Button>
     );
 
@@ -93,7 +154,26 @@ export function Sidebar({
       {/* Scrollable navigation area - matches RMS structure */}
       <ScrollArea h="100%" style={{ flex: 1 }}>
         <Stack gap="xs" p={collapsed ? 'xs' : 'md'}>
-          {navItems.map(renderNavItem)}
+          {/* Main Navigation */}
+          {!collapsed && mainItems.length > 0 && (
+            <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
+              Main
+            </Text>
+          )}
+          {mainItems.map(renderNavItem)}
+
+          {/* Management Section */}
+          {managementItems.length > 0 && (
+            <>
+              {!collapsed && <Divider my="sm" />}
+              {!collapsed && (
+                <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
+                  Management
+                </Text>
+              )}
+              {managementItems.map(renderNavItem)}
+            </>
+          )}
         </Stack>
       </ScrollArea>
 
