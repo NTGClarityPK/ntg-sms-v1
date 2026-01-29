@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, Loader, Modal, MultiSelect, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, Button, Group, Skeleton, Modal, MultiSelect, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useClasses, useCreateLevel, useLevels } from '@/hooks/useCoreLookups';
@@ -38,9 +38,11 @@ export function LevelManager() {
 
   if (levelsQuery.isLoading || classesQuery.isLoading) {
     return (
-      <Group justify="center" py="xl">
-        <Loader color={colors.primary} />
-      </Group>
+      <Stack gap="md">
+        <Skeleton height={40} width="30%" />
+        <Skeleton height={200} />
+        <Skeleton height={50} />
+      </Stack>
     );
   }
 

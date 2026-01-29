@@ -1,6 +1,6 @@
 'use client';
 
-import { Container, Title, Stack, Card, Text, Button, Group, Loader, Alert } from '@mantine/core';
+import { Container, Title, Stack, Card, Text, Button, Group, Skeleton, Alert } from '@mantine/core';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
@@ -54,9 +54,11 @@ export default function SelectChildPage() {
   if (isLoading) {
     return (
       <Container size="sm" py="xl">
-        <Group justify="center">
-          <Loader />
-        </Group>
+        <Stack gap="md">
+          <Skeleton height={40} width="30%" />
+          <Skeleton height={200} />
+          <Skeleton height={200} />
+        </Stack>
       </Container>
     );
   }

@@ -7,7 +7,7 @@ import {
   Group,
   Paper,
   Badge,
-  Loader,
+  Skeleton,
   ScrollArea,
   Divider,
 } from '@mantine/core';
@@ -102,11 +102,10 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
       <Divider mb="sm" />
 
       {isLoading ? (
-        <Stack align="center" gap="md" py="xl">
-          <Loader size="sm" />
-          <Text size="sm" c="dimmed">
-            Loading notifications...
-          </Text>
+        <Stack gap="md" py="xl">
+          <Skeleton height={40} width="80%" />
+          <Skeleton height={60} />
+          <Skeleton height={60} />
         </Stack>
       ) : notifications.length === 0 ? (
         <Stack align="center" gap="sm" py="xl">

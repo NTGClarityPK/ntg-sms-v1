@@ -1,6 +1,6 @@
 'use client';
 
-import { Paper, Stack, Text, Loader, Group, Badge } from '@mantine/core';
+import { Paper, Stack, Text, Skeleton, Group, Badge } from '@mantine/core';
 import type { Attendance } from '@/types/attendance';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -22,9 +22,11 @@ export function AttendanceCalendar({
   if (isLoading) {
     return (
       <Paper withBorder p="xl">
-        <Stack align="center" gap="md">
-          <Loader size="lg" />
-          <Text c="dimmed">Loading attendance calendar...</Text>
+        <Stack gap="md">
+          <Skeleton height={40} width="30%" />
+          <Skeleton height={200} />
+          <Skeleton height={200} />
+          <Skeleton height={200} />
         </Stack>
       </Paper>
     );

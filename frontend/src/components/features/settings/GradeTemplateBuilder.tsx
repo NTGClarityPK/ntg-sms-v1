@@ -5,7 +5,7 @@ import {
   Alert,
   Button,
   Group,
-  Loader,
+  Skeleton,
   Menu,
   Modal,
   NumberInput,
@@ -138,9 +138,11 @@ export function GradeTemplateBuilder() {
 
   if (listQuery.isLoading) {
     return (
-      <Group justify="center" py="xl">
-        <Loader color={colors.primary} />
-      </Group>
+      <Stack gap="md">
+        <Skeleton height={40} width="30%" />
+        <Skeleton height={200} />
+        <Skeleton height={50} />
+      </Stack>
     );
   }
 

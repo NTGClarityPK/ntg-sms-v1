@@ -29,16 +29,22 @@ export function CommunicationSettings() {
 
   useEffect(() => {
     const remote = settingQuery.data?.data?.value;
-    if (remote && typeof remote === 'object') {
-      setValue({
-        teacher_student: remote.teacher_student ?? DEFAULT_VALUE.teacher_student,
-        teacher_parent: remote.teacher_parent ?? DEFAULT_VALUE.teacher_parent,
-      });
-    } else if (!remote && !value) {
-      // No remote value yet – initialize with defaults once
-      setValue(DEFAULT_VALUE);
-    }
-  }, [settingQuery.data?.data?.value, value]);
+    const nextValue: CommunicationDirectionValue =
+      remote && typeof remote === 'object'
+        ? {
+            teacher_student: remote.teacher_student ?? DEFAULT_VALUE.teacher_student,
+            teacher_parent: remote.teacher_parent ?? DEFAULT_VALUE.teacher_parent,
+          }
+        : DEFAULT_VALUE;
+
+    setValue((prev) => {
+      if (!prev) return nextValue;
+      const isSame =
+        prev.teacher_student === nextValue.teacher_student &&
+        prev.teacher_parent === nextValue.teacher_parent;
+      return isSame ? prev : nextValue;
+    });
+  }, [settingQuery.data?.data?.value]);
 
   const onSave = async () => {
     if (!value) return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, Loader, Modal, Select, Stack, Text } from '@mantine/core';
+import { Alert, Button, Group, Skeleton, Modal, Select, Stack, Text } from '@mantine/core';
 import { useState } from 'react';
 import { useBranchesWithSettings, useCopySettingsFromBranch } from '@/hooks/useSettingsStatus';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -47,11 +47,9 @@ export function CopySettingsModal({ opened, onClose, onSuccess }: CopySettingsMo
   if (branchesWithSettingsQuery.isLoading) {
     return (
       <Modal opened={opened} onClose={onClose} title="Copy Settings from Other Branch" size="md">
-        <Stack gap="md" align="center" py="xl">
-          <Loader color={colors.primary} />
-          <Text size="sm" c="dimmed">
-            Checking available branches...
-          </Text>
+        <Stack gap="md" py="xl">
+          <Skeleton height={40} width="80%" />
+          <Skeleton height={200} />
         </Stack>
       </Modal>
     );

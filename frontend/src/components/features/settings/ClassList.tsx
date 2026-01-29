@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, Loader, Modal, NumberInput, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, Button, Group, Skeleton, Modal, NumberInput, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useClasses, useCreateClass } from '@/hooks/useCoreLookups';
@@ -38,9 +38,11 @@ export function ClassList() {
 
   if (listQuery.isLoading) {
     return (
-      <Group justify="center" py="xl">
-        <Loader color={colors.primary} />
-      </Group>
+      <Stack gap="md">
+        <Skeleton height={40} width="30%" />
+        <Skeleton height={200} />
+        <Skeleton height={50} />
+      </Stack>
     );
   }
 

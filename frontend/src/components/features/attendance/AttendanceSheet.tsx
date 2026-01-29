@@ -5,7 +5,7 @@ import {
   Paper,
   Stack,
   Button,
-  Loader,
+  Skeleton,
   Text,
   Group,
   Alert,
@@ -92,9 +92,10 @@ export function AttendanceSheet({
   if (isLoading || !attendance) {
     return (
       <Paper withBorder p="xl">
-        <Stack align="center" gap="md">
-          <Loader size="lg" />
-          <Text c="dimmed">Loading attendance data...</Text>
+        <Stack gap="md">
+          <Skeleton height={40} width="30%" />
+          <Skeleton height={300} />
+          <Skeleton height={50} />
         </Stack>
       </Paper>
     );

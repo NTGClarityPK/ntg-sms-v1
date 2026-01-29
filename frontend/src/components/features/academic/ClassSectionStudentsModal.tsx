@@ -1,6 +1,6 @@
 'use client';
 
-import { Modal, Table, Text, Loader, Paper, Group } from '@mantine/core';
+import { Modal, Table, Text, Skeleton, Paper, Group, Stack } from '@mantine/core';
 import { useClassSectionStudents } from '@/hooks/useClassSections';
 
 interface ClassSectionStudentsModalProps {
@@ -28,9 +28,11 @@ export function ClassSectionStudentsModal({
       size="lg"
     >
       {isLoading && (
-        <Group justify="center" py="xl">
-          <Loader size="lg" />
-        </Group>
+        <Stack gap="md" py="xl">
+          <Skeleton height={40} width="30%" />
+          <Skeleton height={200} />
+          <Skeleton height={50} />
+        </Stack>
       )}
 
       {error && (

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader, Container } from '@mantine/core';
+import { Skeleton, Container, Stack } from '@mantine/core';
 import { useAuth } from '@/hooks/useAuth';
 import type { User } from '@/types/auth';
 
@@ -28,7 +28,10 @@ export function BranchGuard({ children }: BranchGuardProps) {
   if (isLoading) {
     return (
       <Container size="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <Loader size="lg" />
+        <Stack gap="md" align="center">
+          <Skeleton height={40} width="60%" />
+          <Skeleton height={200} width="100%" />
+        </Stack>
       </Container>
     );
   }

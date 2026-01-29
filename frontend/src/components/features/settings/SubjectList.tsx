@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, Loader, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, Button, Group, Skeleton, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useCreateSubject, useSubjects } from '@/hooks/useCoreLookups';
@@ -37,9 +37,11 @@ export function SubjectList() {
 
   if (listQuery.isLoading) {
     return (
-      <Group justify="center" py="xl">
-        <Loader color={colors.primary} />
-      </Group>
+      <Stack gap="md">
+        <Skeleton height={40} width="30%" />
+        <Skeleton height={200} />
+        <Skeleton height={50} />
+      </Stack>
     );
   }
 

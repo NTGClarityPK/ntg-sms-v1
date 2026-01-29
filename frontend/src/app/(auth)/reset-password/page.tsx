@@ -12,7 +12,7 @@ import {
   Stack,
   Text,
   Alert,
-  Loader,
+  Skeleton,
 } from '@mantine/core';
 import { IconAlertCircle, IconLock, IconCheck } from '@tabler/icons-react';
 import { updatePassword, getSession } from '@/lib/auth';
@@ -115,11 +115,10 @@ export default function ResetPasswordPage() {
   if (checkingSession) {
     return (
       <Box style={{ maxWidth: 400, margin: '0 auto', paddingTop: '5rem' }}>
-        <Stack gap="md" align="center">
-          <Loader size="lg" color={DEFAULT_THEME_COLOR} />
-          <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
-            Verifying reset token...
-          </Text>
+        <Stack gap="md">
+          <Skeleton height={40} width="60%" />
+          <Skeleton height={200} />
+          <Skeleton height={50} />
         </Stack>
       </Box>
     );

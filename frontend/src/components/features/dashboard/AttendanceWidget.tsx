@@ -8,7 +8,7 @@ import {
   Badge,
   Button,
   Progress,
-  Loader,
+  Skeleton,
   Alert,
 } from '@mantine/core';
 import { IconCalendarCheck, IconEye } from '@tabler/icons-react';
@@ -62,12 +62,9 @@ export function AttendanceWidget() {
     return (
       <Paper withBorder p="md">
         <Stack gap="md">
-          <Group justify="space-between">
-            <Text fw={500} size="lg">
-              Today&apos;s Attendance
-            </Text>
-            <Loader size="sm" />
-          </Group>
+          <Skeleton height={30} width="60%" />
+          <Skeleton height={100} />
+          <Skeleton height={40} />
         </Stack>
       </Paper>
     );

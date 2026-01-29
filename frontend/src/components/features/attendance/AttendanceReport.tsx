@@ -4,7 +4,7 @@ import {
   Paper,
   Stack,
   Text,
-  Loader,
+  Skeleton,
   Table,
   Badge,
   Group,
@@ -32,9 +32,10 @@ export function AttendanceReport({
   if (isLoading) {
     return (
       <Paper withBorder p="xl">
-        <Stack align="center" gap="md">
-          <Loader size="lg" />
-          <Text c="dimmed">Loading attendance report...</Text>
+        <Stack gap="md">
+          <Skeleton height={40} width="30%" />
+          <Skeleton height={200} />
+          <Skeleton height={300} />
         </Stack>
       </Paper>
     );
