@@ -199,7 +199,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         transition: left 0.3s ease !important;
         border-top-left-radius: 12px !important; /* Rounded top-left corner */
         overflow: hidden !important;
-        padding-left: var(--mantine-spacing-sm) !important; /* Left padding for text */
+        padding-left: var(--mantine-spacing-xs) !important; /* Reduced left padding */
         padding-right: var(--mantine-spacing-sm) !important;
       }
       
@@ -244,7 +244,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         border-top-left-radius: 0 !important;
         border-top-right-radius: 12px !important;
         padding-left: var(--mantine-spacing-sm) !important;
-        padding-right: var(--mantine-spacing-sm) !important;
+        padding-right: var(--mantine-spacing-xs) !important; /* Reduced right padding for RTL */
         transition: right 0.3s ease, width 0.3s ease !important;
       }
       
@@ -287,7 +287,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       .page-title-bar .mantine-Title-root {
         margin: 0 !important;
         text-align: left !important;
-        padding-left: var(--mantine-spacing-sm) !important;
+        padding-left: 0 !important; /* Removed duplicate padding */
         padding-top: var(--mantine-spacing-sm) !important;
       }
       
@@ -296,7 +296,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       [dir="rtl"] .page-title-bar .mantine-Title-root {
         text-align: right !important;
         padding-left: 0 !important;
-        padding-right: var(--mantine-spacing-sm) !important;
+        padding-right: 0 !important; /* Removed duplicate padding */
       }
       
       /* Title bar button group alignment - align with content padding */

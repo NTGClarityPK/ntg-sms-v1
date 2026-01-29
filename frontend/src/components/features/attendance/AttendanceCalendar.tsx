@@ -43,22 +43,29 @@ export function AttendanceCalendar({
   });
 
   // Calculate statistics for each date
-  const dateStats = Array.from(attendanceByDate.entries()).map(([date, records]) => {
-    const presentCount = records.filter((r) => r.status === 'present').length;
-    const absentCount = records.filter((r) => r.status === 'absent').length;
-    const lateCount = records.filter((r) => r.status === 'late').length;
-    const total = records.length;
-    const presentPercentage = total > 0 ? Math.round(((presentCount + lateCount) / total) * 100) : 0;
+  const dateStats = Array.from(attendanceByDate.entries()).map(
+    ([date, records]) => {
+      const presentCount = records.filter((r) => r.status === 'present').length;
+      const absentCount = records.filter((r) => r.status === 'absent').length;
+      const lateCount = records.filter((r) => r.status === 'late').length;
+      const excusedCount = records.filter((r) => r.status === 'excused').length;
+      const total = records.length;
+      const presentPercentage =
+        total > 0
+          ? Math.round(((presentCount + lateCount) / total) * 100)
+          : 0;
 
-    return {
-      date,
-      presentCount,
-      absentCount,
-      lateCount,
-      total,
-      presentPercentage,
-    };
-  });
+      return {
+        date,
+        presentCount,
+        absentCount,
+        lateCount,
+        excusedCount,
+        total,
+        presentPercentage,
+      };
+    },
+  );
 
   // Sort by date
   dateStats.sort((a, b) => a.date.localeCompare(b.date));
@@ -98,8 +105,17 @@ export function AttendanceCalendar({
                       {stat.absentCount} Absent
                     </Badge>
                     {stat.lateCount > 0 && (
-                      <Badge variant="light" color={notifyColors.warning} size="sm">
+                      <Badge
+                        variant="light"
+                        color={notifyColors.warning}
+                        size="sm"
+                      >
                         {stat.lateCount} Late
+                      </Badge>
+                    )}
+                    {stat.excusedCount > 0 && (
+                      <Badge variant="light" color={notifyColors.info} size="sm">
+                        {stat.excusedCount} Excused
                       </Badge>
                     )}
                   </Group>

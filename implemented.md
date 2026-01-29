@@ -1350,6 +1350,81 @@ npm run dev
 
 #### Supabase – Indexing & RLS Performance Tuning ✅
 
+### Recent Frontend & Backend Improvements – Layout, Loading & Tenant Info ✅
+
+#### Global Loading UX – Skeletons instead of spinners ✅
+
+- **Goal**: Align SMS with RMS by using **Skeleton placeholders** instead of page-level spinners.
+- **Changes (Frontend)**:
+  - Replaced `Loader`-based page/section loading in main list pages (`/students`, `/staff`, `/users`, `/parent-associations`, `/my-schedule`, `/staff/[id]/schedule`, notifications, academic pages, attendance child page, settings sub-pages, etc.) with **Skeleton blocks** that mimic the eventual layout (headers + cards/tables).
+  - Updated feature components (`AttendanceCalendar`, `AttendanceSheet`, `AttendanceReport`, settings lists like `SubjectList`, `ClassList`, `SectionList`, `LevelManager`, `AssessmentTypeList`, `GradeTemplateBuilder`) to show structured Skeletons during data fetch instead of central spinners.
+  - Kept **small inline loaders** only where appropriate (e.g. inside buttons, select right sections), following the “no page-level spinner” guideline.
+- **Rules**:
+  - Updated `.cursor/rules/frontend.mdc` and `.cursor/rules/global-rules.mdc` to:
+    - Prefer Skeletons for page/section loading.
+    - Reserve spinners for tiny, inline interactions only.
+
+#### Shared `(portal)` Layout – Stable AppShell across all authenticated routes ✅
+
+- **Goal**: Match RMS behaviour where the **header + sidebar do not remount** when navigating between sections.
+- **Changes (Frontend Routing)**:
+  - Introduced a new route group: `app/(portal)/layout.tsx` which wraps **all authenticated pages** with `AuthGuard` + `AppShell`.
+  - Moved functional routes under `(portal)` without changing URLs, e.g.:
+    - `app/(portal)/dashboard/page.tsx` → `/dashboard`
+    - `app/(portal)/students/page.tsx` → `/students`
+    - `app/(portal)/staff/page.tsx` → `/staff`
+    - `app/(portal)/users/page.tsx` → `/users`
+    - `app/(portal)/academic/*` → `/academic/*`
+    - `app/(portal)/attendance/*` → `/attendance/*`
+    - `app/(portal)/settings/*` → `/settings/*`
+    - `app/(portal)/reports/page.tsx` → `/reports`
+  - Removed now-redundant per-route `layout.tsx` files (students, staff, users, academic, attendance, settings, etc.) that were each wrapping `AuthGuard + AppShell`, to avoid multiple layout boundaries.
+- **Theme & Junction Tweaks**:
+  - Adjusted `DynamicThemeProvider` to refine the **header/sidebar junction**:
+    - Ensured `.mantine-AppShell-header` and its immediate child `.mantine-Group-root` share the same rounded/bordered surface.
+    - Added a subtle top-corner radius to `.mantine-AppShell-main` to make the outer junction consistently rounded even on pages without a `page-title-bar` element.
+
+#### Settings UX – Single Tabbed `/settings` page with internal tabs (RMS-style) ✅
+
+- **Goal**: Ensure `/settings` behaves like RMS: a **single URL** with top tabs switching internal content.
+- **Changes (Frontend)**:
+  - Consolidated all settings subsections into `app/(portal)/settings/page.tsx` with a top-level `Tabs` component:
+    - Tabs: **Permissions**, **Business Information**, **Academic Years**, **Academic**, **Schedule**, **Assessment**, **Communication**, **Behavior**.
+  - Removed the old pattern where `/settings` redirected to `/settings/permissions` and each subsection had its own full page/layout.
+  - Ensured tabs switch client-side only (no URL change) and content uses the standard `page-title-bar` + content area structure.
+  - Replaced `Loader` usage in settings pages with Skeletons for initial status/branch loading.
+
+#### Tenant Business Information – School Name in Header & Editable in Settings ✅
+
+- **Goal**: Mirror RMS’s “Business Information” concept so the **school name** appears in the top bar and is controllable from Settings.
+- **Backend**:
+  - Added a dedicated `TenantsModule`:
+    - `TenantsService` using `SupabaseConfig` to talk to the `tenants` table.
+    - `TenantsController` with branch- and tenant-aware routes (guarded by `JwtAuthGuard` + `BranchGuard` and using `@CurrentBranch` to resolve `tenantId`):
+      - `GET /api/v1/tenants/me` – returns current tenant info (`TenantDto` with `id`, `name`, `code`, `domain`, `isActive`).
+      - `PATCH /api/v1/tenants/me` – accepts `UpdateTenantDto` (currently `name`) and updates tenant name.
+  - Wired `TenantsModule` into `AppModule` and fixed DI by providing `SupabaseConfig` in `TenantsModule` so `TenantsService` can resolve the Supabase client.
+- **Frontend – Data Layer**:
+  - Added `Tenant` type (`id`, `name`, `code`, `domain`, `isActive?`) in the types folder.
+  - Created `useTenant.ts` hook with React Query:
+    - `useTenantMe()` – `GET /api/v1/tenants/me` via `apiClient.get<Tenant>`.
+    - `useUpdateTenantMe()` – `PATCH /api/v1/tenants/me` with `{ name }`, invalidating `['tenant', 'me']` on success.
+- **Frontend – Header**:
+  - Updated `Header` to show **school name** from tenant instead of static “School Management System”:
+    - While loading, shows a short Skeleton text bar.
+    - When loaded, displays `tenant.name` with a fallback to `"School Management System"` if missing.
+    - Keeps the NTG logo and online/offline badge behaviour unchanged.
+- **Frontend – Settings “Business Information” Tab**:
+  - Extended `app/(portal)/settings/page.tsx` with a new tab:
+    - Tab: **Business Information** (icon: `IconBuilding`).
+    - Content:
+      - Shows Skeletons while tenant info is loading.
+      - On success, renders a `Paper` with a `TextInput` labelled “School name” pre-filled from `tenant.name`.
+      - Save button calls `useUpdateTenantMe` mutation:
+        - Validates non-empty trimmed name.
+        - On success, shows a success notification and keeps header + settings in sync via React Query invalidation.
+  - This tab mirrors RMS’s “Business Information” UX while staying within SMS’s theme system and layout structure.
+
 - **Indexes (Attendance)**
   - Applied targeted Supabase migrations:
     - `CREATE INDEX IF NOT EXISTS idx_attendance_academic_year ON public.attendance (academic_year_id);`

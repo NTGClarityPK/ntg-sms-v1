@@ -25,6 +25,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { SettingsStatusModule } from './modules/settings-status/settings-status.module';
 import { RegistrationModule } from './modules/registration/registration.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.module';
+import { EarlyDepartureModule } from './modules/early-departure/early-departure.module';
 
 @Module({
   imports: [
@@ -48,10 +50,12 @@ import { TenantsModule } from './modules/tenants/tenants.module';
     ClassSectionsModule,
     TeacherAssignmentsModule,
     AttendanceModule,
+    LeaveRequestsModule,
     NotificationsModule,
     SettingsStatusModule,
     RegistrationModule,
     TenantsModule,
+    EarlyDepartureModule,
   ],
   controllers: [AppController],
   providers: [

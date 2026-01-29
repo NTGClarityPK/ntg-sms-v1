@@ -301,7 +301,65 @@ export class NotificationsService {
       console.error('Failed to create attendance notifications:', errorMessage);
     }
   }
+
+  async createLeaveRequestNotification(params: {
+    userId: string;
+    studentName: string;
+    status: string;
+    startDate: string;
+    endDate: string;
+    leaveRequestId: string;
+  }): Promise<void> {
+    try {
+      await this.createNotification({
+        userId: params.userId,
+        type: 'leave',
+        title: 'Leave request updated',
+        body: `${params.studentName} leave ${params.status} (${params.startDate} - ${params.endDate})`,
+        data: {
+          leaveRequestId: params.leaveRequestId,
+          startDate: params.startDate,
+          endDate: params.endDate,
+          status: params.status,
+        },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      // eslint-disable-next-line no-console
+      console.error('Failed to create leave notification:', errorMessage);
+    }
+  }
+
+  async createEarlyDepartureNotification(params: {
+    userId: string;
+    studentName: string;
+    status: string;
+    date: string;
+    time: string;
+    earlyDepartureRequestId: string;
+  }): Promise<void> {
+    try {
+      await this.createNotification({
+        userId: params.userId,
+        type: 'early_departure',
+        title: 'Early departure updated',
+        body: `${params.studentName} early departure ${params.status} on ${params.date} at ${params.time}`,
+        data: {
+          earlyDepartureRequestId: params.earlyDepartureRequestId,
+          date: params.date,
+          time: params.time,
+          status: params.status,
+        },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      // eslint-disable-next-line no-console
+      console.error(
+        'Failed to create early departure notification:',
+        errorMessage,
+      );
+    }
+  }
 }
-
-
-

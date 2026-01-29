@@ -24,6 +24,9 @@ import {
   IconBook,
   IconSchool,
   IconClock,
+  IconPlaneDeparture,
+  IconWalk,
+  IconUsersGroup,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -46,7 +49,10 @@ const allNavItems: NavItem[] = [
   { label: 'Users', href: '/users', icon: IconUsers },
   { label: 'Class Sections', href: '/academic/class-sections', icon: IconSchool },
   { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconBook },
+  { label: 'Parent Associations', href: '/parent-associations', icon: IconUsersGroup },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
+  { label: 'Leaves', href: '/leaves', icon: IconPlaneDeparture },
+  { label: 'Early Departure', href: '/early-departure', icon: IconWalk },
   { 
     label: 'My Schedule', 
     href: '/my-schedule', 
@@ -105,6 +111,8 @@ export function Sidebar({
       item.href === '/dashboard' ||
       item.href === '/students' ||
       item.href === '/attendance' ||
+      item.href === '/leaves' ||
+      item.href === '/early-departure' ||
       item.href === '/my-schedule'
   );
   const managementItems = navItems.filter(
@@ -113,6 +121,7 @@ export function Sidebar({
       item.href === '/users' ||
       item.href === '/academic/class-sections' ||
       item.href === '/academic/teacher-mapping' ||
+      item.href === '/parent-associations' ||
       item.href === '/reports' ||
       item.href === '/settings'
   );
