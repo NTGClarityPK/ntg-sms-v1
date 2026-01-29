@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -56,6 +56,7 @@ import { CommunicationSettings } from '@/components/features/settings/Communicat
 import { LibraryCategoryEditor } from '@/components/features/settings/LibraryCategoryEditor';
 
 import { BehaviorSettings } from '@/components/features/settings/BehaviorSettings';
+import { useTenantMe, useUpdateTenantMe } from '@/hooks/useTenant';
 
 export default function SettingsPage() {
   const colors = useThemeColors();
@@ -186,6 +187,9 @@ export default function SettingsPage() {
             <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
               Permissions
             </Tabs.Tab>
+            <Tabs.Tab value="business-information" leftSection={<IconBuilding size={16} />}>
+              Business Information
+            </Tabs.Tab>
             <Tabs.Tab value="academic-years" leftSection={<IconCalendar size={16} />}>
               Academic Years
             </Tabs.Tab>
@@ -209,6 +213,11 @@ export default function SettingsPage() {
           {/* Permissions Tab */}
           <Tabs.Panel value="permissions" pt="md" px="md" pb="md">
             <PermissionsTabContent />
+          </Tabs.Panel>
+
+          {/* Business Information Tab */}
+          <Tabs.Panel value="business-information" pt="md" px="md" pb="md">
+            <BusinessInformationTabContent />
           </Tabs.Panel>
 
           {/* Academic Years Tab */}
@@ -377,6 +386,91 @@ function AcademicYearsTabContent() {
         isSubmitting={createMutation.isPending}
       />
     </>
+  );
+}
+
+function BusinessInformationTabContent() {
+  const colors = useThemeColors();
+  const notifyColors = useNotificationColors();
+  const tenantQuery = useTenantMe();
+  const updateTenant = useUpdateTenantMe();
+
+  const [name, setName] = useState<string>('');
+  const [hasInitialised, setHasInitialised] = useState(false);
+
+  // Initialise local state once when tenant loads
+  useEffect(() => {
+    const remoteName = tenantQuery.data?.data?.name;
+    if (hasInitialised) return;
+    if (!remoteName) return;
+    setName(remoteName);
+    setHasInitialised(true);
+  }, [hasInitialised, tenantQuery.data?.data?.name]);
+
+  if (tenantQuery.isLoading) {
+    return (
+      <Stack gap="md">
+        <Skeleton height={40} width="30%" />
+        <Skeleton height={140} />
+      </Stack>
+    );
+  }
+
+  if (tenantQuery.error) {
+    return (
+      <Alert color={colors.error} title="Failed to load school information">
+        <Text size="sm">Please try again.</Text>
+      </Alert>
+    );
+  }
+
+  const onSave = async () => {
+    const trimmed = name.trim();
+    if (trimmed.length === 0) {
+      notifications.show({
+        title: 'Validation error',
+        message: 'School name is required.',
+        color: notifyColors.error,
+      });
+      return;
+    }
+
+    try {
+      await updateTenant.mutateAsync({ name: trimmed });
+      notifications.show({
+        title: 'Success',
+        message: 'School name updated.',
+        color: notifyColors.success,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      notifications.show({
+        title: 'Error',
+        message,
+        color: notifyColors.error,
+      });
+    }
+  };
+
+  return (
+    <Stack gap="md">
+      <Title order={2}>Business Information</Title>
+      <Paper withBorder p="md">
+        <Stack gap="md">
+          <TextInput
+            label="School name"
+            placeholder="Enter school name"
+            value={name}
+            onChange={(e) => setName(e.currentTarget.value)}
+          />
+          <Group justify="flex-end">
+            <Button variant="light" onClick={onSave} loading={updateTenant.isPending}>
+              Save
+            </Button>
+          </Group>
+        </Stack>
+      </Paper>
+    </Stack>
   );
 }
 

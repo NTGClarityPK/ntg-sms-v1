@@ -1,17 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Group, Text, Badge, Tooltip, Box, Image } from '@mantine/core';
+import { Group, Text, Badge, Tooltip, Box, Image, Skeleton } from '@mantine/core';
 import { IconCircle } from '@tabler/icons-react';
 import { UserMenu } from './UserMenu';
 import { BranchSwitcher } from '@/components/features/branches/BranchSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
+import { useTenantMe } from '@/hooks/useTenant';
 
 export function Header() {
   const successColor = useSuccessColor();
   const errorColor = useErrorColor();
   const [isOnline, setIsOnline] = useState<boolean>(true);
+  const tenantQuery = useTenantMe();
+  const tenantName = tenantQuery.data?.data?.name;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -32,9 +35,13 @@ export function Header() {
 
   return (
     <Group justify="space-between" style={{ flex: 1 }}>
-      <Text fw={600} size="lg">
-        School Management System
-      </Text>
+      {tenantQuery.isLoading ? (
+        <Skeleton height={22} width={220} />
+      ) : (
+        <Text fw={600} size="lg">
+          {tenantName || 'School Management System'}
+        </Text>
+      )}
 
       <Group gap="md" align="center">
         {/* NTG Logo */}

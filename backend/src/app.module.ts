@@ -24,6 +24,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SettingsStatusModule } from './modules/settings-status/settings-status.module';
 import { RegistrationModule } from './modules/registration/registration.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { RegistrationModule } from './modules/registration/registration.module';
     NotificationsModule,
     SettingsStatusModule,
     RegistrationModule,
+    TenantsModule,
   ],
   controllers: [AppController],
   providers: [
