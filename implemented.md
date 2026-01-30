@@ -1670,3 +1670,44 @@ npm run dev
 **Last Updated**: Current Session (2026-01-30)  
 **Status**: ✅ Prompt 6 Complete – Branch selection UX implemented, leave/early departure management functional with role-aware filtering, time validation, and cancel functionality
 
+---
+
+### Performance Optimisation Plan v2 ✅
+
+> Implemented performance improvements based on deep scan findings in `performancereportv2.md`.
+
+#### Phase 0: Frontend Quick Wins ✅
+
+- **`useAuth.ts`**: Added `staleTime: 5min`, `gcTime: 10min` – eliminates `/api/v1/auth/me` on every page navigation
+- **`useTenant.ts`**: Added `staleTime: 5min` – eliminates `/api/v1/tenants/me` on every navigation
+- **`useBranchSwitcher.ts`**: Changed `queryClient.invalidateQueries()` (all queries) to specific keys only (students, staff, attendance, class-sections, leaves, teacher-assignments, notifications, early-departures)
+- **`UserMenu.tsx`**: Replaced `window.location.href` with `router.push('/dashboard')` to preserve React Query cache on branch switch
+- **`useClassSections.ts`, useStudents.ts, useStaff.ts`**: Added `staleTime: 2min` to reduce refetches
+
+#### Phase 1: Backend Auth Optimisation ✅
+
+- **`auth.service.ts`**: Parallelised 6 sequential DB calls into 2 batches using `Promise.all`:
+  - First batch (parallel): auth user, profile, user_branches, user_roles
+  - Second batch (parallel): branches, roles
+  - Replaced `select('*')` with explicit fields for profile query
+  - **Impact**: ~120ms → ~40-50ms per auth request
+
+#### Phase 2: Backend Data Fetching Fixes ✅
+
+- **`students.service.ts`**: Replaced `supabase.auth.admin.listUsers()` (fetches ALL users) with batched `getUserById()` calls via `Promise.all`
+- **`staff.service.ts`**: Same fix – no longer fetches ALL auth users
+- **`leave-requests.service.ts`**: Added `GET /api/v1/leave-requests/stats/:studentId` endpoint with DB-level counting
+- **`useLeaveRequests.ts`**: Updated `useStudentLeaveStats` to use single endpoint (was 3 separate requests)
+
+#### SELECT * → Explicit Fields ✅
+
+Replaced `SELECT *` with explicit field lists in high-traffic services:
+- `attendance.service.ts` (4 queries)
+- `notifications.service.ts` (3 queries)
+- `leave-requests.service.ts` (4 queries)
+- `staff.service.ts` (3 queries)
+
+#### Bug Fix ✅
+
+- **`attendance.service.ts`**: Fixed `throwIfDbError` to correctly access `PostgrestError.message` (was failing with "Unknown error")
+
