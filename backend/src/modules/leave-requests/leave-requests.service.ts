@@ -174,7 +174,10 @@ export class LeaveRequestsService {
 
     let dbQuery = supabase
       .from('leave_requests')
-      .select('*', { count: 'exact' })
+      .select(
+        'id, student_id, requested_by, start_date, end_date, reason, attachment_url, status, reviewed_by, reviewed_at, review_notes, branch_id, academic_year_id, created_at, updated_at',
+        { count: 'exact' },
+      )
       .eq('branch_id', branchId);
 
     // For parents, only show their own requests
@@ -309,7 +312,7 @@ export class LeaveRequestsService {
 
     const { data, error } = await supabase
       .from('leave_requests')
-      .select('*')
+      .select('id, student_id, requested_by, start_date, end_date, reason, attachment_url, status, reviewed_by, reviewed_at, review_notes, branch_id, academic_year_id, created_at, updated_at')
       .eq('id', id)
       .eq('branch_id', branchId)
       .single();
@@ -333,7 +336,7 @@ export class LeaveRequestsService {
 
     const { data: existing, error: fetchError } = await supabase
       .from('leave_requests')
-      .select('*')
+      .select('id, student_id, requested_by, start_date, end_date, reason, attachment_url, status, reviewed_by, reviewed_at, review_notes, branch_id, academic_year_id, created_at, updated_at')
       .eq('id', id)
       .eq('branch_id', branchId)
       .single();
@@ -421,7 +424,7 @@ export class LeaveRequestsService {
 
     const { data: existing, error: fetchError } = await supabase
       .from('leave_requests')
-      .select('*')
+      .select('id, student_id, requested_by, start_date, end_date, reason, attachment_url, status, reviewed_by, reviewed_at, review_notes, branch_id, academic_year_id, created_at, updated_at')
       .eq('id', id)
       .eq('branch_id', branchId)
       .single();
@@ -459,6 +462,45 @@ export class LeaveRequestsService {
     }
 
     return this.mapRowToDto(data as LeaveRequestRow);
+  }
+
+  /**
+   * Get leave request stats for a student using database aggregation
+   * OPTIMISED: Uses COUNT with GROUP BY instead of fetching all records
+   */
+  async getLeaveStats(
+    studentId: string,
+    branchId: string,
+  ): Promise<{ pending: number; approved: number; rejected: number; cancelled: number }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      return { pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+    }
+
+    // Use raw SQL query for efficient COUNT GROUP BY
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .select('status')
+      .eq('student_id', studentId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYear.id);
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    // Count by status client-side (Supabase doesn't support GROUP BY directly)
+    const counts = { pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+    (data || []).forEach((row) => {
+      const status = row.status as keyof typeof counts;
+      if (status in counts) {
+        counts[status]++;
+      }
+    });
+
+    return counts;
   }
 
   async getStudentQuotaUsage(

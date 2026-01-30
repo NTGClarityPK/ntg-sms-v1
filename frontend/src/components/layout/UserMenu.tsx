@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Avatar, Menu, Text, Group } from '@mantine/core';
 import { IconUser, IconSettings, IconLogout, IconSwitchHorizontal } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { signOut } from '@/lib/auth';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
@@ -17,6 +19,8 @@ interface Branch {
 }
 
 export function UserMenu() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, refetch } = useAuth();
   const userTyped = user as User | undefined;
   const [showBranchModal, setShowBranchModal] = useState(false);
@@ -52,8 +56,18 @@ export function UserMenu() {
       // Close modal
       setShowBranchModal(false);
       
-      // Redirect to dashboard to refresh context
-      window.location.href = '/dashboard';
+      // Invalidate only branch-dependent queries (preserves cache for non-branch data)
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['class-sections'] });
+      queryClient.invalidateQueries({ queryKey: ['leaves'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['early-departures'] });
+      
+      // Use SPA navigation (preserves React Query cache)
+      router.push('/dashboard');
     } catch (error) {
       console.error('Failed to switch branch:', error);
       setIsSwitching(false);

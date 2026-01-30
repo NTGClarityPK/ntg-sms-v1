@@ -32,8 +32,7 @@ type AttendanceRow = {
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-  throw new BadRequestException(errorMessage);
+  throw new BadRequestException(error.message || 'Database error');
 }
 
 @Injectable()
@@ -71,7 +70,10 @@ export class AttendanceService {
 
     let dbQuery = supabase
       .from('attendance')
-      .select('*', { count: 'exact' })
+      .select(
+        'id, student_id, class_section_id, date, status, entry_time, exit_time, notes, marked_by, branch_id, academic_year_id, created_at, updated_at',
+        { count: 'exact' },
+      )
       .eq('branch_id', branchId)
       .eq('academic_year_id', activeYearId);
 
@@ -294,7 +296,9 @@ export class AttendanceService {
       await Promise.all([
         supabase
           .from('attendance')
-          .select('*')
+          .select(
+            'id, student_id, class_section_id, date, status, entry_time, exit_time, notes, marked_by, branch_id, academic_year_id, created_at, updated_at',
+          )
           .eq('class_section_id', classSectionId)
           .eq('date', date)
           .eq('branch_id', branchId)
@@ -454,7 +458,9 @@ export class AttendanceService {
 
     let dbQuery = supabase
       .from('attendance')
-      .select('*')
+      .select(
+        'id, student_id, class_section_id, date, status, entry_time, exit_time, notes, marked_by, branch_id, academic_year_id, created_at, updated_at',
+      )
       .eq('student_id', studentId)
       .eq('branch_id', branchId)
       .eq('academic_year_id', activeYearId)
@@ -755,7 +761,7 @@ export class AttendanceService {
     // Verify attendance exists and belongs to branch
     const { data: existing, error: fetchError } = await supabase
       .from('attendance')
-      .select('*')
+      .select('id, student_id, class_section_id, date, status, entry_time, exit_time, notes, marked_by, branch_id, academic_year_id, created_at, updated_at')
       .eq('id', id)
       .eq('branch_id', branchId)
       .single();

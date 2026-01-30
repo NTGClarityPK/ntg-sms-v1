@@ -23,8 +23,8 @@ export function useAuth() {
     retry: false,
     refetchOnWindowFocus: false,
     enabled: true,
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 5 * 60 * 1000,  // 5 minutes - user data rarely changes
+    gcTime: 10 * 60 * 1000,    // 10 minutes
   });
 
   // Store branch ID in localStorage when user data changes

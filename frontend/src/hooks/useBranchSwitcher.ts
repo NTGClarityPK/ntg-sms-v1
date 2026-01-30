@@ -28,8 +28,15 @@ export function useBranchSwitcher() {
       // Refetch user data to get updated currentBranch
       refetchAuth();
 
-      // Invalidate all queries to refresh data for new branch
-      queryClient.invalidateQueries();
+      // Invalidate only branch-dependent queries (not all queries)
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['class-sections'] });
+      queryClient.invalidateQueries({ queryKey: ['leaves'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['early-departures'] });
 
       notifications.show({
         title: 'Success',

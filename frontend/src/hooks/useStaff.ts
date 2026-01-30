@@ -40,6 +40,7 @@ export function useStaff(params?: QueryStaffParams) {
       return response;
     },
     enabled: !!branchId,
+    staleTime: 2 * 60 * 1000,  // 2 minutes - staff list rarely changes mid-session
   });
 }
 

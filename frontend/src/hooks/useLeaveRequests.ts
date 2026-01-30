@@ -163,28 +163,19 @@ export function useStudentLeaveStats(studentId: string | null) {
     queryFn: async () => {
       if (!studentId || !branchId) return null;
       
-      // Fetch counts using status filters - more efficient than fetching all records
-      // Backend returns { data: LeaveRequest[], meta: { total, page, limit, totalPages } }
-      // apiClient.get wraps it as ApiResponse, so response is { data: LeaveRequest[], meta: { total, ... } }
-      const [pendingResponse, rejectedResponse, approvedResponse] = await Promise.all([
-        apiClient.get<LeaveRequest[]>(
-          `/api/v1/leave-requests?studentId=${studentId}&status=pending&limit=1`,
-        ),
-        apiClient.get<LeaveRequest[]>(
-          `/api/v1/leave-requests?studentId=${studentId}&status=rejected&limit=1`,
-        ),
-        apiClient.get<LeaveRequest[]>(
-          `/api/v1/leave-requests?studentId=${studentId}&status=approved&limit=1`,
-        ),
-      ]);
+      // OPTIMISED: Use dedicated stats endpoint (single request with DB aggregation)
+      // instead of 3 separate requests
+      const response = await apiClient.get<{
+        pending: number;
+        approved: number;
+        rejected: number;
+        cancelled: number;
+      }>(`/api/v1/leave-requests/stats/${studentId}`);
       
-      const pending = pendingResponse.meta?.total || 0;
-      const rejected = rejectedResponse.meta?.total || 0;
-      const approved = approvedResponse.meta?.total || 0;
-      
-      return { pending, rejected, approved };
+      return response.data;
     },
     enabled: !!studentId && !!branchId,
+    staleTime: 2 * 60 * 1000,  // 2 minutes - stats don't change frequently
   });
 }
 

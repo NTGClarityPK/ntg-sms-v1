@@ -55,6 +55,7 @@ export function useClassSections(params?: QueryClassSectionsParams) {
       return response;
     },
     enabled: !!branchId,
+    staleTime: 2 * 60 * 1000,  // 2 minutes - class sections rarely change mid-session
   });
 }
 

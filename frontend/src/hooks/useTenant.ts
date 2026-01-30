@@ -14,6 +14,7 @@ export function useTenantMe() {
       const res = await apiClient.get<Tenant>('/api/v1/tenants/me');
       return res;
     },
+    staleTime: 5 * 60 * 1000,  // 5 minutes - tenant data rarely changes
   });
 }
 

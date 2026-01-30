@@ -46,7 +46,7 @@ export class NotificationsService {
 
     let dbQuery = supabase
       .from('notifications')
-      .select('*', { count: 'exact' })
+      .select('id, user_id, type, title, body, data, is_read, created_at', { count: 'exact' })
       .eq('user_id', userId);
 
     if (query.isRead !== undefined) {
@@ -122,7 +122,7 @@ export class NotificationsService {
 
     const { data, error } = await supabase
       .from('notifications')
-      .select('*')
+      .select('id, user_id, type, title, body, data, is_read, created_at')
       .eq('id', id)
       .eq('user_id', userId)
       .single();
@@ -151,7 +151,7 @@ export class NotificationsService {
     // Verify notification exists and belongs to user
     const { data: existing, error: fetchError } = await supabase
       .from('notifications')
-      .select('*')
+      .select('id')
       .eq('id', id)
       .eq('user_id', userId)
       .single();

@@ -74,66 +74,92 @@ export class AuthService {
   async getCurrentUser(userId: string): Promise<UserResponseDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Get user from auth.users
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.admin.getUserById(userId);
+    // OPTIMISED: Run all independent queries in parallel (first batch)
+    const [authResult, profileResult, userBranchesResult, userRolesResult] = await Promise.all([
+      // Get user from auth.users
+      supabase.auth.admin.getUserById(userId),
+      // Get profile from public.profiles (only needed fields)
+      supabase
+        .from('profiles')
+        .select('full_name, avatar_url, current_branch_id')
+        .eq('id', userId)
+        .maybeSingle(),
+      // Get user branch mappings
+      supabase
+        .from('user_branches')
+        .select('branch_id')
+        .eq('user_id', userId),
+      // Get user role mappings
+      supabase
+        .from('user_roles')
+        .select('role_id, branch_id')
+        .eq('user_id', userId),
+    ]);
 
+    const { data: { user }, error: userError } = authResult;
     if (userError || !user) {
       throw new NotFoundException('User not found');
     }
 
-    // Get profile from public.profiles
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
+    const { data: profile, error: profileError } = profileResult;
     if (profileError && profileError.code !== 'PGRST116') {
-      // PGRST116 is "not found" which is okay for new users
       throw new NotFoundException('Profile not found');
     }
 
-    const branches = await this.listUserBranches(userId);
-    const currentBranchId = await this.getProfileCurrentBranchId(userId);
+    const { data: userBranchesData, error: userBranchesError } = userBranchesResult;
+    if (userBranchesError) {
+      throw new BadRequestException(`Failed to fetch user branches: ${userBranchesError.message}`);
+    }
+
+    const { data: userRolesData } = userRolesResult;
+
+    // Extract IDs for second batch
+    const branchIds = (userBranchesData || []).map((ub) => ub.branch_id);
+    const roleIds = Array.from(new Set((userRolesData || []).map((ur) => ur.role_id)));
+
+    // OPTIMISED: Run dependent queries in parallel (second batch)
+    const [branchesResult, rolesResult] = await Promise.all([
+      // Get branch details (only if there are branches)
+      branchIds.length > 0
+        ? supabase.from('branches').select('id, tenant_id, name, code').in('id', branchIds)
+        : Promise.resolve({ data: [], error: null }),
+      // Get role details (only if there are roles)
+      roleIds.length > 0
+        ? supabase.from('roles').select('id, name').in('id', roleIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    const { data: branchesData, error: branchesError } = branchesResult;
+    if (branchesError) {
+      throw new BadRequestException(`Failed to fetch branches: ${branchesError.message}`);
+    }
+
+    const branches = (branchesData || []).map(
+      (b) =>
+        new BranchSummaryDto({
+          id: b.id,
+          tenantId: b.tenant_id,
+          name: b.name,
+          code: b.code,
+        }),
+    );
+
+    // Build roles array
+    let roles: Array<{ roleId: string; roleName: string; branchId: string }> = [];
+    if (userRolesData && userRolesData.length > 0 && !rolesResult.error) {
+      const roleMap = new Map((rolesResult.data || []).map((r) => [r.id, r.name]));
+      roles = userRolesData.map((ur) => ({
+        roleId: ur.role_id,
+        roleName: roleMap.get(ur.role_id) || '',
+        branchId: ur.branch_id,
+      }));
+    }
+
+    // Use current_branch_id from profile (already fetched, no extra query needed)
+    const currentBranchId = (profile as { current_branch_id: string | null } | null)?.current_branch_id ?? null;
     const currentBranch = currentBranchId
       ? branches.find((b) => b.id === currentBranchId) ?? null
       : null;
-
-    // Fetch user roles - use two-step approach for reliability
-    const { data: userRolesData, error: userRolesError } = await supabase
-      .from('user_roles')
-      .select('role_id, branch_id')
-      .eq('user_id', userId);
-
-    let roles: Array<{ roleId: string; roleName: string; branchId: string }> = [];
-    
-    if (userRolesData && userRolesData.length > 0) {
-      // Get unique role IDs
-      const roleIds = Array.from(new Set(userRolesData.map((ur) => ur.role_id)));
-      
-      // Fetch role details
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('roles')
-        .select('id, name')
-        .in('id', roleIds);
-
-      if (!rolesError) {
-        // Create a map of role ID to role name
-        const roleMap = new Map(
-          (rolesData || []).map((r) => [r.id, r.name])
-        );
-
-        // Build roles array
-        roles = userRolesData.map((ur) => ({
-          roleId: ur.role_id,
-          roleName: roleMap.get(ur.role_id) || '',
-          branchId: ur.branch_id,
-        }));
-      }
-    }
 
     const userResponse = new UserResponseDto({
       id: user.id,

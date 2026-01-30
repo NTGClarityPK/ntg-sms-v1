@@ -125,6 +125,18 @@ export class LeaveRequestsController {
     );
     return { data };
   }
+
+  @Get('stats/:studentId')
+  async getLeaveStats(
+    @Param('studentId') studentId: string,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const data = await this.leaveRequestsService.getLeaveStats(
+      studentId,
+      branch.branchId,
+    );
+    return { data };
+  }
 }
 
 

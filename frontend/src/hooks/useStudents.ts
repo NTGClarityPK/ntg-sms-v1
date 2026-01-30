@@ -59,6 +59,7 @@ export function useStudents(params?: QueryStudentsParams) {
       return response;
     },
     enabled: !!branchId,
+    staleTime: 2 * 60 * 1000,  // 2 minutes - student list rarely changes mid-session
   });
 }
 

@@ -89,9 +89,10 @@ export class StaffService {
     // Build the main query
     let dbQuery = supabase
       .from('staff')
-      .select('*', {
-        count: 'exact',
-      })
+      .select(
+        'id, user_id, branch_id, employee_id, department, join_date, is_active, deactivated_at, deactivation_reason, created_at, updated_at',
+        { count: 'exact' },
+      )
       .eq('branch_id', branchId)
       .range(from, to)
       .order('created_at', { ascending: false });
@@ -121,35 +122,13 @@ export class StaffService {
     // Get user emails and profiles
     const userIds = (data as unknown as Array<{ user_id: string }>).map((s) => s.user_id);
     
-    // Fetch emails using admin API - try listUsers first, fallback to individual lookups
-    const emailMap = new Map<string, string>();
-    try {
-      const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
-      if (!listError && authUsers?.users) {
-        authUsers.users
-          .filter((u) => userIds.includes(u.id))
-          .forEach((u) => {
-            if (u.email) emailMap.set(u.id, u.email);
-          });
-      }
-    } catch (error) {
-      // If listUsers fails, fetch emails individually
-      console.warn('Failed to list users, fetching individually:', error);
-    }
-    
-    // Fill in any missing emails by fetching individually
-    for (const userId of userIds) {
-      if (!emailMap.has(userId)) {
-        try {
-          const { data: authUser } = await supabase.auth.admin.getUserById(userId);
-          if (authUser?.user?.email) {
-            emailMap.set(userId, authUser.user.email);
-          }
-        } catch (error) {
-          // Silently continue if individual fetch fails
-        }
-      }
-    }
+    // OPTIMISED: Fetch emails only for needed users via batched individual lookups
+    // (instead of fetching ALL auth users and filtering client-side)
+    const emailPromises = userIds.map((id) =>
+      supabase.auth.admin.getUserById(id).then((res) => [id, res.data.user?.email || ''] as const),
+    );
+    const emailEntries = await Promise.all(emailPromises);
+    const emailMap = new Map(emailEntries);
 
     // Fetch profiles separately
     const { data: profilesData } = await supabase
@@ -271,7 +250,7 @@ export class StaffService {
 
     const { data, error } = await supabase
       .from('staff')
-      .select('*')
+      .select('id, user_id, branch_id, employee_id, department, join_date, is_active, deactivated_at, deactivation_reason, created_at, updated_at')
       .eq('user_id', userId)
       .eq('branch_id', branchId)
       .maybeSingle();
@@ -289,7 +268,7 @@ export class StaffService {
 
     const { data, error } = await supabase
       .from('staff')
-      .select('*')
+      .select('id, user_id, branch_id, employee_id, department, join_date, is_active, deactivated_at, deactivation_reason, created_at, updated_at')
       .eq('id', id)
       .eq('branch_id', branchId)
       .single();

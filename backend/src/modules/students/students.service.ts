@@ -132,13 +132,13 @@ export class StudentsService {
       (profilesData || []).map((p) => [p.id, p.full_name]),
     );
 
-    // Get user emails
-    const { data: authUsers } = await supabase.auth.admin.listUsers();
-    const emailMap = new Map(
-      authUsers.users
-        .filter((u) => userIds.includes(u.id))
-        .map((u) => [u.id, u.email || '']),
+    // OPTIMISED: Fetch emails only for needed users via batched individual lookups
+    // (instead of fetching ALL auth users and filtering client-side)
+    const emailPromises = userIds.map((id) =>
+      supabase.auth.admin.getUserById(id).then((res) => [id, res.data.user?.email || ''] as const),
     );
+    const emailEntries = await Promise.all(emailPromises);
+    const emailMap = new Map(emailEntries);
 
     let students = (data as unknown as Array<{
       id: string;
