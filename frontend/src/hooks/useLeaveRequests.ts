@@ -45,6 +45,8 @@ export function useLeaveRequests(params?: QueryLeaveParams) {
       return response;
     },
     enabled: !!branchId,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -76,6 +78,8 @@ interface CreateLeaveInput {
 export function useCreateLeaveRequest() {
   const queryClient = useQueryClient();
   const notifyColors = useThemeColors();
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
 
   return useMutation({
     mutationFn: async (input: CreateLeaveInput) => {
@@ -86,7 +90,15 @@ export function useCreateLeaveRequest() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leaves'] });
+      // Invalidate all leave-related queries to ensure fresh data
+      queryClient.invalidateQueries({ 
+        queryKey: ['leaves'],
+        exact: false, // Match all queries starting with 'leaves'
+      });
+      // Force refetch all leave queries
+      queryClient.refetchQueries({ 
+        predicate: (query) => query.queryKey[0] === 'leaves' && query.queryKey[1] === branchId,
+      });
       notifications.show({
         title: 'Success',
         message: 'Leave request submitted',

@@ -35,54 +35,9 @@ export function BranchSwitcher() {
     // Don't refetch here to avoid infinite loops - let user manually refresh
   }
 
-  // Only show for school_admin users
-  if (!isSchoolAdmin) {
-    return null;
-  }
-
-  // Don't show if user has no branches
-  if (branches.length === 0) {
-    return null;
-  }
-
-  // If only one branch, show it but make it read-only
-  if (branches.length === 1) {
-    return (
-      <Select
-        leftSection={<IconBuilding size={16} />}
-        value={branches[0].id}
-        data={[
-          {
-            value: branches[0].id,
-            label: branches[0].name || branches[0].code || branches[0].id,
-          },
-        ]}
-        disabled
-        style={{ minWidth: 180 }}
-        size="sm"
-      />
-    );
-  }
-
-  return (
-    <Select
-      leftSection={<IconBuilding size={16} />}
-      placeholder="Select branch"
-      value={currentBranch?.id || null}
-      data={branches.map((branch) => ({
-        value: branch.id,
-        label: branch.name || branch.code || branch.id,
-      }))}
-      onChange={(value) => {
-        if (value && value !== currentBranch?.id) {
-          switchBranch(value);
-        }
-      }}
-      disabled={isSwitching}
-      rightSection={isSwitching ? <Loader size={14} /> : undefined}
-      style={{ minWidth: 180 }}
-      size="sm"
-    />
-  );
+  // Branch selection is now handled at login via modal
+  // Hide branch switcher for all users (including admins)
+  // Users with multiple branches select at login and can re-login to switch
+  return null;
 }
 

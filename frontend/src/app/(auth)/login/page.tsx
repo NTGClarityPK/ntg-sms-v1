@@ -24,6 +24,15 @@ import { useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeColor } from '@/lib/hooks/use-theme-color';
 import { generateThemeColors } from '@/lib/utils/themeColors';
+import { apiClient } from '@/lib/api-client';
+import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
+
+interface Branch {
+  id: string;
+  name: string;
+  code: string;
+  tenantId: string;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,6 +46,9 @@ export default function LoginPage() {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [showBranchSelection, setShowBranchSelection] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchSelectionLoading, setBranchSelectionLoading] = useState(false);
 
   const form = useForm({
     initialValues: {
@@ -73,8 +85,33 @@ export default function LoginPage() {
         throw new Error('Session not created');
       }
       
-      // Redirect to dashboard
-      window.location.href = '/dashboard';
+      // Fetch user's branches
+      try {
+        const response = await apiClient.get<Branch[]>('/api/v1/auth/my-branches');
+        const userBranches = response.data || [];
+        
+        if (userBranches.length === 0) {
+          setError('No branches assigned to your account. Please contact your administrator.');
+          setLoading(false);
+          return;
+        }
+        
+        // If user has only one branch, auto-select it
+        if (userBranches.length === 1) {
+          await handleBranchSelection(userBranches[0].id);
+          window.location.href = '/dashboard';
+          return;
+        }
+        
+        // If user has multiple branches, show selection modal
+        setBranches(userBranches);
+        setShowBranchSelection(true);
+        setLoading(false);
+      } catch (branchError: any) {
+        console.error('Failed to fetch branches:', branchError);
+        setError('Failed to fetch branches. Please try again.');
+        setLoading(false);
+      }
     } catch (err: any) {
       // Extract error message from various possible response structures
       let errorMsg = '';
@@ -90,8 +127,27 @@ export default function LoginPage() {
       }
 
       setError(errorMsg);
-    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBranchSelection = async (branchId: string) => {
+    setBranchSelectionLoading(true);
+    
+    try {
+      // Set the selected branch on the backend
+      await apiClient.post('/api/v1/auth/select-branch', { branchId });
+      
+      // Store in localStorage for immediate use
+      localStorage.setItem('currentBranchId', branchId);
+      
+      // Close modal and redirect
+      setShowBranchSelection(false);
+      window.location.href = '/dashboard';
+    } catch (err: any) {
+      console.error('Failed to select branch:', err);
+      setError('Failed to select branch. Please try again.');
+      setBranchSelectionLoading(false);
     }
   };
 
@@ -307,6 +363,13 @@ export default function LoginPage() {
           </form>
         )}
       </Modal>
+
+      <BranchSelectionModal
+        opened={showBranchSelection}
+        branches={branches}
+        onSelect={handleBranchSelection}
+        loading={branchSelectionLoading}
+      />
     </form>
   );
 }

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton, Container, Stack } from '@mantine/core';
 import { useAuth } from '@/hooks/useAuth';
 import type { User } from '@/types/auth';
+import { apiClient } from '@/lib/api-client';
 
 interface BranchGuardProps {
   children: React.ReactNode;
@@ -12,20 +13,47 @@ interface BranchGuardProps {
 
 export function BranchGuard({ children }: BranchGuardProps) {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refetch } = useAuth();
   const userTyped = user as User | undefined;
+  const [isSelectingBranch, setIsSelectingBranch] = useState(false);
 
   // Auto-select first branch if user has branches but no current branch selected
   useEffect(() => {
-    if (!isLoading && userTyped && !userTyped.currentBranch && userTyped.branches && userTyped.branches.length > 0) {
-      // Auto-select the first available branch
-      // This will be handled by the branch switcher or can be done via API call
-      // For now, we'll just let the user select from the header switcher
-    }
-  }, [user, isLoading]);
+    const autoSelectBranch = async () => {
+      if (
+        !isLoading &&
+        !isSelectingBranch &&
+        userTyped &&
+        !userTyped.currentBranch &&
+        userTyped.branches &&
+        userTyped.branches.length > 0
+      ) {
+        setIsSelectingBranch(true);
+        try {
+          // Auto-select the first available branch
+          const firstBranch = userTyped.branches[0];
+          await apiClient.post('/api/v1/auth/select-branch', {
+            branchId: firstBranch.id,
+          });
+          
+          // Store in localStorage
+          localStorage.setItem('currentBranchId', firstBranch.id);
+          
+          // Refetch user data to get updated current branch
+          await refetch();
+        } catch (error) {
+          console.error('Failed to auto-select branch:', error);
+        } finally {
+          setIsSelectingBranch(false);
+        }
+      }
+    };
 
-  // Show loading while checking
-  if (isLoading) {
+    autoSelectBranch();
+  }, [user, isLoading, isSelectingBranch, refetch]);
+
+  // Show loading while checking or auto-selecting branch
+  if (isLoading || isSelectingBranch) {
     return (
       <Container size="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <Stack gap="md" align="center">

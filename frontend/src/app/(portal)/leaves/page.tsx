@@ -121,7 +121,15 @@ export default function LeavesPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs defaultValue={isParent ? 'my-requests' : 'all-requests'}>
+        <Tabs 
+          defaultValue={isParent ? 'my-requests' : 'all-requests'}
+          onChange={(value) => {
+            // Refetch leave requests when switching to "all-requests" tab
+            if (value === 'all-requests') {
+              leaveQuery.refetch();
+            }
+          }}
+        >
           <Tabs.List>
             {isParent && <Tabs.Tab value="my-requests">My requests</Tabs.Tab>}
             <Tabs.Tab value="all-requests">All requests</Tabs.Tab>
@@ -156,7 +164,7 @@ export default function LeavesPage() {
                     <Card withBorder p="md">
                       <Stack gap="sm">
                         <Title order={3}>Request leave</Title>
-                        <LeaveRequestForm student={selectedStudent} />
+                        <LeaveRequestForm key={selectedStudent?.id || 'no-student'} student={selectedStudent} />
                       </Stack>
                     </Card>
                   </>
@@ -173,7 +181,15 @@ export default function LeavesPage() {
 
           <Tabs.Panel value="all-requests" pt="md">
             <Stack gap="md">
-              {requests.length === 0 ? (
+              {leaveQuery.isLoading ? (
+                <Text size="sm" c="dimmed">
+                  Loading leave requests...
+                </Text>
+              ) : leaveQuery.isError ? (
+                <Text size="sm" c="red">
+                  Error loading leave requests. Please try again.
+                </Text>
+              ) : requests.length === 0 ? (
                 <Text size="sm" c="dimmed">
                   No leave requests found.
                 </Text>

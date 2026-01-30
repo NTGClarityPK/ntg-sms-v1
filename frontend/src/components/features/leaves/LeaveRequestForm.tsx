@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import {
   Button,
   Group,
@@ -50,13 +49,6 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
     validate: zodResolver(schema),
   });
 
-  // Update form when student changes
-  useEffect(() => {
-    if (student?.id) {
-      form.setFieldValue('studentId', student.id);
-    }
-  }, [student?.id, form]);
-
   const handleSubmit = async (values: typeof form.values) => {
     try {
       await createLeave.mutateAsync({
@@ -81,7 +73,7 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
 
   return (
     <Paper withBorder p="md">
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form key={student?.id || 'no-student'} onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Text fw={600}>Request leave</Text>
           {quota && (
