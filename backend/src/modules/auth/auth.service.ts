@@ -17,20 +17,15 @@ export class AuthService {
       .eq('user_id', userId);
 
     if (userBranchesError) {
-      console.error('Error fetching user_branches:', userBranchesError);
       throw new BadRequestException(`Failed to fetch user branches: ${userBranchesError.message}`);
     }
 
-    console.log('User branches query result:', { userId, userBranches });
-
     if (!userBranches || userBranches.length === 0) {
-      console.log('No user_branches found for user:', userId);
       return [];
     }
 
     // Then fetch the branch details
     const branchIds = userBranches.map((ub) => ub.branch_id);
-    console.log('Fetching branch details for IDs:', branchIds);
     
     const { data: branches, error: branchesError } = await supabase
       .from('branches')
@@ -38,11 +33,8 @@ export class AuthService {
       .in('id', branchIds);
 
     if (branchesError) {
-      console.error('Error fetching branches:', branchesError);
       throw new BadRequestException(`Failed to fetch branches: ${branchesError.message}`);
     }
-
-    console.log('Branches query result:', branches);
 
     if (!branches) {
       return [];
@@ -58,7 +50,6 @@ export class AuthService {
         }),
     );
     
-    console.log('Final branches result:', result);
     return result;
   }
 
@@ -129,9 +120,7 @@ export class AuthService {
         .select('id, name')
         .in('id', roleIds);
 
-      if (rolesError) {
-        console.error('Error fetching roles:', rolesError);
-      } else {
+      if (!rolesError) {
         // Create a map of role ID to role name
         const roleMap = new Map(
           (rolesData || []).map((r) => [r.id, r.name])
@@ -155,10 +144,6 @@ export class AuthService {
       branches,
       currentBranch,
     });
-
-    console.log('getCurrentUser - roles:', roles);
-    console.log('getCurrentUser - branches:', branches);
-    console.log('getCurrentUser - currentBranch:', currentBranch);
     
     return userResponse;
   }

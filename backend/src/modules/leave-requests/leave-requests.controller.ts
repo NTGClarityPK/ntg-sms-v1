@@ -33,10 +33,12 @@ export class LeaveRequestsController {
     @CurrentUser() user: CurrentUserPayload,
     @CurrentBranch() branch: { branchId: string },
   ) {
+    const isParent = user.roles?.includes('parent');
     return this.leaveRequestsService.listLeaveRequests(
       query,
       user.id,
       branch.branchId,
+      isParent,
     );
   }
 

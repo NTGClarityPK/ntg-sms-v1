@@ -137,11 +137,41 @@ export class LeaveRequestsService {
     query: QueryLeaveRequestsDto,
     userId: string,
     branchId: string,
+    isParent: boolean = false,
   ): Promise<{
     data: LeaveRequestDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
     const supabase = this.supabaseConfig.getClient();
+
+    // Check if user is a parent by querying user_roles and roles
+    if (!isParent) {
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('role_id')
+        .eq('user_id', userId)
+        .eq('branch_id', branchId);
+
+      console.log('User roles:', userRoles);
+
+      if (userRoles && userRoles.length > 0) {
+        const roleIds = userRoles.map((ur) => ur.role_id);
+        const { data: roles } = await supabase
+          .from('roles')
+          .select('name')
+          .in('id', roleIds)
+          .eq('name', 'parent')
+          .limit(1);
+
+        console.log('Parent roles:', roles);
+
+        if (roles && roles.length > 0) {
+          isParent = true;
+        }
+      }
+    }
+
+    console.log('Is parent:', isParent, 'User ID:', userId, 'Branch ID:', branchId);
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -152,6 +182,12 @@ export class LeaveRequestsService {
       .from('leave_requests')
       .select('*', { count: 'exact' })
       .eq('branch_id', branchId);
+
+    // For parents, only show their own requests
+    if (isParent) {
+      console.log('Filtering by requested_by:', userId);
+      dbQuery = dbQuery.eq('requested_by', userId);
+    }
 
     if (query.studentId) {
       dbQuery = dbQuery.eq('student_id', query.studentId);
@@ -176,6 +212,9 @@ export class LeaveRequestsService {
     dbQuery = dbQuery.order(sortBy, { ascending });
 
     const { data, error, count } = await dbQuery.range(from, to);
+    
+    console.log('Query result - data:', data, 'error:', error, 'count:', count);
+    
     throwIfDbError(error);
 
     const rows = (data ?? []) as LeaveRequestRow[];
@@ -183,6 +222,8 @@ export class LeaveRequestsService {
 
     const total = count ?? items.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    console.log('Returning:', { data: items, meta: { total, page, limit, totalPages } });
 
     return {
       data: items,
