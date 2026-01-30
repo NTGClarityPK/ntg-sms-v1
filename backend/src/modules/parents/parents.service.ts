@@ -111,14 +111,30 @@ export class ParentsService {
     });
   }
 
-  async getChildren(parentUserId: string): Promise<ParentStudentDto[]> {
+  async getChildren(parentUserId: string, branchId?: string): Promise<ParentStudentDto[]> {
     const supabase = this.supabaseConfig.getClient();
 
-    const { data, error } = await supabase
+    let dbQuery = supabase
       .from('parent_students')
       .select('*')
-      .eq('parent_user_id', parentUserId)
-      .order('created_at', { ascending: false });
+      .eq('parent_user_id', parentUserId);
+
+    // Filter by branch if provided
+    if (branchId) {
+      // First get all students in this branch
+      const { data: branchStudents } = await supabase
+        .from('students')
+        .select('id')
+        .eq('branch_id', branchId);
+
+      const studentIds = branchStudents?.map((s) => s.id) || [];
+      if (studentIds.length === 0) {
+        return [];
+      }
+      dbQuery = dbQuery.in('student_id', studentIds);
+    }
+
+    const { data, error } = await dbQuery.order('created_at', { ascending: false });
 
     throwIfDbError(error);
 

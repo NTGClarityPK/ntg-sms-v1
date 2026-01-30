@@ -43,8 +43,12 @@ export class ParentsController {
   }
 
   @Get(':id/children')
-  async getChildren(@Param('id') id: string) {
-    const data = await this.parentsService.getChildren(id);
+  @UseGuards(BranchGuard)
+  async getChildren(
+    @Param('id') id: string,
+    @CurrentBranch() branch?: { branchId: string; tenantId: string },
+  ) {
+    const data = await this.parentsService.getChildren(id, branch?.branchId);
     return { data };
   }
 

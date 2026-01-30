@@ -13,6 +13,7 @@ import { AttendanceSummaryDto } from './dto/attendance-summary.dto';
 import { AttendanceReportDto } from './dto/attendance-report.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LeaveRequestsService } from '../leave-requests/leave-requests.service';
 
 type AttendanceRow = {
   id: string;
@@ -41,7 +42,113 @@ export class AttendanceService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
     private readonly notificationsService: NotificationsService,
+    private readonly leaveRequestsService: LeaveRequestsService,
   ) {}
+
+  /**
+   * Check if student has an existing leave request (pending or approved) for a specific date
+   * Returns true if there's a pending or approved leave request, false otherwise
+   */
+  private async hasExistingLeaveRequest(
+    studentId: string,
+    date: string,
+    branchId: string,
+  ): Promise<boolean> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const activeYear =
+      await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      return false;
+    }
+
+    // Check for pending or approved leave requests (not rejected or cancelled)
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .select('id')
+      .eq('student_id', studentId)
+      .eq('academic_year_id', activeYear.id)
+      .in('status', ['pending', 'approved'])
+      .lte('start_date', date)
+      .gte('end_date', date)
+      .limit(1);
+
+    throwIfDbError(error);
+    return (data?.length ?? 0) > 0;
+  }
+
+  /**
+   * Get parent user_id for a student (prefer primary parent, otherwise first parent)
+   */
+  private async getParentUserIdForStudent(
+    studentId: string,
+  ): Promise<string | null> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data, error } = await supabase
+      .from('parent_students')
+      .select('parent_user_id, is_primary')
+      .eq('student_id', studentId)
+      .order('is_primary', { ascending: false })
+      .limit(1);
+
+    throwIfDbError(error);
+    return data && data.length > 0 ? (data[0] as { parent_user_id: string }).parent_user_id : null;
+  }
+
+  /**
+   * Create an unrequested leave request automatically when student is marked absent
+   */
+  private async createUnrequestedLeaveRequest(
+    studentId: string,
+    date: string,
+    branchId: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Check if leave request already exists (pending or approved) for this date
+    const hasLeave = await this.hasExistingLeaveRequest(studentId, date, branchId);
+    if (hasLeave) {
+      return; // Already has a pending or approved leave request, don't create duplicate
+    }
+
+    // Get parent user_id
+    const parentUserId = await this.getParentUserIdForStudent(studentId);
+    if (!parentUserId) {
+      // No parent linked, cannot create leave request
+      return;
+    }
+
+    const activeYear =
+      await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      return;
+    }
+
+    // Create unrequested leave request with status 'approved' (since it's already happened)
+    const { error } = await supabase
+      .from('leave_requests')
+      .insert({
+        student_id: studentId,
+        requested_by: parentUserId,
+        start_date: date,
+        end_date: date, // Single day absence
+        reason: 'Unrequested absence - automatically created from attendance record',
+        attachment_url: null,
+        status: 'approved', // Auto-approved since it's already happened
+        reviewed_by: null, // System-created, no reviewer
+        reviewed_at: new Date().toISOString(), // Set reviewed_at to current time
+        review_notes: 'Automatically created from attendance marking',
+        branch_id: branchId,
+        academic_year_id: activeYear.id,
+      });
+
+    // Don't throw error - this is best-effort, shouldn't block attendance marking
+    if (error) {
+      // Log but don't fail
+      console.error('Failed to create unrequested leave request:', error);
+    }
+  }
 
   async listAttendance(
     query: QueryAttendanceDto,
@@ -682,6 +789,17 @@ export class AttendanceService {
         .catch(() => {
           // intentionally swallow (notifications are non-critical)
         });
+
+      // Create unrequested leave request if student is marked absent
+      if (row.status === 'absent') {
+        void this.createUnrequestedLeaveRequest(
+          row.student_id,
+          row.date,
+          branchId,
+        ).catch(() => {
+          // intentionally swallow (leave request creation is non-critical)
+        });
+      }
     }
 
     // Return hydrated DTOs in one go (no per-student listAttendance calls)
@@ -801,8 +919,22 @@ export class AttendanceService {
       throw new NotFoundException('Failed to update attendance');
     }
 
+    const updatedRow = updated as AttendanceRow;
+    const existingRow = existing as AttendanceRow;
+
+    // Create unrequested leave request if status changed to absent
+    if (input.status === 'absent' && existingRow.status !== 'absent') {
+      void this.createUnrequestedLeaveRequest(
+        updatedRow.student_id,
+        updatedRow.date,
+        branchId,
+      ).catch(() => {
+        // intentionally swallow (leave request creation is non-critical)
+      });
+    }
+
     // Hydrate the updated attendance record with related data
-    const hydrated = await this.hydrateSingleAttendanceRow(updated as AttendanceRow);
+    const hydrated = await this.hydrateSingleAttendanceRow(updatedRow);
     return hydrated;
   }
 

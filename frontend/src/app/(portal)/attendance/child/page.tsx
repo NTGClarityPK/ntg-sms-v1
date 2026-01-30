@@ -26,8 +26,15 @@ import type { User } from '@/types/auth';
 
 interface Child {
   id: string;
+  parentUserId: string;
   studentId: string;
+  relationship: 'father' | 'mother' | 'guardian';
+  isPrimary: boolean;
+  canApprove: boolean;
+  createdAt: string;
+  parentName?: string;
   studentName?: string;
+  studentStudentId?: string; // student's student_id field (e.g., "ST001")
 }
 
 export default function ChildAttendancePage() {
@@ -42,15 +49,20 @@ export default function ChildAttendancePage() {
     queryKey: ['parent-children', userId],
     queryFn: async () => {
       if (!userId) return null;
-      const response = await apiClient.get<{ data: Child[] }>(
+      // Backend returns { data: Child[] }
+      // apiClient.get<Child[]> returns ApiResponse<Child[]> = { data: Child[], meta?, error? }
+      const response = await apiClient.get<Child[]>(
         `/api/v1/parents/${userId}/children`,
       );
+      // response.data is Child[], so we return it directly
       return response.data;
     },
     enabled: !!userId,
   });
 
-  const children = childrenData?.data || [];
+  // Extract children array from response
+  // childrenData is Child[], so we use it directly
+  const children = Array.isArray(childrenData) ? childrenData : [];
 
   // Get current child from user profile or use first child
   const userTyped = user as User | undefined;
@@ -58,10 +70,11 @@ export default function ChildAttendancePage() {
     if (children.length > 0 && !selectedChildId) {
       // Check if user has current_student_id set
       const currentChildId = (userTyped as any)?.currentStudentId as string | undefined;
-      if (currentChildId && children.some((c) => c.id === currentChildId)) {
+      // Use studentId (UUID) for matching, not the association id
+      if (currentChildId && children.some((c) => c.studentId === currentChildId)) {
         setSelectedChildId(currentChildId);
       } else {
-        setSelectedChildId(children[0].id);
+        setSelectedChildId(children[0].studentId);
       }
     }
   }, [children, selectedChildId, userTyped]);
@@ -78,7 +91,7 @@ export default function ChildAttendancePage() {
   const attendance = attendanceData || [];
   const summary = summaryData || null;
 
-  const selectedChild = children.find((c) => c.id === selectedChildId);
+  const selectedChild = children.find((c) => c.studentId === selectedChildId);
 
   if (isLoadingChildren) {
     return (
@@ -158,8 +171,8 @@ export default function ChildAttendancePage() {
                 label="Select Child"
                 placeholder="Choose a child"
                 data={children.map((c) => ({
-                  value: c.id,
-                  label: c.studentName || `Student ${c.studentId}`,
+                  value: c.studentId, // Use studentId (UUID) as value, not the association id
+                  label: c.studentName || `Student ${c.studentStudentId || c.studentId}`,
                 }))}
                 value={selectedChildId}
                 onChange={(value) => setSelectedChildId(value)}
@@ -185,7 +198,7 @@ export default function ChildAttendancePage() {
                       {selectedChild.studentName || 'Student'}
                     </Text>
                     <Text size="sm" c="dimmed">
-                      Student ID: {selectedChild.studentId}
+                      Student ID: {selectedChild.studentStudentId || selectedChild.studentId}
                     </Text>
                   </Stack>
                 </Group>
@@ -248,6 +261,7 @@ export default function ChildAttendancePage() {
                     isLoading={false}
                     startDate={null}
                     endDate={null}
+                    isSingleStudent={true}
                   />
                   <AttendanceReport
                     attendance={attendance}
