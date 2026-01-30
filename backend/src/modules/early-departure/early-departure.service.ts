@@ -296,6 +296,11 @@ export class EarlyDepartureService {
       );
     }
 
+    // Ensure status is provided (controller should set it, but validate for safety)
+    if (!input.status) {
+      throw new BadRequestException('Status is required');
+    }
+
     const { data, error } = await supabase
       .from('early_departure_requests')
       .update({

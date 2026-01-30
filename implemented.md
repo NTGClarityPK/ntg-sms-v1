@@ -1645,6 +1645,28 @@ npm run dev
 
 ---
 
+#### Recent Updates (2026-01-30) ✅
+
+**Early Departure Time Validation**:
+- Added real-time validation for departure time picker with school hours bounds
+- Time input highlights in red and shows error message when time is outside school hours
+- Submit button disabled until valid time is selected
+- Validation uses student's class to find correct timing template for school hours
+- Fixed student data fetching to properly access `classId` from API response
+
+**Early Departure Cancel Functionality**:
+- Added cancel endpoint (`PUT /api/v1/early-departures/:id/cancel`) for parents
+- Cancel button (red ActionIcon with X) appears in Actions column for pending requests
+- Only parents can cancel their own pending requests (not yet reviewed)
+- Updated `EarlyDepartureStatus` type to include `'cancelled'` status
+- Added status color mapping for cancelled requests (gray badge)
+
+**Bug Fixes**:
+- Fixed validation error when approving early departure requests (made `status` field optional in DTO since controller sets it based on route)
+- Fixed student data structure access in `useStudent` hook to correctly extract `classId` for timing template lookup
+
+---
+
 **Last Updated**: Current Session (2026-01-30)  
-**Status**: ✅ Prompt 6 Complete – Branch selection UX implemented, leave/early departure management functional with role-aware filtering
+**Status**: ✅ Prompt 6 Complete – Branch selection UX implemented, leave/early departure management functional with role-aware filtering, time validation, and cancel functionality
 
