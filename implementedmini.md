@@ -174,6 +174,37 @@
 
 ---
 
+## 10. Leave & Early Departure Management (Prompt 6)
+
+**Tag: prompt 6 changes**
+
+- **Database Schema**
+  - `leave_requests` table: `id`, `student_id`, `requested_by`, `start_date`, `end_date`, `reason`, `attachment_url`, `status` (pending/approved/rejected/cancelled), `reviewed_by`, `reviewed_at`, `review_notes`, `branch_id`, `academic_year_id`, timestamps. RLS policies for branch isolation and parent/staff access.
+  - `early_departure_requests` table: `id`, `student_id`, `requested_by`, `date`, `departure_time`, `reason`, `attachment_url`, `status` (pending/approved/rejected), `reviewed_by`, `reviewed_at`, `review_notes`, `branch_id`, `academic_year_id`, timestamps. RLS policies for branch isolation.
+  - Migration: `prompt_6_leave_and_early_departure_tables` (version: 20260129074744)
+
+- **Backend API**
+  - Leave Requests: `GET /api/v1/leave-requests` (list with filters), `POST /api/v1/leave-requests` (create), `GET /api/v1/leave-requests/:id`, `PUT /api/v1/leave-requests/:id/approve`, `PUT /api/v1/leave-requests/:id/reject`, `PUT /api/v1/leave-requests/:id/cancel`, `GET /api/v1/leave-requests/quota/:studentId`.
+  - Early Departure: `GET /api/v1/early-departure` (list), `POST /api/v1/early-departure` (create), `PUT /api/v1/early-departure/:id/approve`, `PUT /api/v1/early-departure/:id/reject`.
+  - Parent filtering: Parents only see their own requests (`requested_by = userId`). Staff see all requests in their branch.
+  - Review workflow: Staff can approve/reject with optional `reviewNotes`. Backend fetches reviewer's `display_name` from `roles` table (not `name`) for proper display text.
+  - Notifications: Auto-sent to parents when leave/early departure is approved/rejected. Notification body includes formatted dates and status.
+
+- **Frontend UI**
+  - `/leaves` page: Tabbed interface with "Raise a request" (parents) and "All requests" tabs. Student selection dropdown for parents with multiple children. Student statistics badges (Pending/Approved/Rejected counts) shown under dropdown. Table view for all requests with columns: Date Requested, Leave Period, Student, Reason, Status, Review Notes, Reviewed By (with role display name), Date Reviewed, Actions. Skeleton loading states.
+  - `/early-departure` page: Similar structure for early departure requests.
+  - Leave quota indicator: Shows used/remaining days based on approved leave requests.
+  - Form validation: Date range validation, reason required, attachment upload placeholder.
+
+- **Key Features**
+  - Branch isolation: All requests filtered by `branch_id` from `BranchGuard`.
+  - Role-based access: Parents create/view own requests. Staff can review all requests.
+  - Review notes: Optional text field for staff when approving/rejecting.
+  - Status workflow: pending → approved/rejected/cancelled (leave only). Cancellation only allowed for pending, unreviewed requests.
+  - Integration: Notifications sent via `NotificationsService.createLeaveRequestNotification()` with formatted messages.
+
+---
+
 > For full historical detail, per-endpoint SQL, DTO shapes, and per-component notes, see `implemented.md`.  
 
 

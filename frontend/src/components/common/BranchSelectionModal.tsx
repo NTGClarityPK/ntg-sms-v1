@@ -15,6 +15,8 @@ interface BranchSelectionModalProps {
   branches: Branch[];
   onSelect: (branchId: string) => void;
   loading?: boolean;
+  allowClose?: boolean; // Allow closing modal (for switching, not initial selection)
+  onClose?: () => void; // Callback when modal is closed
 }
 
 export function BranchSelectionModal({
@@ -22,6 +24,8 @@ export function BranchSelectionModal({
   branches,
   onSelect,
   loading = false,
+  allowClose = false,
+  onClose,
 }: BranchSelectionModalProps) {
   const colors = useThemeColors();
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(
@@ -34,14 +38,20 @@ export function BranchSelectionModal({
     }
   };
 
+  const handleClose = () => {
+    if (allowClose && onClose) {
+      onClose();
+    }
+  };
+
   return (
     <Modal
       opened={opened}
-      onClose={() => {}} // Cannot close without selection
+      onClose={handleClose}
       title="Select Branch"
-      closeOnClickOutside={false}
-      closeOnEscape={false}
-      withCloseButton={false}
+      closeOnClickOutside={allowClose}
+      closeOnEscape={allowClose}
+      withCloseButton={allowClose}
       centered
       size="md"
     >

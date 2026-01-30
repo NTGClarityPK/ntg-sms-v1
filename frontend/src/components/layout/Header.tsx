@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Group, Text, Badge, Tooltip, Box, Image, Skeleton } from '@mantine/core';
 import { IconCircle } from '@tabler/icons-react';
 import { UserMenu } from './UserMenu';
-import { BranchSwitcher } from '@/components/features/branches/BranchSwitcher';
+import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranchBadge';
 import { NotificationBell } from './NotificationBell';
 import { useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTenantMe } from '@/hooks/useTenant';
@@ -101,7 +101,7 @@ export function Header() {
           </Badge>
         </Tooltip>
 
-        <BranchSwitcher />
+        <CurrentBranchBadge />
         <NotificationBell />
         <UserMenu />
       </Group>

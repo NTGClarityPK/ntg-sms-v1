@@ -1437,5 +1437,214 @@ npm run dev
   - Updated the `Users see own notifications` policy on `public.notifications`:
     - From: `USING (user_id = auth.uid())`
     - To: `USING (user_id = (SELECT auth.uid()))`
-    - Behaviour remains identical, but Supabase no longer re-evaluates `auth.uid()` for every row, improving performance at scale in line with Supabase’s `auth_rls_initplan` advisory.
+    - Behaviour remains identical, but Supabase no longer re-evaluates `auth.uid()` for every row, improving performance at scale in line with Supabase's `auth_rls_initplan` advisory.
+
+---
+
+### Prompt 6: Leave & Early Departure Management – Branch Selection & Parent Visibility Fixes ✅
+
+> This session focused on implementing **Prompt 6 (Leave & Early Departure Management)** with comprehensive improvements to **branch selection UX**, **parent visibility for leave requests**, and **UI consistency** across the application.
+
+#### Phase 6.1-6.5: Leave & Early Departure Core Implementation ✅
+
+- **Database**
+  - `leave_requests` table created with fields: `id`, `student_id`, `requested_by`, `start_date`, `end_date`, `reason`, `attachment_url`, `status` (pending/approved/rejected/cancelled), `reviewed_by`, `reviewed_at`, `review_notes`, `branch_id`, `academic_year_id`, timestamps.
+  - `early_departure_requests` table created with similar structure for same-day early departures.
+  - RLS enabled on both tables with branch isolation policies.
+  - Indexes on `student_id`, `requested_by`, `status`, `branch_id`, `academic_year_id`.
+
+- **Backend – Leave Requests Module**
+  - `LeaveRequestsModule` with `leave-requests.controller.ts`, `leave-requests.service.ts`, DTOs.
+  - Endpoints:
+    - `GET /api/v1/leave-requests` – Paginated list with **role-aware filtering** (parents see only their requests via `requested_by`).
+    - `GET /api/v1/leave-requests/:id` – Single leave request details.
+    - `POST /api/v1/leave-requests` – Create leave request.
+    - `PATCH /api/v1/leave-requests/:id/approve` – Approve request (staff only).
+    - `PATCH /api/v1/leave-requests/:id/reject` – Reject request (staff only).
+    - `PATCH /api/v1/leave-requests/:id/cancel` – Cancel request (parent only, for pending requests).
+    - `GET /api/v1/leave-requests/student/:studentId/quota` – Get student's leave quota usage.
+  - **Key Fix**: Added direct database query to `user_roles` and `roles` tables to accurately determine if user is a parent, instead of relying on JWT claims.
+
+- **Backend – Early Departure Module**
+  - Similar structure to Leave Requests with appropriate endpoints and role-aware filtering.
+
+- **Frontend – Leaves Management**
+  - Page: `/leaves` with tabbed view (My Requests / All Requests).
+  - Components:
+    - `LeaveRequestForm` – Create/edit leave requests with **date range picker** styled to match RMS reference.
+    - `LeaveRequestCard` – Display request with status badges and actions.
+    - `LeaveQuotaIndicator` – Visual quota usage display.
+  - Hook: `useLeaveRequests.ts` – React Query CRUD operations with **proper query invalidation**.
+  - **Key Fixes**:
+    - Fixed parent children fetching to use `/api/v1/parents/${userId}/children` endpoint.
+    - Added student selection dropdown for parents with multiple children.
+    - Fixed date picker styling by using `DatePickerInput` with `IconCalendar`, `placeholder`, `maxDate`/`minDate`.
+    - Removed infinite loop in `useEffect` by using `key` prop to force form remount on student change.
+    - Enhanced query refetching with `refetchOnMount: true` and explicit invalidation.
+
+#### Branch Selection Modal & User Experience Improvements ✅
+
+- **Problem Identified**
+  - Parents had `current_branch_id = NULL` in database, causing all queries to fail.
+  - No mechanism for users with multiple branches to select/switch branches.
+  - Branch switcher in header was always visible, even for users who shouldn't switch.
+
+- **Solution: RMS-Replicated Branch Selection Flow**
+
+##### 1. Branch Selection Modal (Login Flow) ✅
+
+- **Component**: `frontend/src/components/common/BranchSelectionModal.tsx`
+  - RMS-replicated modal with searchable branch dropdown.
+  - Shows "Name (Code)" format for branches.
+  - Props:
+    - `allowClose` – Controls dismissibility (false at login, true when switching).
+    - `onClose` – Callback for when modal is closed.
+  - Modal cannot be closed at login (forced selection).
+  - Modal can be closed when switching from user menu (optional).
+
+- **Login Flow Integration**: `frontend/src/app/(auth)/login/page.tsx`
+  - After successful Supabase authentication:
+    - Fetch user's branches via `GET /api/v1/auth/my-branches`.
+    - If 0 branches: Show error message.
+    - If 1 branch: **Auto-select** → Set `current_branch_id` → Redirect to dashboard.
+    - If 2+ branches: Show modal → User selects → Set `current_branch_id` → Redirect to dashboard.
+  - Branch selection calls `POST /api/v1/auth/select-branch` with `{ branchId }`.
+  - Stores selected branch in `localStorage` for immediate use.
+
+##### 2. BranchGuard Auto-Selection (Safety Net) ✅
+
+- **Component**: `frontend/src/components/common/BranchGuard.tsx`
+  - Enhanced to **auto-select first branch** if user has branches but no `currentBranch` set.
+  - Implementation:
+    - Checks if `user.branches.length > 0` and `!user.currentBranch`.
+    - Calls `POST /api/v1/auth/select-branch` with first branch ID.
+    - Stores in `localStorage`.
+    - Refetches user data.
+  - Prevents "no branch selected" edge cases.
+  - Shows loading state during auto-selection.
+
+##### 3. Current Branch Badge in Header ✅
+
+- **Component**: `frontend/src/components/features/branches/CurrentBranchBadge.tsx`
+  - Displays current branch name with map pin icon (`IconMapPin`).
+  - Non-interactive badge (no click action).
+  - Tooltip: "Currently viewing [Branch Name]".
+  - Only shows when user has a branch selected.
+  - Consistent styling with Online/Offline badge.
+
+- **Header Integration**: `frontend/src/components/layout/Header.tsx`
+  - Replaced old `BranchSwitcher` with `CurrentBranchBadge`.
+  - Header layout: `[School Name] [📍 Branch Badge] [NTG Logo] [Online Status] [🔔] [👤]`.
+
+##### 4. Branch Switcher Removed from Header ✅
+
+- **Component**: `frontend/src/components/features/branches/BranchSwitcher.tsx`
+  - Updated to **return null** (completely hidden).
+  - Branch selection now handled exclusively at login and via user menu.
+  - Reasoning: Cleaner header, consistent with modern SaaS UX (Slack, GitHub, Notion).
+
+##### 5. "Switch Branch" Option in User Menu ✅
+
+- **Component**: `frontend/src/components/layout/UserMenu.tsx`
+  - Added "Switch Branch" menu item (icon: `IconSwitchHorizontal`).
+  - **Only shows if user has 2+ branches** (hidden for single-branch users).
+  - Opens `BranchSelectionModal` with `allowClose={true}` (can be dismissed).
+  - On branch selection:
+    - Calls `POST /api/v1/auth/select-branch`.
+    - Updates `localStorage`.
+    - Refetches user data.
+    - Redirects to `/dashboard` for fresh context.
+  - Menu structure:
+    ```
+    Account
+    ├─ Profile
+    ├─ Settings
+    ├─ ─────────────
+    ├─ 🔄 Switch Branch  ← NEW (only if 2+ branches)
+    ├─ ─────────────
+    └─ 🚪 Logout
+    ```
+
+#### Backend – Branch Selection API Enhancements ✅
+
+- **Endpoints** (already existed, documented here for context):
+  - `GET /api/v1/auth/my-branches` – Returns user's assigned branches.
+  - `POST /api/v1/auth/select-branch` – Body: `{ branchId }`, updates `profiles.current_branch_id`.
+  - `GET /api/v1/auth/current-branch` – Returns current branch context.
+
+- **Auth Service**:
+  - `getMyBranches(userId)` – Lists branches from `user_branches`.
+  - `selectBranch(userId, branchId)` – Validates access, updates `current_branch_id`.
+  - `getCurrentBranch(userId)` – Returns selected branch or null.
+
+#### Key Patterns & Decisions ✅
+
+1. **Branch Selection Flow**:
+   - Single branch: Auto-select (no modal).
+   - Multiple branches: Modal at login (forced), user menu (optional).
+   - No logout required to switch branches.
+
+2. **Parent Leave Requests Visibility**:
+   - Backend: Added `isParent` parameter to `listLeaveRequests`.
+   - If parent: Filter by `requested_by = userId`.
+   - If staff: Show all requests in branch.
+   - Fixed by querying `user_roles` and `roles` tables directly for accurate role detection.
+
+3. **Date Picker Consistency**:
+   - Replaced `DateInput` with `DatePickerInput`.
+   - Added `@mantine/dates/styles.css` import.
+   - Props: `leftSection={<IconCalendar size={16} />}`, `placeholder`, `maxDate`, `minDate`.
+   - Matches RMS reference styling.
+
+4. **Query Invalidation Pattern**:
+   - `onSuccess` in mutations: Invalidate with `exact: false` to cover related queries.
+   - Example: `queryClient.refetchQueries({ queryKey: ['leaves', branchId], exact: false })`.
+   - Ensures fresh data after creates/updates.
+
+5. **Form Reset on Selection Change**:
+   - Use `key` prop on form components to force remount.
+   - Example: `<LeaveRequestForm key={selectedStudent?.id || 'no-student'} />`.
+   - Avoids infinite loops from `useEffect` dependencies.
+
+#### Files Created/Modified ✅
+
+**Backend:**
+- `backend/src/modules/leave-requests/` (entire module)
+- `backend/src/modules/early-departure/` (entire module)
+- `backend/src/modules/auth/auth.service.ts` (selectBranch, getMyBranches, getCurrentBranch)
+- `backend/src/modules/auth/auth.controller.ts` (branch selection endpoints)
+- `backend/src/modules/notifications/notifications.service.ts` (leave/early departure notifications)
+- `backend/src/app.module.ts` (module imports)
+
+**Frontend:**
+- `frontend/src/components/common/BranchSelectionModal.tsx` (new)
+- `frontend/src/components/features/branches/CurrentBranchBadge.tsx` (new)
+- `frontend/src/components/features/branches/BranchSwitcher.tsx` (updated to return null)
+- `frontend/src/components/common/BranchGuard.tsx` (auto-selection logic)
+- `frontend/src/components/layout/Header.tsx` (CurrentBranchBadge integration)
+- `frontend/src/components/layout/UserMenu.tsx` (Switch Branch option)
+- `frontend/src/app/(auth)/login/page.tsx` (branch selection flow)
+- `frontend/src/app/(portal)/leaves/page.tsx` (new)
+- `frontend/src/components/features/leaves/` (LeaveRequestForm, LeaveRequestCard, LeaveQuotaIndicator)
+- `frontend/src/app/(portal)/early-departure/page.tsx` (new)
+- `frontend/src/hooks/useLeaveRequests.ts` (new)
+- `frontend/src/hooks/useEarlyDepartures.ts` (new)
+- `frontend/src/types/leaves.ts` (new)
+- `frontend/src/types/early-departure.ts` (new)
+
+#### Testing Completed ✅
+
+- ✅ Login with `admin@alelafhigh.com` (2 branches) → Modal appears → Select branch → Dashboard.
+- ✅ Branch badge shows current branch name in header.
+- ✅ User menu shows "Switch Branch" option for multi-branch users.
+- ✅ Switching branches works without logout.
+- ✅ Single-branch users auto-selected at login (no modal).
+- ✅ Parent with multiple children sees student selection dropdown.
+- ✅ Leave requests created by parent appear in "All Requests" tab.
+- ✅ Date picker styling consistent with RMS reference.
+
+---
+
+**Last Updated**: Current Session (2026-01-30)  
+**Status**: ✅ Prompt 6 Complete – Branch selection UX implemented, leave/early departure management functional with role-aware filtering
 

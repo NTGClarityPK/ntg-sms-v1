@@ -7,18 +7,20 @@ import {
   Stack,
   Title,
   Tabs,
-  SimpleGrid,
   Text,
   Select,
   Paper,
+  Skeleton,
+  Table,
+  Badge,
 } from '@mantine/core';
 import { IconUser } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
-import { useLeaveRequests } from '@/hooks/useLeaveRequests';
+import { useLeaveRequests, useStudentLeaveStats } from '@/hooks/useLeaveRequests';
 import { LeaveRequestForm } from '@/components/features/leaves/LeaveRequestForm';
-import { LeaveRequestCard } from '@/components/features/leaves/LeaveRequestCard';
+import { LeaveRequestTable } from '@/components/features/leaves/LeaveRequestTable';
 import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
 import type { Student } from '@/types/students';
@@ -39,7 +41,7 @@ interface ParentChild {
 export default function LeavesPage() {
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
-  const [page] = useState(1);
+  const [page, setPage] = useState(1);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // For parents, fetch their children; for staff, fetch all students
@@ -98,12 +100,23 @@ export default function LeavesPage() {
   
   const isLoading = isLoadingChildren || (isParent ? false : isLoadingStudents);
 
+  // Fetch student leave statistics
+  const studentStats = useStudentLeaveStats(selectedStudentId);
+
   const leaveQuery = useLeaveRequests({
     page,
     limit: 20,
   });
 
   const requests = leaveQuery.data?.data ?? [];
+
+  // Create a map of studentId -> student name for display in cards
+  const studentNameMap = new Map<string, string>();
+  availableStudents.forEach((student) => {
+    if (student.id && student.fullName) {
+      studentNameMap.set(student.id, student.fullName);
+    }
+  });
 
   return (
     <>
@@ -131,7 +144,7 @@ export default function LeavesPage() {
           }}
         >
           <Tabs.List>
-            {isParent && <Tabs.Tab value="my-requests">My requests</Tabs.Tab>}
+            {isParent && <Tabs.Tab value="my-requests">Raise a request</Tabs.Tab>}
             <Tabs.Tab value="all-requests">All requests</Tabs.Tab>
           </Tabs.List>
 
@@ -139,26 +152,106 @@ export default function LeavesPage() {
             <Tabs.Panel value="my-requests" pt="md">
               <Stack gap="md">
                 {isLoading ? (
-                  <Card withBorder p="md">
-                    <Text size="sm" c="dimmed">
-                      Loading students...
-                    </Text>
-                  </Card>
+                  <Stack gap="md">
+                    <Paper withBorder p="md">
+                      <Skeleton height={40} width="30%" />
+                      <Skeleton height={20} width="60%" mt="md" />
+                    </Paper>
+                    <Card withBorder p="md">
+                      <Stack gap="md">
+                        <Skeleton height={30} width="40%" />
+                        <Skeleton height={40} />
+                        <Skeleton height={40} />
+                        <Skeleton height={100} />
+                        <Skeleton height={40} width="30%" />
+                      </Stack>
+                    </Card>
+                  </Stack>
                 ) : availableStudents.length > 0 ? (
                   <>
                     {availableStudents.length > 1 && (
                       <Paper withBorder p="md">
-                        <Select
-                          label="Select Student"
-                          placeholder="Choose a student"
-                          data={availableStudents.map((s) => ({
-                            value: s.id,
-                            label: s.fullName || s.studentId || `Student ${s.id.slice(0, 8)}`,
-                          }))}
-                          value={selectedStudentId}
-                          onChange={(value) => setSelectedStudentId(value)}
-                          leftSection={<IconUser size={16} />}
-                        />
+                        <Stack gap="sm">
+                          <Select
+                            label="Select Student"
+                            placeholder="Choose a student"
+                            data={availableStudents.map((s) => ({
+                              value: s.id,
+                              label: s.fullName || s.studentId || `Student ${s.id.slice(0, 8)}`,
+                            }))}
+                            value={selectedStudentId}
+                            onChange={(value) => setSelectedStudentId(value)}
+                            leftSection={<IconUser size={16} />}
+                          />
+                          {selectedStudentId && (
+                            <Group gap="md" mt="xs">
+                              {studentStats.isLoading ? (
+                                <Skeleton height={20} width={100} />
+                              ) : studentStats.data ? (
+                                <>
+                                  <Group gap="xs">
+                                    <Text size="sm" c="dimmed">
+                                      Pending:
+                                    </Text>
+                                    <Badge variant="light" color="yellow" size="sm">
+                                      {studentStats.data.pending}
+                                    </Badge>
+                                  </Group>
+                                  <Group gap="xs">
+                                    <Text size="sm" c="dimmed">
+                                      Approved:
+                                    </Text>
+                                    <Badge variant="light" color="green" size="sm">
+                                      {studentStats.data.approved}
+                                    </Badge>
+                                  </Group>
+                                  <Group gap="xs">
+                                    <Text size="sm" c="dimmed">
+                                      Rejected:
+                                    </Text>
+                                    <Badge variant="light" color="red" size="sm">
+                                      {studentStats.data.rejected}
+                                    </Badge>
+                                  </Group>
+                                </>
+                              ) : null}
+                            </Group>
+                          )}
+                        </Stack>
+                      </Paper>
+                    )}
+                    {availableStudents.length === 1 && selectedStudentId && (
+                      <Paper withBorder p="md">
+                        {studentStats.isLoading ? (
+                          <Skeleton height={20} width={200} />
+                        ) : studentStats.data ? (
+                          <Group gap="md">
+                            <Group gap="xs">
+                              <Text size="sm" c="dimmed">
+                                Pending requests:
+                              </Text>
+                              <Badge variant="light" color="yellow" size="sm">
+                                {studentStats.data.pending}
+                              </Badge>
+                            </Group>
+                            <Group gap="xs">
+                              <Text size="sm" c="dimmed">
+                                Approved requests:
+                              </Text>
+                              <Badge variant="light" color="green" size="sm">
+                                {studentStats.data.approved}
+                              </Badge>
+                            </Group>
+                            <Group gap="xs">
+                              <Text size="sm" c="dimmed">
+                                Rejected requests:
+                              </Text>
+                              <Badge variant="light" color="red" size="sm">
+                                {studentStats.data.rejected}
+                              </Badge>
+                            </Group>
+                          </Group>
+                        ) : null}
                       </Paper>
                     )}
                     <Card withBorder p="md">
@@ -182,9 +275,36 @@ export default function LeavesPage() {
           <Tabs.Panel value="all-requests" pt="md">
             <Stack gap="md">
               {leaveQuery.isLoading ? (
-                <Text size="sm" c="dimmed">
-                  Loading leave requests...
-                </Text>
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Date Requested</Table.Th>
+                      <Table.Th>Leave Period</Table.Th>
+                      <Table.Th>Student</Table.Th>
+                      <Table.Th>Reason</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Reviewed By</Table.Th>
+                      <Table.Th>Date Reviewed</Table.Th>
+                      <Table.Th>Review Notes</Table.Th>
+                      <Table.Th>Actions</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Table.Tr key={i}>
+                        <Table.Td><Skeleton height={20} /></Table.Td>
+                        <Table.Td><Skeleton height={20} /></Table.Td>
+                        <Table.Td><Skeleton height={20} /></Table.Td>
+                        <Table.Td><Skeleton height={20} /></Table.Td>
+                        <Table.Td><Skeleton height={20} width={60} /></Table.Td>
+                        <Table.Td><Skeleton height={20} /></Table.Td>
+                        <Table.Td><Skeleton height={20} /></Table.Td>
+                        <Table.Td><Skeleton height={20} /></Table.Td>
+                        <Table.Td><Skeleton height={20} width={100} /></Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
               ) : leaveQuery.isError ? (
                 <Text size="sm" c="red">
                   Error loading leave requests. Please try again.
@@ -194,15 +314,13 @@ export default function LeavesPage() {
                   No leave requests found.
                 </Text>
               ) : (
-                <SimpleGrid cols={{ base: 1, md: 2 }}>
-                  {requests.map((r) => (
-                    <LeaveRequestCard
-                      key={r.id}
-                      request={r}
-                      isStaffView={!isParent}
-                    />
-                  ))}
-                </SimpleGrid>
+                <LeaveRequestTable
+                  requests={requests}
+                  meta={leaveQuery.data?.meta}
+                  onPageChange={setPage}
+                  isStaffView={!isParent}
+                  studentNameMap={studentNameMap}
+                />
               )}
             </Stack>
           </Tabs.Panel>

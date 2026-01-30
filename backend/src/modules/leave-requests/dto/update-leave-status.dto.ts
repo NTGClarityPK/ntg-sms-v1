@@ -3,8 +3,9 @@ import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { LeaveStatus } from './leave-status.type';
 
 export class UpdateLeaveStatusDto {
+  @IsOptional()
   @IsEnum(['approved', 'rejected', 'cancelled'] as const)
-  status!: Exclude<LeaveStatus, 'pending'>;
+  status?: Exclude<LeaveStatus, 'pending'>; // Optional because route determines status (approve/reject/cancel)
 
   @IsOptional()
   @IsString()

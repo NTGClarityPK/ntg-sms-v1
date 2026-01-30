@@ -152,8 +152,6 @@ export class LeaveRequestsService {
         .eq('user_id', userId)
         .eq('branch_id', branchId);
 
-      console.log('User roles:', userRoles);
-
       if (userRoles && userRoles.length > 0) {
         const roleIds = userRoles.map((ur) => ur.role_id);
         const { data: roles } = await supabase
@@ -163,15 +161,11 @@ export class LeaveRequestsService {
           .eq('name', 'parent')
           .limit(1);
 
-        console.log('Parent roles:', roles);
-
         if (roles && roles.length > 0) {
           isParent = true;
         }
       }
     }
-
-    console.log('Is parent:', isParent, 'User ID:', userId, 'Branch ID:', branchId);
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -185,7 +179,6 @@ export class LeaveRequestsService {
 
     // For parents, only show their own requests
     if (isParent) {
-      console.log('Filtering by requested_by:', userId);
       dbQuery = dbQuery.eq('requested_by', userId);
     }
 
@@ -213,17 +206,94 @@ export class LeaveRequestsService {
 
     const { data, error, count } = await dbQuery.range(from, to);
     
-    console.log('Query result - data:', data, 'error:', error, 'count:', count);
-    
     throwIfDbError(error);
 
     const rows = (data ?? []) as LeaveRequestRow[];
-    const items = rows.map((row) => this.mapRowToDto(row));
+    
+    // Fetch reviewer information for requests that have been reviewed
+    const reviewerIds = Array.from(
+      new Set(
+        rows
+          .filter((row) => row.reviewed_by)
+          .map((row) => row.reviewed_by!)
+      )
+    );
+
+    const reviewerProfileMap = new Map<string, string>();
+    const reviewerRoleMap = new Map<string, string>();
+
+    if (reviewerIds.length > 0) {
+      // Fetch reviewer profiles
+      const { data: reviewerProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', reviewerIds);
+
+      if (reviewerProfiles) {
+        reviewerProfiles.forEach((profile) => {
+          reviewerProfileMap.set(profile.id, profile.full_name || 'Unknown');
+        });
+      }
+
+      // Fetch reviewer roles (get primary role for each reviewer)
+      const { data: reviewerUserRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, role_id')
+        .in('user_id', reviewerIds)
+        .eq('branch_id', branchId);
+
+      if (reviewerUserRoles && reviewerUserRoles.length > 0) {
+        const roleIds = Array.from(
+          new Set(reviewerUserRoles.map((ur) => ur.role_id))
+        );
+
+        const { data: rolesData } = await supabase
+          .from('roles')
+          .select('id, name, display_name')
+          .in('id', roleIds);
+
+        if (rolesData) {
+          const roleMap = new Map<string, { name: string; displayName: string }>();
+          rolesData.forEach((role) => {
+            roleMap.set(role.id, {
+              name: role.name,
+              displayName: role.display_name || role.name,
+            });
+          });
+
+          // Get the first role for each reviewer (primary role) - use display_name for display
+          reviewerUserRoles.forEach((ur) => {
+            const role = roleMap.get(ur.role_id);
+            if (role && !reviewerRoleMap.has(ur.user_id)) {
+              reviewerRoleMap.set(ur.user_id, role.displayName);
+            }
+          });
+        }
+      }
+    }
+
+    const items = rows.map((row) => {
+      const baseDto = this.mapRowToDto(row);
+      
+      // Add reviewer information if available
+      if (row.reviewed_by) {
+        const reviewerName = reviewerProfileMap.get(row.reviewed_by);
+        const reviewerRole = reviewerRoleMap.get(row.reviewed_by);
+        
+        if (reviewerName) {
+          return new LeaveRequestDto({
+            ...baseDto,
+            reviewerName,
+            reviewerRole: reviewerRole || undefined,
+          });
+        }
+      }
+      
+      return baseDto;
+    });
 
     const total = count ?? items.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
-
-    console.log('Returning:', { data: items, meta: { total, page, limit, totalPages } });
 
     return {
       data: items,
@@ -281,6 +351,11 @@ export class LeaveRequestsService {
       );
     }
 
+    // Ensure status is provided (controller should always set it)
+    if (!input.status) {
+      throw new BadRequestException('Status is required');
+    }
+
     const { data, error } = await supabase
       .from('leave_requests')
       .update({
@@ -325,7 +400,7 @@ export class LeaveRequestsService {
       await this.notificationsService.createLeaveRequestNotification({
         userId: existingRow.requested_by,
         studentName,
-        status: input.status,
+        status: input.status, // Now guaranteed to be defined after the check above
         startDate: existingRow.start_date,
         endDate: existingRow.end_date,
         leaveRequestId: existingRow.id,

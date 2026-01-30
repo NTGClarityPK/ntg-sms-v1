@@ -311,11 +311,29 @@ export class NotificationsService {
     leaveRequestId: string;
   }): Promise<void> {
     try {
+      // Format status for display
+      const statusText = params.status.charAt(0).toUpperCase() + params.status.slice(1);
+      
+      // Format date range
+      const startDateFormatted = new Date(params.startDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const endDateFormatted = new Date(params.endDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const dateRange = params.startDate === params.endDate 
+        ? startDateFormatted 
+        : `${startDateFormatted} - ${endDateFormatted}`;
+
       await this.createNotification({
         userId: params.userId,
         type: 'leave',
-        title: 'Leave request updated',
-        body: `${params.studentName} leave ${params.status} (${params.startDate} - ${params.endDate})`,
+        title: `Leave request ${statusText}`,
+        body: `${params.studentName}'s leave request has been ${statusText.toLowerCase()} for ${dateRange}`,
         data: {
           leaveRequestId: params.leaveRequestId,
           startDate: params.startDate,
