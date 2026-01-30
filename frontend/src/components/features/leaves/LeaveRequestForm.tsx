@@ -70,6 +70,7 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
   };
 
   const quota = quotaQuery.data;
+  const isQuotaExceeded = quota ? quota.usedDays > quota.totalQuota : false;
 
   return (
     <Paper withBorder p="md">
@@ -77,9 +78,13 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
         <Stack gap="md">
           <Text fw={600}>Request leave</Text>
           {quota && (
-            <Text size="sm" c="dimmed">
-              Leave quota used: {quota.usedDays}/{quota.totalQuota} days (
-              {quota.remainingDays} remaining)
+            <Text 
+              size="sm" 
+              c={isQuotaExceeded ? 'red' : 'dimmed'}
+              fw={isQuotaExceeded ? 600 : 400}
+            >
+              Leave quota used: {quota.usedDays}/{quota.totalQuota} days
+              {isQuotaExceeded ? ' (Limit exceeded)' : ` (${quota.remainingDays} remaining)`}
             </Text>
           )}
           <DatePickerInput

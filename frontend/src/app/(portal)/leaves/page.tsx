@@ -13,12 +13,13 @@ import {
   Skeleton,
   Table,
   Badge,
+  Alert,
 } from '@mantine/core';
 import { IconUser } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
-import { useLeaveRequests, useStudentLeaveStats } from '@/hooks/useLeaveRequests';
+import { useLeaveRequests, useStudentLeaveStats, useLeaveQuota } from '@/hooks/useLeaveRequests';
 import { LeaveRequestForm } from '@/components/features/leaves/LeaveRequestForm';
 import { LeaveRequestTable } from '@/components/features/leaves/LeaveRequestTable';
 import { apiClient } from '@/lib/api-client';
@@ -59,8 +60,8 @@ export default function LeavesPage() {
     enabled: !!userId && !!isParent,
   });
 
-  // childrenData is already the array (ParentChild[]), not { data: [...] }
-  const children = childrenData || [];
+  // Extract children array from response
+  const children = childrenData?.data || [];
   
   // For parents: create minimal Student objects from children data
   // For staff: fetch all students
@@ -102,6 +103,12 @@ export default function LeavesPage() {
 
   // Fetch student leave statistics
   const studentStats = useStudentLeaveStats(selectedStudentId);
+  
+  // Fetch quota for selected student to check if exceeded
+  const quotaQuery = useLeaveQuota(selectedStudentId);
+  const isQuotaExceeded = quotaQuery.data 
+    ? quotaQuery.data.usedDays > quotaQuery.data.totalQuota 
+    : false;
 
   const leaveQuery = useLeaveRequests({
     page,
@@ -184,75 +191,93 @@ export default function LeavesPage() {
                             leftSection={<IconUser size={16} />}
                           />
                           {selectedStudentId && (
-                            <Group gap="md" mt="xs">
-                              {studentStats.isLoading ? (
-                                <Skeleton height={20} width={100} />
-                              ) : studentStats.data ? (
-                                <>
-                                  <Group gap="xs">
-                                    <Text size="sm" c="dimmed">
-                                      Pending:
-                                    </Text>
-                                    <Badge variant="light" color="yellow" size="sm">
-                                      {studentStats.data.pending}
-                                    </Badge>
-                                  </Group>
-                                  <Group gap="xs">
-                                    <Text size="sm" c="dimmed">
-                                      Approved:
-                                    </Text>
-                                    <Badge variant="light" color="green" size="sm">
-                                      {studentStats.data.approved}
-                                    </Badge>
-                                  </Group>
-                                  <Group gap="xs">
-                                    <Text size="sm" c="dimmed">
-                                      Rejected:
-                                    </Text>
-                                    <Badge variant="light" color="red" size="sm">
-                                      {studentStats.data.rejected}
-                                    </Badge>
-                                  </Group>
-                                </>
-                              ) : null}
-                            </Group>
+                            <Stack gap="xs" mt="xs">
+                              <Group gap="md">
+                                {studentStats.isLoading ? (
+                                  <Skeleton height={20} width={100} />
+                                ) : studentStats.data ? (
+                                  <>
+                                    <Group gap="xs">
+                                      <Text size="sm" c="dimmed">
+                                        Pending:
+                                      </Text>
+                                      <Badge variant="light" color="yellow" size="sm">
+                                        {studentStats.data.pending}
+                                      </Badge>
+                                    </Group>
+                                    <Group gap="xs">
+                                      <Text size="sm" c="dimmed">
+                                        Approved:
+                                      </Text>
+                                      <Badge variant="light" color="green" size="sm">
+                                        {studentStats.data.approved}
+                                      </Badge>
+                                    </Group>
+                                    <Group gap="xs">
+                                      <Text size="sm" c="dimmed">
+                                        Rejected:
+                                      </Text>
+                                      <Badge variant="light" color="red" size="sm">
+                                        {studentStats.data.rejected}
+                                      </Badge>
+                                    </Group>
+                                  </>
+                                ) : null}
+                              </Group>
+                              {quotaQuery.data && isQuotaExceeded && (
+                                <Alert color="red" title="Leave quota exceeded">
+                                  <Text size="sm">
+                                    Leave quota used: {quotaQuery.data.usedDays}/{quotaQuery.data.totalQuota} days (Limit exceeded)
+                                  </Text>
+                                </Alert>
+                              )}
+                            </Stack>
                           )}
                         </Stack>
                       </Paper>
                     )}
                     {availableStudents.length === 1 && selectedStudentId && (
-                      <Paper withBorder p="md">
-                        {studentStats.isLoading ? (
-                          <Skeleton height={20} width={200} />
-                        ) : studentStats.data ? (
-                          <Group gap="md">
-                            <Group gap="xs">
-                              <Text size="sm" c="dimmed">
-                                Pending requests:
-                              </Text>
-                              <Badge variant="light" color="yellow" size="sm">
-                                {studentStats.data.pending}
-                              </Badge>
+                      <Stack gap="xs">
+                        <Paper withBorder p="md">
+                          {studentStats.isLoading ? (
+                            <Skeleton height={20} width={200} />
+                          ) : studentStats.data ? (
+                            <Group gap="md">
+                              <Group gap="xs">
+                                <Text size="sm" c="dimmed">
+                                  Pending requests:
+                                </Text>
+                                <Badge variant="light" color="yellow" size="sm">
+                                  {studentStats.data.pending}
+                                </Badge>
+                              </Group>
+                              <Group gap="xs">
+                                <Text size="sm" c="dimmed">
+                                  Approved requests:
+                                </Text>
+                                <Badge variant="light" color="green" size="sm">
+                                  {studentStats.data.approved}
+                                </Badge>
+                              </Group>
+                              <Group gap="xs">
+                                <Text size="sm" c="dimmed">
+                                  Rejected requests:
+                                </Text>
+                                <Badge variant="light" color="red" size="sm">
+                                  {studentStats.data.rejected}
+                                </Badge>
+                              </Group>
                             </Group>
-                            <Group gap="xs">
-                              <Text size="sm" c="dimmed">
-                                Approved requests:
-                              </Text>
-                              <Badge variant="light" color="green" size="sm">
-                                {studentStats.data.approved}
-                              </Badge>
-                            </Group>
-                            <Group gap="xs">
-                              <Text size="sm" c="dimmed">
-                                Rejected requests:
-                              </Text>
-                              <Badge variant="light" color="red" size="sm">
-                                {studentStats.data.rejected}
-                              </Badge>
-                            </Group>
-                          </Group>
-                        ) : null}
-                      </Paper>
+                          ) : null}
+                        </Paper>
+                        {quotaQuery.data && isQuotaExceeded && (
+                          <Alert color="red" title="Leave quota exceeded">
+                            <Text size="sm">
+                              Leave quota used: {quotaQuery.data.usedDays}/{quotaQuery.data.totalQuota} days (Limit exceeded)
+                            </Text>
+                          </Alert>
+                        )}
+                      </Stack>
                     )}
                     <Card withBorder p="md">
                       <Stack gap="sm">

@@ -1,21 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   Group,
   Stack,
   Title,
   Tabs,
-  SimpleGrid,
   Text,
+  Select,
+  Paper,
+  Skeleton,
+  Badge,
 } from '@mantine/core';
+import { IconUser } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
-import { useEarlyDepartures } from '@/hooks/useEarlyDepartures';
+import { useEarlyDepartures, useStudentEarlyDepartureStats } from '@/hooks/useEarlyDepartures';
 import { EarlyDepartureForm } from '@/components/features/early-departure/EarlyDepartureForm';
-import { EarlyDepartureCard } from '@/components/features/early-departure/EarlyDepartureCard';
+import { EarlyDepartureTable } from '@/components/features/early-departure/EarlyDepartureTable';
 import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
 import type { Student } from '@/types/students';
@@ -36,7 +40,8 @@ interface ParentChild {
 export default function EarlyDeparturePage() {
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
-  const [page] = useState(1);
+  const [page, setPage] = useState(1);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // For parents, fetch their children; for staff, fetch all students
   const userId = (user as User | undefined)?.id;
@@ -44,19 +49,20 @@ export default function EarlyDeparturePage() {
     queryKey: ['parent-children', userId],
     queryFn: async () => {
       if (!userId || !isParent) return null;
-      const response = await apiClient.get<{ data: ParentChild[] }>(
+      const response = await apiClient.get<ParentChild[]>(
         `/api/v1/parents/${userId}/children`,
       );
-      // apiClient.get returns { data: [...] }, so response.data is the array
       return response.data;
     },
     enabled: !!userId && !!isParent,
   });
 
-  // childrenData is already the array (ParentChild[]), not { data: [...] }
-  const children = childrenData || [];
+  // Extract children array from response
+  // apiClient.get returns ApiResponse<T> which is { data: T, meta?, error? }
+  // Backend returns { data: ParentChild[] }, so response.data is ParentChild[]
+  const children = Array.isArray(childrenData) ? childrenData : [];
   
-  // For parents: create Student objects from children data
+  // For parents: create minimal Student objects from children data
   // For staff: fetch all students
   const { data: studentsData, isLoading: isLoadingStudents } = useStudents({
     page: 1,
@@ -83,9 +89,19 @@ export default function EarlyDeparturePage() {
     availableStudents = studentsData.data;
   }
 
-  const firstStudent = availableStudents[0] ?? null;
+  // Set default selected student when students load
+  useEffect(() => {
+    if (availableStudents.length > 0 && !selectedStudentId) {
+      setSelectedStudentId(availableStudents[0].id);
+    }
+  }, [availableStudents, selectedStudentId]);
+
+  const selectedStudent = availableStudents.find((s) => s.id === selectedStudentId) ?? availableStudents[0] ?? null;
   
   const isLoading = isLoadingChildren || (isParent ? false : isLoadingStudents);
+
+  // Fetch student early departure statistics
+  const studentStats = useStudentEarlyDepartureStats(selectedStudentId);
 
   const requestsQuery = useEarlyDepartures({
     page,
@@ -93,6 +109,25 @@ export default function EarlyDeparturePage() {
   });
 
   const requests = requestsQuery.data?.data ?? [];
+
+  // Create a map of studentId -> student name for display in table
+  const studentNameMap = new Map<string, string>();
+  availableStudents.forEach((student) => {
+    if (student.id && student.fullName) {
+      studentNameMap.set(student.id, student.fullName);
+    }
+  });
+
+  // Also add students from the requests if they're not in availableStudents
+  requests.forEach((request) => {
+    if (!studentNameMap.has(request.studentId)) {
+      // Try to get from studentsData
+      const student = studentsData?.data?.find((s) => s.id === request.studentId);
+      if (student?.fullName) {
+        studentNameMap.set(request.studentId, student.fullName);
+      }
+    }
+  });
 
   return (
     <>
@@ -110,53 +145,170 @@ export default function EarlyDeparturePage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs defaultValue={isParent ? 'my-requests' : 'all-requests'}>
+        <Tabs 
+          defaultValue={isParent ? 'my-requests' : 'all-requests'}
+          onChange={(value) => {
+            // Refetch requests when switching to "all-requests" tab
+            if (value === 'all-requests') {
+              requestsQuery.refetch();
+            }
+          }}
+        >
           <Tabs.List>
-            {isParent && (
-              <Tabs.Tab value="my-requests">My requests</Tabs.Tab>
-            )}
+            {isParent && <Tabs.Tab value="my-requests">Raise a request</Tabs.Tab>}
             <Tabs.Tab value="all-requests">All requests</Tabs.Tab>
           </Tabs.List>
 
           {isParent && (
             <Tabs.Panel value="my-requests" pt="md">
               <Stack gap="md">
-                <Card withBorder p="md">
-                  <Stack gap="sm">
-                    <Title order={3}>Request early departure</Title>
-                    {isLoading ? (
-                      <Text size="sm" c="dimmed">
-                        Loading students...
-                      </Text>
-                    ) : firstStudent ? (
-                      <EarlyDepartureForm student={firstStudent} />
-                    ) : (
-                      <Text size="sm" c="dimmed">
-                        No student found for your account. {children.length > 0 ? `Found ${children.length} linked children, but no matching students.` : 'No children linked to your account.'}
-                      </Text>
-                    )}
+                {isLoading ? (
+                  <Stack gap="md">
+                    <Paper withBorder p="md">
+                      <Skeleton height={40} width="30%" />
+                      <Skeleton height={20} width="60%" mt="md" />
+                    </Paper>
+                    <Card withBorder p="md">
+                      <Stack gap="md">
+                        <Skeleton height={30} width="40%" />
+                        <Skeleton height={40} />
+                        <Skeleton height={40} />
+                        <Skeleton height={100} />
+                        <Skeleton height={40} width="30%" />
+                      </Stack>
+                    </Card>
                   </Stack>
-                </Card>
+                ) : availableStudents.length > 0 ? (
+                  <>
+                    {availableStudents.length > 1 && (
+                      <Paper withBorder p="md">
+                        <Stack gap="sm">
+                          <Select
+                            label="Select Student"
+                            placeholder="Choose a student"
+                            data={availableStudents.map((s) => ({
+                              value: s.id,
+                              label: s.fullName || s.studentId || `Student ${s.id.slice(0, 8)}`,
+                            }))}
+                            value={selectedStudentId}
+                            onChange={(value) => setSelectedStudentId(value)}
+                            leftSection={<IconUser size={16} />}
+                          />
+                          {selectedStudentId && (
+                            <Stack gap="xs" mt="xs">
+                              <Group gap="md">
+                                {studentStats.isLoading ? (
+                                  <Skeleton height={20} width={100} />
+                                ) : studentStats.data ? (
+                                  <>
+                                    <Group gap="xs">
+                                      <Text size="sm" c="dimmed">
+                                        Pending:
+                                      </Text>
+                                      <Badge variant="light" color="yellow" size="sm">
+                                        {studentStats.data.pending}
+                                      </Badge>
+                                    </Group>
+                                    <Group gap="xs">
+                                      <Text size="sm" c="dimmed">
+                                        Approved:
+                                      </Text>
+                                      <Badge variant="light" color="green" size="sm">
+                                        {studentStats.data.approved}
+                                      </Badge>
+                                    </Group>
+                                    <Group gap="xs">
+                                      <Text size="sm" c="dimmed">
+                                        Rejected:
+                                      </Text>
+                                      <Badge variant="light" color="red" size="sm">
+                                        {studentStats.data.rejected}
+                                      </Badge>
+                                    </Group>
+                                  </>
+                                ) : null}
+                              </Group>
+                            </Stack>
+                          )}
+                        </Stack>
+                      </Paper>
+                    )}
+                    {availableStudents.length === 1 && selectedStudentId && (
+                      <Stack gap="xs">
+                        <Paper withBorder p="md">
+                          {studentStats.isLoading ? (
+                            <Skeleton height={20} width={200} />
+                          ) : studentStats.data ? (
+                            <Group gap="md">
+                              <Group gap="xs">
+                                <Text size="sm" c="dimmed">
+                                  Pending requests:
+                                </Text>
+                                <Badge variant="light" color="yellow" size="sm">
+                                  {studentStats.data.pending}
+                                </Badge>
+                              </Group>
+                              <Group gap="xs">
+                                <Text size="sm" c="dimmed">
+                                  Approved requests:
+                                </Text>
+                                <Badge variant="light" color="green" size="sm">
+                                  {studentStats.data.approved}
+                                </Badge>
+                              </Group>
+                              <Group gap="xs">
+                                <Text size="sm" c="dimmed">
+                                  Rejected requests:
+                                </Text>
+                                <Badge variant="light" color="red" size="sm">
+                                  {studentStats.data.rejected}
+                                </Badge>
+                              </Group>
+                            </Group>
+                          ) : null}
+                        </Paper>
+                      </Stack>
+                    )}
+                    <Card withBorder p="md">
+                      <Stack gap="sm">
+                        <Title order={3}>Request early departure</Title>
+                        <EarlyDepartureForm student={selectedStudent} />
+                      </Stack>
+                    </Card>
+                  </>
+                ) : (
+                  <Text size="sm" c="dimmed">
+                    No student found for your account. {children.length > 0 ? `Found ${children.length} linked children, but no matching students.` : 'No children linked to your account.'}
+                  </Text>
+                )}
               </Stack>
             </Tabs.Panel>
           )}
 
           <Tabs.Panel value="all-requests" pt="md">
             <Stack gap="md">
-              {requests.length === 0 ? (
+              {requestsQuery.isLoading ? (
+                <Stack gap="md">
+                  <Skeleton height={40} width="30%" />
+                  <Skeleton height={400} />
+                  <Skeleton height={50} />
+                </Stack>
+              ) : requestsQuery.error ? (
+                <Text size="sm" c="dimmed">
+                  Failed to load early departure requests. Please try again.
+                </Text>
+              ) : requests.length === 0 ? (
                 <Text size="sm" c="dimmed">
                   No early departure requests found.
                 </Text>
               ) : (
-                <SimpleGrid cols={{ base: 1, md: 2 }}>
-                  {requests.map((r) => (
-                    <EarlyDepartureCard
-                      key={r.id}
-                      request={r}
-                      isStaffView={!isParent}
-                    />
-                  ))}
-                </SimpleGrid>
+                <EarlyDepartureTable
+                  requests={requests}
+                  meta={requestsQuery.data?.meta}
+                  onPageChange={setPage}
+                  isStaffView={!isParent}
+                  studentNameMap={studentNameMap}
+                />
               )}
             </Stack>
           </Tabs.Panel>
@@ -165,5 +317,3 @@ export default function EarlyDeparturePage() {
     </>
   );
 }
-
-

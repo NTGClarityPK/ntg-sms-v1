@@ -176,7 +176,88 @@ export class EarlyDepartureService {
     throwIfDbError(error);
 
     const rows = (data ?? []) as EarlyDepartureRow[];
-    const items = rows.map((row) => this.mapRowToDto(row));
+    
+    // Fetch reviewer information for requests that have been reviewed
+    const reviewerIds = Array.from(
+      new Set(
+        rows
+          .filter((row) => row.reviewed_by)
+          .map((row) => row.reviewed_by!)
+      )
+    );
+
+    const reviewerProfileMap = new Map<string, string>();
+    const reviewerRoleMap = new Map<string, string>();
+
+    if (reviewerIds.length > 0) {
+      // Fetch reviewer profiles
+      const { data: reviewerProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', reviewerIds);
+
+      if (reviewerProfiles) {
+        reviewerProfiles.forEach((profile) => {
+          reviewerProfileMap.set(profile.id, profile.full_name || 'Unknown');
+        });
+      }
+
+      // Fetch reviewer roles (get primary role for each reviewer)
+      const { data: reviewerUserRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, role_id')
+        .in('user_id', reviewerIds)
+        .eq('branch_id', branchId);
+
+      if (reviewerUserRoles && reviewerUserRoles.length > 0) {
+        const roleIds = Array.from(
+          new Set(reviewerUserRoles.map((ur) => ur.role_id))
+        );
+
+        const { data: rolesData } = await supabase
+          .from('roles')
+          .select('id, name, display_name')
+          .in('id', roleIds);
+
+        if (rolesData) {
+          const roleMap = new Map<string, { name: string; displayName: string }>();
+          rolesData.forEach((role) => {
+            roleMap.set(role.id, {
+              name: role.name,
+              displayName: role.display_name || role.name,
+            });
+          });
+
+          // Get the first role for each reviewer (primary role) - use display_name for display
+          reviewerUserRoles.forEach((ur) => {
+            const role = roleMap.get(ur.role_id);
+            if (role && !reviewerRoleMap.has(ur.user_id)) {
+              reviewerRoleMap.set(ur.user_id, role.displayName);
+            }
+          });
+        }
+      }
+    }
+
+    const items = rows.map((row) => {
+      const baseDto = this.mapRowToDto(row);
+      
+      // Add reviewer information if available
+      if (row.reviewed_by) {
+        const reviewerName = reviewerProfileMap.get(row.reviewed_by);
+        const reviewerRole = reviewerRoleMap.get(row.reviewed_by);
+        
+        if (reviewerName) {
+          return new EarlyDepartureRequestDto({
+            ...baseDto,
+            reviewerName,
+            reviewerRole: reviewerRole || undefined,
+          });
+        }
+      }
+      
+      return baseDto;
+    });
 
     const total = count ?? items.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -270,6 +351,56 @@ export class EarlyDepartureService {
       // ignore notification errors
     }
 
+    return this.mapRowToDto(updatedRow);
+  }
+
+  async cancelEarlyDepartureRequest(
+    id: string,
+    userId: string,
+    branchId: string,
+  ): Promise<EarlyDepartureRequestDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('early_departure_requests')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+
+    throwIfDbError(fetchError);
+    if (!existing) {
+      throw new NotFoundException('Early departure request not found');
+    }
+
+    const existingRow = existing as EarlyDepartureRow;
+
+    if (existingRow.requested_by !== userId) {
+      throw new ForbiddenException('You can only cancel your own requests');
+    }
+
+    if (existingRow.status !== 'pending') {
+      throw new BadRequestException(
+        'Only pending early departure requests can be cancelled',
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('early_departure_requests')
+      .update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    throwIfDbError(error);
+    if (!data) {
+      throw new BadRequestException('Failed to cancel early departure request');
+    }
+
+    const updatedRow = data as EarlyDepartureRow;
     return this.mapRowToDto(updatedRow);
   }
 }

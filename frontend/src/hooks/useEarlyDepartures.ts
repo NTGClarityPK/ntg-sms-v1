@@ -71,8 +71,12 @@ export function useCreateEarlyDeparture() {
       );
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['early-departures'] });
+      // Invalidate stats for the student
+      if (data.data?.studentId) {
+        queryClient.invalidateQueries({ queryKey: ['early-departures', 'stats', data.data.studentId] });
+      }
       notifications.show({
         title: 'Success',
         message: 'Early departure request submitted',
@@ -98,21 +102,35 @@ export function useUpdateEarlyDepartureStatus() {
   return useMutation({
     mutationFn: async (params: {
       id: string;
-      action: 'approve' | 'reject';
+      action: 'approve' | 'reject' | 'cancel';
       reviewNotes?: string;
     }) => {
       const { id, action, reviewNotes } = params;
+      
+      if (action === 'cancel') {
+        const response = await apiClient.put<{ data: EarlyDepartureRequest }>(
+          `/api/v1/early-departures/${id}/cancel`,
+          {},
+        );
+        return response.data;
+      }
+      
       const response = await apiClient.put<{ data: EarlyDepartureRequest }>(
         `/api/v1/early-departures/${id}/${action}`,
         reviewNotes ? { reviewNotes } : {},
       );
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['early-departures'] });
+      // Invalidate stats if studentId is available
+      queryClient.invalidateQueries({ queryKey: ['early-departures', 'stats'] });
+      const message = variables.action === 'cancel' 
+        ? 'Early departure request cancelled'
+        : 'Early departure request updated';
       notifications.show({
         title: 'Success',
-        message: 'Early departure request updated',
+        message,
         color: notifyColors.success,
       });
     },
@@ -127,5 +145,37 @@ export function useUpdateEarlyDepartureStatus() {
     },
   });
 }
+
+export function useStudentEarlyDepartureStats(studentId: string | null) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['early-departures', 'stats', studentId, branchId],
+    queryFn: async () => {
+      if (!studentId || !branchId) return null;
+
+      const [pendingResponse, rejectedResponse, approvedResponse] = await Promise.all([
+        apiClient.get<EarlyDepartureRequest[]>(
+          `/api/v1/early-departures?studentId=${studentId}&status=pending&limit=1`,
+        ),
+        apiClient.get<EarlyDepartureRequest[]>(
+          `/api/v1/early-departures?studentId=${studentId}&status=rejected&limit=1`,
+        ),
+        apiClient.get<EarlyDepartureRequest[]>(
+          `/api/v1/early-departures?studentId=${studentId}&status=approved&limit=1`,
+        ),
+      ]);
+
+      const pending = pendingResponse.meta?.total || 0;
+      const rejected = rejectedResponse.meta?.total || 0;
+      const approved = approvedResponse.meta?.total || 0;
+
+      return { pending, rejected, approved };
+    },
+    enabled: !!studentId && !!branchId,
+  });
+}
+
 
 

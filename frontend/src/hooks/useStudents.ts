@@ -67,7 +67,9 @@ export function useStudent(id: string | null) {
     queryKey: ['student', id],
     queryFn: async () => {
       if (!id) return null;
-      const response = await apiClient.get<{ data: Student }>(`/api/v1/students/${id}`);
+      // Backend returns { data: StudentDto }, so apiClient.get<Student> returns ApiResponse<Student>
+      // which is { data: Student, meta?, error? }
+      const response = await apiClient.get<Student>(`/api/v1/students/${id}`);
       return response.data;
     },
     enabled: !!id,

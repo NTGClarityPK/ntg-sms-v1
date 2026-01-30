@@ -15,6 +15,7 @@ export function LeaveQuotaIndicator({ studentId }: LeaveQuotaIndicatorProps) {
   }
 
   const quota = quotaQuery.data;
+  const isExceeded = quota.usedDays > quota.totalQuota;
   const percent =
     quota.totalQuota > 0
       ? Math.min(
@@ -28,11 +29,19 @@ export function LeaveQuotaIndicator({ studentId }: LeaveQuotaIndicatorProps) {
       <Stack gap="xs">
         <Group justify="space-between">
           <Text fw={600}>Leave quota</Text>
-          <Text size="sm" c="dimmed">
+          <Text 
+            size="sm" 
+            c={isExceeded ? 'red' : 'dimmed'}
+            fw={isExceeded ? 600 : 400}
+          >
             {quota.usedDays}/{quota.totalQuota} days used
+            {isExceeded && ' (Limit exceeded)'}
           </Text>
         </Group>
-        <Progress value={percent} />
+        <Progress 
+          value={percent} 
+          color={isExceeded ? 'red' : undefined}
+        />
       </Stack>
     </Paper>
   );

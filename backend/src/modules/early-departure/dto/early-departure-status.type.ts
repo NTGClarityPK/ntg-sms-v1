@@ -1,3 +1,4 @@
-export type EarlyDepartureStatus = 'pending' | 'approved' | 'rejected';
+export type EarlyDepartureStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
 
 

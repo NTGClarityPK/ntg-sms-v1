@@ -83,6 +83,21 @@ export class EarlyDepartureController {
     );
     return { data };
   }
+
+  @Put(':id/cancel')
+  async cancelEarlyDepartureRequest(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const data = await this.earlyDepartureService.cancelEarlyDepartureRequest(
+      id,
+      user.id,
+      branch.branchId,
+    );
+    return { data };
+  }
 }
+
 
 

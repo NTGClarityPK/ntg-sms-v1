@@ -12,6 +12,8 @@ export class EarlyDepartureRequestDto {
   reviewedBy?: string;
   reviewedAt?: string;
   reviewNotes?: string;
+  reviewerName?: string;
+  reviewerRole?: string;
   branchId!: string;
   academicYearId!: string;
   createdAt!: string;
