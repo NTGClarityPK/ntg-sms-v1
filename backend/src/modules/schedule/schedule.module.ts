@@ -6,6 +6,7 @@ import { ScheduleService } from './schedule.service';
 @Module({
   controllers: [ScheduleController],
   providers: [ScheduleService, SupabaseConfig],
+  exports: [ScheduleService],
 })
 export class ScheduleModule {}
 

@@ -27,6 +27,7 @@ import {
   IconPlaneDeparture,
   IconWalk,
   IconUsersGroup,
+  IconCalendarClock,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -64,6 +65,17 @@ const allNavItems: NavItem[] = [
       return true; // Will be filtered in render
     }
   },
+  {
+    label: 'Timetable Management',
+    href: '/timetable',
+    icon: IconCalendarClock,
+    showCondition: () => {
+      // Show for school_admin, principal, and academic_coordinator
+      if (typeof window === 'undefined') return false;
+      // This will be checked in the component using useAuth
+      return true; // Will be filtered in render
+    }
+  },
   { label: 'Reports', href: '/reports', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
@@ -89,8 +101,17 @@ export function Sidebar({
   const navbarConfig = themeConfig?.components?.navbar;
   const navButtonConfig = themeConfig?.components?.navButton;
 
-  // Check if user is a teacher
-  const isTeacher = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'teacher') || false;
+  // Check if user is a teacher (subject_teacher or class_teacher)
+  const isTeacher = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return roleName === 'subject_teacher' || roleName === 'class_teacher';
+  }) || false;
+  
+  // Check if user has admin/coordinator role for timetable management
+  const canManageTimetable = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return roleName === 'school_admin' || roleName === 'principal' || roleName === 'academic_coordinator';
+  }) || false;
 
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
@@ -99,6 +120,10 @@ export function Sidebar({
       // For "My Schedule", show only if user is a teacher
       if (item.href === '/my-schedule') {
         return isTeacher;
+      }
+      // For "Timetable Management", show only if user has admin/coordinator role
+      if (item.href === '/timetable') {
+        return canManageTimetable;
       }
       return item.showCondition();
     }
@@ -121,6 +146,7 @@ export function Sidebar({
       item.href === '/users' ||
       item.href === '/academic/class-sections' ||
       item.href === '/academic/teacher-mapping' ||
+      item.href === '/timetable' ||
       item.href === '/parent-associations' ||
       item.href === '/reports' ||
       item.href === '/settings'
@@ -193,7 +219,12 @@ export function Sidebar({
   return (
     <Stack h="100%" justify="space-between" gap={0}>
       {/* Scrollable navigation area - matches RMS structure */}
-      <ScrollArea h="100%" style={{ flex: 1 }}>
+      <ScrollArea 
+        h="100%" 
+        style={{ flex: 1 }}
+        scrollbarSize={8}
+        type="auto"
+      >
         <Stack gap="xs" p={collapsed ? 'xs' : 'md'}>
           {/* Main Navigation */}
           {!collapsed && mainItems.length > 0 && (

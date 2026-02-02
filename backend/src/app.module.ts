@@ -27,6 +27,7 @@ import { RegistrationModule } from './modules/registration/registration.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.module';
 import { EarlyDepartureModule } from './modules/early-departure/early-departure.module';
+import { TimetableModule } from './modules/timetable/timetable.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { EarlyDepartureModule } from './modules/early-departure/early-departure.
     RegistrationModule,
     TenantsModule,
     EarlyDepartureModule,
+    TimetableModule,
   ],
   controllers: [AppController],
   providers: [

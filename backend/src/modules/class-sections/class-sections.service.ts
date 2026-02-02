@@ -270,7 +270,9 @@ export class ClassSectionsService {
     branchId: string,
     academicYearId?: string,
   ): Promise<{ data: ClassSectionDto[] }> {
-    // Use provided academicYearId or get active year
+    const supabase = this.supabaseConfig.getClient();
+
+    // 1. Get academic year ONCE
     let activeYearId = academicYearId;
     if (!activeYearId) {
       const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
@@ -280,25 +282,125 @@ export class ClassSectionsService {
       activeYearId = activeYear.id;
     }
 
-    const results: ClassSectionDto[] = [];
+    // 2. Extract unique class and section IDs from input
+    const requestedClassIds = [...new Set(input.classSections.map((cs) => cs.classId))];
+    const requestedSectionIds = [...new Set(input.classSections.map((cs) => cs.sectionId))];
+
+    // 3. Batch validate: fetch all requested classes and sections in parallel
+    const [classesResult, sectionsResult, existingResult] = await Promise.all([
+      supabase.from('classes').select('id').in('id', requestedClassIds),
+      supabase.from('sections').select('id').in('id', requestedSectionIds),
+      supabase
+        .from('class_sections')
+        .select('class_id, section_id')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', activeYearId),
+    ]);
+
+    throwIfDbError(classesResult.error);
+    throwIfDbError(sectionsResult.error);
+    throwIfDbError(existingResult.error);
+
+    const validClassIds = new Set((classesResult.data || []).map((c) => c.id));
+    const validSectionIds = new Set((sectionsResult.data || []).map((s) => s.id));
+    const existingCombinations = new Set(
+      (existingResult.data || []).map((e) => `${e.class_id}:${e.section_id}`),
+    );
+
+    // 4. Filter and validate in memory
     const errors: string[] = [];
+    const toInsert: Array<{
+      class_id: string;
+      section_id: string;
+      branch_id: string;
+      academic_year_id: string;
+      capacity: number;
+    }> = [];
 
-    for (const classSection of input.classSections) {
-      try {
-        const created = await this.createClassSection(classSection, branchId, activeYearId);
-        results.push(created);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-        errors.push(
-          `Class ${classSection.classId} - Section ${classSection.sectionId}: ${errorMessage}`,
-        );
+    for (const cs of input.classSections) {
+      const comboKey = `${cs.classId}:${cs.sectionId}`;
+
+      if (!validClassIds.has(cs.classId)) {
+        errors.push(`Class ${cs.classId} not found`);
+        continue;
       }
+      if (!validSectionIds.has(cs.sectionId)) {
+        errors.push(`Section ${cs.sectionId} not found`);
+        continue;
+      }
+      if (existingCombinations.has(comboKey)) {
+        // Skip duplicates silently (they already exist)
+        continue;
+      }
+
+      toInsert.push({
+        class_id: cs.classId,
+        section_id: cs.sectionId,
+        branch_id: branchId,
+        academic_year_id: activeYearId,
+        capacity: cs.capacity ?? 30,
+      });
     }
 
-    if (errors.length > 0 && results.length === 0) {
-      throw new BadRequestException(`Failed to create class sections: ${errors.join('; ')}`);
+    if (toInsert.length === 0) {
+      if (errors.length > 0) {
+        throw new BadRequestException(`Failed to create class sections: ${errors.join('; ')}`);
+      }
+      // All requested combinations already exist
+      return { data: [] };
     }
+
+    // 5. Batch insert all at once
+    const { data: insertedRows, error: insertError } = await supabase
+      .from('class_sections')
+      .insert(toInsert)
+      .select('id, class_id, section_id, branch_id, academic_year_id, capacity, is_active, created_at, updated_at');
+
+    throwIfDbError(insertError);
+
+    if (!insertedRows || insertedRows.length === 0) {
+      throw new BadRequestException('Failed to insert class sections');
+    }
+
+    // 6. Batch hydrate: fetch class and section names for all inserted rows
+    const insertedClassIds = [...new Set(insertedRows.map((r) => r.class_id))];
+    const insertedSectionIds = [...new Set(insertedRows.map((r) => r.section_id))];
+
+    const [classNamesResult, sectionNamesResult] = await Promise.all([
+      supabase.from('classes').select('id, name, display_name').in('id', insertedClassIds),
+      supabase.from('sections').select('id, name').in('id', insertedSectionIds),
+    ]);
+
+    const classMap = new Map(
+      (classNamesResult.data || []).map((c) => [c.id, { name: c.name, displayName: c.display_name }]),
+    );
+    const sectionMap = new Map(
+      (sectionNamesResult.data || []).map((s) => [s.id, s.name]),
+    );
+
+    // 7. Build DTOs without additional queries (no student counts needed for new sections)
+    const results = insertedRows.map((row) => {
+      const classInfo = classMap.get(row.class_id);
+      const sectionName = sectionMap.get(row.section_id);
+
+      return new ClassSectionDto({
+        id: row.id,
+        classId: row.class_id,
+        sectionId: row.section_id,
+        branchId: row.branch_id,
+        academicYearId: row.academic_year_id,
+        capacity: row.capacity,
+        isActive: row.is_active,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        className: classInfo?.name,
+        classDisplayName: classInfo?.displayName,
+        sectionName: sectionName,
+        studentCount: 0, // New sections have 0 students
+        classTeacherId: undefined,
+        classTeacherName: undefined,
+      });
+    });
 
     return { data: results };
   }

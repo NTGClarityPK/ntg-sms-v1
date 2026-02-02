@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Title, Group, Button, Skeleton, Text, Stack } from '@mantine/core';
 import { IconPlus, IconChecklist } from '@tabler/icons-react';
 import { useClassSections, useBulkCreateClassSections } from '@/hooks/useClassSections';
@@ -13,10 +13,18 @@ import { modals } from '@mantine/modals';
 
 export default function ClassSectionsPage() {
   const [opened, { open, close }] = useDisclosure(false);
+  const [isBulkCreating, setIsBulkCreating] = useState(false);
   const { data, isLoading, error } = useClassSections();
   const { data: classesData } = useClasses();
   const { data: sectionsData } = useSections();
   const bulkCreate = useBulkCreateClassSections();
+
+  // Reset bulk creating state when mutation completes
+  useEffect(() => {
+    if (bulkCreate.isSuccess || bulkCreate.isError) {
+      setIsBulkCreating(false);
+    }
+  }, [bulkCreate.isSuccess, bulkCreate.isError]);
 
   const classes = classesData?.data || [];
   const sections = sectionsData?.data || [];
@@ -85,6 +93,7 @@ export default function ClassSectionsPage() {
       labels: { confirm: 'Create All', cancel: 'Cancel' },
       confirmProps: { color: 'blue' },
       onConfirm: () => {
+        setIsBulkCreating(true);
         bulkCreate.mutate({
           classSections: missingCombinations.map((combo) => ({
             classId: combo.classId,
@@ -167,7 +176,8 @@ export default function ClassSectionsPage() {
                 leftSection={<IconChecklist size={16} />}
                 variant="light"
                 onClick={handleBulkCreate}
-                loading={bulkCreate.isPending}
+                loading={isBulkCreating}
+                disabled={isBulkCreating}
               >
                 Create All ({missingCombinations.length})
               </Button>
