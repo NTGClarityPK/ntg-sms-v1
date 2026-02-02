@@ -115,13 +115,17 @@ export function useBulkCreateClassSections() {
         '/api/v1/class-sections',
         input,
       );
-      return response.data?.data;
+      // Response structure: { data: { data: ClassSection[] }, meta }
+      // Access the nested data array
+      const innerData = response.data as unknown as { data: ClassSection[] };
+      return innerData?.data || [];
     },
-    onSuccess: (data) => {
+    onSuccess: (createdSections) => {
       queryClient.invalidateQueries({ queryKey: ['class-sections', branchId] });
+      const count = Array.isArray(createdSections) ? createdSections.length : 0;
       notifications.show({
         title: 'Success',
-        message: `${data?.length || 0} class section(s) created successfully`,
+        message: `${count} class section(s) created successfully`,
         color: successColor,
       });
     },
