@@ -26,9 +26,10 @@ export class CreateTimetableSlotDto {
   @Max(6)
   dayOfWeek!: number;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  periodNumber!: number;
+  periodNumber?: number; // Optional label - time range is primary identifier
 
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))

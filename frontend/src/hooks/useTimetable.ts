@@ -7,6 +7,7 @@ import type {
   Conflict,
   CreateTimetableSlotInput,
   GenerateTimetableInput,
+  TimingTemplateInfo,
 } from '@/types/timetable';
 import { useAuth } from './useAuth';
 import { useMyStaff } from './useStaff';
@@ -216,5 +217,70 @@ export function useGenerateTimetable() {
       });
     },
   });
+}
+
+export function useTimingTemplateInfo(classSectionId: string | null) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['timetable', 'template-info', classSectionId, branchId],
+    queryFn: async () => {
+      if (!classSectionId || !branchId) return null;
+      const response = await apiClient.get<TimingTemplateInfo>(
+        `/api/v1/timetable/class/${classSectionId}/template-info`,
+      );
+      return response;
+    },
+    enabled: !!classSectionId && !!branchId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Hook for real-time conflict checking of a single slot.
+ * Returns a function that checks if a slot would conflict with existing slots.
+ */
+export function useCheckSlotConflict() {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return async (slot: Partial<CreateTimetableSlotInput>): Promise<boolean> => {
+    if (!branchId || !slot.startTime || !slot.endTime || !slot.staffId) {
+      return false;
+    }
+
+    try {
+      const queryParams = new URLSearchParams();
+      if (slot.classSectionId) queryParams.append('classSectionId', slot.classSectionId);
+      if (slot.staffId) queryParams.append('staffId', slot.staffId);
+      if (slot.academicYearId) queryParams.append('academicYearId', slot.academicYearId);
+
+      const response = await apiClient.get<Conflict[]>(
+        `/api/v1/timetable/conflicts${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
+      );
+      
+      const conflicts = response.data || [];
+      
+      // Check if any conflict involves the same day and overlapping time
+      return conflicts.some((conflict) => {
+        if (conflict.dayOfWeek !== slot.dayOfWeek) return false;
+        
+        // Check if times overlap
+        return conflict.conflictingSlots.some((cs) => {
+          const slotStart = slot.startTime!;
+          const slotEnd = slot.endTime!;
+          const conflictStart = cs.startTime;
+          const conflictEnd = cs.endTime;
+          
+          // Times overlap if: slotStart < conflictEnd && slotEnd > conflictStart
+          return slotStart < conflictEnd && slotEnd > conflictStart;
+        });
+      });
+    } catch {
+      // If check fails, don't block user - return false (no conflict detected)
+      return false;
+    }
+  };
 }
 

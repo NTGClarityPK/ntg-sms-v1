@@ -1,6 +1,7 @@
 'use client';
 
-import { Badge, Card, Stack, Text } from '@mantine/core';
+import { Badge, Card, Stack, Text, Group } from '@mantine/core';
+import { IconAlertCircle } from '@tabler/icons-react';
 import type { TimetableSlot } from '@/types/timetable';
 
 interface TimetableSlotProps {
@@ -27,15 +28,22 @@ export function TimetableSlotComponent({
       style={{
         cursor: onClick ? 'pointer' : 'default',
         height: '100%',
-        borderColor: showConflict ? 'red' : undefined,
+        border: showConflict ? '2px solid var(--mantine-color-red-6)' : undefined,
+        backgroundColor: showConflict ? 'var(--mantine-color-red-0)' : undefined,
+        transition: 'all 0.2s',
       }}
       onClick={onClick}
-      withBorder={showConflict}
+      withBorder={!showConflict}
     >
       <Stack gap={4}>
-        <Badge size="xs" variant="light" color={slotTypeColors[slot.slotType]}>
-          {slot.slotType}
-        </Badge>
+        <Group justify="space-between" gap={4}>
+          <Badge size="xs" variant="light" color={slotTypeColors[slot.slotType]}>
+            {slot.slotType}
+          </Badge>
+          {showConflict && (
+            <IconAlertCircle size={14} color="var(--mantine-color-red-6)" />
+          )}
+        </Group>
         {slot.subjectName ? (
           <Text size="sm" fw={500}>
             {slot.subjectName}

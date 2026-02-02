@@ -100,6 +100,18 @@ export class TimetableController {
     return { data };
   }
 
+  @Get('class/:classSectionId/template-info')
+  async getTimingTemplateInfo(
+    @Param('classSectionId') classSectionId: string,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const data = await this.timetableService.getTimingTemplateInfo(
+      classSectionId,
+      branch.branchId,
+    );
+    return { data };
+  }
+
   @Get('teacher/:staffId')
   async getTeacherTimetable(
     @Param('staffId') staffId: string,

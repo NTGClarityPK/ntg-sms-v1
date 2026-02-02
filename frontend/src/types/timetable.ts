@@ -4,7 +4,7 @@ export interface TimetableSlot {
   id: string;
   classSectionId: string;
   dayOfWeek: number;
-  periodNumber: number;
+  periodNumber?: number; // Optional label - time range is primary identifier
   startTime: string;
   endTime: string;
   subjectId?: string;
@@ -64,7 +64,7 @@ export interface Conflict {
 export interface CreateTimetableSlotInput {
   classSectionId: string;
   dayOfWeek: number;
-  periodNumber: number;
+  periodNumber?: number; // Optional label - time range is primary identifier
   startTime: string;
   endTime: string;
   subjectId?: string;
@@ -77,5 +77,19 @@ export interface CreateTimetableSlotInput {
 export interface GenerateTimetableInput {
   classSectionId: string;
   academicYearId?: string;
+}
+
+export interface TimingTemplateInfo {
+  templateId: string;
+  templateName: string;
+  startTime: string;
+  endTime: string;
+  periodDurationMinutes: number;
+  slots: Array<{
+    name: string;
+    startTime: string | null;
+    endTime: string | null;
+    sortOrder: number;
+  }>;
 }
 

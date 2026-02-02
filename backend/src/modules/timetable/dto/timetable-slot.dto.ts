@@ -2,7 +2,7 @@ export class TimetableSlotDto {
   id!: string;
   classSectionId!: string;
   dayOfWeek!: number;
-  periodNumber!: number;
+  periodNumber?: number; // Optional label - time range is primary identifier
   startTime!: string;
   endTime!: string;
   subjectId?: string;

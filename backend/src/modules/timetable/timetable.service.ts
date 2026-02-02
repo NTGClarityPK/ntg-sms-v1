@@ -14,12 +14,13 @@ import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import { ClassTimetableDto } from './dto/class-timetable.dto';
 import { TeacherTimetableDto, FreePeriod } from './dto/teacher-timetable.dto';
 import { ConflictDto, ConflictType, ConflictingSlot } from './dto/conflict.dto';
+import { TimingTemplateInfoDto } from './dto/timing-template-info.dto';
 
 type TimetableSlotRow = {
   id: string;
   class_section_id: string;
   day_of_week: number;
-  period_number: number;
+  period_number: number | null; // Optional label - time range is primary identifier
   start_time: string;
   end_time: string;
   subject_id: string | null;
@@ -131,7 +132,7 @@ export class TimetableService {
       .eq('branch_id', branchId)
       .eq('academic_year_id', activeYearId)
       .order('day_of_week', { ascending: true })
-      .order('period_number', { ascending: true });
+      .order('start_time', { ascending: true }); // Sort by time, not period_number
     throwIfDbError(slotsError);
 
     const slots = ((slotsData as TimetableSlotWithRelations[]) ?? []).map((row) => {
@@ -148,7 +149,7 @@ export class TimetableService {
         id: row.id,
         classSectionId: row.class_section_id,
         dayOfWeek: row.day_of_week,
-        periodNumber: row.period_number,
+        periodNumber: row.period_number ?? undefined, // Optional
         startTime: row.start_time,
         endTime: row.end_time,
         subjectId: row.subject_id ?? undefined,
@@ -257,7 +258,7 @@ export class TimetableService {
       .eq('branch_id', branchId)
       .eq('academic_year_id', activeYearId)
       .order('day_of_week', { ascending: true })
-      .order('period_number', { ascending: true });
+      .order('start_time', { ascending: true }); // Sort by time, not period_number
     throwIfDbError(slotsError);
 
     // Fetch class and section names
@@ -293,7 +294,7 @@ export class TimetableService {
         id: row.id,
         classSectionId: row.class_section_id,
         dayOfWeek: row.day_of_week,
-        periodNumber: row.period_number,
+        periodNumber: row.period_number ?? undefined, // Optional
         startTime: row.start_time,
         endTime: row.end_time,
         subjectId: row.subject_id ?? undefined,
@@ -311,22 +312,28 @@ export class TimetableService {
       });
     });
 
-    // Calculate free periods (gaps in schedule)
+    // Calculate free periods (time gaps in schedule)
+    // Note: With time-range primary approach, free periods are less meaningful
+    // We'll calculate based on time gaps instead of period numbers
     const schoolDays = await this.scheduleService.getSchoolDays();
     const activeDays = schoolDays.data;
     const freePeriods: FreePeriod[] = [];
 
-    // Get all periods from slots to determine max period
-    const maxPeriod = slots.length > 0 ? Math.max(...slots.map((s) => s.periodNumber)) : 0;
+    // For backward compatibility, we'll still calculate free periods
+    // but only for slots that have periodNumber labels
+    const slotsWithPeriods = slots.filter((s) => s.periodNumber !== undefined);
+    if (slotsWithPeriods.length > 0) {
+      const maxPeriod = Math.max(...slotsWithPeriods.map((s) => s.periodNumber!));
 
-    for (const day of activeDays) {
-      const daySlots = slots.filter((s) => s.dayOfWeek === day);
-      const occupiedPeriods = new Set(daySlots.map((s) => s.periodNumber));
+      for (const day of activeDays) {
+        const daySlots = slotsWithPeriods.filter((s) => s.dayOfWeek === day);
+        const occupiedPeriods = new Set(daySlots.map((s) => s.periodNumber!));
 
-      // Find gaps (periods 1 to maxPeriod that are not occupied)
-      for (let period = 1; period <= maxPeriod; period++) {
-        if (!occupiedPeriods.has(period)) {
-          freePeriods.push({ dayOfWeek: day, periodNumber: period });
+        // Find gaps (periods 1 to maxPeriod that are not occupied)
+        for (let period = 1; period <= maxPeriod; period++) {
+          if (!occupiedPeriods.has(period)) {
+            freePeriods.push({ dayOfWeek: day, periodNumber: period });
+          }
         }
       }
     }
@@ -404,7 +411,7 @@ export class TimetableService {
         {
           class_section_id: input.classSectionId,
           day_of_week: input.dayOfWeek,
-          period_number: input.periodNumber,
+          period_number: input.periodNumber ?? null, // Optional label
           start_time: input.startTime,
           end_time: input.endTime,
           subject_id: input.subjectId ?? null,
@@ -416,7 +423,7 @@ export class TimetableService {
           updated_at: new Date().toISOString(),
         },
         {
-          onConflict: 'class_section_id,day_of_week,period_number,academic_year_id',
+          onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id',
         },
       )
       .select('*')
@@ -448,6 +455,102 @@ export class TimetableService {
     throwIfDbError(error);
 
     return { success: true };
+  }
+
+  /**
+   * Derives slot_type from template slot name.
+   * Matches common names (case-insensitive) to determine type.
+   */
+  private deriveSlotType(slotName: string): 'class' | 'assembly' | 'break' | 'free' {
+    const nameLower = slotName.toLowerCase().trim();
+    
+    if (nameLower.includes('break') || nameLower.includes('recess')) {
+      return 'break';
+    }
+    if (nameLower.includes('assembly') || nameLower.includes('assembly')) {
+      return 'assembly';
+    }
+    if (nameLower.includes('free') || nameLower.includes('spare')) {
+      return 'free';
+    }
+    // Default to 'class' for subject periods
+    return 'class';
+  }
+
+  /**
+   * Validates that a time string is within template bounds.
+   * Returns true if time is within [templateStart, templateEnd].
+   */
+  private isTimeWithinBounds(
+    time: string,
+    templateStart: string,
+    templateEnd: string,
+  ): boolean {
+    // Simple string comparison works for HH:MM:SS format
+    return time >= templateStart && time <= templateEnd;
+  }
+
+  async getTimingTemplateInfo(
+    classSectionId: string,
+    branchId: string,
+  ) {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Get class-section to find class_id
+    const { data: classSection, error: csError } = await supabase
+      .from('class_sections')
+      .select('class_id')
+      .eq('id', classSectionId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(csError);
+    if (!classSection) {
+      return null; // No template info if class-section not found
+    }
+
+    // Get timing template assignment
+    const { data: timingAssignment, error: taError } = await supabase
+      .from('class_timing_assignments')
+      .select('timing_template_id')
+      .eq('class_id', classSection.class_id)
+      .maybeSingle();
+    throwIfDbError(taError);
+    if (!timingAssignment) {
+      return null; // No template assigned
+    }
+
+    // Get timing template
+    const { data: timingTemplate, error: ttError } = await supabase
+      .from('timing_templates')
+      .select('id, name, start_time, end_time, period_duration_minutes')
+      .eq('id', timingAssignment.timing_template_id)
+      .maybeSingle();
+    throwIfDbError(ttError);
+    if (!timingTemplate) {
+      return null;
+    }
+
+    // Get template slots
+    const { data: templateSlots, error: tsError } = await supabase
+      .from('timing_template_slots')
+      .select('name, start_time, end_time, sort_order')
+      .eq('timing_template_id', timingTemplate.id)
+      .order('sort_order', { ascending: true });
+    throwIfDbError(tsError);
+
+    return {
+      templateId: timingTemplate.id,
+      templateName: timingTemplate.name,
+      startTime: timingTemplate.start_time,
+      endTime: timingTemplate.end_time,
+      periodDurationMinutes: timingTemplate.period_duration_minutes,
+      slots: (templateSlots ?? []).map((slot) => ({
+        name: slot.name,
+        startTime: slot.start_time,
+        endTime: slot.end_time,
+        sortOrder: slot.sort_order,
+      })),
+    };
   }
 
   async generateFromTimingTemplate(
@@ -483,7 +586,7 @@ export class TimetableService {
       activeYearId = activeYear.id;
     }
 
-    // Get timing template for this class
+    // Get timing template assignment for this class
     const { data: timingAssignment, error: taError } = await supabase
       .from('class_timing_assignments')
       .select('timing_template_id')
@@ -494,7 +597,18 @@ export class TimetableService {
       throw new BadRequestException('No timing template assigned to this class');
     }
 
-    // Get timing template slots
+    // Get the timing template itself (for start/end time bounds)
+    const { data: timingTemplate, error: ttError } = await supabase
+      .from('timing_templates')
+      .select('start_time, end_time')
+      .eq('id', timingAssignment.timing_template_id)
+      .maybeSingle();
+    throwIfDbError(ttError);
+    if (!timingTemplate) {
+      throw new NotFoundException('Timing template not found');
+    }
+
+    // Get timing template slots (ordered by sort_order)
     const { data: templateSlots, error: tsError } = await supabase
       .from('timing_template_slots')
       .select('*')
@@ -506,27 +620,50 @@ export class TimetableService {
       throw new BadRequestException('Timing template has no slots defined');
     }
 
+    // Validate that all template slots have times and are within template bounds
+    for (const slot of templateSlots) {
+      if (!slot.start_time || !slot.end_time) {
+        throw new BadRequestException(
+          `Template slot "${slot.name}" is missing start_time or end_time`,
+        );
+      }
+      if (
+        !this.isTimeWithinBounds(
+          slot.start_time,
+          timingTemplate.start_time,
+          timingTemplate.end_time,
+        ) ||
+        !this.isTimeWithinBounds(
+          slot.end_time,
+          timingTemplate.start_time,
+          timingTemplate.end_time,
+        )
+      ) {
+        throw new BadRequestException(
+          `Template slot "${slot.name}" (${slot.start_time} - ${slot.end_time}) is outside template bounds (${timingTemplate.start_time} - ${timingTemplate.end_time})`,
+        );
+      }
+      if (slot.start_time >= slot.end_time) {
+        throw new BadRequestException(
+          `Template slot "${slot.name}" has invalid time range: start_time must be before end_time`,
+        );
+      }
+    }
+
     // Get active school days
     const schoolDays = await this.scheduleService.getSchoolDays();
     const activeDays = schoolDays.data;
 
-    // Get teacher assignments for this class-section (for potential auto-assignment)
-    const assignments = await this.teacherAssignmentsService.listTeacherAssignments(
-      {
-        page: 1,
-        limit: 100,
-        sortOrder: 'desc',
-        classSectionId,
-      },
-      branchId,
-      activeYearId,
-    );
+    if (!activeDays || activeDays.length === 0) {
+      throw new BadRequestException('No active school days configured');
+    }
 
     // Generate slots for each active day and each template slot
+    // This creates the structure: one timetable slot per template slot per active day
     const slotsToInsert: Array<{
       class_section_id: string;
       day_of_week: number;
-      period_number: number;
+      period_number: number | null; // Optional label
       start_time: string;
       end_time: string;
       subject_id: string | null;
@@ -536,33 +673,35 @@ export class TimetableService {
       academic_year_id: string;
     }> = [];
 
-    // Try to auto-assign subjects/teachers by distributing assignments across periods
-    const assignmentsList = assignments.data;
-    let assignmentIndex = 0;
+    // Sort template slots by start_time (chronological order)
+    const sortedTemplateSlots = [...templateSlots].sort((a, b) => {
+      const timeA = a.start_time || '';
+      const timeB = b.start_time || '';
+      return timeA.localeCompare(timeB);
+    });
 
     for (const day of activeDays) {
-      templateSlots.forEach((templateSlot, index) => {
+      sortedTemplateSlots.forEach((templateSlot, index) => {
+        // Optional period number label (1-indexed based on chronological order)
         const periodNumber = index + 1;
-        let subjectId: string | null = null;
-        let staffId: string | null = null;
+        
+        // Derive slot_type from template slot name
+        const slotType = this.deriveSlotType(templateSlot.name);
 
-        // Auto-assign if we have assignments (distribute them across periods)
-        if (assignmentsList.length > 0) {
-          const assignment = assignmentsList[assignmentIndex % assignmentsList.length];
-          subjectId = assignment.subjectId;
-          staffId = assignment.staffId;
-          assignmentIndex++;
-        }
+        // For 'class' slots, create placeholders (empty subject/teacher)
+        // For 'break', 'assembly', 'free' slots, always leave empty
+        const subjectId: string | null = slotType === 'class' ? null : null;
+        const staffId: string | null = slotType === 'class' ? null : null;
 
         slotsToInsert.push({
           class_section_id: classSectionId,
           day_of_week: day,
-          period_number: periodNumber,
-          start_time: templateSlot.start_time ?? '09:00:00',
-          end_time: templateSlot.end_time ?? '10:00:00',
+          period_number: periodNumber, // Optional label
+          start_time: templateSlot.start_time!,
+          end_time: templateSlot.end_time!,
           subject_id: subjectId,
           staff_id: staffId,
-          slot_type: 'class',
+          slot_type: slotType,
           branch_id: branchId,
           academic_year_id: activeYearId,
         });
@@ -577,7 +716,7 @@ export class TimetableService {
     const { error: insertError } = await supabase
       .from('timetable_slots')
       .upsert(slotsToInsert, {
-        onConflict: 'class_section_id,day_of_week,period_number,academic_year_id',
+        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id',
       });
     throwIfDbError(insertError);
 

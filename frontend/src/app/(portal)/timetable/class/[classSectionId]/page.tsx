@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Title,
@@ -12,15 +12,16 @@ import {
   Alert,
   Paper,
 } from '@mantine/core';
-import { IconArrowLeft, IconPlus, IconRefresh } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
 import { useClassSection } from '@/hooks/useClassSections';
-import { useClassTimetable, useConflicts, useGenerateTimetable } from '@/hooks/useTimetable';
+import { useClassTimetable, useConflicts, useGenerateTimetable, useCheckSlotConflict, useTimingTemplateInfo } from '@/hooks/useTimetable';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TimetableGrid } from '@/components/features/timetable/TimetableGrid';
-import { SlotEditModal } from '@/components/features/timetable/SlotEditModal';
+import { SlotEditPopover } from '@/components/features/timetable/SlotEditPopover';
 import { ConflictList } from '@/components/features/timetable/ConflictList';
+import { TemplateInfoBanner } from '@/components/features/timetable/TemplateInfoBanner';
 import { useDisclosure } from '@mantine/hooks';
-import type { TimetableSlot } from '@/types/timetable';
+import type { TimetableSlot, CreateTimetableSlotInput } from '@/types/timetable';
 
 export default function ClassTimetablePage() {
   const params = useParams();
@@ -29,24 +30,36 @@ export default function ClassTimetablePage() {
   const colors = useThemeColors();
   const [selectedSlot, setSelectedSlot] = useState<TimetableSlot | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState<number | null>(null);
-  const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('');
+  const [popoverTarget, setPopoverTarget] = useState<HTMLElement | null>(null);
+  const [popoverOpened, { open: openPopover, close: closePopover }] = useDisclosure(false);
 
   // Optional: Try to fetch class-section, but don't block on it
-  const { data: classSectionData, isLoading: classSectionLoading } = useClassSection(classSectionId);
+  const { data: classSectionData } = useClassSection(classSectionId);
   const { data: timetableData, isLoading: timetableLoading, error: timetableError } = useClassTimetable(classSectionId);
   const { data: conflictsData } = useConflicts({ classSectionId });
+  const { data: templateInfoData } = useTimingTemplateInfo(classSectionId);
   const generateMutation = useGenerateTimetable();
+  const checkConflict = useCheckSlotConflict();
 
   const classSection = classSectionData?.data;
   const timetable = timetableData?.data;
   const conflicts = conflictsData?.data || [];
 
-  const handleSlotClick = (slot: TimetableSlot | null, day: number, period: number) => {
+  const handleSlotClick = (slot: TimetableSlot | null, day: number, timeRange: string, target: HTMLElement) => {
     setSelectedSlot(slot);
     setSelectedDay(day);
-    setSelectedPeriod(period);
-    openModal();
+    setSelectedTimeRange(timeRange);
+    setPopoverTarget(target);
+    openPopover();
+  };
+
+  const handleConflictCheck = async (slotInput: Partial<CreateTimetableSlotInput>): Promise<boolean> => {
+    return await checkConflict({
+      ...slotInput,
+      classSectionId,
+      dayOfWeek: selectedDay ?? 0,
+    });
   };
 
   const handleGenerate = async () => {
@@ -165,6 +178,8 @@ export default function ClassTimetablePage() {
         }}
       >
         <Stack gap="md">
+          <TemplateInfoBanner templateInfo={templateInfoData?.data || null} />
+
           {conflicts.length > 0 && (
             <Paper p="md" withBorder>
               <ConflictList conflicts={conflicts} />
@@ -176,6 +191,7 @@ export default function ClassTimetablePage() {
               classSectionId={classSectionId}
               slots={timetable.slots}
               onSlotClick={handleSlotClick}
+              templateInfo={templateInfoData?.data || null}
               conflicts={conflicts}
               isLoading={timetableLoading}
             />
@@ -192,18 +208,21 @@ export default function ClassTimetablePage() {
         </Stack>
       </div>
 
-      <SlotEditModal
-        opened={modalOpened}
+      <SlotEditPopover
+        opened={popoverOpened}
         onClose={() => {
-          closeModal();
+          closePopover();
           setSelectedSlot(null);
           setSelectedDay(null);
-          setSelectedPeriod(null);
+          setSelectedTimeRange('');
+          setPopoverTarget(null);
         }}
+        target={popoverTarget}
         slot={selectedSlot}
         classSectionId={classSectionId}
         dayOfWeek={selectedDay ?? 0}
-        periodNumber={selectedPeriod ?? 1}
+        timeRange={selectedTimeRange}
+        onConflictCheck={handleConflictCheck}
       />
     </>
   );
