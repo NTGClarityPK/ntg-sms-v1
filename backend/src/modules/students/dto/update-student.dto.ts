@@ -44,5 +44,13 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  subjectTemplateId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
 }
 

@@ -2,7 +2,11 @@ export class TimetableSlotDto {
   id!: string;
   classSectionId!: string;
   dayOfWeek!: number;
-  periodNumber?: number; // Optional label - time range is primary identifier
+  /**
+   * Optional period label for display. Time range (startTime, endTime) is the
+   * primary identifier for ordering and uniqueness.
+   */
+  periodNumber?: number;
   startTime!: string;
   endTime!: string;
   subjectId?: string;
@@ -11,9 +15,11 @@ export class TimetableSlotDto {
   slotType!: 'class' | 'assembly' | 'break' | 'free';
   branchId!: string;
   academicYearId!: string;
+  subjectTemplateId?: string;
   createdAt!: string;
   updatedAt!: string;
-  // Related data (from joins)
+
+  // Enriched fields from relations (subjects, staff, classes, sections)
   subjectName?: string;
   staffName?: string;
   className?: string;

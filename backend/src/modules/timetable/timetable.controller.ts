@@ -86,16 +86,32 @@ export class TimetableController {
     return { data };
   }
 
+  @Get('student/:studentId')
+  async getStudentTimetable(
+    @Param('studentId') studentId: string,
+    @CurrentBranch() branch: { branchId: string },
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    const data = await this.timetableService.getStudentTimetable(
+      studentId,
+      branch.branchId,
+      academicYearId,
+    );
+    return { data };
+  }
+
   @Get('class/:classSectionId')
   async getClassTimetable(
     @Param('classSectionId') classSectionId: string,
     @CurrentBranch() branch: { branchId: string },
     @Query('academicYearId') academicYearId?: string,
+    @Query('subjectTemplateId') subjectTemplateId?: string,
   ) {
     const data = await this.timetableService.getClassTimetable(
       classSectionId,
       branch.branchId,
       academicYearId,
+      subjectTemplateId,
     );
     return { data };
   }
@@ -153,6 +169,7 @@ export class TimetableController {
       input.classSectionId,
       branch.branchId,
       input.academicYearId,
+      input.subjectTemplateId,
     );
     return { data };
   }

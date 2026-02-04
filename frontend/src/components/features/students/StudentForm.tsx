@@ -7,8 +7,11 @@ import { z } from 'zod';
 import { useCreateStudent, useUpdateStudent, useGenerateStudentId } from '@/hooks/useStudents';
 import { useClasses, useSections } from '@/hooks/useCoreLookups';
 import { useAcademicYearsList } from '@/hooks/useAcademicYears';
+import { useTemplatesForClass, useStudentTemplate } from '@/hooks/useSubjectTemplates';
+import { useAuth } from '@/hooks/useAuth';
 import type { Student, CreateStudentInput, UpdateStudentInput } from '@/types/students';
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 const createStudentSchema = z.object({
   email: z.string().email('Invalid email'),
@@ -49,6 +52,9 @@ interface StudentFormProps {
 
 export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const isEdit = !!student;
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+  const queryClient = useQueryClient();
   const createStudent = useCreateStudent();
   const updateStudent = useUpdateStudent();
   const generateId = useGenerateStudentId();
@@ -77,13 +83,45 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       admissionDate: '',
       academicYearId: '',
       isActive: true,
+      subjectTemplateId: '',
     },
     validate: zodResolver(isEdit ? updateStudentSchema : createStudentSchema),
   });
 
+  // Fetch available templates for selected class
+  // Use student's classId if in edit mode and form hasn't been populated yet
+  const effectiveClassId = form.values.classId || student?.classId || null;
+  const { data: templatesData, isLoading: templatesLoading } = useTemplatesForClass(
+    effectiveClassId,
+    branchId ?? null,
+  );
+  
+  // Fetch student's current template assignment (for edit mode)
+  const { data: studentTemplateData } = useStudentTemplate(
+    student?.id ?? null,
+    form.values.academicYearId || student?.academicYearId || null,
+    branchId ?? null,
+  );
+
+  const availableTemplates = templatesData?.data ?? [];
+  const currentTemplate = studentTemplateData?.data;
+
   // Reset form when student prop changes (for edit mode)
   useEffect(() => {
     if (student) {
+      // Invalidate student template query when modal opens to ensure fresh data
+      if (student.id && branchId) {
+        const academicYearId = student.academicYearId || null;
+        queryClient.invalidateQueries({
+          queryKey: ['subject-templates', 'student', student.id, academicYearId, branchId],
+        });
+      }
+      
+      // Invalidate templates query when modal opens with a student to ensure fresh data
+      if (student.classId && branchId) {
+        queryClient.invalidateQueries({ queryKey: ['subject-templates', 'class', student.classId, branchId] });
+      }
+
       form.setValues({
         email: student.email || '',
         password: '',
@@ -100,11 +138,12 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         admissionDate: student.admissionDate || '',
         academicYearId: student.academicYearId || '',
         isActive: student.isActive ?? true,
+        subjectTemplateId: student.subjectTemplateId || currentTemplate?.id || '',
       });
     } else {
       form.reset();
     }
-  }, [student]);
+  }, [student, currentTemplate, branchId, queryClient]);
 
   // Generate student ID when class/section/year changes
   useEffect(() => {
@@ -141,7 +180,9 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           bloodGroup: values.bloodGroup || undefined,
           medicalNotes: values.medicalNotes || undefined,
           admissionDate: values.admissionDate || undefined,
+          academicYearId: values.academicYearId || undefined,
           isActive: values.isActive,
+          subjectTemplateId: values.subjectTemplateId || undefined,
         };
 
         await updateStudent.mutateAsync({ id: student.id, input: updateData });
@@ -162,6 +203,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           admissionDate: values.admissionDate || undefined,
           academicYearId: values.academicYearId || undefined,
           isActive: values.isActive,
+          subjectTemplateId: values.subjectTemplateId || undefined,
         };
 
         await createStudent.mutateAsync(createData);
@@ -232,6 +274,28 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           <TextInput label="Blood Group" placeholder="O+" {...form.getInputProps('bloodGroup')} />
           <Textarea label="Medical Notes" placeholder="Any medical conditions..." {...form.getInputProps('medicalNotes')} />
           <TextInput label="Admission Date" type="date" {...form.getInputProps('admissionDate')} />
+
+          <Select
+            label="Subject Template (Optional)"
+            placeholder={
+              effectiveClassId
+                ? availableTemplates.length === 0
+                  ? 'No templates available for this class'
+                  : 'Select subject template'
+                : 'Select a class first'
+            }
+            data={availableTemplates.map((t) => ({ value: t.id, label: t.name }))}
+            {...form.getInputProps('subjectTemplateId')}
+            clearable
+            disabled={!effectiveClassId || availableTemplates.length === 0}
+            description={
+              !effectiveClassId
+                ? 'Select a class to see available templates'
+                : availableTemplates.length === 0
+                  ? 'No subject templates are assigned to this class. Assign templates in Settings > Subject Templates.'
+                  : 'Templates available for this class/level. Only one template can be assigned per student.'
+            }
+          />
 
           <Select
             label="Status"

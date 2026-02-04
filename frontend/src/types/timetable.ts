@@ -1,6 +1,7 @@
 export type TimetableSlotType = 'class' | 'assembly' | 'break' | 'free';
 
 export interface TimetableSlot {
+  subjectTemplateId?: string;
   id: string;
   classSectionId: string;
   dayOfWeek: number;
@@ -72,11 +73,13 @@ export interface CreateTimetableSlotInput {
   room?: string;
   slotType: TimetableSlotType;
   academicYearId?: string;
+  subjectTemplateId?: string;
 }
 
 export interface GenerateTimetableInput {
   classSectionId: string;
   academicYearId?: string;
+  subjectTemplateId?: string;
 }
 
 export interface TimingTemplateInfo {

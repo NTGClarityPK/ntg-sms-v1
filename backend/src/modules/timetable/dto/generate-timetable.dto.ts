@@ -7,5 +7,9 @@ export class GenerateTimetableDto {
   @IsOptional()
   @IsUUID()
   academicYearId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  subjectTemplateId?: string;
 }
 

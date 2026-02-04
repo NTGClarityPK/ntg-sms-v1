@@ -58,6 +58,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
             <SortableHeader field="fullName">Name</SortableHeader>
             <SortableHeader field="className">Class</SortableHeader>
             <SortableHeader field="sectionName">Section</SortableHeader>
+            <Table.Th>Subject Template</Table.Th>
             <SortableHeader field="isActive">Status</SortableHeader>
             <Table.Th>Actions</Table.Th>
           </Table.Tr>
@@ -65,7 +66,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
         <Table.Tbody>
           {students.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={7}>
                 <Text c="dimmed" ta="center" py="md">
                   No students found
                 </Text>
@@ -85,6 +86,9 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">{student.sectionName || 'N/A'}</Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="sm">{student.subjectTemplateName || 'N/A'}</Text>
                 </Table.Td>
                 <Table.Td>
                   <Badge color={student.isActive ? 'green' : 'red'} variant="light">

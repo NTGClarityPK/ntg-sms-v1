@@ -65,6 +65,17 @@ const allNavItems: NavItem[] = [
       return true; // Will be filtered in render
     }
   },
+  { 
+    label: 'My Timetable', 
+    href: '/my-timetable', 
+    icon: IconCalendarClock,
+    showCondition: () => {
+      // Show only for students - check if user has student role
+      if (typeof window === 'undefined') return false;
+      // This will be checked in the component using useAuth
+      return true; // Will be filtered in render
+    }
+  },
   {
     label: 'Timetable Management',
     href: '/timetable',
@@ -107,6 +118,12 @@ export function Sidebar({
     return roleName === 'subject_teacher' || roleName === 'class_teacher';
   }) || false;
   
+  // Check if user is a student
+  const isStudent = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return roleName === 'student';
+  }) || false;
+  
   // Check if user has admin/coordinator role for timetable management
   const canManageTimetable = user?.roles?.some((r) => {
     const roleName = r.roleName?.toLowerCase();
@@ -120,6 +137,10 @@ export function Sidebar({
       // For "My Schedule", show only if user is a teacher
       if (item.href === '/my-schedule') {
         return isTeacher;
+      }
+      // For "My Timetable", show only if user is a student
+      if (item.href === '/my-timetable') {
+        return isStudent;
       }
       // For "Timetable Management", show only if user has admin/coordinator role
       if (item.href === '/timetable') {

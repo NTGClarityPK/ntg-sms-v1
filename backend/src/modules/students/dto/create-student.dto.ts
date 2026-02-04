@@ -68,5 +68,9 @@ export class CreateStudentDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  subjectTemplateId?: string;
 }
 

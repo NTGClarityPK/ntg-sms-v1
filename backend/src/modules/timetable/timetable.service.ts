@@ -29,6 +29,7 @@ type TimetableSlotRow = {
   slot_type: 'class' | 'assembly' | 'break' | 'free';
   branch_id: string;
   academic_year_id: string;
+  subject_template_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -78,6 +79,7 @@ export class TimetableService {
     classSectionId: string,
     branchId: string,
     academicYearId?: string,
+    subjectTemplateId?: string,
   ): Promise<ClassTimetableDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -123,14 +125,21 @@ export class TimetableService {
     throwIfDbError(sectionError);
 
     // Fetch timetable slots with relations
-    const { data: slotsData, error: slotsError } = await supabase
+    let slotsQuery = supabase
       .from('timetable_slots')
       .select(
         '*, subjects:subject_id(name), staff:staff_id(id, user_id), class_sections:class_section_id(id, class_id, section_id)',
       )
       .eq('class_section_id', classSectionId)
       .eq('branch_id', branchId)
-      .eq('academic_year_id', activeYearId)
+      .eq('academic_year_id', activeYearId);
+
+    // Filter by subject template if provided
+    if (subjectTemplateId) {
+      slotsQuery = slotsQuery.eq('subject_template_id', subjectTemplateId);
+    }
+
+    const { data: slotsData, error: slotsError } = await slotsQuery
       .order('day_of_week', { ascending: true })
       .order('start_time', { ascending: true }); // Sort by time, not period_number
     throwIfDbError(slotsError);
@@ -158,6 +167,7 @@ export class TimetableService {
         slotType: row.slot_type,
         branchId: row.branch_id,
         academicYearId: row.academic_year_id,
+        subjectTemplateId: (row as any).subject_template_id ?? undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         subjectName: subjectData?.name,
@@ -383,6 +393,34 @@ export class TimetableService {
       throw new BadRequestException(`Day ${input.dayOfWeek} is not an active school day`);
     }
 
+    // Validate subject-template if provided
+    if (input.subjectTemplateId) {
+      const { data: template, error: templateError } = await supabase
+        .from('subject_templates')
+        .select('id')
+        .eq('id', input.subjectTemplateId)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(templateError);
+      if (!template) {
+        throw new NotFoundException('Subject template not found');
+      }
+
+      // If subject is provided, validate it belongs to the template
+      if (input.subjectId) {
+        const { data: templateSubject, error: tsError } = await supabase
+          .from('subject_template_subjects')
+          .select('subject_id')
+          .eq('subject_template_id', input.subjectTemplateId)
+          .eq('subject_id', input.subjectId)
+          .maybeSingle();
+        throwIfDbError(tsError);
+        if (!templateSubject) {
+          throw new BadRequestException('Subject does not belong to the selected template');
+        }
+      }
+    }
+
     // Validate subject-teacher assignment if both provided
     if (input.subjectId && input.staffId) {
       const assignments = await this.teacherAssignmentsService.listTeacherAssignments(
@@ -404,28 +442,33 @@ export class TimetableService {
       }
     }
 
-    // Upsert using unique constraint
+    // Upsert using unique constraint (with subject_template_id)
+    const upsertData: any = {
+      class_section_id: input.classSectionId,
+      day_of_week: input.dayOfWeek,
+      period_number: input.periodNumber ?? null, // Optional label
+      start_time: input.startTime,
+      end_time: input.endTime,
+      subject_id: input.subjectId ?? null,
+      staff_id: input.staffId ?? null,
+      room: input.room ?? null,
+      slot_type: input.slotType,
+      branch_id: branchId,
+      academic_year_id: academicYearId,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.subjectTemplateId) {
+      upsertData.subject_template_id = input.subjectTemplateId;
+    }
+
     const { data, error } = await supabase
       .from('timetable_slots')
-      .upsert(
-        {
-          class_section_id: input.classSectionId,
-          day_of_week: input.dayOfWeek,
-          period_number: input.periodNumber ?? null, // Optional label
-          start_time: input.startTime,
-          end_time: input.endTime,
-          subject_id: input.subjectId ?? null,
-          staff_id: input.staffId ?? null,
-          room: input.room ?? null,
-          slot_type: input.slotType,
-          branch_id: branchId,
-          academic_year_id: academicYearId,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id',
-        },
-      )
+      .upsert(upsertData, {
+        // Use the primary time-range uniqueness constraint for upsert
+        // This matches the UNIQUE index: (class_section_id, day_of_week, start_time, end_time, academic_year_id)
+        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id',
+      })
       .select('*')
       .single();
     throwIfDbError(error);
@@ -557,6 +600,7 @@ export class TimetableService {
     classSectionId: string,
     branchId: string,
     academicYearId?: string,
+    subjectTemplateId?: string,
   ): Promise<{ slotsCreated: number }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -671,6 +715,7 @@ export class TimetableService {
       slot_type: 'class' | 'assembly' | 'break' | 'free';
       branch_id: string;
       academic_year_id: string;
+      subject_template_id: string | null;
     }> = [];
 
     // Sort template slots by start_time (chronological order)
@@ -704,6 +749,7 @@ export class TimetableService {
           slot_type: slotType,
           branch_id: branchId,
           academic_year_id: activeYearId,
+          subject_template_id: subjectTemplateId ?? null,
         });
       });
     }
@@ -713,14 +759,79 @@ export class TimetableService {
     }
 
     // Upsert slots (will replace existing ones due to unique constraint)
+    // Note: For partial unique index, we need to handle null subject_template_id separately
     const { error: insertError } = await supabase
       .from('timetable_slots')
       .upsert(slotsToInsert, {
-        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id',
+        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
       });
     throwIfDbError(insertError);
 
     return { slotsCreated: slotsToInsert.length };
+  }
+
+  async getStudentTimetable(
+    studentId: string,
+    branchId: string,
+    academicYearId?: string,
+  ): Promise<ClassTimetableDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Get student record
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, class_id, section_id, academic_year_id')
+      .eq('id', studentId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(studentError);
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Use provided academicYearId or student's academic year or active year
+    let activeYearId = academicYearId;
+    if (!activeYearId) {
+      activeYearId = student.academic_year_id;
+      if (!activeYearId) {
+        const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+        if (!activeYear) {
+          throw new BadRequestException('No active academic year found');
+        }
+        activeYearId = activeYear.id;
+      }
+    }
+
+    // Get student's assigned template for this academic year
+    const { data: templateAssignment, error: templateError } = await supabase
+      .from('student_subject_template_assignments')
+      .select('subject_template_id')
+      .eq('student_id', studentId)
+      .eq('academic_year_id', activeYearId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(templateError);
+
+    if (!templateAssignment) {
+      throw new BadRequestException('No subject template assigned to this student for this academic year');
+    }
+
+    // Get class-section for this student
+    const { data: classSection, error: csError } = await supabase
+      .from('class_sections')
+      .select('id')
+      .eq('class_id', student.class_id)
+      .eq('section_id', student.section_id)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYearId)
+      .maybeSingle();
+    throwIfDbError(csError);
+    if (!classSection) {
+      throw new NotFoundException('Class-section not found for this student');
+    }
+
+    // Get timetable filtered by template
+    return this.getClassTimetable(classSection.id, branchId, activeYearId, templateAssignment.subject_template_id);
   }
 
   async checkConflicts(

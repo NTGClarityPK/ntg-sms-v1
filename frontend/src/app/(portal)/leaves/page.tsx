@@ -51,17 +51,18 @@ export default function LeavesPage() {
     queryKey: ['parent-children', userId],
     queryFn: async () => {
       if (!userId || !isParent) return null;
-      const response = await apiClient.get<{ data: ParentChild[] }>(
+      const response = await apiClient.get<ParentChild[]>(
         `/api/v1/parents/${userId}/children`,
       );
-      // apiClient.get returns { data: [...] }, so response.data is the array
+      // Backend returns { data: ParentChild[] }; apiClient.get unwraps the HTTP body.
+      // So response.data is ParentChild[].
       return response.data;
     },
     enabled: !!userId && !!isParent,
   });
 
   // Extract children array from response
-  const children = childrenData?.data || [];
+  const children = Array.isArray(childrenData) ? childrenData : [];
   
   // For parents: create minimal Student objects from children data
   // For staff: fetch all students

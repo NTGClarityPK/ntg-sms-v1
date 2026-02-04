@@ -28,6 +28,7 @@ import { TenantsModule } from './modules/tenants/tenants.module';
 import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.module';
 import { EarlyDepartureModule } from './modules/early-departure/early-departure.module';
 import { TimetableModule } from './modules/timetable/timetable.module';
+import { SubjectTemplatesModule } from './modules/subject-templates/subject-templates.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { TimetableModule } from './modules/timetable/timetable.module';
     TenantsModule,
     EarlyDepartureModule,
     TimetableModule,
+    SubjectTemplatesModule,
   ],
   controllers: [AppController],
   providers: [

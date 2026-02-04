@@ -12,6 +12,9 @@ import { useTeacherAssignments } from '@/hooks/useTeacherAssignments';
 import { useSubjects } from '@/hooks/useCoreLookups';
 import { useStaff } from '@/hooks/useStaff';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useAuth } from '@/hooks/useAuth';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
+import { useSubjectTemplate } from '@/hooks/useSubjectTemplates';
 
 const slotSchema = z
   .object({
@@ -58,6 +61,7 @@ interface SlotEditPopoverProps {
   dayOfWeek: number;
   timeRange: string; // Format: "HH:MM:SS-HH:MM:SS" or empty string
   academicYearId?: string;
+  subjectTemplateId?: string;
   onConflictCheck?: (slot: Partial<CreateTimetableSlotInput>) => Promise<boolean>;
 }
 
@@ -83,20 +87,29 @@ export function SlotEditPopover({
   dayOfWeek,
   timeRange,
   academicYearId,
+  subjectTemplateId,
   onConflictCheck,
 }: SlotEditPopoverProps) {
   const isEdit = !!slot;
   const colors = useThemeColors();
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+  const { data: activeYear } = useActiveAcademicYear();
   const createOrUpdate = useCreateOrUpdateSlot();
   const deleteSlot = useDeleteSlot();
   const { data: assignmentsData } = useTeacherAssignments({ classSectionId });
   const { data: subjectsData } = useSubjects();
   const { data: staffData } = useStaff();
   const { data: templateInfoData } = useTimingTemplateInfo(classSectionId);
+  const { data: templateData } = useSubjectTemplate(
+    subjectTemplateId ?? null,
+    branchId ?? null,
+  );
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
   
-  const templateInfo = templateInfoData?.data;
+  const templateInfo = templateInfoData;
+  const subjectTemplate = templateData?.data;
 
   const assignments = assignmentsData?.data || [];
   const subjects = (subjectsData as { data?: Array<{ id: string; name: string }> })?.data || [];
@@ -209,6 +222,7 @@ export function SlotEditPopover({
       endTime: values.endTime,
       slotType: values.slotType,
       academicYearId,
+      subjectTemplateId,
     });
     form.reset();
     setConflictWarning(null);
@@ -225,8 +239,15 @@ export function SlotEditPopover({
   const classSectionSubjectIds = new Set(
     assignments.map((a) => a.subjectId),
   );
+  
+  // Filter subjects by template if template is selected
+  let availableSubjectIds = new Set(subjects.map((s) => s.id));
+  if (subjectTemplate && subjectTemplate.subjectIds.length > 0) {
+    availableSubjectIds = new Set(subjectTemplate.subjectIds);
+  }
+  
   const subjectOptions = subjects
-    .filter((s) => classSectionSubjectIds.has(s.id))
+    .filter((s) => classSectionSubjectIds.has(s.id) && availableSubjectIds.has(s.id))
     .map((s) => ({
       value: s.id,
       label: s.name,

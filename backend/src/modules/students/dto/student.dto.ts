@@ -17,6 +17,8 @@ export class StudentDto {
   email?: string;
   className?: string;
   sectionName?: string;
+  subjectTemplateId?: string;
+  subjectTemplateName?: string;
 
   constructor(partial: Partial<StudentDto>) {
     Object.assign(this, partial);

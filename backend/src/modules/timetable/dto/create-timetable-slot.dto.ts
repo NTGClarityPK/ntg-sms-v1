@@ -58,5 +58,9 @@ export class CreateTimetableSlotDto {
   @IsOptional()
   @IsUUID()
   academicYearId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  subjectTemplateId?: string;
 }
 

@@ -62,10 +62,18 @@ export function useClassSections(params?: QueryClassSectionsParams) {
 export function useClassSection(id: string | null) {
   return useQuery({
     queryKey: ['class-section', id],
-    queryFn: async () => {
+    queryFn: async (): Promise<ClassSection | null> => {
       if (!id) return null;
+      // Backend returns { data: ClassSection }
+      // apiClient.get<{ data: ClassSection }> returns { data: ClassSection }
+      // response.data is { data: ClassSection }, so response.data.data is ClassSection
       const response = await apiClient.get<{ data: ClassSection }>(`/api/v1/class-sections/${id}`);
-      return response.data;
+      // Based on console logs, response.data is actually ClassSection directly, not { data: ClassSection }
+      // So we check: if it has a 'data' property, use that, otherwise use response.data directly
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        return (response.data as { data: ClassSection }).data;
+      }
+      return response.data as ClassSection;
     },
     enabled: !!id,
   });

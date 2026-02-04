@@ -20,6 +20,8 @@ export interface Student {
   gender?: 'male' | 'female';
   className?: string;
   sectionName?: string;
+  subjectTemplateId?: string;
+  subjectTemplateName?: string;
 }
 
 export interface CreateStudentInput {
@@ -39,6 +41,7 @@ export interface CreateStudentInput {
   admissionDate?: string;
   academicYearId?: string;
   isActive?: boolean;
+  subjectTemplateId?: string;
 }
 
 export interface UpdateStudentInput {
@@ -52,6 +55,8 @@ export interface UpdateStudentInput {
   bloodGroup?: string;
   medicalNotes?: string;
   admissionDate?: string;
+  academicYearId?: string;
   isActive?: boolean;
+  subjectTemplateId?: string;
 }
 

@@ -77,6 +77,30 @@ export function useStudent(id: string | null) {
   });
 }
 
+export function useMyStudent() {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['student', 'me', branchId],
+    queryFn: async () => {
+      if (!branchId) return null;
+      // Get current student from profile's current_student_id
+      const response = await apiClient.get<{ data: { id: string; studentId: string; fullName: string } | null }>(
+        '/api/v1/auth/current-child',
+      );
+      const currentChild = response.data?.data;
+      if (!currentChild?.id) return null;
+
+      // Fetch full student data
+      const studentResponse = await apiClient.get<{ data: Student }>(`/api/v1/students/${currentChild.id}`);
+      return studentResponse.data;
+    },
+    enabled: !!branchId && !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
 export function useGenerateStudentId() {
   return useMutation({
     mutationFn: async (params: { classId?: string; sectionId?: string; academicYearId?: string }) => {
@@ -131,9 +155,15 @@ export function useUpdateStudent() {
       const response = await apiClient.put<{ data: Student }>(`/api/v1/students/${id}`, input);
       return response.data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['students', branchId] });
       queryClient.invalidateQueries({ queryKey: ['student', variables.id] });
+      // Invalidate all student template queries for this student (covers all academic years)
+      if (variables.input.subjectTemplateId !== undefined) {
+        queryClient.invalidateQueries({
+          queryKey: ['subject-templates', 'student', variables.id],
+        });
+      }
       notifications.show({
         title: 'Success',
         message: 'Student updated successfully',

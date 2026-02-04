@@ -17,23 +17,51 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export function useClassTimetable(
   classSectionId: string | null,
   academicYearId?: string,
+  subjectTemplateId?: string,
 ) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
 
   return useQuery({
-    queryKey: ['timetable', 'class', classSectionId, academicYearId, branchId],
+    queryKey: ['timetable', 'class', classSectionId, academicYearId, subjectTemplateId, branchId],
     queryFn: async () => {
       if (!classSectionId || !branchId) return null;
       const queryParams = new URLSearchParams();
       if (academicYearId) queryParams.append('academicYearId', academicYearId);
+      if (subjectTemplateId) queryParams.append('subjectTemplateId', subjectTemplateId);
 
       const response = await apiClient.get<ClassTimetable>(
         `/api/v1/timetable/class/${classSectionId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
       );
       return response;
     },
-    enabled: !!classSectionId && !!branchId,
+    // Only enable query if we have classSectionId, branchId, AND subjectTemplateId
+    // This prevents the query from running before a template is selected
+    enabled: !!classSectionId && !!branchId && !!subjectTemplateId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useStudentTimetable(
+  studentId: string | null,
+  academicYearId?: string,
+) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['timetable', 'student', studentId, academicYearId, branchId],
+    queryFn: async () => {
+      if (!studentId || !branchId) return null;
+      const queryParams = new URLSearchParams();
+      if (academicYearId) queryParams.append('academicYearId', academicYearId);
+
+      const response = await apiClient.get<ClassTimetable>(
+        `/api/v1/timetable/student/${studentId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
+      );
+      return response;
+    },
+    enabled: !!studentId && !!branchId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
@@ -227,10 +255,13 @@ export function useTimingTemplateInfo(classSectionId: string | null) {
     queryKey: ['timetable', 'template-info', classSectionId, branchId],
     queryFn: async () => {
       if (!classSectionId || !branchId) return null;
+      // Backend returns TimingTemplateInfo directly
+      // apiClient.get<TimingTemplateInfo> returns { data: TimingTemplateInfo }
       const response = await apiClient.get<TimingTemplateInfo>(
         `/api/v1/timetable/class/${classSectionId}/template-info`,
       );
-      return response;
+      // Return the inner data
+      return response.data;
     },
     enabled: !!classSectionId && !!branchId,
     staleTime: 5 * 60 * 1000, // 5 minutes

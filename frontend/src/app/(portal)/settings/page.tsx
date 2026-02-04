@@ -57,6 +57,7 @@ import { LibraryCategoryEditor } from '@/components/features/settings/LibraryCat
 
 import { BehaviorSettings } from '@/components/features/settings/BehaviorSettings';
 import { useTenantMe, useUpdateTenantMe } from '@/hooks/useTenant';
+import { SubjectTemplatesTabContent } from '@/components/features/settings/SubjectTemplatesTabContent';
 
 export default function SettingsPage() {
   const colors = useThemeColors();
@@ -482,6 +483,7 @@ function AcademicTabContent() {
         <Tabs.Tab value="classes">Classes</Tabs.Tab>
         <Tabs.Tab value="sections">Sections</Tabs.Tab>
         <Tabs.Tab value="levels">Levels</Tabs.Tab>
+        <Tabs.Tab value="subject-templates">Subject Templates</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="subjects" pt="md">
@@ -495,6 +497,9 @@ function AcademicTabContent() {
       </Tabs.Panel>
       <Tabs.Panel value="levels" pt="md">
         <LevelManager />
+      </Tabs.Panel>
+      <Tabs.Panel value="subject-templates" pt="md">
+        <SubjectTemplatesTabContent />
       </Tabs.Panel>
     </Tabs>
   );

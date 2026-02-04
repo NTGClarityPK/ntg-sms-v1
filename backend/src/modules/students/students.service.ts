@@ -140,6 +140,38 @@ export class StudentsService {
     const emailEntries = await Promise.all(emailPromises);
     const emailMap = new Map(emailEntries);
 
+    // Fetch subject template assignments for all students
+    const studentIds = (data as unknown as Array<{ id: string }>)
+      .map((s) => s.id)
+      .filter((id): id is string => !!id);
+
+    const { data: templateAssignments } = studentIds.length > 0
+      ? await supabase
+          .from('student_subject_template_assignments')
+          .select('student_id, subject_template_id, subject_templates:subject_template_id(name)')
+          .in('student_id', studentIds)
+      : { data: [] };
+
+    // Create map: student_id -> { templateId, templateName }
+    const templateMap = new Map(
+      (templateAssignments || []).map((ta: {
+        student_id: string;
+        subject_template_id: string;
+        subject_templates: { name: string } | { name: string }[] | null;
+      }) => {
+        const templateData = Array.isArray(ta.subject_templates) 
+          ? ta.subject_templates[0] 
+          : ta.subject_templates;
+        return [
+          ta.student_id,
+          {
+            templateId: ta.subject_template_id,
+            templateName: templateData?.name,
+          },
+        ];
+      }),
+    );
+
     let students = (data as unknown as Array<{
       id: string;
       user_id: string;
@@ -169,6 +201,8 @@ export class StudentsService {
         const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
         const fullName = profileMap.get(row.user_id);
 
+        const templateInfo = templateMap.get(row.id);
+
         return new StudentDto({
           id: row.id,
           userId: row.user_id,
@@ -187,6 +221,8 @@ export class StudentsService {
           email: emailMap.get(row.user_id),
           className: classData?.display_name ?? classData?.name,
           sectionName: sectionData?.name,
+          subjectTemplateId: templateInfo?.templateId,
+          subjectTemplateName: templateInfo?.templateName,
         });
       });
 
@@ -264,6 +300,17 @@ export class StudentsService {
 
     const { data: authUser } = await supabase.auth.admin.getUserById(row.user_id);
 
+    // Fetch subject template assignment
+    const { data: templateAssignment } = await supabase
+      .from('student_subject_template_assignments')
+      .select('subject_template_id, subject_templates:subject_template_id(name)')
+      .eq('student_id', id)
+      .maybeSingle();
+
+    const templateData = Array.isArray(templateAssignment?.subject_templates)
+      ? templateAssignment?.subject_templates[0]
+      : templateAssignment?.subject_templates;
+
     return new StudentDto({
       id: row.id,
       userId: row.user_id,
@@ -282,6 +329,8 @@ export class StudentsService {
       email: authUser.user?.email,
       className: classData?.display_name ?? classData?.name,
       sectionName: sectionData?.name,
+      subjectTemplateId: templateAssignment?.subject_template_id,
+      subjectTemplateName: templateData?.name,
     });
   }
 
@@ -475,7 +524,27 @@ export class StudentsService {
         throw new BadRequestException('Failed to create student record');
       }
 
-      return this.getStudentById((student as StudentRow).id, branchId);
+      const studentRow = student as StudentRow;
+
+      // Create subject template assignment if provided
+      if (input.subjectTemplateId) {
+        const { error: assignmentError } = await supabase
+          .from('student_subject_template_assignments')
+          .upsert(
+            {
+              student_id: studentRow.id,
+              subject_template_id: input.subjectTemplateId,
+              academic_year_id: academicYearId,
+              branch_id: branchId,
+            },
+            {
+              onConflict: 'student_id,academic_year_id',
+            },
+          );
+        throwIfDbError(assignmentError);
+      }
+
+      return this.getStudentById(studentRow.id, branchId);
     } catch (error) {
       // Rollback: delete auth user if student creation fails
       await supabase.auth.admin.deleteUser(user.id);
@@ -518,21 +587,82 @@ export class StudentsService {
       }
     }
 
-    // Update student record
-    const { error } = await supabase
+    // Get student's academic year for template assignment
+    const { data: studentData } = await supabase
       .from('students')
-      .update({
-        class_id: input.classId ?? undefined,
-        section_id: input.sectionId ?? undefined,
-        blood_group: input.bloodGroup,
-        medical_notes: input.medicalNotes,
-        admission_date: input.admissionDate,
-        is_active: input.isActive,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
+      .select('academic_year_id')
+      .eq('id', id)
+      .single();
+
+    // Update student record (including academic_year_id if provided)
+    const updatePayload: {
+      class_id?: string;
+      section_id?: string;
+      blood_group?: string | null;
+      medical_notes?: string | null;
+      admission_date?: string | null;
+      is_active?: boolean;
+      updated_at: string;
+      academic_year_id?: string | null;
+    } = {
+      class_id: input.classId ?? undefined,
+      section_id: input.sectionId ?? undefined,
+      blood_group: input.bloodGroup,
+      medical_notes: input.medicalNotes,
+      admission_date: input.admissionDate,
+      is_active: input.isActive,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Update academic_year_id if provided
+    if (input.academicYearId !== undefined) {
+      updatePayload.academic_year_id = input.academicYearId ?? null;
+    }
+
+    const { error } = await supabase.from('students').update(updatePayload).eq('id', id);
 
     throwIfDbError(error);
+
+    // Determine academic year to use for template assignment
+    // Priority: input.academicYearId > existing student.academic_year_id
+    const academicYearIdForTemplate =
+      input.academicYearId ?? studentData?.academic_year_id ?? null;
+
+    // Update subject template assignment if provided
+    if (input.subjectTemplateId !== undefined) {
+      if (!academicYearIdForTemplate) {
+        throw new BadRequestException(
+          'Cannot assign subject template: Student must have an academic year assigned.',
+        );
+      }
+
+      if (input.subjectTemplateId) {
+        // Upsert assignment
+        const { error: assignmentError } = await supabase
+          .from('student_subject_template_assignments')
+          .upsert(
+            {
+              student_id: id,
+              subject_template_id: input.subjectTemplateId,
+              academic_year_id: academicYearIdForTemplate,
+              branch_id: branchId,
+            },
+            {
+              onConflict: 'student_id,academic_year_id',
+            },
+          );
+        throwIfDbError(assignmentError);
+      } else {
+        // Remove assignment if set to null/empty
+        const { error: deleteError } = await supabase
+          .from('student_subject_template_assignments')
+          .delete()
+          .eq('student_id', id)
+          .eq('academic_year_id', academicYearIdForTemplate)
+          .eq('branch_id', branchId);
+        throwIfDbError(deleteError);
+      }
+    }
 
     return this.getStudentById(id, branchId);
   }
