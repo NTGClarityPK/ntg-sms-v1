@@ -24,15 +24,20 @@
 - **Hook return types**: Explicitly type values returned from custom hooks (e.g. `user: User | undefined`) so consumers get correct types.
 - **TanStack Query v5**: Do not use `onSuccess` / `onError` on `useQuery`. Handle side‑effects in components or `useEffect`. Reserve those callbacks for `useMutation`.
 
-### 5. API Response Structure & Nested Data
+### 5. API Response Structure & Nested Data - CRITICAL
 - **Standard shape**: Treat the HTTP JSON body as `ApiResponse<T>` = `{ data: T; meta? }`. For lists, `T` is usually `TItem[]`.
-- **Nested access**: Remember the chain: `axiosResponse.data` → JSON body → `.data` for actual payload. If types say `{ data: T[] }`, you must use `response.data.data`.
-- **Hook/Component contract**: Ensure each React Query hook returns data in exactly the structure the component expects (`data` vs `data.data`).
+- **Hook return pattern - NEVER BREAK THIS:**
+  - **Paginated lists** (`GET /resource` with `meta`): Hook returns `response` (full object), component accesses `query.data?.data`
+  - **Single items** (`GET /resource/:id`): Hook returns `response.data`, component accesses `query.data`
+  - **Mutations**: Hook returns `response.data`, component uses `mutation.data` directly
+- **NEVER use `response.data.data` in hooks** - This is almost always wrong! The pattern depends on endpoint type.
+- **Hook/Component contract**: Before writing any hook, check an existing similar hook in the codebase and follow its pattern exactly. Ensure hook return matches component expectations.
 
 ### 6. NestJS Modules, Routes & Server Behaviour
 - **Graceful shutdown**: Implement shutdown handlers (`SIGINT`, `SIGTERM`, `uncaughtException`, `unhandledRejection`) and a timeout to avoid port conflicts in watch mode.
 - **Kill existing ports**: Use a pre‑start script to clear dev ports before `start:dev`.
-- **Providers**: Whenever a service injects `SupabaseConfig` (or any dependency), add it to the module `providers` array. Never rely on “global magic”.
+- **Providers**: Whenever a service injects `SupabaseConfig` (or any dependency), add it to the module `providers` array. Never rely on "global magic".
+- **Service exports**: When a service needs to be injected in other modules, add it to the module's `exports` array. Just importing the module is not enough - the service must be explicitly exported for cross-module dependency injection.
 - **Route ordering**: Always put specific routes (e.g. `@Get('by-tenant')`) before parameterised routes (`@Get(':id')`) to avoid accidental matches.
 - **Controller base paths**: Do not share base paths for controllers that have overlapping patterns (`/settings` + `/:key`). Give them distinct base paths.
 
@@ -50,7 +55,13 @@
 ### 9. Validation, Limits & Guards
 - **Query param transforms**: When using NestJS `ValidationPipe` with `enableImplicitConversion`, DTO transforms must support already‑converted types (e.g. booleans for `isRead`) as well as strings.
 - **Unread counts**: Do not derive unread counts from page‑sized lists. Prefer backend totals (`meta.total`) and compute `unread = total − read`, or derive unread/read segments client‑side from a single authoritative list.
-- **Pagination limits**: Respect backend limits (`@Max(100)` etc.). Never exceed them in frontend queries.
+- **Pagination limits - CRITICAL**: 
+  - **Backend default max is 100** (`@Max(100)` in `BasePaginationDto`)
+  - **NEVER use arbitrary large numbers** like `limit: 1000` or `limit: 9999` - this causes `HTTP 400: limit must not be greater than 100` errors
+  - **Before setting any limit**, check existing hooks in the codebase to see what they use
+  - **If you need "all items"**, use `limit: 100` (the max) or implement proper pagination
+  - **Common mistake**: Using `limit: 1000` in dropdowns/forms causes validation errors
+  - **Rule**: When in doubt, use `limit: 100` or check an existing similar hook first
 - **Context‑aware guards**: Before calling guarded endpoints (e.g. branch‑guarded routes), ensure required context exists (like `currentBranch`) and gate React Query with `enabled`.
 
 ### 10. Mantine v7 & Theming
@@ -78,12 +89,19 @@
 - **Optional arrays**: Treat possibly undefined arrays defensively using `?? []` before accessing `.length` or other methods.
 - **Error visibility**: Where appropriate, surface meaningful feedback (notifications, alerts) instead of silent failures, but do not rely on `console.log` in production code.
 
-### 15. Meta‑Lessons & Workflow
+### 15. Frontend Page Layout Consistency
+- **Never use `Container` for main pages**: Application pages (lists, CRUD, dashboards) need full-width layouts, not centered containers. `Container` is for content articles only.
+- **Always use `<Title order={1}>`** for main page headings - not `order={2}`. H1 gives proper visual hierarchy.
+- **Follow `page-title-bar` pattern**: Use `<div className="page-title-bar">` with full-width `Group` for consistent headers across all pages.
+- **Review existing pages FIRST**: Before implementing any new page, check `/users/page.tsx` or `/leaves/page.tsx` for the established layout pattern and follow it exactly.
+- **Layout rules**: Full-width header with H1 title → Content area with controlled padding using CSS variables → No Container wrappers on main pages.
+
+### 16. Meta‑Lessons & Workflow
 - **Fix root causes**: When you see many similar type errors, fix the root utilities/hooks rather than patching each usage.
 - **Version awareness**: Always confirm library versions (Mantine, TanStack Query, etc.) and follow the correct, version‑specific patterns.
 - **Checklists**: Use simple checklists per feature:
   - **Backend**: DTOs ✓ validation ✓ service ✓ controller ✓ module providers ✓
-  - **Frontend**: hook ✓ types ✓ UI components ✓ navigation ✓ loading/empty/error states ✓
+  - **Frontend**: hook ✓ types ✓ UI components ✓ navigation ✓ loading/empty/error states ✓ **layout consistency** ✓
   - **Integration**: branch/auth context ✓ correct headers ✓ response shape aligned ✓ manual test ✓
 
 

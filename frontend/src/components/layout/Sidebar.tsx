@@ -28,6 +28,7 @@ import {
   IconWalk,
   IconUsersGroup,
   IconCalendarClock,
+  IconFileText,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -52,6 +53,7 @@ const allNavItems: NavItem[] = [
   { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconBook },
   { label: 'Parent Associations', href: '/parent-associations', icon: IconUsersGroup },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
+  { label: 'Assessments', href: '/assessments', icon: IconFileText },
   { label: 'Leaves', href: '/leaves', icon: IconPlaneDeparture },
   { label: 'Early Departure', href: '/early-departure', icon: IconWalk },
   { 
@@ -157,6 +159,7 @@ export function Sidebar({
       item.href === '/dashboard' ||
       item.href === '/students' ||
       item.href === '/attendance' ||
+      item.href === '/assessments' ||
       item.href === '/leaves' ||
       item.href === '/early-departure' ||
       item.href === '/my-schedule' ||

@@ -11,6 +11,8 @@ import { AcademicYearsModule } from './modules/academic-years/academic-years.mod
 import { CoreLookupsModule } from './modules/core-lookups/core-lookups.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { AssessmentModule } from './modules/assessment/assessment.module';
+import { AssessmentsModule } from './modules/assessments/assessments.module';
+import { GradesModule } from './modules/grades/grades.module';
 import { SystemSettingsModule } from './modules/system-settings/system-settings.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { RolesModule } from './modules/roles/roles.module';
@@ -42,6 +44,8 @@ import { SubjectTemplatesModule } from './modules/subject-templates/subject-temp
     CoreLookupsModule,
     ScheduleModule,
     AssessmentModule,
+    AssessmentsModule,
+    GradesModule,
     SystemSettingsModule,
     BranchesModule,
     RolesModule,
