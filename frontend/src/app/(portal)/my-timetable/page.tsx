@@ -1,22 +1,59 @@
 'use client';
 
-import { Title, Text, Stack, Skeleton, Group, Alert, Paper } from '@mantine/core';
+import { Title, Text, Stack, Skeleton, Group, Alert, Paper, Modal, Badge } from '@mantine/core';
 import { useStudentTimetable, useTimingTemplateInfo } from '@/hooks/useTimetable';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useStudentTemplate } from '@/hooks/useSubjectTemplates';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getThemeColorShade } from '@/lib/utils/theme';
+
+// Helper to convert hex to RGB for rgba calculations (local copy since it's not exported)
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+    : null;
+}
+import { useThemeStore } from '@/lib/store/theme-store';
 import { TimetableGrid } from '@/components/features/timetable/TimetableGrid';
-import { TemplateInfoBanner } from '@/components/features/timetable/TemplateInfoBanner';
 import { useMyStudent } from '@/hooks/useStudents';
 import { useClassSections } from '@/hooks/useClassSections';
+import { useState, useEffect, useMemo } from 'react';
+import { useDisclosure } from '@mantine/hooks';
+import type { TimetableSlot } from '@/types/timetable';
+import { IconX, IconClock } from '@tabler/icons-react';
 
 export default function MyTimetablePage() {
   const colors = useThemeColors();
+  const { themeVersion } = useThemeStore();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const { data: activeYear } = useActiveAcademicYear();
   const activeYearId = activeYear?.data?.id;
+
+  // Get light background color for banner (similar to blue-0 shade)
+  // Reactive to theme changes via themeVersion dependency
+  const bannerBackgroundColor = useMemo(() => getThemeColorShade(0), [themeVersion]);
+
+  // Get light background colors for badges (light variant backgrounds)
+  const currentBadgeBg = useMemo(() => {
+    // Mix success color with white for light background (similar to Mantine's light variant)
+    const rgb = hexToRgb(colors.success);
+    if (!rgb) return colors.success;
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`;
+  }, [colors.success, themeVersion]);
+
+  const upcomingBadgeBg = useMemo(() => {
+    // Mix info color with white for light background
+    const rgb = hexToRgb(colors.info);
+    if (!rgb) return colors.info;
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`;
+  }, [colors.info, themeVersion]);
 
   // Get current student
   const { data: myStudentData, isLoading: myStudentLoading, error: myStudentError } = useMyStudent();
@@ -48,10 +85,23 @@ export default function MyTimetablePage() {
   const { data: timetableData, isLoading: timetableLoading, error: timetableError } =
     useStudentTimetable(studentId ?? null, activeYearId);
 
-  // Get timing template info for banner
+  // Get timing template info for grid (needed for vertical timeline, but banner is removed)
   const { data: templateInfoData, isLoading: templateInfoLoading } = useTimingTemplateInfo(classSectionId ?? null);
 
   const timetable = timetableData?.data;
+  const templateInfo = templateInfoData;
+  
+  // State for slot details modal
+  const [selectedSlot, setSelectedSlot] = useState<TimetableSlot | null>(null);
+  const [slotModalOpened, { open: openSlotModal, close: closeSlotModal }] = useDisclosure(false);
+
+  // State for next period
+  const [nextPeriod, setNextPeriod] = useState<{
+    slot: TimetableSlot | null;
+    timeUntil: { hours: number; minutes: number } | null;
+    status: 'upcoming' | 'current' | 'none';
+  } | null>(null);
+  
   // Use template info from student data if available, otherwise from separate query
   const subjectTemplate = myStudentData?.data?.subjectTemplateId
     ? {
@@ -59,8 +109,165 @@ export default function MyTimetablePage() {
         name: myStudentData.data.subjectTemplateName || 'Unknown Template',
       }
     : templateData?.data;
-  const templateInfo = templateInfoData;
-  
+
+  // Calculate next period
+  useEffect(() => {
+    if (!timetable?.slots || timetable.slots.length === 0) {
+      setNextPeriod(null);
+      return;
+    }
+
+    const updateNextPeriod = () => {
+      const now = new Date();
+      const currentDay = now.getDay(); // 0-6 (Sunday = 0, Monday = 1, etc.)
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+      const currentTime = `${String(currentHours).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}:00`;
+
+      // Debug logging
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      console.log('[NextPeriod] Current day:', currentDay, `(${dayNames[currentDay]})`, 'Current time:', currentTime);
+      console.log('[NextPeriod] All slots:', timetable.slots);
+      console.log('[NextPeriod] Slots by day:', timetable.slots.map(s => ({ 
+        day: s.dayOfWeek, 
+        dayName: dayNames[s.dayOfWeek] || 'Unknown',
+        time: s.startTime, 
+        subject: s.subjectName || 'No subject'
+      })));
+
+      // Filter today's slots - check if day matches
+      const todaySlots = timetable.slots.filter((s) => s.dayOfWeek === currentDay);
+      console.log('[NextPeriod] Today slots (matching day', currentDay, `(${dayNames[currentDay]})):`, todaySlots);
+      
+      // If no slots for today, try to find next available slot from any day
+      if (todaySlots.length === 0) {
+        console.log('[NextPeriod] No slots for today, checking all slots for next available period...');
+        // Find the next slot from any day (for better UX - show next period even if not today)
+        const allUpcomingSlots = timetable.slots
+          .map((s) => {
+            // Calculate days until this slot's day
+            let daysUntil = s.dayOfWeek - currentDay;
+            if (daysUntil < 0) daysUntil += 7; // Wrap around to next week
+            
+            const [startH, startM] = s.startTime.split(':').map(Number);
+            const startMinutes = startH * 60 + startM;
+            const currentMinutesTotal = currentHours * 60 + currentMinutes;
+            
+            // If same day, only include if time is in future
+            if (daysUntil === 0 && startMinutes <= currentMinutesTotal) {
+              return null;
+            }
+            
+            return { slot: s, daysUntil, startMinutes };
+          })
+          .filter((item): item is { slot: TimetableSlot; daysUntil: number; startMinutes: number } => item !== null)
+          .sort((a, b) => {
+            // Sort by days until first, then by time
+            if (a.daysUntil !== b.daysUntil) {
+              return a.daysUntil - b.daysUntil;
+            }
+            return a.startMinutes - b.startMinutes;
+          });
+        
+        console.log('[NextPeriod] All upcoming slots (any day):', allUpcomingSlots);
+        
+        if (allUpcomingSlots.length > 0) {
+          const { slot: nextSlot, daysUntil, startMinutes } = allUpcomingSlots[0];
+          const nextDayName = dayNames[nextSlot.dayOfWeek] || 'Unknown';
+          console.log('[NextPeriod] Next slot is on', nextDayName, 'at', nextSlot.startTime, `(${daysUntil} days away)`);
+          
+          // Calculate total time until next period
+          const currentMinutesTotal = currentHours * 60 + currentMinutes;
+          let totalMinutesUntil = 0;
+          
+          if (daysUntil === 0) {
+            // Same day, just calculate time difference
+            totalMinutesUntil = startMinutes - currentMinutesTotal;
+          } else {
+            // Different day: calculate minutes until end of today + minutes until slot time on target day
+            const minutesUntilEndOfDay = (24 * 60) - currentMinutesTotal;
+            totalMinutesUntil = minutesUntilEndOfDay + ((daysUntil - 1) * 24 * 60) + startMinutes;
+          }
+          
+          const hours = Math.floor(totalMinutesUntil / 60);
+          const minutes = totalMinutesUntil % 60;
+          
+          setNextPeriod({ 
+            slot: nextSlot, 
+            timeUntil: { hours, minutes }, 
+            status: 'upcoming'
+          });
+          return;
+        }
+        
+        console.log('[NextPeriod] No upcoming slots found, setting status to none');
+        setNextPeriod({ slot: null, timeUntil: null, status: 'none' });
+        return;
+      }
+
+      // Check if currently in a period
+      const currentSlot = todaySlots.find((s) => {
+        const [startH, startM] = s.startTime.split(':').map(Number);
+        const [endH, endM] = s.endTime.split(':').map(Number);
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+        const currentMinutesTotal = currentHours * 60 + currentMinutes;
+        return currentMinutesTotal >= startMinutes && currentMinutesTotal < endMinutes;
+      });
+
+      if (currentSlot) {
+        console.log('[NextPeriod] Currently in period:', currentSlot.subjectName);
+        setNextPeriod({ slot: currentSlot, timeUntil: null, status: 'current' });
+        return;
+      }
+
+      // Find next upcoming slot
+      const upcomingSlots = todaySlots
+        .filter((s) => {
+          const [startH, startM] = s.startTime.split(':').map(Number);
+          const startMinutes = startH * 60 + startM;
+          const currentMinutesTotal = currentHours * 60 + currentMinutes;
+          return startMinutes > currentMinutesTotal;
+        })
+        .sort((a, b) => {
+          const [aH, aM] = a.startTime.split(':').map(Number);
+          const [bH, bM] = b.startTime.split(':').map(Number);
+          return aH * 60 + aM - (bH * 60 + bM);
+        });
+
+      console.log('[NextPeriod] Upcoming slots:', upcomingSlots);
+
+      if (upcomingSlots.length > 0) {
+        const nextSlot = upcomingSlots[0];
+        const [startH, startM] = nextSlot.startTime.split(':').map(Number);
+        const startMinutes = startH * 60 + startM;
+        const currentMinutesTotal = currentHours * 60 + currentMinutes;
+        const diffMinutes = startMinutes - currentMinutesTotal;
+
+        const hours = Math.floor(diffMinutes / 60);
+        const minutes = diffMinutes % 60;
+
+        console.log('[NextPeriod] Next period:', nextSlot.subjectName, 'in', hours, 'hours', minutes, 'minutes');
+        setNextPeriod({
+          slot: nextSlot,
+          timeUntil: { hours, minutes },
+          status: 'upcoming',
+        });
+      } else {
+        // No more periods today
+        console.log('[NextPeriod] No more periods today');
+        setNextPeriod({ slot: null, timeUntil: null, status: 'none' });
+      }
+    };
+
+    updateNextPeriod(); // Initial calculation
+    const interval = setInterval(updateNextPeriod, 60000); // Update every 60 seconds
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [timetable?.slots]);
+
   console.log('[MyTimetablePage] subjectTemplate:', subjectTemplate);
   console.log('[MyTimetablePage] myStudentData.data.subjectTemplateId:', myStudentData?.data?.subjectTemplateId);
 
@@ -179,6 +386,35 @@ export default function MyTimetablePage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>My Timetable</Title>
+          {/* Next Period Badge */}
+          {nextPeriod && nextPeriod.status !== 'none' && (
+            <Badge
+              size="lg"
+              variant="light"
+              color={nextPeriod.status === 'current' ? colors.success : colors.info}
+              leftSection={<IconClock size={16} />}
+              style={{
+                whiteSpace: 'nowrap',
+                backgroundColor: nextPeriod.status === 'current' ? currentBadgeBg : upcomingBadgeBg,
+              }}
+            >
+              {nextPeriod.status === 'current' ? (
+                <Text size="sm" fw={500}>
+                  Currently: {nextPeriod.slot?.subjectName || 'Free Period'}
+                </Text>
+              ) : (
+                nextPeriod.slot && nextPeriod.timeUntil && (
+                  <Text size="sm" fw={500}>
+                    Upcoming: {nextPeriod.slot.subjectName || 'Free Period'} in{' '}
+                    {nextPeriod.timeUntil.hours > 0
+                      ? `${nextPeriod.timeUntil.hours} hour${nextPeriod.timeUntil.hours > 1 ? 's' : ''} `
+                      : ''}
+                    {nextPeriod.timeUntil.minutes} minute{nextPeriod.timeUntil.minutes !== 1 ? 's' : ''}
+                  </Text>
+                )
+              )}
+            </Badge>
+          )}
         </Group>
       </div>
       <div
@@ -191,26 +427,27 @@ export default function MyTimetablePage() {
         }}
       >
         <Stack gap="md">
-          {subjectTemplate && (
-            <Paper p="md" withBorder>
-              <Text size="sm" fw={500}>
-                Subject Template: {subjectTemplate.name}
+          {/* Student Info Banner */}
+          <Paper p="md" withBorder style={{ backgroundColor: bannerBackgroundColor }}>
+            <Text size="sm" fw={500}>
+              Showing Timetable for <Text component="span" fw={600}>{myStudentData.data.fullName}</Text> of{' '}
+              <Text component="span" fw={600}>{subjectTemplate?.name || 'Unknown Template'}</Text> for{' '}
+              <Text component="span" fw={600}>
+                {timetable ? `${timetable.className} - ${timetable.sectionName}` : 'Unknown Class'}
               </Text>
-              {'description' in subjectTemplate && subjectTemplate.description && (
-                <Text size="xs" c="dimmed" mt={4}>
-                  {subjectTemplate.description}
-                </Text>
-              )}
-            </Paper>
-          )}
-
-          <TemplateInfoBanner templateInfo={templateInfo || null} />
+            </Text>
+          </Paper>
 
           {timetable && (
             <TimetableGrid
               classSectionId={classSectionId ?? ''}
               slots={timetable.slots}
-              onSlotClick={() => {}} // Read-only for students
+              onSlotClick={(slot, day, timeRange, target) => {
+                if (slot) {
+                  setSelectedSlot(slot);
+                  openSlotModal();
+                }
+              }}
               templateInfo={templateInfo || null}
               conflicts={[]}
               isLoading={timetableLoading}
@@ -226,7 +463,114 @@ export default function MyTimetablePage() {
           )}
         </Stack>
       </div>
+
+      {/* Slot Details Modal for Students */}
+      <Modal
+        opened={slotModalOpened}
+        onClose={closeSlotModal}
+        title="Timetable Slot Details"
+        size="md"
+      >
+        {selectedSlot && (
+          <Stack gap="md">
+            <Group justify="space-between">
+              <Badge
+                size="lg"
+                variant="light"
+                color={
+                  selectedSlot.slotType === 'class'
+                    ? 'blue'
+                    : selectedSlot.slotType === 'assembly'
+                      ? 'orange'
+                      : selectedSlot.slotType === 'break'
+                        ? 'yellow'
+                        : 'gray'
+                }
+              >
+                {selectedSlot.slotType.charAt(0).toUpperCase() + selectedSlot.slotType.slice(1)}
+              </Badge>
+              {selectedSlot.periodNumber && (
+                <Text size="sm" c="dimmed">
+                  Period {selectedSlot.periodNumber}
+                </Text>
+              )}
+            </Group>
+
+            <div>
+              <Text size="xs" c="dimmed" mb={4}>
+                Time
+              </Text>
+              <Text size="sm" fw={500}>
+                {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
+              </Text>
+            </div>
+
+            {selectedSlot.subjectName && (
+              <div>
+                <Text size="xs" c="dimmed" mb={4}>
+                  Subject
+                </Text>
+                <Text size="sm" fw={500}>
+                  {selectedSlot.subjectName}
+                </Text>
+              </div>
+            )}
+
+            {selectedSlot.staffName && (
+              <div>
+                <Text size="xs" c="dimmed" mb={4}>
+                  Teacher
+                </Text>
+                <Text size="sm" fw={500}>
+                  {selectedSlot.staffName}
+                </Text>
+              </div>
+            )}
+
+            {selectedSlot.room && (
+              <div>
+                <Text size="xs" c="dimmed" mb={4}>
+                  Room
+                </Text>
+                <Text size="sm" fw={500}>
+                  {selectedSlot.room}
+                </Text>
+              </div>
+            )}
+
+            <div>
+              <Text size="xs" c="dimmed" mb={4}>
+                Day
+              </Text>
+              <Text size="sm" fw={500}>
+                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][selectedSlot.dayOfWeek]}
+              </Text>
+            </div>
+
+            {selectedSlot.className && selectedSlot.sectionName && (
+              <div>
+                <Text size="xs" c="dimmed" mb={4}>
+                  Class
+                </Text>
+                <Text size="sm" fw={500}>
+                  {selectedSlot.className} - {selectedSlot.sectionName}
+                </Text>
+              </div>
+            )}
+          </Stack>
+        )}
+      </Modal>
     </>
   );
 }
+
+// Format time from HH:MM:SS to HH:MM AM/PM
+const formatTime = (time: string): string => {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours || '0', 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes || '00'} ${ampm}`;
+};
 

@@ -18,6 +18,7 @@ import {
 import { TimetableService } from './timetable.service';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import { GenerateTimetableDto } from './dto/generate-timetable.dto';
+import { ReplicateDayDto } from './dto/replicate-day.dto';
 import { StaffService } from '../staff/staff.service';
 
 @Controller('api/v1/timetable')
@@ -171,6 +172,15 @@ export class TimetableController {
       input.academicYearId,
       input.subjectTemplateId,
     );
+    return { data };
+  }
+
+  @Post('replicate-day')
+  async replicateDay(
+    @Body() input: ReplicateDayDto,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const data = await this.timetableService.replicateDay(input, branch.branchId);
     return { data };
   }
 }

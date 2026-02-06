@@ -15,6 +15,7 @@ import { ClassTimetableDto } from './dto/class-timetable.dto';
 import { TeacherTimetableDto, FreePeriod } from './dto/teacher-timetable.dto';
 import { ConflictDto, ConflictType, ConflictingSlot } from './dto/conflict.dto';
 import { TimingTemplateInfoDto } from './dto/timing-template-info.dto';
+import { ReplicateDayDto } from './dto/replicate-day.dto';
 
 type TimetableSlotRow = {
   id: string;
@@ -465,18 +466,119 @@ export class TimetableService {
     const { data, error } = await supabase
       .from('timetable_slots')
       .upsert(upsertData, {
-        // Use the primary time-range uniqueness constraint for upsert
-        // This matches the UNIQUE index: (class_section_id, day_of_week, start_time, end_time, academic_year_id)
-        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id',
+        // Use the unique constraint that includes subject_template_id
+        // This matches: (class_section_id, day_of_week, start_time, end_time, academic_year_id, subject_template_id)
+        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
       })
       .select('*')
       .single();
     throwIfDbError(error);
 
     const row = data as TimetableSlotRow;
+    
+    // Automatically renumber periods based on chronological order
+    await this.renumberPeriodsForClassSection(
+      input.classSectionId,
+      branchId,
+      academicYearId,
+      input.subjectTemplateId,
+    );
+    
     return this.getClassTimetable(input.classSectionId, branchId, academicYearId).then(
       (timetable) => timetable.slots.find((s) => s.id === row.id)!,
     );
+  }
+
+  /**
+   * Automatically renumbers period numbers for a class-section based on chronological order.
+   * Periods are numbered 1, 2, 3... based on start_time within each day_of_week.
+   * This is done separately for each day_of_week and subject_template_id combination.
+   * 
+   * Rules:
+   * - If there's only 1 slot for a day+template, it gets period 1
+   * - If there are multiple slots, they get numbered 1, 2, 3... based on start_time order
+   * - Period numbers are assigned per day_of_week and per subject_template_id
+   */
+  private async renumberPeriodsForClassSection(
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string,
+    subjectTemplateId?: string | null,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Fetch all slots for this class-section, filtered by template if provided
+    let slotsQuery = supabase
+      .from('timetable_slots')
+      .select('id, day_of_week, start_time, subject_template_id')
+      .eq('class_section_id', classSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId);
+
+    // Filter by subject_template_id if provided
+    if (subjectTemplateId) {
+      slotsQuery = slotsQuery.eq('subject_template_id', subjectTemplateId);
+    } else {
+      // If no template specified, only renumber slots without templates (null)
+      slotsQuery = slotsQuery.is('subject_template_id', null);
+    }
+
+    const { data: allSlots, error: slotsError } = await slotsQuery
+      .order('day_of_week', { ascending: true })
+      .order('start_time', { ascending: true });
+    throwIfDbError(slotsError);
+
+    if (!allSlots || allSlots.length === 0) {
+      return; // No slots to renumber
+    }
+
+    // Group slots by day_of_week and subject_template_id
+    const slotsByDayAndTemplate = new Map<string, Array<{ id: string; start_time: string }>>();
+    
+    for (const slot of allSlots) {
+      const key = `${slot.day_of_week}_${slot.subject_template_id || 'null'}`;
+      if (!slotsByDayAndTemplate.has(key)) {
+        slotsByDayAndTemplate.set(key, []);
+      }
+      slotsByDayAndTemplate.get(key)!.push({
+        id: slot.id,
+        start_time: slot.start_time,
+      });
+    }
+
+    // Renumber periods for each day+template combination
+    const updates: Array<{ id: string; period_number: number }> = [];
+    
+    for (const [key, slots] of slotsByDayAndTemplate.entries()) {
+      // Slots are already sorted by start_time from the query
+      // Assign period numbers 1, 2, 3... based on chronological order
+      slots.forEach((slot, index) => {
+        updates.push({
+          id: slot.id,
+          period_number: index + 1, // 1-indexed
+        });
+      });
+    }
+
+    // Batch update all slots
+    if (updates.length > 0) {
+      // Use Promise.all to update all slots in parallel
+      const updatePromises = updates.map((update) =>
+        supabase
+          .from('timetable_slots')
+          .update({ period_number: update.period_number })
+          .eq('id', update.id),
+      );
+
+      const results = await Promise.all(updatePromises);
+      
+      // Check for errors
+      for (const result of results) {
+        if (result.error) {
+          throwIfDbError(result.error);
+        }
+      }
+    }
   }
 
   async deleteSlot(id: string, branchId: string): Promise<{ success: boolean }> {
@@ -494,10 +596,139 @@ export class TimetableService {
       throw new NotFoundException('Timetable slot not found');
     }
 
+    // Get slot info before deletion for renumbering
+    const { data: slotToDelete, error: getError } = await supabase
+      .from('timetable_slots')
+      .select('class_section_id, academic_year_id, subject_template_id')
+      .eq('id', id)
+      .single();
+    throwIfDbError(getError);
+    
+    if (!slotToDelete) {
+      throw new NotFoundException('Timetable slot not found');
+    }
+
     const { error } = await supabase.from('timetable_slots').delete().eq('id', id);
     throwIfDbError(error);
 
+    // Automatically renumber periods after deletion
+    if (slotToDelete) {
+      await this.renumberPeriodsForClassSection(
+        slotToDelete.class_section_id,
+        branchId,
+        slotToDelete.academic_year_id,
+        slotToDelete.subject_template_id,
+      );
+    }
+
     return { success: true };
+  }
+
+  /**
+   * Replicates all slots from a source day to one or more target days.
+   * Only replicates slots that match the subject_template_id if provided.
+   * Existing slots on target days with the same time range will be replaced.
+   */
+  async replicateDay(
+    input: ReplicateDayDto,
+    branchId: string,
+  ): Promise<{ slotsReplicated: number }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Validate source day is not in target days
+    if (input.targetDaysOfWeek.includes(input.sourceDayOfWeek)) {
+      throw new BadRequestException('Source day cannot be in target days');
+    }
+
+    // Get active academic year if not provided
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      throw new BadRequestException('No active academic year found');
+    }
+    const activeYearId = input.academicYearId ?? activeYear.id;
+
+    // Fetch all slots from source day
+    let sourceSlotsQuery = supabase
+      .from('timetable_slots')
+      .select('*')
+      .eq('class_section_id', input.classSectionId)
+      .eq('day_of_week', input.sourceDayOfWeek)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYearId);
+
+    // Filter by subject_template_id if provided
+    if (input.subjectTemplateId) {
+      sourceSlotsQuery = sourceSlotsQuery.eq('subject_template_id', input.subjectTemplateId);
+    } else {
+      sourceSlotsQuery = sourceSlotsQuery.is('subject_template_id', null);
+    }
+
+    const { data: sourceSlots, error: sourceError } = await sourceSlotsQuery;
+    throwIfDbError(sourceError);
+
+    if (!sourceSlots || sourceSlots.length === 0) {
+      return { slotsReplicated: 0 };
+    }
+
+    // Prepare slots to insert for each target day
+    const slotsToInsert: Array<{
+      class_section_id: string;
+      day_of_week: number;
+      period_number: number | null;
+      start_time: string;
+      end_time: string;
+      subject_id: string | null;
+      staff_id: string | null;
+      room: string | null;
+      slot_type: 'class' | 'assembly' | 'break' | 'free';
+      branch_id: string;
+      academic_year_id: string;
+      subject_template_id: string | null;
+    }> = [];
+
+    for (const targetDay of input.targetDaysOfWeek) {
+      for (const sourceSlot of sourceSlots) {
+        slotsToInsert.push({
+          class_section_id: input.classSectionId,
+          day_of_week: targetDay,
+          period_number: sourceSlot.period_number,
+          start_time: sourceSlot.start_time,
+          end_time: sourceSlot.end_time,
+          subject_id: sourceSlot.subject_id,
+          staff_id: sourceSlot.staff_id,
+          room: sourceSlot.room,
+          slot_type: sourceSlot.slot_type,
+          branch_id: branchId,
+          academic_year_id: activeYearId,
+          subject_template_id: sourceSlot.subject_template_id,
+        });
+      }
+    }
+
+    if (slotsToInsert.length === 0) {
+      return { slotsReplicated: 0 };
+    }
+
+    // Upsert slots (will replace existing ones due to unique constraint)
+    const { error: insertError } = await supabase
+      .from('timetable_slots')
+      .upsert(slotsToInsert, {
+        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
+      });
+    throwIfDbError(insertError);
+
+    // Renumber periods for all affected days
+    const allAffectedDays = [...new Set([input.sourceDayOfWeek, ...input.targetDaysOfWeek])];
+    for (const day of allAffectedDays) {
+      await this.renumberPeriodsForClassSection(
+        input.classSectionId,
+        branchId,
+        activeYearId,
+        input.subjectTemplateId,
+      );
+    }
+
+    return { slotsReplicated: slotsToInsert.length };
   }
 
   /**
@@ -767,6 +998,15 @@ export class TimetableService {
         onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
       });
     throwIfDbError(insertError);
+
+    // Automatically renumber periods based on chronological order
+    // This ensures all slots (including existing ones) are properly numbered
+    await this.renumberPeriodsForClassSection(
+      classSectionId,
+      branchId,
+      activeYearId,
+      subjectTemplateId,
+    );
 
     return { slotsCreated: slotsToInsert.length };
   }

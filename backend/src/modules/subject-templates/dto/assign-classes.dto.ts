@@ -7,3 +7,5 @@ export class AssignClassesToTemplateDto {
   classIds!: string[];
 }
 
+
+

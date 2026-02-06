@@ -8,6 +8,8 @@ import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranch
 import { NotificationBell } from './NotificationBell';
 import { useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTenantMe } from '@/hooks/useTenant';
+import { useAuth } from '@/hooks/useAuth';
+import { useMyStudent } from '@/hooks/useStudents';
 
 export function Header() {
   const successColor = useSuccessColor();
@@ -15,6 +17,14 @@ export function Header() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const tenantQuery = useTenantMe();
   const tenantName = tenantQuery.data?.data?.name;
+  const { user } = useAuth();
+  
+  // Check if user is a student and get class name
+  const isStudent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'student') || false;
+  const { data: myStudentData } = useMyStudent();
+  const studentClassName = myStudentData?.data?.className && myStudentData?.data?.sectionName
+    ? `${myStudentData.data.className} - ${myStudentData.data.sectionName}`
+    : null;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -35,13 +45,20 @@ export function Header() {
 
   return (
     <Group justify="space-between" style={{ flex: 1 }}>
-      {tenantQuery.isLoading ? (
-        <Skeleton height={22} width={220} />
-      ) : (
-        <Text fw={600} size="lg">
-          {tenantName || 'School Management System'}
-        </Text>
-      )}
+      <Group gap="sm" align="center">
+        {tenantQuery.isLoading ? (
+          <Skeleton height={22} width={220} />
+        ) : (
+          <Text fw={600} size="lg">
+            {tenantName || 'School Management System'}
+          </Text>
+        )}
+        {isStudent && studentClassName && (
+          <Badge variant="light" color="blue" size="lg">
+            {studentClassName}
+          </Badge>
+        )}
+      </Group>
 
       <Group gap="md" align="center">
         {/* NTG Logo */}

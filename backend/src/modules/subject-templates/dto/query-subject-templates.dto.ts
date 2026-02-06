@@ -7,3 +7,5 @@ export class QuerySubjectTemplatesDto extends BasePaginationDto {
   sortBy?: 'name' | 'created_at' | 'updated_at';
 }
 
+
+

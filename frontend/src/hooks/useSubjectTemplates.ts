@@ -239,7 +239,7 @@ export function useStudentTemplate(
       );
       return response.data;
     },
-    enabled: !!studentId && !!branchId,
+    enabled: !!studentId && !!branchId && !!academicYearId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
