@@ -36,23 +36,28 @@ export function TimetableSlotComponent({
       withBorder={!showConflict}
     >
       <Stack gap={4}>
-        <Group justify="space-between" gap={4}>
+        <Group justify="space-between" gap={8} wrap="nowrap" style={{ marginTop: 8 }}>
+          {slot.subjectName ? (
+            <Text size="sm" fw={500} lineClamp={1}>
+              {slot.subjectName}
+            </Text>
+          ) : (
+            <Text size="sm" c="dimmed" lineClamp={1}>
+              Free Period
+            </Text>
+          )}
+
+          <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+            {slot.startTime} - {slot.endTime}
+          </Text>
+        </Group>
+
+        <Group justify="space-between" gap={4} wrap="nowrap">
           <Badge size="xs" variant="light" color={slotTypeColors[slot.slotType]}>
             {slot.slotType}
           </Badge>
-          {showConflict && (
-            <IconAlertCircle size={14} color="var(--mantine-color-red-6)" />
-          )}
+          {showConflict && <IconAlertCircle size={14} color="var(--mantine-color-red-6)" />}
         </Group>
-        {slot.subjectName ? (
-          <Text size="sm" fw={500}>
-            {slot.subjectName}
-          </Text>
-        ) : (
-          <Text size="sm" c="dimmed">
-            Free Period
-          </Text>
-        )}
         {slot.staffName && (
           <Text size="xs" c="dimmed">
             {slot.staffName}
@@ -63,9 +68,6 @@ export function TimetableSlotComponent({
             Room: {slot.room}
           </Text>
         )}
-        <Text size="xs" c="dimmed">
-          {slot.startTime} - {slot.endTime}
-        </Text>
       </Stack>
     </Card>
   );

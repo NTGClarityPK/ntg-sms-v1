@@ -473,7 +473,24 @@ export default function MyTimetablePage() {
       >
         {selectedSlot && (
           <Stack gap="md">
-            <Group justify="space-between">
+            <Group justify="space-between" align="flex-start" wrap="nowrap">
+              <Stack gap={2} style={{ flex: 1 }}>
+                <Text size="lg" fw={600} lineClamp={1}>
+                  {selectedSlot.subjectName || 'Free Period'}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
+                </Text>
+              </Stack>
+
+              {selectedSlot.periodNumber && (
+                <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                  Period {selectedSlot.periodNumber}
+                </Text>
+              )}
+            </Group>
+
+            <Group justify="space-between" align="center" wrap="nowrap">
               <Badge
                 size="lg"
                 variant="light"
@@ -489,32 +506,7 @@ export default function MyTimetablePage() {
               >
                 {selectedSlot.slotType.charAt(0).toUpperCase() + selectedSlot.slotType.slice(1)}
               </Badge>
-              {selectedSlot.periodNumber && (
-                <Text size="sm" c="dimmed">
-                  Period {selectedSlot.periodNumber}
-                </Text>
-              )}
             </Group>
-
-            <div>
-              <Text size="xs" c="dimmed" mb={4}>
-                Time
-              </Text>
-              <Text size="sm" fw={500}>
-                {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
-              </Text>
-            </div>
-
-            {selectedSlot.subjectName && (
-              <div>
-                <Text size="xs" c="dimmed" mb={4}>
-                  Subject
-                </Text>
-                <Text size="sm" fw={500}>
-                  {selectedSlot.subjectName}
-                </Text>
-              </div>
-            )}
 
             {selectedSlot.staffName && (
               <div>

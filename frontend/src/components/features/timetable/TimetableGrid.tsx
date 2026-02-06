@@ -247,7 +247,7 @@ export function TimetableGrid({
                           size="xs"
                           variant="light"
                           color="gray"
-                          style={{ position: 'absolute', top: 2, right: 2 }}
+                          style={{ position: 'absolute', top: 4, right: 4 }}
                         >
                           Period {slot.periodNumber}
                         </Badge>
