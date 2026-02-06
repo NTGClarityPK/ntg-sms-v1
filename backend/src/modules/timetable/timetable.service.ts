@@ -759,7 +759,8 @@ export class TimetableService {
     }
 
     // Upsert slots (will replace existing ones due to unique constraint)
-    // Note: For partial unique index, we need to handle null subject_template_id separately
+    // The unique constraint includes: (class_section_id, day_of_week, start_time, end_time, academic_year_id, subject_template_id)
+    // This allows multiple slots at the same time for different templates
     const { error: insertError } = await supabase
       .from('timetable_slots')
       .upsert(slotsToInsert, {

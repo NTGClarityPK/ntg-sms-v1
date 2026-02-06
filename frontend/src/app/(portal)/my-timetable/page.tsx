@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Title, Text, Stack, Skeleton, Group, Alert, Paper } from '@mantine/core';
 import { useStudentTimetable, useTimingTemplateInfo } from '@/hooks/useTimetable';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,7 +19,10 @@ export default function MyTimetablePage() {
   const activeYearId = activeYear?.data?.id;
 
   // Get current student
-  const { data: myStudentData } = useMyStudent();
+  const { data: myStudentData, isLoading: myStudentLoading, error: myStudentError } = useMyStudent();
+  console.log('[MyTimetablePage] myStudentData:', myStudentData);
+  console.log('[MyTimetablePage] myStudentLoading:', myStudentLoading);
+  console.log('[MyTimetablePage] myStudentError:', myStudentError);
   const studentId = myStudentData?.data?.id;
 
   // Get student's template assignment
@@ -31,7 +33,7 @@ export default function MyTimetablePage() {
   );
 
   // Get class-section ID from student's classId and sectionId
-  const { data: classSectionsData } = useClassSections(
+  const { data: classSectionsData, isLoading: classSectionsLoading } = useClassSections(
     myStudentData?.data?.classId && myStudentData?.data?.sectionId && activeYearId
       ? {
           classId: myStudentData.data.classId,
@@ -47,14 +49,23 @@ export default function MyTimetablePage() {
     useStudentTimetable(studentId ?? null, activeYearId);
 
   // Get timing template info for banner
-  const { data: templateInfoData } = useTimingTemplateInfo(classSectionId ?? null);
+  const { data: templateInfoData, isLoading: templateInfoLoading } = useTimingTemplateInfo(classSectionId ?? null);
 
   const timetable = timetableData?.data;
-  const subjectTemplate = templateData?.data;
+  // Use template info from student data if available, otherwise from separate query
+  const subjectTemplate = myStudentData?.data?.subjectTemplateId
+    ? {
+        id: myStudentData.data.subjectTemplateId,
+        name: myStudentData.data.subjectTemplateName || 'Unknown Template',
+      }
+    : templateData?.data;
   const templateInfo = templateInfoData;
+  
+  console.log('[MyTimetablePage] subjectTemplate:', subjectTemplate);
+  console.log('[MyTimetablePage] myStudentData.data.subjectTemplateId:', myStudentData?.data?.subjectTemplateId);
 
-  // Loading state
-  if (templateLoading || timetableLoading || !timetableData) {
+  // Loading state - only check isLoading flags, not data existence
+  if (myStudentLoading || timetableLoading || classSectionsLoading || templateInfoLoading) {
     return (
       <>
         <div className="page-title-bar">
@@ -75,6 +86,34 @@ export default function MyTimetablePage() {
             <Skeleton height={40} width="30%" />
             <Skeleton height={400} />
           </Stack>
+        </div>
+      </>
+    );
+  }
+
+  // Check if student data is available
+  if (!myStudentData?.data) {
+    return (
+      <>
+        <div className="page-title-bar">
+          <Group justify="space-between" w="100%">
+            <Title order={1}>My Timetable</Title>
+          </Group>
+        </div>
+        <div
+          style={{
+            marginTop: '60px',
+            paddingLeft: 'var(--mantine-spacing-md)',
+            paddingRight: 'var(--mantine-spacing-md)',
+            paddingTop: 'var(--mantine-spacing-sm)',
+            paddingBottom: 'var(--mantine-spacing-xl)',
+          }}
+        >
+          <Alert color={colors.warning} title="Student Not Found">
+            <Text size="sm">
+              Unable to retrieve your student information. Please contact your administrator.
+            </Text>
+          </Alert>
         </div>
       </>
     );

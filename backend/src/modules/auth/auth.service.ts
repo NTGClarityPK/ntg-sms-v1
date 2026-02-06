@@ -256,42 +256,74 @@ export class AuthService {
   } | null> {
     const supabase = this.supabaseConfig.getClient();
 
+    // Get user's current branch from profile
+    const currentBranchId = await this.getProfileCurrentBranchId(userId);
+    if (!currentBranchId) {
+      return null;
+    }
+
+    // First, check if user has a current_student_id set (for parents)
     const { data: profile } = await supabase
       .from('profiles')
       .select('current_student_id')
       .eq('id', userId)
       .maybeSingle();
 
-    if (!profile || !(profile as { current_student_id: string | null }).current_student_id) {
+    let studentIdToFetch: string | null = null;
+
+    if (profile && (profile as { current_student_id: string | null }).current_student_id) {
+      // Parent has selected a child - verify it's in the current branch
+      const { data: studentCheck } = await supabase
+        .from('students')
+        .select('id')
+        .eq('id', (profile as { current_student_id: string }).current_student_id)
+        .eq('branch_id', currentBranchId)
+        .maybeSingle();
+
+      if (studentCheck) {
+        studentIdToFetch = studentCheck.id;
+      }
+    } else {
+      // No current_student_id set - check if user is a student themselves
+      // (student record linked directly to user_id) - filter by current branch
+      const { data: studentRecord } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('branch_id', currentBranchId)
+        .maybeSingle();
+
+      if (studentRecord) {
+        studentIdToFetch = studentRecord.id;
+      }
+    }
+
+    if (!studentIdToFetch) {
       return null;
     }
 
-    const currentStudentId = (profile as { current_student_id: string }).current_student_id;
-
-    const { data: student } = await supabase
+    // Fetch the student record
+    const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, student_id, profiles:user_id(full_name)')
-      .eq('id', currentStudentId)
+      .select('id, student_id, user_id')
+      .eq('id', studentIdToFetch)
       .single();
 
-    if (!student) {
+    if (studentError || !student) {
       return null;
     }
 
-    const studentData = student as unknown as {
-      id: string;
-      student_id: string;
-      profiles: { full_name: string } | { full_name: string }[] | null;
-    };
-
-    const profileData = Array.isArray(studentData.profiles)
-      ? studentData.profiles[0]
-      : studentData.profiles;
+    // Fetch profile separately to get full_name
+    const { data: studentProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', student.user_id)
+      .maybeSingle();
 
     return {
-      id: studentData.id,
-      studentId: studentData.student_id,
-      fullName: profileData?.full_name || '',
+      id: student.id,
+      studentId: student.student_id,
+      fullName: studentProfile?.full_name || '',
     };
   }
 }

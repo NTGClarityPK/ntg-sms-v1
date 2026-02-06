@@ -159,7 +159,8 @@ export function Sidebar({
       item.href === '/attendance' ||
       item.href === '/leaves' ||
       item.href === '/early-departure' ||
-      item.href === '/my-schedule'
+      item.href === '/my-schedule' ||
+      item.href === '/my-timetable'
   );
   const managementItems = navItems.filter(
     (item) =>

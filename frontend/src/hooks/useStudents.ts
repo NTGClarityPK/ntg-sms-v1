@@ -84,17 +84,43 @@ export function useMyStudent() {
   return useQuery({
     queryKey: ['student', 'me', branchId],
     queryFn: async () => {
-      if (!branchId) return null;
-      // Get current student from profile's current_student_id
-      const response = await apiClient.get<{ data: { id: string; studentId: string; fullName: string } | null }>(
-        '/api/v1/auth/current-child',
-      );
-      const currentChild = response.data?.data;
-      if (!currentChild?.id) return null;
+      if (!branchId) {
+        console.error('[useMyStudent] No branchId');
+        return null;
+      }
+      
+      try {
+        // Get current student from profile's current_student_id or user_id link
+        // Backend controller returns: { data: { id: string; studentId: string; fullName: string } | null }
+        const response = await apiClient.get<{ id: string; studentId: string; fullName: string } | null>(
+          '/api/v1/auth/current-child',
+        );
+        
+        console.log('[useMyStudent] current-child response:', JSON.stringify(response, null, 2));
+        
+        // apiClient.get returns ApiResponse<T> = { data: T, meta?, error? }
+        // So response is { data: { id, studentId, fullName } | null }
+        // response.data is { id, studentId, fullName } | null
+        const currentChild = response.data;
+        console.log('[useMyStudent] currentChild:', currentChild);
+        
+        if (!currentChild?.id) {
+          console.error('[useMyStudent] No currentChild.id, currentChild:', currentChild);
+          return null;
+        }
 
-      // Fetch full student data
-      const studentResponse = await apiClient.get<{ data: Student }>(`/api/v1/students/${currentChild.id}`);
-      return studentResponse.data;
+        // Fetch full student data
+        // Backend returns: { data: Student }
+        const studentResponse = await apiClient.get<Student>(`/api/v1/students/${currentChild.id}`);
+        console.log('[useMyStudent] studentResponse:', JSON.stringify(studentResponse, null, 2));
+        
+        // studentResponse is { data: Student }
+        // Component expects { data: Student }, so return as-is
+        return studentResponse;
+      } catch (error) {
+        console.error('[useMyStudent] Error:', error);
+        throw error;
+      }
     },
     enabled: !!branchId && !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
