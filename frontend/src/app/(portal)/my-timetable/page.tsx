@@ -196,7 +196,7 @@ export default function MyTimetablePage() {
               <Text size="sm" fw={500}>
                 Subject Template: {subjectTemplate.name}
               </Text>
-              {subjectTemplate.description && (
+              {'description' in subjectTemplate && subjectTemplate.description && (
                 <Text size="xs" c="dimmed" mt={4}>
                   {subjectTemplate.description}
                 </Text>

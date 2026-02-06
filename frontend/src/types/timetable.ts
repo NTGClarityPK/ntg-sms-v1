@@ -82,6 +82,14 @@ export interface GenerateTimetableInput {
   subjectTemplateId?: string;
 }
 
+export interface ReplicateDayInput {
+  classSectionId: string;
+  sourceDayOfWeek: number;
+  targetDaysOfWeek: number[];
+  academicYearId?: string;
+  subjectTemplateId?: string;
+}
+
 export interface TimingTemplateInfo {
   templateId: string;
   templateName: string;

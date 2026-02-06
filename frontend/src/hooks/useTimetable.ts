@@ -7,6 +7,7 @@ import type {
   Conflict,
   CreateTimetableSlotInput,
   GenerateTimetableInput,
+  ReplicateDayInput,
   TimingTemplateInfo,
 } from '@/types/timetable';
 import { useAuth } from './useAuth';
@@ -313,5 +314,43 @@ export function useCheckSlotConflict() {
       return false;
     }
   };
+}
+
+export function useReplicateDay() {
+  const queryClient = useQueryClient();
+  const notifyColors = useThemeColors();
+
+  return useMutation({
+    mutationFn: async (input: ReplicateDayInput) => {
+      const response = await apiClient.post<{ slotsReplicated: number }>(
+        '/api/v1/timetable/replicate-day',
+        input,
+      );
+      // apiClient.post returns { data: T }, so response.data is { slotsReplicated: number }
+      return response.data;
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate timetable queries
+      queryClient.invalidateQueries({
+        queryKey: ['timetable', 'class', variables.classSectionId],
+      });
+      // Invalidate conflicts
+      queryClient.invalidateQueries({ queryKey: ['timetable', 'conflicts'] });
+      notifications.show({
+        title: 'Success',
+        message: `Replicated ${data.slotsReplicated} slots to selected days`,
+        color: notifyColors.success,
+      });
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      notifications.show({
+        title: 'Error',
+        message: message || 'Failed to replicate slots',
+        color: notifyColors.error,
+      });
+    },
+  });
 }
 

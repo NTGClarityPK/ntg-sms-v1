@@ -12,11 +12,12 @@ import {
   Alert,
   Paper,
 } from '@mantine/core';
-import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconCopy, IconAlertTriangle } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { useClassSection } from '@/hooks/useClassSections';
 import type { ClassSection } from '@/types/class-sections';
-import { useClassTimetable, useConflicts, useGenerateTimetable, useCheckSlotConflict, useTimingTemplateInfo } from '@/hooks/useTimetable';
+import { useClassTimetable, useConflicts, useGenerateTimetable, useCheckSlotConflict, useTimingTemplateInfo, useReplicateDay } from '@/hooks/useTimetable';
 import { useTemplatesForClass } from '@/hooks/useSubjectTemplates';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TimetableGrid } from '@/components/features/timetable/TimetableGrid';
@@ -24,7 +25,9 @@ import { SlotEditPopover } from '@/components/features/timetable/SlotEditPopover
 import { ConflictList } from '@/components/features/timetable/ConflictList';
 import { TemplateInfoBanner } from '@/components/features/timetable/TemplateInfoBanner';
 import { useDisclosure } from '@mantine/hooks';
-import { Select, Paper as MantinePaper } from '@mantine/core';
+import { Select, Paper as MantinePaper, Modal, MultiSelect } from '@mantine/core';
+import { useSchoolDays } from '@/hooks/useScheduleSettings';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useAuth } from '@/hooks/useAuth';
 import type { TimetableSlot, CreateTimetableSlotInput } from '@/types/timetable';
 import { TemplateSwitcher } from '@/components/features/timetable/TemplateSwitcher';
@@ -72,6 +75,12 @@ export default function ClassTimetablePage() {
   const { data: templateInfoData } = useTimingTemplateInfo(classSectionId);
   const generateMutation = useGenerateTimetable();
   const checkConflict = useCheckSlotConflict();
+  const replicateDayMutation = useReplicateDay();
+  const { data: schoolDaysData } = useSchoolDays();
+  const { data: activeYear } = useActiveAcademicYear();
+  const [replicateModalOpened, { open: openReplicateModal, close: closeReplicateModal }] = useDisclosure(false);
+  const [sourceDay, setSourceDay] = useState<number | null>(null);
+  const [targetDays, setTargetDays] = useState<number[]>([]);
   const timetable = timetableData?.data;
   const conflicts = conflictsData?.data || [];
   const availableTemplates = templatesData?.data ?? [];
@@ -122,6 +131,69 @@ export default function ClassTimetablePage() {
     await generateMutation.mutateAsync({
       classSectionId,
       subjectTemplateId: selectedTemplateId,
+    });
+  };
+
+  const activeSchoolDays = schoolDaysData?.data || [];
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayOptions = activeSchoolDays.map((d) => ({
+    value: String(d),
+    label: dayNames[d] || `Day ${d}`,
+  }));
+
+  const handleReplicateDay = async () => {
+    if (!classSectionId || !sourceDay || targetDays.length === 0) {
+      notifications.show({
+        title: 'Error',
+        message: 'Please select source day and at least one target day',
+        color: colors.error,
+      });
+      return;
+    }
+    if (!selectedTemplateId) {
+      notifications.show({
+        title: 'Error',
+        message: 'Please select a subject template first',
+        color: colors.error,
+      });
+      return;
+    }
+
+    // Show confirmation modal
+    const sourceDayName = dayNames[sourceDay] || `Day ${sourceDay}`;
+    const targetDayNames = targetDays.map((d) => dayNames[d] || `Day ${d}`).join(', ');
+
+    modals.openConfirmModal({
+      title: 'Confirm Day Replication',
+      children: (
+        <Text size="sm">
+          This action will replace all timetable slots on the selected target day(s) ({targetDayNames}) that match the time ranges from the source day ({sourceDayName}). Any existing slots with matching times will be overwritten, while slots with different time ranges will remain unchanged.
+          <br />
+          <br />
+          Are you sure you want to proceed?
+        </Text>
+      ),
+      labels: { confirm: 'Replicate', cancel: 'Cancel' },
+      confirmProps: { color: 'blue' },
+      onConfirm: () => {
+        // Use mutate instead of mutateAsync to avoid blocking the modal
+        replicateDayMutation.mutate(
+          {
+            classSectionId,
+            sourceDayOfWeek: sourceDay,
+            targetDaysOfWeek: targetDays,
+            academicYearId: activeYear?.data?.id,
+            subjectTemplateId: selectedTemplateId,
+          },
+          {
+            onSuccess: () => {
+              closeReplicateModal();
+              setSourceDay(null);
+              setTargetDays([]);
+            },
+          },
+        );
+      },
     });
   };
 
@@ -218,6 +290,14 @@ export default function ClassTimetablePage() {
                 isLoading={templatesLoading || classSectionLoading}
               />
             )}
+            <Button
+              leftSection={<IconCopy size={18} />}
+              onClick={openReplicateModal}
+              disabled={!selectedTemplateId || !classId || !timetable || timetable.slots.length === 0}
+              variant="light"
+            >
+              Replicate Day
+            </Button>
             <Button
               leftSection={<IconPlus size={18} />}
               onClick={handleGenerate}
@@ -360,6 +440,44 @@ export default function ClassTimetablePage() {
         subjectTemplateId={selectedTemplateId ?? undefined}
         onConflictCheck={handleConflictCheck}
       />
+
+      <Modal
+        opened={replicateModalOpened}
+        onClose={closeReplicateModal}
+        title="Replicate Day to Other Days"
+        size="md"
+      >
+        <Stack gap="md">
+          <Select
+            label="Source Day (Day to copy from)"
+            placeholder="Select a day"
+            data={dayOptions}
+            value={sourceDay !== null ? String(sourceDay) : null}
+            onChange={(value) => setSourceDay(value ? Number(value) : null)}
+            required
+          />
+          <MultiSelect
+            label="Target Days (Days to copy to)"
+            placeholder="Select one or more days"
+            data={dayOptions.filter((d) => d.value !== String(sourceDay))}
+            value={targetDays.map(String)}
+            onChange={(values) => setTargetDays(values.map(Number))}
+            required
+          />
+          <Group justify="flex-end" gap="xs" mt="md">
+            <Button variant="subtle" onClick={closeReplicateModal}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReplicateDay}
+              loading={replicateDayMutation.isPending}
+              disabled={!sourceDay || targetDays.length === 0}
+            >
+              Replicate
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

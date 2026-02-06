@@ -15,6 +15,8 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useSubjectTemplate } from '@/hooks/useSubjectTemplates';
+import { useSchoolDays } from '@/hooks/useScheduleSettings';
+import { MultiSelect } from '@mantine/core';
 
 const slotSchema = z
   .object({
@@ -127,6 +129,17 @@ export function SlotEditPopover({
     | undefined;
   const staff = staffResponse?.data || [];
 
+  const { data: schoolDaysData } = useSchoolDays();
+  const activeSchoolDays = schoolDaysData?.data || [];
+  
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayOptions = activeSchoolDays
+    .filter((d) => d !== dayOfWeek) // Exclude current day
+    .map((d) => ({
+      value: String(d),
+      label: dayNames[d] || `Day ${d}`,
+    }));
+
   const form = useForm({
     initialValues: {
       subjectId: '',
@@ -136,6 +149,7 @@ export function SlotEditPopover({
       startTime: '',
       endTime: '',
       slotType: 'class' as TimetableSlotType,
+      additionalDays: [] as string[], // For multi-day creation
     },
     validate: zodResolver(slotSchema),
   });
@@ -211,19 +225,28 @@ export function SlotEditPopover({
   }, [form.values.startTime, form.values.endTime, form.values.staffId, form.values.slotType, opened]);
 
   const handleSubmit = async (values: typeof form.values) => {
-    await createOrUpdate.mutateAsync({
-      classSectionId,
-      dayOfWeek,
-      periodNumber: values.periodNumber ? Number(values.periodNumber) : undefined,
-      subjectId: values.subjectId || undefined,
-      staffId: values.staffId || undefined,
-      room: values.room || undefined,
-      startTime: values.startTime,
-      endTime: values.endTime,
-      slotType: values.slotType,
-      academicYearId,
-      subjectTemplateId,
-    });
+    const daysToCreate = isEdit
+      ? [dayOfWeek] // When editing, only update the current day
+      : [dayOfWeek, ...values.additionalDays.map((d) => Number(d))]; // When creating, include additional days
+
+    // Create/update slot for each day
+    const promises = daysToCreate.map((day) =>
+      createOrUpdate.mutateAsync({
+        classSectionId,
+        dayOfWeek: day,
+        periodNumber: values.periodNumber ? Number(values.periodNumber) : undefined,
+        subjectId: values.subjectId || undefined,
+        staffId: values.staffId || undefined,
+        room: values.room || undefined,
+        startTime: values.startTime,
+        endTime: values.endTime,
+        slotType: values.slotType,
+        academicYearId,
+        subjectTemplateId,
+      }),
+    );
+
+    await Promise.all(promises);
     form.reset();
     setConflictWarning(null);
     onClose();
@@ -405,6 +428,17 @@ export function SlotEditPopover({
                 {...form.getInputProps('endTime')}
               />
             </Group>
+
+            {!isEdit && dayOptions.length > 0 && (
+              <MultiSelect
+                label="Also assign to other days"
+                placeholder="Select additional days (optional)"
+                size="xs"
+                data={dayOptions}
+                comboboxProps={{ zIndex: 1002 }}
+                {...form.getInputProps('additionalDays')}
+              />
+            )}
 
             <Group justify="flex-end" gap="xs" mt="xs">
               {isEdit && (
