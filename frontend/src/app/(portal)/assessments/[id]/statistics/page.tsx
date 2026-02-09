@@ -16,10 +16,14 @@ import {
   SimpleGrid,
   RingProgress,
   Box,
+  Table,
+  ScrollArea,
+  Badge,
 } from '@mantine/core';
 import { useRouter, useParams } from 'next/navigation';
-import { useAssessment, useAssessmentStatistics } from '@/hooks/api/useAssessments';
+import { useAssessment, useAssessmentStatistics, useAssessmentStudentStatus, AssessmentStudentStatus } from '@/hooks/api/useAssessments';
 import { IconUsers, IconCheck, IconX, IconClock } from '@tabler/icons-react';
+import dayjs from 'dayjs';
 
 export default function AssessmentStatisticsPage() {
   const router = useRouter();
@@ -27,8 +31,10 @@ export default function AssessmentStatisticsPage() {
   const assessmentId = params.id as string;
   const { data: assessmentData, isLoading: assessmentLoading } = useAssessment(assessmentId);
   const { data: statisticsData, isLoading: statsLoading } = useAssessmentStatistics(assessmentId);
+  const { data: studentStatusData, isLoading: statusLoading } = useAssessmentStudentStatus(assessmentId);
   const assessment = assessmentData; // Hook already returns response.data
   const statistics = statisticsData; // Hook already returns response.data
+  const studentStatuses: AssessmentStudentStatus[] = Array.isArray(studentStatusData) ? studentStatusData : [];
 
   if (assessmentLoading || statsLoading) {
     return (
@@ -171,7 +177,7 @@ export default function AssessmentStatisticsPage() {
                 }
               />
               <Text size="sm" c="dimmed">
-                {statistics.gradedCount} of {statistics.totalStudents} students
+                {statistics.gradedCount - statistics.absentCount - statistics.excusedCount} of {statistics.totalStudents} students
               </Text>
             </Stack>
           </Paper>
@@ -232,6 +238,86 @@ export default function AssessmentStatisticsPage() {
             </Stack>
           </Paper>
         )}
+
+        {/* Assessment Status - per student */}
+        <Paper p="md" withBorder>
+          <Stack gap="md">
+            <Text fw={500} size="lg">
+              Assessment Status
+            </Text>
+            <Text size="sm" c="dimmed">
+              Showing status for all enrolled students who have interacted with this assessment.
+            </Text>
+            {statusLoading ? (
+              <Stack gap="xs">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} height={40} />
+                ))}
+              </Stack>
+            ) : studentStatuses.length > 0 ? (
+              <ScrollArea>
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Student</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Read</Table.Th>
+                      <Table.Th>Last Updated</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {studentStatuses.map((s) => (
+                      <Table.Tr key={s.studentId}>
+                        <Table.Td>
+                          <Stack gap={2}>
+                            <Text size="sm" fw={500}>
+                              {s.studentName || 'Student'}
+                            </Text>
+                            {s.studentStudentId && (
+                              <Text size="xs" c="dimmed">
+                                ID: {s.studentStudentId}
+                              </Text>
+                            )}
+                          </Stack>
+                        </Table.Td>
+                        <Table.Td>
+                          {s.status === 'submitted' ? (
+                            <Badge color="green">Submitted</Badge>
+                          ) : s.status === 'in_progress' ? (
+                            <Badge color="yellow">In progress</Badge>
+                          ) : (
+                            <Badge color="gray">Not started</Badge>
+                          )}
+                        </Table.Td>
+                        <Table.Td>
+                          {s.isRead ? (
+                            <Badge color="blue" variant="light">
+                              Read
+                            </Badge>
+                          ) : (
+                            <Badge color="gray" variant="light">
+                              Unread
+                            </Badge>
+                          )}
+                        </Table.Td>
+                        <Table.Td>
+                          {s.updatedAt
+                            ? dayjs(s.updatedAt).format('DD MMM YYYY HH:mm')
+                            : '—'}
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
+            ) : (
+              <Text size="sm" c="dimmed">
+                No students have marked this assessment as read or submitted yet.
+              </Text>
+            )}
+          </Stack>
+        </Paper>
+
         </Stack>
       </div>
     </>

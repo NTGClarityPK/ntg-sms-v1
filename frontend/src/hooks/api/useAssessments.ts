@@ -15,6 +15,16 @@ import type {
   StudentPerformance,
 } from '@/types/assessment';
 import type { ApiResponse, PaginatedApiResponse } from '@/types/api';
+
+export interface AssessmentStudentStatus {
+  studentId: string;
+  studentUserId: string;
+  studentName?: string;
+  studentStudentId?: string;
+  status?: 'not_started' | 'in_progress' | 'submitted';
+  isRead: boolean;
+  updatedAt?: string;
+}
 import { notifications } from '@mantine/notifications';
 
 /**
@@ -236,6 +246,23 @@ export function useAssessmentStatistics(assessmentId: string | undefined) {
         `/api/v1/assessments/${assessmentId}/statistics`,
       );
       return response.data; // Returns AssessmentStatistics directly
+    },
+    enabled: !!assessmentId,
+    staleTime: 1000 * 60, // 1 minute
+  });
+}
+
+/**
+ * Hook to get per-student assessment status for statistics view
+ */
+export function useAssessmentStudentStatus(assessmentId: string | undefined) {
+  return useQuery({
+    queryKey: ['assessments', assessmentId, 'student-status'],
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<AssessmentStudentStatus[]>>(
+        `/api/v1/assessments/${assessmentId}/student-status`,
+      );
+      return response.data;
     },
     enabled: !!assessmentId,
     staleTime: 1000 * 60, // 1 minute

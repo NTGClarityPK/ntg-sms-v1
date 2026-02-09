@@ -6,7 +6,7 @@
  */
 
 import { useForm, zodResolver } from '@mantine/form';
-import { Button, Stack, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton } from '@mantine/core';
+import { Button, Stack, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton, Divider } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconCalendar } from '@tabler/icons-react';
@@ -16,6 +16,8 @@ import { useAssessmentTypes } from '@/hooks/useAssessmentSettings';
 import { useSubjects } from '@/hooks/useCoreLookups';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useMemo } from 'react';
+import { FileUpload } from './FileUpload';
+import { FileUploadForCreate } from './FileUploadForCreate';
 
 const assessmentSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -47,9 +49,11 @@ interface AssessmentFormProps {
   assessment?: Assessment;
   onSubmit: (values: CreateAssessmentInput | UpdateAssessmentInput) => void;
   isLoading?: boolean;
+  filesToUpload?: File[];
+  onFilesChange?: (files: File[]) => void;
 }
 
-export function AssessmentForm({ assessment, onSubmit, isLoading }: AssessmentFormProps) {
+export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload = [], onFilesChange }: AssessmentFormProps) {
   // Fetch data for dropdowns
   const { data: assessmentTypesData, isLoading: assessmentTypesLoading } = useAssessmentTypes();
   const { data: subjectsData, isLoading: subjectsLoading } = useSubjects();
@@ -201,6 +205,13 @@ export function AssessmentForm({ assessment, onSubmit, isLoading }: AssessmentFo
             {...form.getInputProps('allowLateSubmission', { type: 'checkbox' })}
           />
         </Group>
+
+        <Divider my="md" />
+        {assessment?.id ? (
+          <FileUpload assessmentId={assessment.id} />
+        ) : (
+          <FileUploadForCreate files={filesToUpload} onFilesChange={onFilesChange || (() => {})} />
+        )}
 
         <Group justify="flex-end" mt="md">
           <Button type="submit" loading={isLoading}>

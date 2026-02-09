@@ -8,6 +8,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ClassSectionsService } from '../class-sections/class-sections.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AssessmentDto } from './dto/assessment.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
@@ -19,6 +20,11 @@ import { AssessmentStatisticsDto } from './dto/assessment-statistics.dto';
 import { ClassStatisticsDto } from './dto/class-statistics.dto';
 import { SubjectStatisticsDto } from './dto/subject-statistics.dto';
 import { StudentPerformanceDto } from './dto/student-performance.dto';
+import { AssessmentStudentStatusDto } from './dto/assessment-student-status.dto';
+import { StudentAssessmentStatusDto } from './dto/student-assessment-status.dto';
+import { UpdateStudentAssessmentStatusDto } from './dto/update-student-assessment-status.dto';
+import { AssessmentAttachmentDto } from './dto/assessment-attachment.dto';
+import { CreateAssessmentAttachmentDto } from './dto/create-assessment-attachment.dto';
 
 type Meta = {
   total: number;
@@ -43,6 +49,14 @@ type AssessmentRow = {
   branch_id: string;
   academic_year_id: string;
   created_at: string;
+  updated_at: string;
+};
+
+type StudentAssessmentStatusRow = {
+  assessment_id: string;
+  student_id: string;
+  status: string;
+  is_read: boolean;
   updated_at: string;
 };
 
@@ -76,6 +90,18 @@ function mapAssessment(row: AssessmentRow): AssessmentDto {
   });
 }
 
+function mapStudentStatusRow(
+  row: StudentAssessmentStatusRow,
+): StudentAssessmentStatusDto {
+  return new StudentAssessmentStatusDto({
+    assessmentId: row.assessment_id,
+    studentId: row.student_id,
+    status: row.status as StudentAssessmentStatusDto['status'],
+    isRead: row.is_read,
+    updatedAt: row.updated_at,
+  });
+}
+
 @Injectable()
 export class AssessmentsService {
   constructor(
@@ -83,6 +109,7 @@ export class AssessmentsService {
     private readonly academicYearsService: AcademicYearsService,
     private readonly classSectionsService: ClassSectionsService,
     private readonly teacherAssignmentsService: TeacherAssignmentsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async listAssessments(
@@ -264,6 +291,8 @@ export class AssessmentsService {
     if (input.dueDate !== undefined) payload.due_date = input.dueDate ?? null;
     if (input.publishDate !== undefined)
       payload.publish_date = input.publishDate ?? null;
+    if (input.isPublished !== undefined)
+      payload.is_published = input.isPublished;
     if (input.allowLateSubmission !== undefined)
       payload.allow_late_submission = input.allowLateSubmission;
 
@@ -428,8 +457,14 @@ export class AssessmentsService {
     const lowestMarks =
       validGrades.length > 0 ? Math.min(...validGrades.map((g) => toNumber(g.marks_obtained))) : undefined;
 
-    const submissionRate = totalStudents ? (gradedCount / totalStudents) * 100 : 0;
-    const completionRate = totalStudents ? ((gradedCount - absentCount - excusedCount) / totalStudents) * 100 : 0;
+    // Submission rate: percentage of students who submitted (excluding absent and excused)
+    // This should be: (students who submitted) / (total students)
+    // = (gradedCount - absentCount - excusedCount) / totalStudents
+    const submittedCount = gradedCount - absentCount - excusedCount;
+    const submissionRate = totalStudents ? (submittedCount / totalStudents) * 100 : 0;
+    
+    // Completion rate: same as submission rate (students who completed/submitted)
+    const completionRate = totalStudents ? (submittedCount / totalStudents) * 100 : 0;
 
     return new AssessmentStatisticsDto({
       assessmentId: assessment.id,
@@ -444,6 +479,100 @@ export class AssessmentsService {
       lowestMarks,
       submissionRate: Math.round(submissionRate * 100) / 100,
       completionRate: Math.round(completionRate * 100) / 100,
+    });
+  }
+
+  /**
+   * Get per-student assessment status for statistics view
+   */
+  async getAssessmentStudentStatuses(
+    assessmentId: string,
+    branchId: string,
+  ): Promise<AssessmentStudentStatusDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Get assessment details
+    const { data: assessment, error: aError } = await supabase
+      .from('assessments')
+      .select('id, class_section_id, academic_year_id')
+      .eq('id', assessmentId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(aError);
+    if (!assessment) {
+      throw new NotFoundException('Assessment not found.');
+    }
+
+    // Get class section details
+    const classSection = await this.classSectionsService.getClassSectionById(
+      assessment.class_section_id,
+      branchId,
+    );
+
+    // Get all active students in this class/section/year
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('id, user_id, student_id, branch_id, academic_year_id')
+      .eq('class_id', classSection.classId)
+      .eq('section_id', classSection.sectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', assessment.academic_year_id)
+      .eq('is_active', true);
+    throwIfDbError(studentsError);
+
+    if (!students || students.length === 0) {
+      return [];
+    }
+
+    const studentIds = students.map((s: any) => s.id as string);
+
+    // Fetch statuses for these students for this assessment
+    const { data: statuses, error: statusesError } = await supabase
+      .from('student_assessment_statuses')
+      .select('assessment_id, student_id, status, is_read, updated_at')
+      .eq('assessment_id', assessmentId)
+      .eq('branch_id', branchId)
+      .in('student_id', studentIds);
+    throwIfDbError(statusesError);
+
+    const statusMap = new Map<string, StudentAssessmentStatusDto>();
+    for (const row of statuses ?? []) {
+      const dto = mapStudentStatusRow(row as StudentAssessmentStatusRow);
+      statusMap.set(dto.studentId, dto);
+    }
+
+    // Fetch student names from profiles via user_id
+    const userIds = (students as any[])
+      .map((s) => s.user_id as string | null)
+      .filter((id) => !!id) as string[];
+    const uniqueUserIds = Array.from(new Set(userIds));
+
+    const profilesMap = new Map<string, string>();
+    if (uniqueUserIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', uniqueUserIds);
+      throwIfDbError(profilesError);
+      for (const p of profiles ?? []) {
+        profilesMap.set((p as any).id as string, (p as any).full_name as string);
+      }
+    }
+
+    return (students as any[]).map((s) => {
+      const status = statusMap.get(s.id as string);
+      const studentUserId = s.user_id as string | undefined;
+      const name = studentUserId ? profilesMap.get(studentUserId) : undefined;
+
+      return new AssessmentStudentStatusDto({
+        studentId: s.id as string,
+        studentUserId: studentUserId ?? '',
+        studentName: name,
+        studentStudentId: s.student_id as string | undefined,
+        status: status?.status,
+        isRead: status?.isRead ?? false,
+        updatedAt: status?.updatedAt,
+      });
     });
   }
 
@@ -708,6 +837,424 @@ export class AssessmentsService {
       totalPossibleMarks,
       percentageScore: percentageScore ? Math.round(percentageScore * 100) / 100 : undefined,
     });
+  }
+
+  /**
+   * Get published assessments for the current student in their class
+   */
+  async getMyAssessmentsForCurrentStudent(
+    userId: string,
+    branchId: string,
+  ): Promise<
+    Array<{
+      assessment: AssessmentDto;
+      status?: StudentAssessmentStatusDto;
+      attachments: {
+        id: string;
+        fileName: string;
+        fileUrl: string;
+        mimeType?: string;
+        createdAt: string;
+      }[];
+    }>
+  > {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Find student record for this user in the current branch
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, class_id, section_id, academic_year_id, branch_id')
+      .eq('user_id', userId)
+      .eq('branch_id', branchId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    throwIfDbError(studentError);
+    if (!student) {
+      throw new BadRequestException('No student record found for current user');
+    }
+
+    // Find class_section for this student's class/section/year
+    const { data: classSection, error: csError } = await supabase
+      .from('class_sections')
+      .select('id')
+      .eq('class_id', student.class_id)
+      .eq('section_id', student.section_id)
+      .eq('academic_year_id', student.academic_year_id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    throwIfDbError(csError);
+    if (!classSection) {
+      // No class section means no assessments
+      return [];
+    }
+
+    // Get published assessments for this class section
+    const { data: assessments, error: assessmentsError } = await supabase
+      .from('assessments')
+      .select(
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+      )
+      .eq('class_section_id', classSection.id)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', student.academic_year_id)
+      .eq('is_published', true)
+      .order('due_date', { ascending: true });
+
+    throwIfDbError(assessmentsError);
+
+    const assessmentRows = (assessments ?? []) as AssessmentRow[];
+    if (assessmentRows.length === 0) {
+      return [];
+    }
+
+    const assessmentIds = assessmentRows.map((a) => a.id);
+
+    // Fetch attachments for these assessments
+    const { data: attachments, error: attachmentsError } = await supabase
+      .from('assessment_attachments')
+      .select('id, assessment_id, file_name, file_url, mime_type, created_at')
+      .in('assessment_id', assessmentIds);
+
+    throwIfDbError(attachmentsError);
+
+    const attachmentsByAssessment = new Map<
+      string,
+      {
+        id: string;
+        fileName: string;
+        fileUrl: string;
+        mimeType?: string;
+        createdAt: string;
+      }[]
+    >();
+
+    for (const att of attachments ?? []) {
+      const key = (att as any).assessment_id as string;
+      const list = attachmentsByAssessment.get(key) ?? [];
+      list.push({
+        id: (att as any).id,
+        fileName: (att as any).file_name,
+        fileUrl: (att as any).file_url,
+        mimeType: (att as any).mime_type ?? undefined,
+        createdAt: (att as any).created_at,
+      });
+      attachmentsByAssessment.set(key, list);
+    }
+
+    // Fetch existing statuses for this student
+    const { data: statuses, error: statusesError } = await supabase
+      .from('student_assessment_statuses')
+      .select('assessment_id, student_id, status, is_read, updated_at')
+      .eq('student_id', student.id)
+      .eq('branch_id', branchId)
+      .in('assessment_id', assessmentIds);
+
+    throwIfDbError(statusesError);
+    const statusMap = new Map<string, StudentAssessmentStatusDto>();
+    for (const row of statuses ?? []) {
+      const dto = mapStudentStatusRow(row as StudentAssessmentStatusRow);
+      statusMap.set(dto.assessmentId, dto);
+    }
+
+    return assessmentRows.map((row) => {
+      const assessment = mapAssessment(row);
+      const status = statusMap.get(assessment.id);
+      const att = attachmentsByAssessment.get(assessment.id) ?? [];
+      return {
+        assessment,
+        status,
+        attachments: att,
+      };
+    });
+  }
+
+  /**
+   * Update current student's status for a given assessment
+   */
+  async updateMyAssessmentStatus(
+    assessmentId: string,
+    userId: string,
+    branchId: string,
+    dto: UpdateStudentAssessmentStatusDto,
+  ): Promise<StudentAssessmentStatusDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Verify assessment exists in this branch
+    const { data: assessment, error: assessmentError } = await supabase
+      .from('assessments')
+      .select('id, title, class_section_id, academic_year_id, branch_id, created_by')
+      .eq('id', assessmentId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    throwIfDbError(assessmentError);
+    if (!assessment) {
+      throw new NotFoundException('Assessment not found');
+    }
+
+    // Find student record for this user in the current branch
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, user_id, academic_year_id, branch_id')
+      .eq('user_id', userId)
+      .eq('branch_id', branchId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    throwIfDbError(studentError);
+    if (!student) {
+      throw new BadRequestException('No student record found for current user');
+    }
+
+    // Upsert status
+    const payload: Partial<StudentAssessmentStatusRow> = {
+      assessment_id: assessmentId,
+      student_id: student.id,
+      status: dto.status ?? 'in_progress',
+      is_read: dto.isRead ?? true,
+    };
+
+    const { data, error } = await supabase
+      .from('student_assessment_statuses')
+      .upsert(
+        {
+          assessment_id: payload.assessment_id,
+          student_id: payload.student_id,
+          branch_id: branchId,
+          academic_year_id: assessment.academic_year_id,
+          status: payload.status,
+          is_read: payload.is_read,
+        },
+        {
+          // Unique constraint on (assessment_id, student_id)
+          onConflict: 'assessment_id,student_id',
+        },
+      )
+      .select('assessment_id, student_id, status, is_read, updated_at')
+      .single();
+
+    throwIfDbError(error);
+    const statusDto = mapStudentStatusRow(data as StudentAssessmentStatusRow);
+
+    // If explicitly marked as read, notify relevant staff
+    if (dto.isRead) {
+      await this.notifyAssessmentRead(assessment, student, branchId);
+    }
+
+    return statusDto;
+  }
+
+  /**
+   * Notify school admin(s), class teacher, and assessment creator when a student marks an assessment as read
+   */
+  private async notifyAssessmentRead(
+    assessment: any,
+    student: any,
+    branchId: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const userIds = new Set<string>();
+
+    // 1) Assessment creator
+    if (assessment.created_by) {
+      userIds.add(assessment.created_by as string);
+    }
+
+    // 2) Class teacher for this class section (if any)
+    if (assessment.class_section_id) {
+      const classSection = await this.classSectionsService.getClassSectionById(
+        assessment.class_section_id,
+        branchId,
+      );
+
+      if (classSection.classTeacherId) {
+        const { data: staffRow, error: staffError } = await supabase
+          .from('staff')
+          .select('user_id')
+          .eq('id', classSection.classTeacherId)
+          .maybeSingle();
+
+        throwIfDbError(staffError);
+        if (staffRow?.user_id) {
+          userIds.add(staffRow.user_id as string);
+        }
+      }
+    }
+
+    // 3) School admin(s) for this branch
+    const { data: adminUsers, error: adminError } = await supabase
+      .from('user_roles')
+      .select('user_id, roles(name)')
+      .eq('branch_id', branchId);
+
+    throwIfDbError(adminError);
+    for (const ur of adminUsers ?? []) {
+      const roleName = (ur as any).roles?.name as string | undefined;
+      if (roleName && roleName.toLowerCase() === 'school_admin') {
+        userIds.add((ur as any).user_id as string);
+      }
+    }
+
+    if (userIds.size === 0) {
+      return;
+    }
+
+    // Optional: get student name for message
+    let studentLabel = 'A student';
+    if (student?.user_id) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', student.user_id)
+        .maybeSingle();
+      if (!profileError && profile?.full_name) {
+        studentLabel = profile.full_name;
+      }
+    }
+
+    const title = 'Assessment read';
+    const body = `${studentLabel} marked the assessment "${assessment.title}" as read.`;
+
+    for (const notifyUserId of userIds) {
+      await this.notificationsService.createNotification({
+        userId: notifyUserId,
+        type: 'assessment_read',
+        title,
+        body,
+        data: {
+          assessmentId: assessment.id,
+          studentId: student.id,
+        },
+      });
+    }
+  }
+
+  /**
+   * Get all attachments for an assessment
+   */
+  async getAssessmentAttachments(assessmentId: string, branchId: string): Promise<AssessmentAttachmentDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Verify assessment exists and belongs to branch
+    const { data: assessment, error: assessmentError } = await supabase
+      .from('assessments')
+      .select('id')
+      .eq('id', assessmentId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(assessmentError);
+    if (!assessment) {
+      throw new NotFoundException('Assessment not found');
+    }
+
+    const { data: attachments, error } = await supabase
+      .from('assessment_attachments')
+      .select('id, assessment_id, file_name, file_url, file_size_bytes, mime_type, created_at')
+      .eq('assessment_id', assessmentId)
+      .order('created_at', { ascending: false });
+
+    throwIfDbError(error);
+
+    return (attachments ?? []).map((a) => new AssessmentAttachmentDto({
+      id: a.id,
+      assessmentId: a.assessment_id,
+      fileName: a.file_name,
+      fileUrl: a.file_url,
+      fileSizeBytes: a.file_size_bytes ?? undefined,
+      mimeType: a.mime_type ?? undefined,
+      createdAt: a.created_at,
+    }));
+  }
+
+  /**
+   * Create an attachment for an assessment
+   */
+  async createAssessmentAttachment(
+    dto: CreateAssessmentAttachmentDto,
+    branchId: string,
+  ): Promise<AssessmentAttachmentDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Verify assessment exists and belongs to branch
+    const { data: assessment, error: assessmentError } = await supabase
+      .from('assessments')
+      .select('id')
+      .eq('id', dto.assessmentId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(assessmentError);
+    if (!assessment) {
+      throw new NotFoundException('Assessment not found');
+    }
+
+    const { data: attachment, error } = await supabase
+      .from('assessment_attachments')
+      .insert({
+        assessment_id: dto.assessmentId,
+        file_name: dto.fileName,
+        file_url: dto.fileUrl,
+        file_size_bytes: null, // Can be added if needed
+        mime_type: dto.mimeType ?? null,
+      })
+      .select('id, assessment_id, file_name, file_url, file_size_bytes, mime_type, created_at')
+      .single();
+
+    throwIfDbError(error);
+    if (!attachment) {
+      throw new BadRequestException('Failed to create attachment');
+    }
+
+    return new AssessmentAttachmentDto({
+      id: attachment.id,
+      assessmentId: attachment.assessment_id,
+      fileName: attachment.file_name,
+      fileUrl: attachment.file_url,
+      fileSizeBytes: attachment.file_size_bytes ?? undefined,
+      mimeType: attachment.mime_type ?? undefined,
+      createdAt: attachment.created_at,
+    });
+  }
+
+  /**
+   * Delete an attachment
+   */
+  async deleteAssessmentAttachment(attachmentId: string, branchId: string): Promise<{ id: string }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Verify attachment exists and belongs to an assessment in this branch
+    const { data: attachment, error: attachmentError } = await supabase
+      .from('assessment_attachments')
+      .select('id, assessment_id')
+      .eq('id', attachmentId)
+      .maybeSingle();
+    throwIfDbError(attachmentError);
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    // Verify the assessment belongs to this branch
+    const { data: assessment, error: assessmentError } = await supabase
+      .from('assessments')
+      .select('id')
+      .eq('id', attachment.assessment_id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(assessmentError);
+    if (!assessment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    const { error } = await supabase
+      .from('assessment_attachments')
+      .delete()
+      .eq('id', attachmentId);
+
+    throwIfDbError(error);
+
+    return { id: attachmentId };
   }
 }
 

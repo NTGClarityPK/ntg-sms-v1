@@ -103,20 +103,67 @@ export function useBulkCreateGrades() {
 
   return useMutation({
     mutationFn: async (data: BulkCreateGradesInput) => {
+      // Backend controller returns: { data: StudentGradeDto[], errors: [...] }
+      // ResponseInterceptor sees it has 'data' property, passes through as-is
+      // apiClient.post() returns ApiResponse<T> which is { data: T }
+      // So response.data is { data: [...], errors: [...] }
       const response = await apiClient.post<{
         data: StudentGrade[];
         errors: BulkGradeError[];
       }>('/api/v1/grades/bulk', data);
+      
+      // response is ApiResponse<{ data: [...], errors: [...] }>
+      // response.data is { data: [...], errors: [...] }
       return response.data;
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['grades'] });
       queryClient.invalidateQueries({ queryKey: ['assessments'] });
 
-      const successCount = result.data.length;
-      const errorCount = result.errors.length;
+      // Debug logging - always log to help diagnose
+      console.log('[BulkCreateGrades] Success result:', JSON.stringify(result, null, 2));
+      console.log('[BulkCreateGrades] Result type:', typeof result);
+      console.log('[BulkCreateGrades] Result keys:', result ? Object.keys(result) : 'null');
+      console.log('[BulkCreateGrades] result.data:', result?.data);
+      console.log('[BulkCreateGrades] result.errors:', result?.errors);
+      console.log('[BulkCreateGrades] Is result.data an array?', Array.isArray(result?.data));
+      console.log('[BulkCreateGrades] Is result.errors an array?', Array.isArray(result?.errors));
 
-      if (errorCount === 0) {
+      // The backend returns { data: [...], errors: [...] }
+      // After ResponseInterceptor: { data: [...], errors: [...] } (passed through)
+      // After apiClient.post(): { data: { data: [...], errors: [...] } }
+      // After return response.data: { data: [...], errors: [...] }
+      // So result should be { data: [...], errors: [...] }
+      
+      // Handle the actual response structure
+      let grades: StudentGrade[] = [];
+      let errors: BulkGradeError[] = [];
+
+      if (result) {
+        // Case 1: result is { data: [...], errors: [...] }
+        if (Array.isArray(result.data) && Array.isArray(result.errors)) {
+          grades = result.data;
+          errors = result.errors;
+        }
+        // Case 2: result is wrapped in another data property: { data: { data: [...], errors: [...] } }
+        else if (result.data && typeof result.data === 'object' && 'data' in result.data) {
+          const innerData = (result.data as any).data;
+          const innerErrors = (result.data as any).errors;
+          if (Array.isArray(innerData)) grades = innerData;
+          if (Array.isArray(innerErrors)) errors = innerErrors;
+        }
+        // Case 3: result itself is the array (shouldn't happen but handle it)
+        else if (Array.isArray(result)) {
+          grades = result;
+        }
+      }
+
+      const successCount = grades.length;
+      const errorCount = errors.length;
+
+      console.log('[BulkCreateGrades] Final parsed - successCount:', successCount, 'errorCount:', errorCount);
+
+      if (errorCount === 0 && successCount > 0) {
         notifications.show({
           title: 'Success',
           message: `${successCount} grades saved successfully`,
@@ -137,9 +184,13 @@ export function useBulkCreateGrades() {
       }
     },
     onError: (error: any) => {
+      // Log full error for debugging
+      console.error('[BulkCreateGrades] Error:', error);
+      console.error('[BulkCreateGrades] Error response:', error.response);
+      console.error('[BulkCreateGrades] Error response data:', error.response?.data);
       notifications.show({
         title: 'Error',
-        message: error.response?.data?.message || 'Failed to save grades',
+        message: error.response?.data?.message || error.response?.data?.error?.message || 'Failed to save grades',
         color: 'red',
       });
     },

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AssessmentModule } from '../assessment/assessment.module';
 import { AcademicYearsModule } from '../academic-years/academic-years.module';
 import { ClassSectionsModule } from '../class-sections/class-sections.module';
@@ -8,7 +9,7 @@ import { AssessmentsService } from './assessments.service';
 import { AssessmentsController } from './assessments.controller';
 
 @Module({
-  imports: [AssessmentModule, AcademicYearsModule, ClassSectionsModule, TeacherAssignmentsModule],
+  imports: [AssessmentModule, AcademicYearsModule, ClassSectionsModule, TeacherAssignmentsModule, NotificationsModule],
   controllers: [AssessmentsController],
   providers: [AssessmentsService, SupabaseConfig],
   exports: [AssessmentsService], // Export so GradesModule can use it
