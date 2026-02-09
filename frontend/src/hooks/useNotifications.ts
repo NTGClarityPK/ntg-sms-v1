@@ -30,6 +30,8 @@ export function useNotifications(params?: QueryNotificationsParams) {
       const response = await apiClient.get<Notification[]>(
         `/api/v1/notifications?${queryParams.toString()}`,
       );
+      // response is ApiResponse<Notification[]> => { data: Notification[], meta?: {...} }
+      // We return it as-is so consumers can access .data and .meta
       return response;
     },
     enabled: !!userId,

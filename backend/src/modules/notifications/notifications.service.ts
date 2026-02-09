@@ -103,6 +103,66 @@ export class NotificationsService {
     };
   }
 
+  /**
+   * Dedicated helper to fetch unread notifications.
+   * This uses exactly the same filters as getUnreadCount to avoid any divergence.
+   */
+  async listUnreadNotifications(
+    userId: string,
+    limit = 10,
+  ): Promise<{
+    data: NotificationDto[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data, error, count } = await supabase
+      .from('notifications')
+      .select('id, user_id, type, title, body, data, is_read, created_at', { count: 'exact' })
+      .eq('user_id', userId)
+      .eq('is_read', false)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    throwIfDbError(error);
+
+    if (!data || data.length === 0) {
+      return {
+        data: [],
+        meta: {
+          total: count || 0,
+          page: 1,
+          limit,
+          totalPages: Math.ceil((count || 0) / limit),
+        },
+      };
+    }
+
+    const notifications = (data as NotificationRow[]).map(
+      (row) =>
+        new NotificationDto({
+          id: row.id,
+          userId: row.user_id,
+          type: row.type,
+          title: row.title,
+          body: row.body ?? undefined,
+          data: row.data ?? undefined,
+          isRead: row.is_read,
+          createdAt: row.created_at,
+        }),
+    );
+
+    return {
+      data: notifications,
+      meta: {
+        total: count || 0,
+        page: 1,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
+    };
+  }
+
   async getUnreadCount(userId: string): Promise<{ unreadCount: number }> {
     const supabase = this.supabaseConfig.getClient();
 

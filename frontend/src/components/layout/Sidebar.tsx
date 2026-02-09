@@ -30,6 +30,7 @@ import {
   IconCalendarClock,
   IconFileText,
   IconCalendarEvent,
+  IconBell,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -76,6 +77,7 @@ const allNavItems: NavItem[] = [
   },
   { label: 'Leaves', href: '/leaves', icon: IconPlaneDeparture },
   { label: 'Early Departure', href: '/early-departure', icon: IconWalk },
+  { label: 'Notifications', href: '/notifications', icon: IconBell },
   { 
     label: 'My Events', 
     href: '/my-events', 

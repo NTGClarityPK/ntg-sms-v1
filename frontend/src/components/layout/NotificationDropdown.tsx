@@ -25,13 +25,15 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
   const router = useRouter();
   const notifyColors = useThemeColors();
   const { data: notificationsData, isLoading } = useNotifications({
-    isRead: false,
-    limit: 10,
+    limit: 20,
   });
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
 
-  const notifications = notificationsData?.data || [];
+  // Show the latest few notifications (read + unread), while the red bubble
+  // on the bell still reflects the unread count via useUnreadCount.
+  const allNotifications = notificationsData?.data || [];
+  const notifications = allNotifications.slice(0, 5);
 
   const handleNotificationClick = (notification: Notification) => {
     // Mark as read

@@ -22,6 +22,13 @@ export class NotificationsController {
     @Query() query: QueryNotificationsDto,
     @CurrentUser() user: { id: string },
   ) {
+    // When explicitly requesting unread notifications, use a dedicated helper
+    // that mirrors the logic used by getUnreadCount to avoid any divergence.
+    if (query.isRead === false) {
+      const limit = query.limit ?? 10;
+      return this.notificationsService.listUnreadNotifications(user.id, limit);
+    }
+
     return this.notificationsService.listNotifications(user.id, query);
   }
 
