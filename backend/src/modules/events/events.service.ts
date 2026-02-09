@@ -845,14 +845,60 @@ export class EventsService {
       ];
 
       if (studentIds.length > 0) {
-        const { data: participants } = await supabase
-          .from('event_participants')
-          .select('event_id')
-          .in('student_id', studentIds);
+        // Get class-section IDs for these students
+        const { data: students } = await supabase
+          .from('students')
+          .select('id, class_id, section_id')
+          .in('id', studentIds);
 
-        eventIds = [
-          ...new Set((participants || []).map((p) => p.event_id as string)),
-        ];
+        // Build class-section lookup
+        const classSectionConditions: { classId: string; sectionId: string }[] = [];
+        for (const student of students || []) {
+          if (student.class_id && student.section_id) {
+            classSectionConditions.push({
+              classId: student.class_id as string,
+              sectionId: student.section_id as string,
+            });
+          }
+        }
+
+        if (classSectionConditions.length > 0) {
+          // Get class-section IDs
+          const { data: classSections } = await supabase
+            .from('class_sections')
+            .select('id, class_id, section_id, branch_id, academic_year_id')
+            .eq('branch_id', branchId)
+            .eq('academic_year_id', activeYear.id);
+
+          const classSectionIds: string[] = [];
+          for (const cs of classSections || []) {
+            for (const condition of classSectionConditions) {
+              if (cs.class_id === condition.classId && cs.section_id === condition.sectionId) {
+                classSectionIds.push(cs.id as string);
+              }
+            }
+          }
+
+          // Query event_participants for both student_id and class_section_id
+          const { data: participantsByStudent } = await supabase
+            .from('event_participants')
+            .select('event_id')
+            .in('student_id', studentIds);
+
+          const { data: participantsByClass } = await supabase
+            .from('event_participants')
+            .select('event_id')
+            .in('class_section_id', classSectionIds);
+
+          const allParticipants = [
+            ...(participantsByStudent || []),
+            ...(participantsByClass || []),
+          ];
+
+          eventIds = [
+            ...new Set(allParticipants.map((p) => p.event_id as string)),
+          ];
+        }
       }
     }
 
@@ -922,20 +968,48 @@ export class EventsService {
     if (userRoles.includes('student')) {
       const { data: student } = await supabase
         .from('students')
-        .select('id')
+        .select('id, class_id, section_id')
         .eq('user_id', userId)
         .eq('branch_id', branchId)
         .maybeSingle();
 
       if (student) {
-        const { data: participants } = await supabase
+        const studentData = student as { id: string; class_id: string | null; section_id: string | null };
+
+        // Check for events assigned directly to the student
+        const { data: directParticipants } = await supabase
           .from('event_participants')
           .select('event_id')
-          .eq('student_id', (student as { id: string }).id);
+          .eq('student_id', studentData.id);
 
-        const studentEventIds = [
-          ...new Set((participants || []).map((p) => p.event_id as string)),
+        let studentEventIds = [
+          ...new Set((directParticipants || []).map((p) => p.event_id as string)),
         ];
+
+        // Also check for events assigned to their class-section
+        if (studentData.class_id && studentData.section_id) {
+          const { data: classSection } = await supabase
+            .from('class_sections')
+            .select('id')
+            .eq('class_id', studentData.class_id)
+            .eq('section_id', studentData.section_id)
+            .eq('branch_id', branchId)
+            .eq('academic_year_id', activeYear.id)
+            .maybeSingle();
+
+          if (classSection) {
+            const { data: classParticipants } = await supabase
+              .from('event_participants')
+              .select('event_id')
+              .eq('class_section_id', (classSection as { id: string }).id);
+
+            const classEventIds = [
+              ...new Set((classParticipants || []).map((p) => p.event_id as string)),
+            ];
+            studentEventIds = [...new Set([...studentEventIds, ...classEventIds])];
+          }
+        }
+
         eventIds = [...new Set([...eventIds, ...studentEventIds])];
       }
     }
