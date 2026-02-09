@@ -38,10 +38,12 @@ export function useAssessmentGrades(assessmentId: string | undefined) {
   return useQuery({
     queryKey: ['grades', 'assessment', assessmentId],
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<StudentGrade[]>>(
+      // Backend returns { data: StudentGrade[] }
+      // apiClient.get<StudentGrade[]>() returns ApiResponse<StudentGrade[]> = { data: StudentGrade[] }
+      const response = await apiClient.get<StudentGrade[]>(
         `/api/v1/grades/assessment/${assessmentId}`,
       );
-      return response.data;
+      return response.data; // Returns StudentGrade[] directly
     },
     enabled: !!assessmentId,
     staleTime: 1000 * 60, // 1 minute
@@ -105,7 +107,7 @@ export function useBulkCreateGrades() {
         data: StudentGrade[];
         errors: BulkGradeError[];
       }>('/api/v1/grades/bulk', data);
-      return response;
+      return response.data;
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['grades'] });

@@ -1,36 +1,37 @@
 'use client';
 
 /**
- * Edit Assessment Page
+ * Edit Event Page
  */
 
-import { Title, Paper, Stack, Skeleton, Text, Group, Button } from '@mantine/core';
+import { Title, Paper, Button, Group, Stack, Skeleton, Alert } from '@mantine/core';
 import { useRouter, useParams } from 'next/navigation';
-import { AssessmentForm } from '@/components/assessments/AssessmentForm';
-import { useAssessment, useUpdateAssessment } from '@/hooks/api/useAssessments';
-import type { UpdateAssessmentInput } from '@/types/assessment';
+import { EventForm } from '@/components/features/events/EventForm';
+import { useEvent, useUpdateEvent } from '@/hooks/api/useEvents';
+import type { CreateEventInput, UpdateEventInput } from '@/types/events';
 
-export default function EditAssessmentPage() {
+export default function EditEventPage() {
   const router = useRouter();
   const params = useParams();
-  const assessmentId = params.id as string;
-  const { data: assessmentData, isLoading } = useAssessment(assessmentId);
-  const assessment = assessmentData; // Hook already returns response.data, so assessmentData is the Assessment directly
-  const updateAssessment = useUpdateAssessment(assessmentId);
+  const eventId = params.id as string;
+  const { data: eventData, isLoading } = useEvent(eventId);
+  const updateEvent = useUpdateEvent(eventId);
 
-  const handleSubmit = (values: UpdateAssessmentInput) => {
-    updateAssessment.mutate(values, {
+  const event = eventData?.data;
+
+  const handleSubmit = (values: CreateEventInput | UpdateEventInput) => {
+    updateEvent.mutate(values as UpdateEventInput, {
       onSuccess: () => {
-        router.push('/assessments');
+        router.push(`/events/${eventId}`);
       },
     });
   };
 
-  if (isLoading) {
+  if (isLoading || !eventData) {
     return (
       <>
         <div className="page-title-bar">
-          <Skeleton height={40} width="30%" />
+          <Skeleton height={40} width={200} />
         </div>
         <div
           style={{
@@ -41,17 +42,19 @@ export default function EditAssessmentPage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Skeleton height={400} />
+          <Stack gap="md">
+            <Skeleton height={200} />
+          </Stack>
         </div>
       </>
     );
   }
 
-  if (!assessment) {
+  if (!event) {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Edit Assessment</Title>
+          <Title order={1}>Event Not Found</Title>
         </div>
         <div
           style={{
@@ -62,11 +65,7 @@ export default function EditAssessmentPage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Paper p="xl" withBorder>
-            <Text ta="center" c="dimmed">
-              Assessment not found.
-            </Text>
-          </Paper>
+          <Alert color="red">The requested event could not be found.</Alert>
         </div>
       </>
     );
@@ -76,7 +75,7 @@ export default function EditAssessmentPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Edit Assessment</Title>
+          <Title order={1}>Edit Event</Title>
         </Group>
       </div>
 
@@ -91,11 +90,7 @@ export default function EditAssessmentPage() {
       >
         <Stack gap="md">
           <Paper p="md" withBorder>
-            <AssessmentForm
-              assessment={assessment}
-              onSubmit={handleSubmit}
-              isLoading={updateAssessment.isPending}
-            />
+            <EventForm event={event} onSubmit={handleSubmit} isLoading={updateEvent.isPending} />
           </Paper>
 
           <Group justify="flex-end">

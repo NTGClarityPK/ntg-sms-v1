@@ -14,7 +14,8 @@ export default function AssessmentGradesPage() {
   const router = useRouter();
   const params = useParams();
   const assessmentId = params.id as string;
-  const { data: assessment, isLoading } = useAssessment(assessmentId);
+  const { data: assessmentData, isLoading } = useAssessment(assessmentId);
+  const assessment = assessmentData; // Hook already returns response.data, so assessmentData is the Assessment directly
 
   if (isLoading) {
     return (

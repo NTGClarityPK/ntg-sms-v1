@@ -55,8 +55,9 @@ export function GradeEntrySheet({ assessment }: GradeEntrySheetProps) {
       return;
     }
 
-    const students = studentsData.data;
-    const gradesMap = new Map(existingGrades?.map((g) => [g.studentId, g]) || []);
+    const students = studentsData?.data || []; // useStudents returns full response { data: [], meta: {...} }
+    const grades = existingGrades || []; // useAssessmentGrades returns response.data (already unwrapped)
+    const gradesMap = new Map(grades.map((g) => [g.studentId, g]));
 
     const gradeRows: GradeRow[] = students.map((student) => {
       const existing = gradesMap.get(student.id);

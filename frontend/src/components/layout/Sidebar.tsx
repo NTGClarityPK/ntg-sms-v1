@@ -29,6 +29,7 @@ import {
   IconUsersGroup,
   IconCalendarClock,
   IconFileText,
+  IconCalendarEvent,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -56,6 +57,26 @@ const allNavItems: NavItem[] = [
   { label: 'Assessments', href: '/assessments', icon: IconFileText },
   { label: 'Leaves', href: '/leaves', icon: IconPlaneDeparture },
   { label: 'Early Departure', href: '/early-departure', icon: IconWalk },
+  { 
+    label: 'My Events', 
+    href: '/my-events', 
+    icon: IconCalendarEvent,
+    showCondition: () => {
+      // Show for parents, students, and teachers
+      if (typeof window === 'undefined') return false;
+      return true; // Will be filtered in render
+    }
+  },
+  {
+    label: 'Events Management',
+    href: '/events',
+    icon: IconCalendarEvent,
+    showCondition: () => {
+      // Show for school_admin, principal, and academic_coordinator
+      if (typeof window === 'undefined') return false;
+      return true; // Will be filtered in render
+    }
+  },
   { 
     label: 'My Schedule', 
     href: '/my-schedule', 
@@ -132,6 +153,18 @@ export function Sidebar({
     return roleName === 'school_admin' || roleName === 'principal' || roleName === 'academic_coordinator';
   }) || false;
 
+  // Check if user is a parent
+  const isParent = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return roleName === 'parent';
+  }) || false;
+
+  // Check if user can manage events (admin/coordinator)
+  const canManageEvents = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return roleName === 'school_admin' || roleName === 'principal' || roleName === 'academic_coordinator';
+  }) || false;
+
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
     // Check showCondition if it exists
@@ -148,6 +181,14 @@ export function Sidebar({
       if (item.href === '/timetable') {
         return canManageTimetable;
       }
+      // For "My Events", show for parents, students, and teachers
+      if (item.href === '/my-events') {
+        return isParent || isStudent || isTeacher;
+      }
+      // For "Events Management", show only if user has admin/coordinator role
+      if (item.href === '/events') {
+        return canManageEvents;
+      }
       return item.showCondition();
     }
     return true;
@@ -163,7 +204,8 @@ export function Sidebar({
       item.href === '/leaves' ||
       item.href === '/early-departure' ||
       item.href === '/my-schedule' ||
-      item.href === '/my-timetable'
+      item.href === '/my-timetable' ||
+      item.href === '/my-events'
   );
   const managementItems = navItems.filter(
     (item) =>
@@ -173,6 +215,7 @@ export function Sidebar({
       item.href === '/academic/teacher-mapping' ||
       item.href === '/timetable' ||
       item.href === '/parent-associations' ||
+      item.href === '/events' ||
       item.href === '/reports' ||
       item.href === '/settings'
   );

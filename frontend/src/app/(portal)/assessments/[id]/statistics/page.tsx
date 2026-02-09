@@ -25,8 +25,10 @@ export default function AssessmentStatisticsPage() {
   const router = useRouter();
   const params = useParams();
   const assessmentId = params.id as string;
-  const { data: assessment, isLoading: assessmentLoading } = useAssessment(assessmentId);
-  const { data: statistics, isLoading: statsLoading } = useAssessmentStatistics(assessmentId);
+  const { data: assessmentData, isLoading: assessmentLoading } = useAssessment(assessmentId);
+  const { data: statisticsData, isLoading: statsLoading } = useAssessmentStatistics(assessmentId);
+  const assessment = assessmentData; // Hook already returns response.data
+  const statistics = statisticsData; // Hook already returns response.data
 
   if (assessmentLoading || statsLoading) {
     return (

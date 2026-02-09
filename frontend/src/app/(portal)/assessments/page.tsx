@@ -40,7 +40,7 @@ export default function AssessmentsPage() {
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState<string | null>(null);
 
-  const { data, isLoading } = useAssessments({
+  const { data, isLoading, error } = useAssessments({
     page,
     limit: 20,
     search: search || undefined,
@@ -48,6 +48,24 @@ export default function AssessmentsPage() {
     subjectId: subjectId || undefined,
     isPublished: isPublished === 'true' ? true : isPublished === 'false' ? false : undefined,
   });
+
+  // Debug logging
+  if (process.env.NODE_ENV === 'development') {
+    if (data) {
+      console.log('[Assessments Page] Full data object:', data);
+      console.log('[Assessments Page] data.data:', data.data);
+      console.log('[Assessments Page] data.data type:', typeof data.data);
+      console.log('[Assessments Page] data.data is array?', Array.isArray(data.data));
+      if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+        console.log('[Assessments Page] data.data keys:', Object.keys(data.data));
+        console.log('[Assessments Page] data.data.data:', data.data.data);
+        console.log('[Assessments Page] data.data.meta:', data.data.meta);
+      }
+    }
+    if (error) {
+      console.error('[Assessments Page] Error:', error);
+    }
+  }
 
   const deleteAssessment = useDeleteAssessment();
 
@@ -119,7 +137,11 @@ export default function AssessmentsPage() {
                 <Skeleton key={i} height={60} />
               ))}
             </Stack>
-          ) : data && data.data.length > 0 ? (
+          ) : error ? (
+            <Text c="red" ta="center" py="xl">
+              Error loading assessments. Please try again.
+            </Text>
+          ) : data?.data && Array.isArray(data.data) && data.data.length > 0 ? (
             <Stack gap="md">
               <ScrollArea>
                 <Table striped highlightOnHover>
@@ -205,7 +227,7 @@ export default function AssessmentsPage() {
               </ScrollArea>
 
               {/* Pagination */}
-              {data.meta.totalPages > 1 && (
+              {data.meta && data.meta.totalPages > 1 && (
                 <Group justify="center" mt="md">
                   <Pagination total={data.meta.totalPages} value={page} onChange={setPage} />
                 </Group>

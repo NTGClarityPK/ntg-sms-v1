@@ -24,10 +24,13 @@ export function useAssessments(params: QueryAssessmentsInput = {}) {
   return useQuery({
     queryKey: ['assessments', params],
     queryFn: async () => {
+      // Backend returns { data: AssessmentDto[], meta: {...} }
+      // ResponseInterceptor returns it as-is
+      // apiClient.get() wraps it in ApiResponse, so we get { data: { data: Assessment[], meta: {...} } }
       const response = await apiClient.get<PaginatedApiResponse<Assessment>>('/api/v1/assessments', {
         params,
       });
-      // apiClient.get() already returns { data: T[], meta: {...} }
+      // Return the response - structure is { data: { data: Assessment[], meta: {...} } }
       return response;
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
@@ -41,8 +44,10 @@ export function useAssessment(id: string | undefined) {
   return useQuery({
     queryKey: ['assessments', id],
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<Assessment>>(`/api/v1/assessments/${id}`);
-      return response.data;
+      // Backend returns { data: Assessment }
+      // apiClient.get<Assessment>() returns ApiResponse<Assessment> = { data: Assessment }
+      const response = await apiClient.get<Assessment>(`/api/v1/assessments/${id}`);
+      return response.data; // Returns Assessment directly
     },
     enabled: !!id,
     staleTime: 1000 * 60 * 2, // 2 minutes
@@ -225,10 +230,12 @@ export function useAssessmentStatistics(assessmentId: string | undefined) {
   return useQuery({
     queryKey: ['assessments', assessmentId, 'statistics'],
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<AssessmentStatistics>>(
+      // Backend returns { data: AssessmentStatistics }
+      // apiClient.get<AssessmentStatistics>() returns ApiResponse<AssessmentStatistics> = { data: AssessmentStatistics }
+      const response = await apiClient.get<AssessmentStatistics>(
         `/api/v1/assessments/${assessmentId}/statistics`,
       );
-      return response.data;
+      return response.data; // Returns AssessmentStatistics directly
     },
     enabled: !!assessmentId,
     staleTime: 1000 * 60, // 1 minute

@@ -31,6 +31,7 @@ import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.mod
 import { EarlyDepartureModule } from './modules/early-departure/early-departure.module';
 import { TimetableModule } from './modules/timetable/timetable.module';
 import { SubjectTemplatesModule } from './modules/subject-templates/subject-templates.module';
+import { EventsModule } from './modules/events/events.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { SubjectTemplatesModule } from './modules/subject-templates/subject-temp
     EarlyDepartureModule,
     TimetableModule,
     SubjectTemplatesModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [
