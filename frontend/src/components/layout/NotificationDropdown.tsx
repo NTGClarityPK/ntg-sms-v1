@@ -30,8 +30,8 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
 
-  // Show the latest few notifications (read + unread), while the red bubble
-  // on the bell still reflects the unread count via useUnreadCount.
+  // Show the latest few notifications (read + unread). The red bubble on the bell
+  // still reflects the unread count via useUnreadCount.
   const allNotifications = notificationsData?.data || [];
   const notifications = allNotifications.slice(0, 5);
 
@@ -62,10 +62,14 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
       case 'attendance':
         return notifyColors.info;
       case 'leave':
+      case 'early_departure':
         return notifyColors.warning;
       case 'grade':
+      case 'assessment_read':
         return notifyColors.success;
       case 'event':
+      case 'event_created':
+      case 'event_updated':
         return notifyColors.primary;
       default:
         return notifyColors.primary;

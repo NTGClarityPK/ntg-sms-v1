@@ -27,11 +27,14 @@ export function useNotifications(params?: QueryNotificationsParams) {
         queryParams.append('isRead', params.isRead.toString());
       if (params?.type) queryParams.append('type', params.type);
 
-      const response = await apiClient.get<Notification[]>(
-        `/api/v1/notifications?${queryParams.toString()}`,
-      );
-      // response is ApiResponse<Notification[]> => { data: Notification[], meta?: {...} }
-      // We return it as-is so consumers can access .data and .meta
+      // Backend returns { data: NotificationDto[]; meta: {...} }
+      // ResponseInterceptor passes this through unchanged
+      // apiClient.get returns the response body, which is { data: Notification[], meta: {...} }
+      const response = await apiClient.get<{
+        data: Notification[];
+        meta: { total: number; page: number; limit: number; totalPages: number };
+      }>(`/api/v1/notifications?${queryParams.toString()}`);
+
       return response;
     },
     enabled: !!userId,
@@ -50,7 +53,7 @@ export function useNotification(id: string | null) {
       const response = await apiClient.get<{ data: Notification }>(
         `/api/v1/notifications/${id}`,
       );
-      return response.data;
+      return response;
     },
     enabled: !!id && !!userId,
   });
@@ -65,7 +68,7 @@ export function useUnreadCount() {
     queryFn: async () => {
       if (!userId) return 0;
 
-      const response = await apiClient.get<{ unreadCount: number }>(
+      const response = await apiClient.get<{ data: { unreadCount: number } }>(
         `/api/v1/notifications/unread-count`,
       );
 
@@ -88,7 +91,7 @@ export function useMarkAsRead() {
         `/api/v1/notifications/${id}/read`,
         {},
       );
-      return response.data;
+      return response;
     },
     onSuccess: () => {
       // Invalidate all notification queries

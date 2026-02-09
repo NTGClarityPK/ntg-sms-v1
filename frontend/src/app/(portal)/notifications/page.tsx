@@ -40,10 +40,14 @@ export default function NotificationsPage() {
       case 'attendance':
         return notifyColors.info;
       case 'leave':
+      case 'early_departure':
         return notifyColors.warning;
       case 'grade':
+      case 'assessment_read':
         return notifyColors.success;
       case 'event':
+      case 'event_created':
+      case 'event_updated':
         return notifyColors.primary;
       default:
         return notifyColors.primary;
