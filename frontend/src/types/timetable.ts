@@ -63,6 +63,7 @@ export interface Conflict {
 }
 
 export interface CreateTimetableSlotInput {
+  id?: string; // Optional: if provided, update existing slot by ID
   classSectionId: string;
   dayOfWeek: number;
   periodNumber?: number; // Optional label - time range is primary identifier

@@ -18,6 +18,10 @@ export enum TimetableSlotType {
 }
 
 export class CreateTimetableSlotDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string; // Optional: if provided, update existing slot by ID
+
   @IsUUID()
   classSectionId!: string;
 

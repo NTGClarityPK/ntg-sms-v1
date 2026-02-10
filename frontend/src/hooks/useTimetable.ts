@@ -155,8 +155,12 @@ export function useCreateOrUpdateSlot() {
       return response.data;
     },
     onSuccess: (_, variables) => {
-      // Invalidate timetable queries
+      // Invalidate all timetable queries to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ['timetable'] });
+      // Specifically invalidate the class timetable query
+      queryClient.invalidateQueries({ 
+        queryKey: ['timetable', 'class', variables.classSectionId] 
+      });
       // Invalidate conflicts
       queryClient.invalidateQueries({ queryKey: ['timetable', 'conflicts'] });
       notifications.show({

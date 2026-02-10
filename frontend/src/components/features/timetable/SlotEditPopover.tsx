@@ -232,6 +232,7 @@ export function SlotEditPopover({
     // Create/update slot for each day
     const promises = daysToCreate.map((day) =>
       createOrUpdate.mutateAsync({
+        ...(isEdit && slot ? { id: slot.id } : {}), // Include ID when editing
         classSectionId,
         dayOfWeek: day,
         periodNumber: values.periodNumber ? Number(values.periodNumber) : undefined,

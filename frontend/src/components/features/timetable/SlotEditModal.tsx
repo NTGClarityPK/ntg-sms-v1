@@ -108,6 +108,7 @@ export function SlotEditModal({
 
   const handleSubmit = async (values: typeof form.values) => {
     await createOrUpdate.mutateAsync({
+      ...(isEdit && slot ? { id: slot.id } : {}), // Include ID when editing
       classSectionId,
       dayOfWeek,
       periodNumber,

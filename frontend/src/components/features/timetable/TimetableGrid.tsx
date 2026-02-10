@@ -220,6 +220,10 @@ export function TimetableGrid({
                     : minutesToOffset(endMinutes);
                   const height = Math.max(bottom - top, 24);
                   const hasConflict = conflictSlotIds.has(slot.id);
+                  
+                  // Calculate duration to determine if compact layout needed
+                  const durationMinutes = endMinutes - startMinutes;
+                  const isCompact = durationMinutes < 15 || height < 50;
 
                   return (
                     <div
@@ -241,8 +245,10 @@ export function TimetableGrid({
                         slot={slot}
                         onClick={() => {}}
                         showConflict={hasConflict}
+                        height={height}
                       />
-                      {slot.periodNumber && (
+                      {/* Only show period badge for non-compact slots */}
+                      {slot.periodNumber && !isCompact && (
                         <Badge
                           size="xs"
                           variant="light"

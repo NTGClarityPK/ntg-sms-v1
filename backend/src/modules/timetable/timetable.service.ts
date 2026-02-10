@@ -443,8 +443,9 @@ export class TimetableService {
       }
     }
 
-    // Upsert using unique constraint (with subject_template_id)
-    const upsertData: any = {
+    // If ID is provided, update existing slot by ID (handles time changes)
+    // Otherwise, use upsert based on unique constraint
+    const updateData: any = {
       class_section_id: input.classSectionId,
       day_of_week: input.dayOfWeek,
       period_number: input.periodNumber ?? null, // Optional label
@@ -460,21 +461,39 @@ export class TimetableService {
     };
 
     if (input.subjectTemplateId) {
-      upsertData.subject_template_id = input.subjectTemplateId;
+      updateData.subject_template_id = input.subjectTemplateId;
     }
 
-    const { data, error } = await supabase
-      .from('timetable_slots')
-      .upsert(upsertData, {
-        // Use the unique constraint that includes subject_template_id
-        // This matches: (class_section_id, day_of_week, start_time, end_time, academic_year_id, subject_template_id)
-        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
-      })
-      .select('*')
-      .single();
-    throwIfDbError(error);
+    let row: TimetableSlotRow;
 
-    const row = data as TimetableSlotRow;
+    if (input.id) {
+      // Update existing slot by ID
+      const { data, error } = await supabase
+        .from('timetable_slots')
+        .update(updateData)
+        .eq('id', input.id)
+        .eq('branch_id', branchId)
+        .select('*')
+        .single();
+      throwIfDbError(error);
+      if (!data) {
+        throw new NotFoundException('Timetable slot not found');
+      }
+      row = data as TimetableSlotRow;
+    } else {
+      // Upsert using unique constraint (with subject_template_id)
+      const { data, error } = await supabase
+        .from('timetable_slots')
+        .upsert(updateData, {
+          // Use the unique constraint that includes subject_template_id
+          // This matches: (class_section_id, day_of_week, start_time, end_time, academic_year_id, subject_template_id)
+          onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
+        })
+        .select('*')
+        .single();
+      throwIfDbError(error);
+      row = data as TimetableSlotRow;
+    }
     
     // Automatically renumber periods based on chronological order
     await this.renumberPeriodsForClassSection(
