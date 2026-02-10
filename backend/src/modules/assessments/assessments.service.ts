@@ -201,12 +201,81 @@ export class AssessmentsService {
   ): Promise<AssessmentDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Validate class-section belongs to branch + get academic year
-    const classSection = await this.classSectionsService.getClassSectionById(
-      input.classSectionId,
-      branchId,
-    );
-    const academicYearId = classSection.academicYearId;
+    // Determine which mode we're using
+    let classSectionIdsToCreate: string[] = [];
+    let academicYearId: string;
+
+    if (input.classSectionId) {
+      // Mode 1: Single class-section (existing, backward compatible)
+      const classSection = await this.classSectionsService.getClassSectionById(
+        input.classSectionId,
+        branchId,
+      );
+      academicYearId = classSection.academicYearId;
+      classSectionIdsToCreate = [input.classSectionId];
+    } else if (input.classId) {
+      // Mode 2 or 3: Class-level creation
+      // Get active academic year
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+      if (!activeYear) {
+        throw new BadRequestException('No active academic year found');
+      }
+      academicYearId = activeYear.id;
+
+      if (input.subjectTemplateId) {
+        // Mode 2: Class + Subject Template - get all sections for this class
+        const { data: classSectionsData, error: csError } = await supabase
+          .from('class_sections')
+          .select('id')
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', academicYearId)
+          .eq('class_id', input.classId)
+          .eq('is_active', true);
+        throwIfDbError(csError);
+        if (!classSectionsData || classSectionsData.length === 0) {
+          throw new BadRequestException('No active class sections found for this class');
+        }
+        classSectionIdsToCreate = classSectionsData.map((cs) => cs.id);
+
+        // Validate subject template exists and subject belongs to it
+        const { data: templateSubjects, error: templateError } = await supabase
+          .from('subject_template_subjects')
+          .select('subject_id')
+          .eq('subject_template_id', input.subjectTemplateId);
+        throwIfDbError(templateError);
+        const templateSubjectIds = (templateSubjects || []).map((ts) => ts.subject_id);
+        if (!templateSubjectIds.includes(input.subjectId)) {
+          throw new BadRequestException(
+            'Selected subject does not belong to the selected subject template',
+          );
+        }
+      } else if (input.classSectionIds && input.classSectionIds.length > 0) {
+        // Mode 3: Class + Specific Sections
+        // Validate all class-section IDs belong to the class and branch
+        const { data: classSectionsData, error: csError } = await supabase
+          .from('class_sections')
+          .select('id, class_id')
+          .in('id', input.classSectionIds)
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', academicYearId);
+        throwIfDbError(csError);
+        if (!classSectionsData || classSectionsData.length !== input.classSectionIds.length) {
+          throw new BadRequestException('One or more class sections not found');
+        }
+        // Verify all sections belong to the specified class
+        const invalidSections = classSectionsData.filter((cs) => cs.class_id !== input.classId);
+        if (invalidSections.length > 0) {
+          throw new BadRequestException('One or more class sections do not belong to the specified class');
+        }
+        classSectionIdsToCreate = input.classSectionIds;
+      } else {
+        throw new BadRequestException(
+          'Either subjectTemplateId or classSectionIds must be provided when classId is specified',
+        );
+      }
+    } else {
+      throw new BadRequestException('Either classSectionId or classId must be provided');
+    }
 
     // Ensure assessment type exists for branch
     const { data: typeRow, error: typeError } = await supabase
@@ -231,32 +300,37 @@ export class AssessmentsService {
       throw new BadRequestException('Subject not found');
     }
 
-    // Optionally validate teacher assignment (subject/class-section) here later using teacherAssignmentsService
+    // Create assessments for each class-section
+    const assessmentsToInsert = classSectionIdsToCreate.map((classSectionId) => ({
+      title: input.title,
+      description: input.description ?? null,
+      assessment_type_id: input.assessmentTypeId,
+      subject_id: input.subjectId,
+      class_section_id: classSectionId,
+      created_by: createdByUserId,
+      total_marks: input.totalMarks,
+      due_date: input.dueDate ?? null,
+      publish_date: input.publishDate ?? null,
+      is_published: input.isPublished ?? false,
+      allow_late_submission: input.allowLateSubmission ?? false,
+      branch_id: branchId,
+      academic_year_id: academicYearId,
+    }));
 
     const { data, error } = await supabase
       .from('assessments')
-      .insert({
-        title: input.title,
-        description: input.description ?? null,
-        assessment_type_id: input.assessmentTypeId,
-        subject_id: input.subjectId,
-        class_section_id: input.classSectionId,
-        created_by: createdByUserId,
-        total_marks: input.totalMarks,
-        due_date: input.dueDate ?? null,
-        publish_date: input.publishDate ?? null,
-        is_published: input.isPublished ?? false,
-        allow_late_submission: input.allowLateSubmission ?? false,
-        branch_id: branchId,
-        academic_year_id: academicYearId,
-      })
+      .insert(assessmentsToInsert)
       .select(
         'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
-      )
-      .single();
+      );
     throwIfDbError(error);
 
-    return mapAssessment(data as AssessmentRow);
+    if (!data || data.length === 0) {
+      throw new BadRequestException('Failed to create assessments');
+    }
+
+    // Return the first created assessment
+    return mapAssessment(data[0] as AssessmentRow);
   }
 
   async updateAssessment(
@@ -909,7 +983,62 @@ export class AssessmentsService {
       return [];
     }
 
-    const assessmentIds = assessmentRows.map((a) => a.id);
+    // Get student's subject template assignment for this academic year
+    const { data: studentTemplate, error: templateError } = await supabase
+      .from('student_subject_template_assignments')
+      .select('subject_template_id')
+      .eq('student_id', student.id)
+      .eq('academic_year_id', student.academic_year_id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    throwIfDbError(templateError);
+    const studentTemplateId = studentTemplate?.subject_template_id || null;
+
+    // Filter assessments based on subject template
+    // If student has a template, only show assessments whose subject is in that template
+    // If student has no template, show all assessments (backward compatibility)
+    let filteredAssessments = assessmentRows;
+
+    if (studentTemplateId) {
+      // Get subjects in the student's template
+      const { data: templateSubjects, error: templateSubjectsError } = await supabase
+        .from('subject_template_subjects')
+        .select('subject_id')
+        .eq('subject_template_id', studentTemplateId);
+
+      throwIfDbError(templateSubjectsError);
+      const templateSubjectIds = new Set(
+        (templateSubjects || []).map((ts: { subject_id: string }) => ts.subject_id),
+      );
+
+      // Get all subjects that belong to ANY template (to identify assessments created with template mode)
+      const { data: allTemplateSubjects, error: allTemplateSubjectsError } = await supabase
+        .from('subject_template_subjects')
+        .select('subject_id');
+
+      throwIfDbError(allTemplateSubjectsError);
+      const allTemplateSubjectIds = new Set(
+        (allTemplateSubjects || []).map((ts: { subject_id: string }) => ts.subject_id),
+      );
+
+      // Filter assessments:
+      // 1. Show assessments whose subject is in the student's template (created with template mode)
+      // 2. Show assessments whose subject doesn't belong to any template (created in single mode, backward compatibility)
+      filteredAssessments = assessmentRows.filter((assessment) => {
+        const subjectInAnyTemplate = allTemplateSubjectIds.has(assessment.subject_id);
+        if (subjectInAnyTemplate) {
+          // Subject belongs to a template - only show if it's in student's template
+          return templateSubjectIds.has(assessment.subject_id);
+        } else {
+          // Subject doesn't belong to any template - show to all students (backward compatibility)
+          return true;
+        }
+      });
+    }
+    // If student has no template, show all assessments (backward compatibility)
+
+    const assessmentIds = filteredAssessments.map((a) => a.id);
 
     // Fetch attachments for these assessments
     const { data: attachments, error: attachmentsError } = await supabase
@@ -958,7 +1087,7 @@ export class AssessmentsService {
       statusMap.set(dto.assessmentId, dto);
     }
 
-    return assessmentRows.map((row) => {
+    return filteredAssessments.map((row) => {
       const assessment = mapAssessment(row);
       const status = statusMap.get(assessment.id);
       const att = attachmentsByAssessment.get(assessment.id) ?? [];

@@ -16,13 +16,15 @@ import {
   Card,
   ScrollArea,
   Button,
+  Divider,
 } from '@mantine/core';
-import { IconCalendar, IconCheck, IconX, IconClock, IconUsers } from '@tabler/icons-react';
+import { IconCalendar, IconCheck, IconX, IconClock, IconUsers, IconRotateClockwise } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
-import { useMyEvents } from '@/hooks/api/useEvents';
+import { useMyEvents, useSubmitConsent } from '@/hooks/api/useEvents';
 import { useAuth } from '@/hooks/useAuth';
 import dayjs from 'dayjs';
 import type { Event } from '@/types/events';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function MyEventsPage() {
   const router = useRouter();
@@ -49,6 +51,102 @@ export default function MyEventsPage() {
 
   const upcomingEvents = events.filter((e) => dayjs(e.endDate).isAfter(dayjs()));
   const pastEvents = events.filter((e) => dayjs(e.endDate).isBefore(dayjs()));
+
+  const ConsentActions = ({ event }: { event: Event }) => {
+    const submitConsent = useSubmitConsent(event.id);
+
+    const handleConsent = async (studentId: string, status: 'approved' | 'rejected') => {
+      try {
+        await submitConsent.mutateAsync({
+          studentId,
+          status,
+        });
+      } catch (error) {
+        // Error handling is done in the hook
+      }
+    };
+
+    if (!event.requiresConsent || !isParent || !event.consentStatuses || event.consentStatuses.length === 0) {
+      return null;
+    }
+
+    return (
+      <Stack gap="sm" mt="xs">
+        <Divider />
+        <Text size="sm" fw={500} c="dimmed">
+          Consent Status:
+        </Text>
+        {event.consentStatuses.map((consent) => (
+          <Group key={consent.studentId} justify="space-between">
+            <Text size="sm">
+              {consent.studentName}:{' '}
+              <Badge
+                color={
+                  consent.status === 'approved'
+                    ? 'green'
+                    : consent.status === 'rejected'
+                      ? 'red'
+                      : 'orange'
+                }
+                variant="light"
+              >
+                {consent.status.charAt(0).toUpperCase() + consent.status.slice(1)}
+              </Badge>
+            </Text>
+            <Group gap="xs">
+              {consent.status === 'pending' && (
+                <>
+                  <Button
+                    size="xs"
+                    color="green"
+                    leftSection={<IconCheck size={14} />}
+                    onClick={() => handleConsent(consent.studentId, 'approved')}
+                    loading={submitConsent.isPending}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    size="xs"
+                    color="red"
+                    variant="light"
+                    leftSection={<IconX size={14} />}
+                    onClick={() => handleConsent(consent.studentId, 'rejected')}
+                    loading={submitConsent.isPending}
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
+              {consent.status === 'approved' && (
+                <Button
+                  size="xs"
+                  color="red"
+                  variant="light"
+                  leftSection={<IconRotateClockwise size={14} />}
+                  onClick={() => handleConsent(consent.studentId, 'rejected')}
+                  loading={submitConsent.isPending}
+                >
+                  Change to Reject
+                </Button>
+              )}
+              {consent.status === 'rejected' && (
+                <Button
+                  size="xs"
+                  color="green"
+                  variant="light"
+                  leftSection={<IconRotateClockwise size={14} />}
+                  onClick={() => handleConsent(consent.studentId, 'approved')}
+                  loading={submitConsent.isPending}
+                >
+                  Change to Approve
+                </Button>
+              )}
+            </Group>
+          </Group>
+        ))}
+      </Stack>
+    );
+  };
 
   return (
     <>
@@ -88,45 +186,48 @@ export default function MyEventsPage() {
                       <Stack gap="sm">
                         {upcomingEvents.map((event) => (
                           <Card key={event.id} withBorder p="md">
-                            <Group justify="space-between">
-                              <Stack gap="xs">
-                                <Group>
-                                  <Text fw={500}>{event.title}</Text>
-                                  {getStatusBadge(event)}
-                                  {event.requiresConsent && (
-                                    <Badge color="orange">Consent Required</Badge>
-                                  )}
-                                </Group>
-                                <Group gap="xs">
-                                  <IconCalendar size={16} />
-                                  <Text size="sm">
-                                    {dayjs(event.startDate).format('MMM D, YYYY')}
-                                    {event.startDate !== event.endDate &&
-                                      ` – ${dayjs(event.endDate).format('MMM D, YYYY')}`}
-                                  </Text>
-                                </Group>
-                                {isParent && event.studentNames && event.studentNames.length > 0 && (
+                            <Stack gap="xs">
+                              <Group justify="space-between">
+                                <Stack gap="xs">
+                                  <Group>
+                                    <Text fw={500}>{event.title}</Text>
+                                    {getStatusBadge(event)}
+                                    {event.requiresConsent && (
+                                      <Badge color="orange">Consent Required</Badge>
+                                    )}
+                                  </Group>
                                   <Group gap="xs">
-                                    <IconUsers size={16} />
-                                    <Text size="sm" fw={500}>
-                                      {event.studentNames.join(', ')}
+                                    <IconCalendar size={16} />
+                                    <Text size="sm">
+                                      {dayjs(event.startDate).format('MMM D, YYYY')}
+                                      {event.startDate !== event.endDate &&
+                                        ` – ${dayjs(event.endDate).format('MMM D, YYYY')}`}
                                     </Text>
                                   </Group>
-                                )}
-                                {event.description && (
-                                  <Text size="sm" c="dimmed" lineClamp={2}>
-                                    {event.description}
-                                  </Text>
-                                )}
-                              </Stack>
-                              <Button
-                                variant="light"
-                                size="sm"
-                                onClick={() => router.push(`/events/${event.id}`)}
-                              >
-                                View Details
-                              </Button>
-                            </Group>
+                                  {isParent && event.studentNames && event.studentNames.length > 0 && (
+                                    <Group gap="xs">
+                                      <IconUsers size={16} />
+                                      <Text size="sm" fw={500}>
+                                        {event.studentNames.join(', ')}
+                                      </Text>
+                                    </Group>
+                                  )}
+                                  {event.description && (
+                                    <Text size="sm" c="dimmed" lineClamp={2}>
+                                      {event.description}
+                                    </Text>
+                                  )}
+                                </Stack>
+                                <Button
+                                  variant="light"
+                                  size="sm"
+                                  onClick={() => router.push(`/events/${event.id}`)}
+                                >
+                                  View Details
+                                </Button>
+                              </Group>
+                              <ConsentActions event={event} />
+                            </Stack>
                           </Card>
                         ))}
                       </Stack>
@@ -147,42 +248,45 @@ export default function MyEventsPage() {
                       <Stack gap="sm">
                         {pastEvents.map((event) => (
                           <Card key={event.id} withBorder p="md">
-                            <Group justify="space-between">
-                              <Stack gap="xs">
-                                <Group>
-                                  <Text fw={500}>{event.title}</Text>
-                                  {getStatusBadge(event)}
-                                </Group>
-                                <Group gap="xs">
-                                  <IconCalendar size={16} />
-                                  <Text size="sm">
-                                    {dayjs(event.startDate).format('MMM D, YYYY')}
-                                    {event.startDate !== event.endDate &&
-                                      ` – ${dayjs(event.endDate).format('MMM D, YYYY')}`}
-                                  </Text>
-                                </Group>
-                                {isParent && event.studentNames && event.studentNames.length > 0 && (
+                            <Stack gap="xs">
+                              <Group justify="space-between">
+                                <Stack gap="xs">
+                                  <Group>
+                                    <Text fw={500}>{event.title}</Text>
+                                    {getStatusBadge(event)}
+                                  </Group>
                                   <Group gap="xs">
-                                    <IconUsers size={16} />
-                                    <Text size="sm" fw={500}>
-                                      {event.studentNames.join(', ')}
+                                    <IconCalendar size={16} />
+                                    <Text size="sm">
+                                      {dayjs(event.startDate).format('MMM D, YYYY')}
+                                      {event.startDate !== event.endDate &&
+                                        ` – ${dayjs(event.endDate).format('MMM D, YYYY')}`}
                                     </Text>
                                   </Group>
-                                )}
-                                {event.description && (
-                                  <Text size="sm" c="dimmed" lineClamp={2}>
-                                    {event.description}
-                                  </Text>
-                                )}
-                              </Stack>
-                              <Button
-                                variant="light"
-                                size="sm"
-                                onClick={() => router.push(`/events/${event.id}`)}
-                              >
-                                View Details
-                              </Button>
-                            </Group>
+                                  {isParent && event.studentNames && event.studentNames.length > 0 && (
+                                    <Group gap="xs">
+                                      <IconUsers size={16} />
+                                      <Text size="sm" fw={500}>
+                                        {event.studentNames.join(', ')}
+                                      </Text>
+                                    </Group>
+                                  )}
+                                  {event.description && (
+                                    <Text size="sm" c="dimmed" lineClamp={2}>
+                                      {event.description}
+                                    </Text>
+                                  )}
+                                </Stack>
+                                <Button
+                                  variant="light"
+                                  size="sm"
+                                  onClick={() => router.push(`/events/${event.id}`)}
+                                >
+                                  View Details
+                                </Button>
+                              </Group>
+                              <ConsentActions event={event} />
+                            </Stack>
                           </Card>
                         ))}
                       </Stack>

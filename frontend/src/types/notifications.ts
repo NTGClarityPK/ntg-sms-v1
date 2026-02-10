@@ -4,6 +4,7 @@ export type NotificationType =
   | 'event' 
   | 'event_created'
   | 'event_updated'
+  | 'event_consent_submitted'
   | 'grade' 
   | 'message'
   | 'assessment_read'

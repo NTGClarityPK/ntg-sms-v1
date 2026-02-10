@@ -4,6 +4,13 @@
 
 export type ConsentStatus = 'pending' | 'approved' | 'rejected';
 
+export interface EventConsentStatus {
+  studentId: string;
+  studentName: string;
+  status: ConsentStatus;
+  respondedAt?: string;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -19,6 +26,7 @@ export interface Event {
   updatedAt: string;
   participants?: EventParticipant[];
   studentNames?: string[]; // Names of students involved (for parents)
+  consentStatuses?: EventConsentStatus[]; // Consent statuses for each student (for parents)
 }
 
 export interface EventParticipant {

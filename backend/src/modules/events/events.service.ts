@@ -748,6 +748,16 @@ export class EventsService {
       throw new BadRequestException('Failed to submit consent');
     }
 
+    // Send notification to event creator
+    await this.notifyConsentSubmitted(
+      eventId,
+      event.createdBy,
+      studentId,
+      userId,
+      status,
+      branchId,
+    );
+
     return mapEventConsent(data as EventConsentRow);
   }
 
@@ -1163,6 +1173,74 @@ export class EventsService {
           // Remove duplicates and add to event
           event.studentNames = [...new Set(involvedStudentNames)];
           console.log(`[getMyEvents] Final studentNames for event "${event.title}":`, event.studentNames);
+
+          // If event requires consent, fetch consent statuses for parent's children
+          if (event.requiresConsent) {
+            const involvedStudentIds = new Set<string>();
+            
+            // Collect involved student IDs (same logic as above)
+            for (const participant of participants || []) {
+              // Check if directly assigned to a student
+              if (participant.student_id && parentStudentIds.includes(participant.student_id as string)) {
+                involvedStudentIds.add(participant.student_id as string);
+              }
+              // Check if assigned to a class-section
+              else if (participant.class_section_id) {
+                const { data: classSection } = await supabase
+                  .from('class_sections')
+                  .select('class_id, section_id')
+                  .eq('id', participant.class_section_id as string)
+                  .maybeSingle();
+
+                if (classSection) {
+                  // Find students in this class-section that belong to parent
+                  for (const student of students || []) {
+                    if (
+                      student.class_id === classSection.class_id &&
+                      student.section_id === classSection.section_id &&
+                      parentStudentIds.includes(student.id as string)
+                    ) {
+                      involvedStudentIds.add(student.id as string);
+                    }
+                  }
+                }
+              }
+            }
+
+            // Fetch consent statuses for involved students
+            if (involvedStudentIds.size > 0) {
+              const studentIdsArray = Array.from(involvedStudentIds);
+              const { data: consents } = await supabase
+                .from('event_consents')
+                .select('student_id, status, responded_at')
+                .eq('event_id', event.id)
+                .eq('parent_user_id', userId)
+                .in('student_id', studentIdsArray);
+
+              // Map consent statuses with student names
+              const consentStatuses: Array<{
+                studentId: string;
+                studentName: string;
+                status: 'pending' | 'approved' | 'rejected';
+                respondedAt?: string;
+              }> = [];
+
+              for (const studentId of studentIdsArray) {
+                const studentName = studentNamesMap.get(studentId);
+                if (studentName) {
+                  const consent = (consents || []).find(c => c.student_id === studentId);
+                  consentStatuses.push({
+                    studentId,
+                    studentName,
+                    status: consent?.status || 'pending',
+                    respondedAt: consent?.responded_at || undefined,
+                  });
+                }
+              }
+
+              event.consentStatuses = consentStatuses;
+            }
+          }
         }
       }
       console.log('[getMyEvents] Events with student names:', JSON.stringify(events.map(e => ({ id: e.id, title: e.title, studentNames: e.studentNames })), null, 2));
@@ -1444,6 +1522,58 @@ export class EventsService {
         data: { eventId: event.id },
       });
     }
+  }
+
+  private async notifyConsentSubmitted(
+    eventId: string,
+    eventCreatorUserId: string,
+    studentId: string,
+    parentUserId: string,
+    status: 'approved' | 'rejected',
+    branchId: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Get event details
+    const event = await this.getEvent(eventId, branchId);
+
+    // Get student name
+    const { data: student } = await supabase
+      .from('students')
+      .select('user_id')
+      .eq('id', studentId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    let studentName = 'Student';
+    if (student?.user_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', student.user_id as string)
+        .maybeSingle();
+      if (profile?.full_name) {
+        studentName = profile.full_name as string;
+      }
+    }
+
+    // Get parent name
+    const { data: parentProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', parentUserId)
+      .maybeSingle();
+
+    const parentName = parentProfile?.full_name || 'Parent';
+
+    // Send notification to event creator
+    await this.notificationsService.createNotification({
+      userId: eventCreatorUserId,
+      type: 'event_consent_submitted',
+      title: `Event Consent ${status === 'approved' ? 'Approved' : 'Rejected'}: ${event.title}`,
+      body: `${parentName} has ${status === 'approved' ? 'approved' : 'rejected'} consent for ${studentName} to participate in "${event.title}".`,
+      data: { eventId, studentId, status },
+    });
   }
 }
 

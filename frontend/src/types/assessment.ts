@@ -37,7 +37,13 @@ export interface CreateAssessmentInput {
   description?: string;
   assessmentTypeId: string;
   subjectId: string;
-  classSectionId: string;
+  // Option 1: Single class-section (existing, backward compatible)
+  classSectionId?: string;
+  // Option 2: Class-level with subject template (for all sections)
+  classId?: string;
+  subjectTemplateId?: string;
+  // Option 3: Class-level with specific sections
+  classSectionIds?: string[];
   totalMarks: number;
   dueDate?: string;
   publishDate?: string;

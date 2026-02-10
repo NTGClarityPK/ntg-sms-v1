@@ -9,6 +9,9 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  IsArray,
+  ArrayMinSize,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateAssessmentDto {
@@ -29,8 +32,26 @@ export class CreateAssessmentDto {
   @IsUUID('4')
   subjectId!: string;
 
+  // Option 1: Single class-section (existing, backward compatible)
+  @ValidateIf((o) => !o.classId)
   @IsUUID('4')
-  classSectionId!: string;
+  classSectionId?: string;
+
+  // Option 2: Class-level with subject template (for all sections)
+  @ValidateIf((o) => !o.classSectionId && !o.classSectionIds)
+  @IsUUID('4')
+  classId?: string;
+
+  @ValidateIf((o) => o.classId && !o.classSectionIds)
+  @IsUUID('4')
+  subjectTemplateId?: string;
+
+  // Option 3: Class-level with specific sections
+  @ValidateIf((o) => o.classId && !o.subjectTemplateId)
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('4', { each: true })
+  classSectionIds?: string[];
 
   @IsNumber()
   @IsPositive()
