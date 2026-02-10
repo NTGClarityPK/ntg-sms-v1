@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Table, Paper, Badge, Text, Group } from '@mantine/core';
+import { Table, Paper, Text } from '@mantine/core';
 import type { TimetableSlot, FreePeriod } from '@/types/timetable';
 import { TimetableSlotComponent } from './TimetableSlot';
 
@@ -82,19 +82,11 @@ export function TeacherWeekView({
         <Table.Tbody>
           {timeRanges.map((timeRange) => {
             const [startTime, endTime] = timeRange.split('-');
-            const slotForPeriod = slots.find(s => `${s.startTime}-${s.endTime}` === timeRange);
 
             return (
               <Table.Tr key={timeRange}>
                 <Table.Td fw={500} style={{ minWidth: '150px' }}>
-                  <Group gap="xs">
-                    <Text size="sm">{formatTimeRange(startTime, endTime)}</Text>
-                    {slotForPeriod?.periodNumber && (
-                      <Badge size="xs" variant="light" color="gray">
-                        P{slotForPeriod.periodNumber}
-                      </Badge>
-                    )}
-                  </Group>
+                  <Text size="sm">{formatTimeRange(startTime, endTime)}</Text>
                 </Table.Td>
                 {activeDays.map((day) => {
                   const key = `${day}-${timeRange}`;

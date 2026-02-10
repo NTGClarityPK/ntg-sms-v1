@@ -48,11 +48,11 @@ export default function EarlyDeparturePage() {
   const { data: childrenData, isLoading: isLoadingChildren } = useQuery({
     queryKey: ['parent-children', userId],
     queryFn: async () => {
-      if (!userId || !isParent) return null;
+      if (!userId) return [];
       const response = await apiClient.get<ParentChild[]>(
         `/api/v1/parents/${userId}/children`,
       );
-      return response.data;
+      return response.data || [];
     },
     enabled: !!userId && !!isParent,
   });

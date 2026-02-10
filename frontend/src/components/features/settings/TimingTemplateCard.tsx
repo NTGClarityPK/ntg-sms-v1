@@ -16,7 +16,12 @@ export function TimingTemplateCard({ template, classes, isSavingAssignments, onA
   const colors = useThemeColors();
   const [selected, setSelected] = useState<string[]>(template.assignedClassIds);
 
-  const options = useMemo(() => classes.map((c) => ({ value: c.id, label: c.displayName })), [classes]);
+  const options = useMemo(() => {
+    const sortedClasses = [...classes].sort((a, b) => 
+      a.displayName.localeCompare(b.displayName)
+    );
+    return sortedClasses.map((c) => ({ value: c.id, label: c.displayName }));
+  }, [classes]);
 
   const hasChanges =
     selected.length !== template.assignedClassIds.length ||

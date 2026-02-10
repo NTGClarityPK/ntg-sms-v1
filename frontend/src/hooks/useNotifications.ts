@@ -27,14 +27,11 @@ export function useNotifications(params?: QueryNotificationsParams) {
         queryParams.append('isRead', params.isRead.toString());
       if (params?.type) queryParams.append('type', params.type);
 
-      // Backend returns { data: NotificationDto[]; meta: {...} }
-      // ResponseInterceptor passes this through unchanged
-      // apiClient.get returns the response body, which is { data: Notification[], meta: {...} }
-      const response = await apiClient.get<{
-        data: Notification[];
-        meta: { total: number; page: number; limit: number; totalPages: number };
-      }>(`/api/v1/notifications?${queryParams.toString()}`);
-
+      // Backend returns: { data: NotificationDto[]; meta: {...} }
+      // apiClient.get<Notification[]> returns ApiResponse<Notification[]> = { data: Notification[], meta: {...} }
+      const response = await apiClient.get<Notification[]>(
+        `/api/v1/notifications?${queryParams.toString()}`,
+      );
       return response;
     },
     enabled: !!userId,
@@ -68,11 +65,11 @@ export function useUnreadCount() {
     queryFn: async () => {
       if (!userId) return 0;
 
-      const response = await apiClient.get<{ data: { unreadCount: number } }>(
+      const response = await apiClient.get<{ unreadCount: number }>(
         `/api/v1/notifications/unread-count`,
       );
 
-      const unreadCount = response.data?.unreadCount ?? 0;
+      const unreadCount = (response as unknown as { data: { unreadCount: number } }).data?.unreadCount ?? 0;
       return unreadCount > 0 ? unreadCount : 0;
     },
     enabled: !!userId,

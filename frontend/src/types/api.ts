@@ -21,4 +21,3 @@ export interface PaginatedApiResponse<T> {
     totalPages: number;
   };
 }
-

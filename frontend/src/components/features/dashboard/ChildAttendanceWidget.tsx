@@ -34,11 +34,12 @@ export function ChildAttendanceWidget() {
   const { data: childrenData } = useQuery({
     queryKey: ['parent-children', userTyped?.id],
     queryFn: async () => {
-      if (!userTyped?.id) return null;
-      const response = await apiClient.get<{ data: Child[] }>(
+      if (!userTyped?.id) return [];
+      // apiClient.get<Child[]> returns ApiResponse<Child[]> = { data: Child[], ... }
+      const response = await apiClient.get<Child[]>(
         `/api/v1/parents/${userTyped.id}/children`,
       );
-      return response.data?.data;
+      return response.data || [];
     },
     enabled: !!userTyped?.id,
   });

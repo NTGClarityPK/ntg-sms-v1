@@ -17,7 +17,7 @@ import {
   ScrollArea,
   Button,
 } from '@mantine/core';
-import { IconCalendar, IconCheck, IconX, IconClock } from '@tabler/icons-react';
+import { IconCalendar, IconCheck, IconX, IconClock, IconUsers } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useMyEvents } from '@/hooks/api/useEvents';
 import { useAuth } from '@/hooks/useAuth';
@@ -105,6 +105,14 @@ export default function MyEventsPage() {
                                       ` – ${dayjs(event.endDate).format('MMM D, YYYY')}`}
                                   </Text>
                                 </Group>
+                                {isParent && event.studentNames && event.studentNames.length > 0 && (
+                                  <Group gap="xs">
+                                    <IconUsers size={16} />
+                                    <Text size="sm" fw={500}>
+                                      {event.studentNames.join(', ')}
+                                    </Text>
+                                  </Group>
+                                )}
                                 {event.description && (
                                   <Text size="sm" c="dimmed" lineClamp={2}>
                                     {event.description}
@@ -153,6 +161,14 @@ export default function MyEventsPage() {
                                       ` – ${dayjs(event.endDate).format('MMM D, YYYY')}`}
                                   </Text>
                                 </Group>
+                                {isParent && event.studentNames && event.studentNames.length > 0 && (
+                                  <Group gap="xs">
+                                    <IconUsers size={16} />
+                                    <Text size="sm" fw={500}>
+                                      {event.studentNames.join(', ')}
+                                    </Text>
+                                  </Group>
+                                )}
                                 {event.description && (
                                   <Text size="sm" c="dimmed" lineClamp={2}>
                                     {event.description}

@@ -556,7 +556,7 @@ export class AttendanceService {
       .select('id, user_id')
       .eq('id', studentId)
       .eq('branch_id', branchId)
-      .single();
+      .maybeSingle();
 
     throwIfDbError(studentError);
     if (!studentData) {

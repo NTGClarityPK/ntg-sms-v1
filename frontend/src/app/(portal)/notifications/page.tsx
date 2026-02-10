@@ -30,7 +30,11 @@ export default function NotificationsPage() {
     limit: 100,
   });
 
-  const allNotifications = allNotificationsData?.data || [];
+  // allNotificationsData is ApiResponse<Notification[]> | null
+  // which is { data: Notification[], meta?: {...} } | null
+  const allNotifications: Notification[] = allNotificationsData 
+    ? (allNotificationsData as unknown as { data: Notification[] }).data 
+    : [];
   const unreadNotifications = allNotifications.filter((n) => !n.isRead);
   const readNotifications = allNotifications.filter((n) => n.isRead);
   const attendanceNotifications = allNotifications.filter((n) => n.type === 'attendance');

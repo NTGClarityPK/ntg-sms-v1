@@ -89,7 +89,7 @@ const allNavItems: NavItem[] = [
     }
   },
   {
-    label: 'Events Management',
+    label: 'Events',
     href: '/events',
     icon: IconCalendarEvent,
     showCondition: () => {
@@ -121,7 +121,7 @@ const allNavItems: NavItem[] = [
     }
   },
   {
-    label: 'Timetable Management',
+    label: 'Timetable',
     href: '/timetable',
     icon: IconCalendarClock,
     showCondition: () => {

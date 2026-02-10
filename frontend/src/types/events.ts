@@ -18,6 +18,7 @@ export interface Event {
   createdAt: string;
   updatedAt: string;
   participants?: EventParticipant[];
+  studentNames?: string[]; // Names of students involved (for parents)
 }
 
 export interface EventParticipant {

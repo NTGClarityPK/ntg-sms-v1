@@ -23,9 +23,10 @@ export default function SelectChildPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['parent-children', userId],
     queryFn: async () => {
-      if (!userId) return null;
-      const response = await apiClient.get<{ data: Child[] }>(`/api/v1/parents/${userId}/children`);
-      return response.data;
+      if (!userId) return [];
+      // apiClient.get<Child[]> returns ApiResponse<Child[]> = { data: Child[], ... }
+      const response = await apiClient.get<Child[]>(`/api/v1/parents/${userId}/children`);
+      return response.data || [];
     },
     enabled: !!userId,
   });
@@ -63,7 +64,7 @@ export default function SelectChildPage() {
     );
   }
 
-  if (error || !data?.data || data.data.length === 0) {
+  if (error || !data || data.length === 0) {
     return (
       <Container size="sm" py="xl">
         <Alert color="red" title="No children found">
@@ -80,7 +81,7 @@ export default function SelectChildPage() {
         <Text c="dimmed">Please select which child you want to view information for.</Text>
 
         <Stack gap="md">
-          {data.data.map((child) => (
+          {data.map((child) => (
             <Card key={child.id} padding="lg" withBorder>
               <Group justify="space-between">
                 <div>

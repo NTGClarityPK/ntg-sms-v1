@@ -1,4 +1,4 @@
-export type TimetableSlotType = 'class' | 'assembly' | 'break' | 'free';
+export type TimetableSlotType = 'class' | 'assembly' | 'break';
 
 export interface TimetableSlot {
   subjectTemplateId?: string;

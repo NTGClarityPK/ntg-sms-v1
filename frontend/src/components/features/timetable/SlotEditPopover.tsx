@@ -32,7 +32,7 @@ const slotSchema = z
       ),
     startTime: z.string().min(1, 'Start time is required'),
     endTime: z.string().min(1, 'End time is required'),
-    slotType: z.enum(['class', 'assembly', 'break', 'free']),
+    slotType: z.enum(['class', 'assembly', 'break']),
   })
   .refine((data) => {
     if (data.slotType === 'class' && !data.subjectId) {
@@ -361,7 +361,6 @@ export function SlotEditPopover({
                 { value: 'class', label: 'Class' },
                 { value: 'assembly', label: 'Assembly' },
                 { value: 'break', label: 'Break' },
-                { value: 'free', label: 'Free' },
               ]}
               required
               comboboxProps={{ zIndex: 1002 }}

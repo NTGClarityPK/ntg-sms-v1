@@ -50,13 +50,14 @@ export default function LeavesPage() {
   const { data: childrenData, isLoading: isLoadingChildren } = useQuery({
     queryKey: ['parent-children', userId],
     queryFn: async () => {
-      if (!userId || !isParent) return null;
+      if (!userId) return [];
       const response = await apiClient.get<ParentChild[]>(
         `/api/v1/parents/${userId}/children`,
       );
-      // Backend returns { data: ParentChild[] }; apiClient.get unwraps the HTTP body.
-      // So response.data is ParentChild[].
-      return response.data;
+      // Backend returns { data: ParentChild[] }
+      // apiClient.get() returns ApiResponse<ParentChild[]> = { data: ParentChild[], meta?, error? }
+      // So response.data is ParentChild[]
+      return response.data || [];
     },
     enabled: !!userId && !!isParent,
   });

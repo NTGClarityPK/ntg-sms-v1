@@ -41,3 +41,4 @@ export class QueryGradesDto extends BasePaginationDto {
   isExcused?: boolean;
 }
 
+

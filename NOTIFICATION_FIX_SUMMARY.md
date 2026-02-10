@@ -155,3 +155,4 @@ If notifications still don't work:
 4. Check RLS policies on `notifications` table in Supabase
 5. Verify `currentBranchId` is set in localStorage
 
+

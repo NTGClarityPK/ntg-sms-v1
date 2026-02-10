@@ -48,14 +48,14 @@ export default function ChildAttendancePage() {
   const { data: childrenData, isLoading: isLoadingChildren } = useQuery({
     queryKey: ['parent-children', userId],
     queryFn: async () => {
-      if (!userId) return null;
+      if (!userId) return [];
       // Backend returns { data: Child[] }
       // apiClient.get<Child[]> returns ApiResponse<Child[]> = { data: Child[], meta?, error? }
       const response = await apiClient.get<Child[]>(
         `/api/v1/parents/${userId}/children`,
       );
       // response.data is Child[], so we return it directly
-      return response.data;
+      return response.data || [];
     },
     enabled: !!userId,
   });

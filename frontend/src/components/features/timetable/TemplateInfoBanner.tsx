@@ -3,15 +3,18 @@
 import { Alert, Group, Text, Stack, Badge } from '@mantine/core';
 import { IconClock, IconCalendar, IconInfoCircle } from '@tabler/icons-react';
 import type { TimingTemplateInfo } from '@/types/timetable';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 interface TemplateInfoBannerProps {
   templateInfo: TimingTemplateInfo | null;
 }
 
 export function TemplateInfoBanner({ templateInfo }: TemplateInfoBannerProps) {
+  const colors = useThemeColors();
+  
   if (!templateInfo) {
     return (
-      <Alert icon={<IconInfoCircle size={16} />} color="yellow" title="No Timing Template">
+      <Alert icon={<IconInfoCircle size={16} />} color={colors.warning} title="No Timing Template">
         <Text size="sm">
           No timing template is assigned to this class. Please assign one in Settings to ensure
           proper time validation.
@@ -32,7 +35,7 @@ export function TemplateInfoBanner({ templateInfo }: TemplateInfoBannerProps) {
   return (
     <Alert
       icon={<IconCalendar size={16} />}
-      color="blue"
+      color={colors.info}
       title={`Timing Template: ${templateInfo.templateName}`}
     >
       <Stack gap="xs" mt="xs">
@@ -80,6 +83,7 @@ export function TemplateInfoBanner({ templateInfo }: TemplateInfoBannerProps) {
     </Alert>
   );
 }
+
 
 
 

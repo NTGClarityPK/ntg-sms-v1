@@ -14,6 +14,7 @@ export class EventDto {
   createdAt!: string;
   updatedAt!: string;
   participants?: EventParticipantDto[];
+  studentNames?: string[]; // Names of students involved (for parents)
 
   constructor(partial: Partial<EventDto>) {
     Object.assign(this, partial);

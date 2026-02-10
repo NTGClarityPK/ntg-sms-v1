@@ -36,13 +36,32 @@ export class JwtAuthGuard implements CanActivate {
       }
 
       const email = user.email ?? '';
-      const roleFromClaims = typeof user.role === 'string' ? user.role : undefined;
+
+      // Fetch application roles from user_roles table
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role_id, roles(name)')
+        .eq('user_id', user.id);
+
+      if (rolesError) {
+        this.logger.warn(`Failed to fetch user roles: ${rolesError.message}`);
+      }
+
+      const roles = (userRoles || [])
+        .map((ur) => {
+          const roleData = ur.roles as unknown;
+          if (roleData && typeof roleData === 'object' && 'name' in roleData) {
+            return (roleData as { name: string }).name;
+          }
+          return null;
+        })
+        .filter((name): name is string => !!name);
 
       // Attach user info to request
       request['user'] = {
         id: user.id,
         email,
-        roles: roleFromClaims ? [roleFromClaims] : [],
+        roles,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

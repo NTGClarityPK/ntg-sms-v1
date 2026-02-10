@@ -214,17 +214,17 @@ export class GradesService {
 
     const studentMap = new Map((students ?? []).map((s) => [s.id, s]));
 
-    // Check for existing grades
+    // Check for existing grades - get full records including IDs for updates
     const studentIds = dto.grades.map((g) => g.studentId);
     const { data: existingGrades, error: existingError } = await supabase
       .from('student_grades')
-      .select('student_id, assessment_id')
+      .select('id, student_id, assessment_id')
       .eq('assessment_id', dto.assessmentId)
       .in('student_id', studentIds);
     throwIfDbError(existingError);
 
-    const existingGradeSet = new Set(
-      (existingGrades ?? []).map((eg) => `${eg.student_id}-${eg.assessment_id}`),
+    const existingGradeMap = new Map(
+      (existingGrades ?? []).map((eg) => [`${eg.student_id}-${eg.assessment_id}`, eg.id]),
     );
 
     // Process each grade
@@ -236,15 +236,6 @@ export class GradesService {
           errors.push({
             studentId: gradeDto.studentId,
             error: 'Student not found in assessment class section.',
-          });
-          continue;
-        }
-
-        // Check for duplicate
-        if (existingGradeSet.has(`${gradeDto.studentId}-${dto.assessmentId}`)) {
-          errors.push({
-            studentId: gradeDto.studentId,
-            error: 'Grade already exists for this assessment.',
           });
           continue;
         }
@@ -268,30 +259,64 @@ export class GradesService {
           submissionStatus = 'submitted';
         }
 
-        // Insert grade
-        const { data, error } = await supabase
-          .from('student_grades')
-          .insert({
-            student_id: gradeDto.studentId,
-            assessment_id: dto.assessmentId,
-            marks_obtained: gradeDto.marksObtained,
-            submission_status: submissionStatus,
-            feedback: gradeDto.remarks ?? null,
-            submitted_at: gradeDto.submittedAt ?? new Date().toISOString(),
-            graded_by: userId,
-            graded_at: new Date().toISOString(),
-            branch_id: branchId,
-            academic_year_id: assessment.academicYearId,
-          })
-          .select('*')
-          .single();
+        const gradeKey = `${gradeDto.studentId}-${dto.assessmentId}`;
+        const existingGradeId = existingGradeMap.get(gradeKey);
 
-        if (error) {
-          errors.push({ studentId: gradeDto.studentId, error: error.message });
-          continue;
+        let data: StudentGradeRow | null = null;
+
+        if (existingGradeId) {
+          // Update existing grade
+          const { data: updatedData, error: updateError } = await supabase
+            .from('student_grades')
+            .update({
+              marks_obtained: gradeDto.marksObtained,
+              submission_status: submissionStatus,
+              feedback: gradeDto.remarks ?? null,
+              submitted_at: gradeDto.submittedAt ?? new Date().toISOString(),
+              graded_by: userId,
+              graded_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingGradeId)
+            .select('*')
+            .single();
+
+          if (updateError) {
+            errors.push({ studentId: gradeDto.studentId, error: updateError.message });
+            continue;
+          }
+
+          data = updatedData as StudentGradeRow;
+        } else {
+          // Insert new grade
+          const { data: insertedData, error: insertError } = await supabase
+            .from('student_grades')
+            .insert({
+              student_id: gradeDto.studentId,
+              assessment_id: dto.assessmentId,
+              marks_obtained: gradeDto.marksObtained,
+              submission_status: submissionStatus,
+              feedback: gradeDto.remarks ?? null,
+              submitted_at: gradeDto.submittedAt ?? new Date().toISOString(),
+              graded_by: userId,
+              graded_at: new Date().toISOString(),
+              branch_id: branchId,
+              academic_year_id: assessment.academicYearId,
+            })
+            .select('*')
+            .single();
+
+          if (insertError) {
+            errors.push({ studentId: gradeDto.studentId, error: insertError.message });
+            continue;
+          }
+
+          data = insertedData as StudentGradeRow;
         }
 
-        successfulGrades.push(this.mapGradeRowToDto(data as StudentGradeRow));
+        if (data) {
+          successfulGrades.push(this.mapGradeRowToDto(data));
+        }
       } catch (err) {
         errors.push({
           studentId: gradeDto.studentId,
