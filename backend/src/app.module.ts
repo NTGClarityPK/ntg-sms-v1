@@ -32,6 +32,8 @@ import { EarlyDepartureModule } from './modules/early-departure/early-departure.
 import { TimetableModule } from './modules/timetable/timetable.module';
 import { SubjectTemplatesModule } from './modules/subject-templates/subject-templates.module';
 import { EventsModule } from './modules/events/events.module';
+import { BehavioralModule } from './modules/behavioral/behavioral.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -66,6 +68,8 @@ import { EventsModule } from './modules/events/events.module';
     TimetableModule,
     SubjectTemplatesModule,
     EventsModule,
+    BehavioralModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [

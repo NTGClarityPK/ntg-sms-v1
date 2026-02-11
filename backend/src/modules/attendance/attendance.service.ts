@@ -1030,6 +1030,86 @@ export class AttendanceService {
     });
   }
 
+  /**
+   * Batch fetch attendance summaries for multiple students (one query instead of N).
+   * Returns a Map of studentId -> AttendanceSummaryDto.
+   */
+  async getAttendanceSummariesByStudents(
+    studentIds: string[],
+    branchId: string,
+    academicYearId?: string,
+  ): Promise<Map<string, AttendanceSummaryDto>> {
+    const supabase = this.supabaseConfig.getClient();
+    const result = new Map<string, AttendanceSummaryDto>();
+
+    if (studentIds.length === 0) return result;
+
+    let activeYearId = academicYearId;
+    if (!activeYearId) {
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+      if (!activeYear) return result;
+      activeYearId = activeYear.id;
+    }
+
+    const { data: academicYear, error: yearError } = await supabase
+      .from('academic_years')
+      .select('start_date, end_date')
+      .eq('id', activeYearId)
+      .single();
+    throwIfDbError(yearError);
+    if (!academicYear) return result;
+
+    const { data: rows, error } = await supabase
+      .from('attendance')
+      .select('student_id, status')
+      .in('student_id', studentIds)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYearId)
+      .gte('date', (academicYear as { start_date: string }).start_date)
+      .lte('date', (academicYear as { end_date: string }).end_date);
+    throwIfDbError(error);
+
+    const byStudent = new Map<
+      string,
+      { present: number; absent: number; late: number; excused: number }
+    >();
+    for (const id of studentIds) {
+      byStudent.set(id, { present: 0, absent: 0, late: 0, excused: 0 });
+    }
+    for (const row of rows || []) {
+      const r = row as { student_id: string; status: string };
+      const cur = byStudent.get(r.student_id);
+      if (!cur) continue;
+      if (r.status === 'present') cur.present += 1;
+      else if (r.status === 'absent') cur.absent += 1;
+      else if (r.status === 'late') cur.late += 1;
+      else if (r.status === 'excused') cur.excused += 1;
+    }
+
+    byStudent.forEach((counts, studentId) => {
+      const totalDays =
+        counts.present + counts.absent + counts.late + counts.excused;
+      const percentage =
+        totalDays > 0
+          ? Math.round(
+              ((counts.present + counts.late) / totalDays) * 100,
+            )
+          : 0;
+      result.set(
+        studentId,
+        new AttendanceSummaryDto({
+          totalDays,
+          presentDays: counts.present,
+          absentDays: counts.absent,
+          lateDays: counts.late,
+          excusedDays: counts.excused,
+          percentage,
+        }),
+      );
+    });
+    return result;
+  }
+
   async getAttendanceSummaryByClass(
     classSectionId: string,
     branchId: string,

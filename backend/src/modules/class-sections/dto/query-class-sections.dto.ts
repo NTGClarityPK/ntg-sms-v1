@@ -27,5 +27,15 @@ export class QueryClassSectionsDto extends BasePaginationDto {
   @IsOptional()
   @IsUUID()
   classTeacherId?: string;
+
+  /** When true, skip student counts and teacher names (faster, for dropdowns) */
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
+  minimal?: boolean;
 }
 

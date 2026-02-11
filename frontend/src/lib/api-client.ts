@@ -79,6 +79,18 @@ class ApiClient {
     return response.data;
   }
 
+  /**
+   * Fetch a URL as binary (e.g. PDF/Excel export). Uses auth and branch headers.
+   * Returns the blob for download; does not parse as JSON.
+   */
+  async getBlob(url: string, config?: AxiosRequestConfig): Promise<Blob> {
+    const response = await this.client.get<Blob>(url, {
+      ...config,
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.post<ApiResponse<T>>(url, data, config);
     return response.data;

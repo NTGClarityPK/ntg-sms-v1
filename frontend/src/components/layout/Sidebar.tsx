@@ -31,6 +31,7 @@ import {
   IconFileText,
   IconCalendarEvent,
   IconBell,
+  IconStar,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -73,6 +74,15 @@ const allNavItems: NavItem[] = [
       // Student-only view (checked in filter)
       if (typeof window === 'undefined') return false;
       return true;
+    },
+  },
+  {
+    label: 'Behavioral',
+    href: '/behavioral',
+    icon: IconStar,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true; // Filtered in render for assessor roles
     },
   },
   { label: 'Leaves', href: '/leaves', icon: IconPlaneDeparture },
@@ -186,6 +196,18 @@ export function Sidebar({
     return roleName === 'school_admin' || roleName === 'principal' || roleName === 'academic_coordinator';
   }) || false;
 
+  // Can assess behavioral (teachers, counselors, principal, admin)
+  const canAssessBehavioral = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return (
+      roleName === 'class_teacher' ||
+      roleName === 'subject_teacher' ||
+      roleName === 'guidance_counselor' ||
+      roleName === 'principal' ||
+      roleName === 'school_admin'
+    );
+  }) || false;
+
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
     // Check showCondition if it exists
@@ -218,6 +240,10 @@ export function Sidebar({
       if (item.href === '/events') {
         return canManageEvents;
       }
+      // For "Behavioral", show only for roles that can assess
+      if (item.href === '/behavioral') {
+        return canAssessBehavioral;
+      }
       return item.showCondition();
     }
     return true;
@@ -231,6 +257,7 @@ export function Sidebar({
       item.href === '/attendance' ||
       item.href === '/assessments' ||
       item.href === '/my-assessments' ||
+      item.href === '/behavioral' ||
       item.href === '/leaves' ||
       item.href === '/early-departure' ||
       item.href === '/my-schedule' ||

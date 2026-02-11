@@ -106,17 +106,22 @@ export class ClassSectionsService {
     const total = count ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
-    // Get student counts for each class-section
-    const classSectionIds = (data as ClassSectionWithRelations[]).map((cs) => cs.id);
-    const studentCounts = await this.getStudentCounts(classSectionIds);
+    const rows = data as ClassSectionWithRelations[];
 
-    // Get class teacher names if class_teacher_id exists
-    const teacherIds = (data as ClassSectionWithRelations[])
-      .map((cs) => cs.class_teacher_id)
-      .filter((id): id is string => !!id);
-    const teacherNames = await this.getTeacherNames(teacherIds);
+    let studentCounts = new Map<string, number>();
+    let teacherNames = new Map<string, string>();
+    if (!query.minimal) {
+      studentCounts = await this.getStudentCountsForBranch(
+        branchId,
+        rows.map((cs) => ({ id: cs.id, class_id: cs.class_id, section_id: cs.section_id })),
+      );
+      const teacherIds = rows
+        .map((cs) => cs.class_teacher_id)
+        .filter((id): id is string => !!id);
+      teacherNames = await this.getTeacherNames(teacherIds);
+    }
 
-    const classSections = (data as ClassSectionWithRelations[]).map((row) => {
+    const classSections = rows.map((row) => {
       const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
       const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
 
@@ -552,41 +557,42 @@ export class ClassSectionsService {
     return count ?? 0;
   }
 
-  private async getStudentCounts(classSectionIds: string[]): Promise<Map<string, number>> {
-    if (classSectionIds.length === 0) {
+  /**
+   * Get student counts for the given class sections in one query (avoids N+1).
+   * Fetches (class_id, section_id) for all active students in the branch, then aggregates in memory.
+   */
+  private async getStudentCountsForBranch(
+    branchId: string,
+    classSections: Array<{ id: string; class_id: string; section_id: string }>,
+  ): Promise<Map<string, number>> {
+    if (classSections.length === 0) {
       return new Map();
     }
 
     const supabase = this.supabaseConfig.getClient();
 
-    // Get all class-sections with their class_id, section_id, branch_id
-    const { data: classSections, error: csError } = await supabase
-      .from('class_sections')
-      .select('id, class_id, section_id, branch_id')
-      .in('id', classSectionIds);
-    throwIfDbError(csError);
+    const { data: students, error } = await supabase
+      .from('students')
+      .select('class_id, section_id')
+      .eq('branch_id', branchId)
+      .eq('is_active', true);
+    throwIfDbError(error);
 
-    const counts = new Map<string, number>();
-
-    // For each class-section, count students
-    for (const cs of (classSections || []) as Array<{
-      id: string;
-      class_id: string;
-      section_id: string;
-      branch_id: string;
-    }>) {
-      const { count, error } = await supabase
-        .from('students')
-        .select('*', { count: 'exact', head: true })
-        .eq('branch_id', cs.branch_id)
-        .eq('class_id', cs.class_id)
-        .eq('section_id', cs.section_id)
-        .eq('is_active', true);
-      throwIfDbError(error);
-      counts.set(cs.id, count ?? 0);
+    const countByClassSection = new Map<string, number>();
+    for (const cs of classSections) {
+      countByClassSection.set(cs.id, 0);
     }
-
-    return counts;
+    const key = (c: string, s: string) => `${c}:${s}`;
+    const runningCount = new Map<string, number>();
+    for (const row of (students || []) as Array<{ class_id: string; section_id: string }>) {
+      const k = key(row.class_id, row.section_id);
+      runningCount.set(k, (runningCount.get(k) ?? 0) + 1);
+    }
+    for (const cs of classSections) {
+      const k = key(cs.class_id, cs.section_id);
+      countByClassSection.set(cs.id, runningCount.get(k) ?? 0);
+    }
+    return countByClassSection;
   }
 
   private async getTeacherNames(staffIds: string[]): Promise<Map<string, string>> {

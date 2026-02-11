@@ -25,6 +25,8 @@ interface QueryClassSectionsParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   classTeacherId?: string;
+  /** When true, backend skips student counts and teacher names (faster for dropdowns) */
+  minimal?: boolean;
 }
 
 export function useClassSections(params?: QueryClassSectionsParams) {
@@ -48,6 +50,7 @@ export function useClassSections(params?: QueryClassSectionsParams) {
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
       if (params?.classTeacherId) queryParams.append('classTeacherId', params.classTeacherId);
+      if (params?.minimal) queryParams.append('minimal', 'true');
 
       const response = await apiClient.get<ClassSection[]>(
         `/api/v1/class-sections?${queryParams.toString()}`,
