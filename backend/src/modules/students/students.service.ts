@@ -41,7 +41,12 @@ export class StudentsService {
     private readonly academicYearsService: AcademicYearsService,
   ) {}
 
-  async listStudents(query: QueryStudentsDto, branchId: string): Promise<{
+  async listStudents(
+    query: QueryStudentsDto,
+    branchId: string,
+    userId: string,
+    userRoles?: string[],
+  ): Promise<{
     data: StudentDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
@@ -52,6 +57,25 @@ export class StudentsService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    // Check if user is parent/guardian - filter to only their children
+    const isParent = userRoles?.some((r) => ['parent', 'guardian'].includes(r.toLowerCase()));
+    let allowedStudentIds: string[] | null = null;
+
+    if (isParent) {
+      const { data: parentStudents } = await supabase
+        .from('parent_students')
+        .select('student_id')
+        .eq('parent_user_id', userId);
+      allowedStudentIds = (parentStudents || []).map((ps) => ps.student_id as string);
+      if (allowedStudentIds.length === 0) {
+        // Parent has no children - return empty result
+        return {
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 0 },
+        };
+      }
+    }
+
     let dbQuery = supabase
       .from('students')
       .select(
@@ -59,6 +83,11 @@ export class StudentsService {
         { count: 'exact' },
       )
       .eq('branch_id', branchId);
+
+    // Filter by allowed student IDs if parent/guardian
+    if (allowedStudentIds) {
+      dbQuery = dbQuery.in('id', allowedStudentIds);
+    }
 
     // Support both single (backward compatibility) and multiple filters
     if (query.classIds && query.classIds.length > 0) {

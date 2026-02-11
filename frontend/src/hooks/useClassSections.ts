@@ -79,6 +79,7 @@ export function useClassSection(id: string | null) {
       return response.data as ClassSection;
     },
     enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - single class section rarely changes
   });
 }
 
@@ -222,6 +223,7 @@ export function useClassSectionStudents(id: string | null) {
       return response.data;
     },
     enabled: !!id,
+    staleTime: 2 * 60 * 1000, // 2 minutes - student list can change
   });
 }
 

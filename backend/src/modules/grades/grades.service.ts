@@ -227,7 +227,12 @@ export class GradesService {
       (existingGrades ?? []).map((eg) => [`${eg.student_id}-${eg.assessment_id}`, eg.id]),
     );
 
-    // Process each grade
+    // OPTIMIZED: Separate into updates and inserts, then batch process
+    const toUpdate: Array<{ gradeId: string; gradeDto: any; submissionStatus: string }> = [];
+    const toInsert: Array<any> = [];
+    const now = new Date().toISOString();
+
+    // Validate and categorize all grades first
     for (const gradeDto of dto.grades) {
       try {
         // Validate student
@@ -262,65 +267,91 @@ export class GradesService {
         const gradeKey = `${gradeDto.studentId}-${dto.assessmentId}`;
         const existingGradeId = existingGradeMap.get(gradeKey);
 
-        let data: StudentGradeRow | null = null;
-
         if (existingGradeId) {
-          // Update existing grade
-          const { data: updatedData, error: updateError } = await supabase
-            .from('student_grades')
-            .update({
-              marks_obtained: gradeDto.marksObtained,
-              submission_status: submissionStatus,
-              feedback: gradeDto.remarks ?? null,
-              submitted_at: gradeDto.submittedAt ?? new Date().toISOString(),
-              graded_by: userId,
-              graded_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingGradeId)
-            .select('*')
-            .single();
-
-          if (updateError) {
-            errors.push({ studentId: gradeDto.studentId, error: updateError.message });
-            continue;
-          }
-
-          data = updatedData as StudentGradeRow;
+          toUpdate.push({
+            gradeId: existingGradeId,
+            gradeDto,
+            submissionStatus,
+          });
         } else {
-          // Insert new grade
-          const { data: insertedData, error: insertError } = await supabase
-            .from('student_grades')
-            .insert({
-              student_id: gradeDto.studentId,
-              assessment_id: dto.assessmentId,
-              marks_obtained: gradeDto.marksObtained,
-              submission_status: submissionStatus,
-              feedback: gradeDto.remarks ?? null,
-              submitted_at: gradeDto.submittedAt ?? new Date().toISOString(),
-              graded_by: userId,
-              graded_at: new Date().toISOString(),
-              branch_id: branchId,
-              academic_year_id: assessment.academicYearId,
-            })
-            .select('*')
-            .single();
-
-          if (insertError) {
-            errors.push({ studentId: gradeDto.studentId, error: insertError.message });
-            continue;
-          }
-
-          data = insertedData as StudentGradeRow;
-        }
-
-        if (data) {
-          successfulGrades.push(this.mapGradeRowToDto(data));
+          toInsert.push({
+            student_id: gradeDto.studentId,
+            assessment_id: dto.assessmentId,
+            marks_obtained: gradeDto.marksObtained,
+            submission_status: submissionStatus,
+            feedback: gradeDto.remarks ?? null,
+            submitted_at: gradeDto.submittedAt ?? now,
+            graded_by: userId,
+            graded_at: now,
+            branch_id: branchId,
+            academic_year_id: assessment.academicYearId,
+          });
         }
       } catch (err) {
         errors.push({
           studentId: gradeDto.studentId,
           error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    }
+
+    // OPTIMIZED: Batch update all existing grades in parallel
+    const updatePromises = toUpdate.map(async ({ gradeId, gradeDto, submissionStatus }) => {
+      try {
+        const result = await supabase
+          .from('student_grades')
+          .update({
+            marks_obtained: gradeDto.marksObtained,
+            submission_status: submissionStatus,
+            feedback: gradeDto.remarks ?? null,
+            submitted_at: gradeDto.submittedAt ?? now,
+            graded_by: userId,
+            graded_at: now,
+            updated_at: now,
+          })
+          .eq('id', gradeId)
+          .select('*')
+          .single();
+
+        if (result.error) {
+          errors.push({ studentId: gradeDto.studentId, error: result.error.message });
+          return null;
+        }
+        return result.data as StudentGradeRow;
+      } catch (err: unknown) {
+        errors.push({
+          studentId: gradeDto.studentId,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+        return null;
+      }
+    });
+
+    const updatedGrades = await Promise.all(updatePromises);
+    updatedGrades.forEach((grade: StudentGradeRow | null) => {
+      if (grade) {
+        successfulGrades.push(this.mapGradeRowToDto(grade));
+      }
+    });
+
+    // OPTIMIZED: Batch insert all new grades at once
+    if (toInsert.length > 0) {
+      const { data: insertedGrades, error: insertError } = await supabase
+        .from('student_grades')
+        .insert(toInsert)
+        .select('*');
+
+      if (insertError) {
+        // If batch insert fails, add error for all
+        toInsert.forEach((insert) => {
+          errors.push({
+            studentId: insert.student_id,
+            error: insertError.message,
+          });
+        });
+      } else {
+        (insertedGrades || []).forEach((grade) => {
+          successfulGrades.push(this.mapGradeRowToDto(grade as StudentGradeRow));
         });
       }
     }

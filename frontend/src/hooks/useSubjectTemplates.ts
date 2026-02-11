@@ -196,7 +196,7 @@ export function useTemplatesForClass(classId: string | null, branchId: string | 
       return { data: [] };
     },
     enabled: !!classId && !!branchId,
-    staleTime: 0, // Always refetch to get latest assignments
+    staleTime: 2 * 60 * 1000, // 2 minutes - templates rarely change mid-session
   });
 }
 
@@ -218,7 +218,7 @@ export function useTemplatesForLevel(levelId: string | null, branchId: string | 
       return response as unknown as SubjectTemplateListResponse;
     },
     enabled: !!levelId && !!branchId,
-    staleTime: 0, // Always refetch to get latest assignments
+    staleTime: 2 * 60 * 1000, // 2 minutes - templates rarely change mid-session
   });
 }
 

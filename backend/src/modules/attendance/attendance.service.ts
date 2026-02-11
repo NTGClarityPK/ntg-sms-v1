@@ -542,7 +542,7 @@ export class AttendanceService {
 
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
-    if (!activeYearId) {
+    if (!academicYearId) {
       const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
         throw new BadRequestException('No active academic year found');
@@ -550,17 +550,38 @@ export class AttendanceService {
       activeYearId = activeYear.id;
     }
 
-    // Verify student exists and belongs to branch
+    // Verify student exists and get user_id for profile lookup
     const { data: studentData, error: studentError } = await supabase
       .from('students')
       .select('id, user_id')
       .eq('id', studentId)
-      .eq('branch_id', branchId)
       .maybeSingle();
-
     throwIfDbError(studentError);
     if (!studentData) {
       throw new NotFoundException('Student not found');
+    }
+
+    // Check if student has attendance records in this branch/academic year
+    // (allows querying historical attendance even if student moved branches)
+    const { count: attendanceCount, error: attCheckError } = await supabase
+      .from('attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYearId);
+    throwIfDbError(attCheckError);
+
+    // If no attendance records exist, verify student is currently in this branch
+    if (!attendanceCount || attendanceCount === 0) {
+      const { data: studentInBranch } = await supabase
+        .from('students')
+        .select('id')
+        .eq('id', studentId)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      if (!studentInBranch) {
+        throw new NotFoundException('Student not found in this branch');
+      }
     }
 
     let dbQuery = supabase
@@ -646,11 +667,14 @@ export class AttendanceService {
       ]),
     );
 
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('id', studentData.user_id)
-      .single();
+    const userId = studentData.user_id;
+    const { data: profileData } = userId
+      ? await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('id', userId)
+          .maybeSingle()
+      : { data: null };
 
     const studentName = profileData?.full_name || 'Unknown';
 
@@ -942,6 +966,8 @@ export class AttendanceService {
     studentId: string,
     branchId: string,
     academicYearId?: string,
+    startDate?: string,
+    endDate?: string,
   ): Promise<AttendanceSummaryDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -968,16 +994,26 @@ export class AttendanceService {
       throw new NotFoundException('Student not found');
     }
 
-    // Get academic year dates
-    const { data: academicYear, error: yearError } = await supabase
-      .from('academic_years')
-      .select('start_date, end_date')
-      .eq('id', activeYearId)
-      .single();
+    // Get academic year dates or use provided date range
+    let dateStart: string;
+    let dateEnd: string;
 
-    throwIfDbError(yearError);
-    if (!academicYear) {
-      throw new NotFoundException('Academic year not found');
+    if (startDate && endDate) {
+      dateStart = startDate;
+      dateEnd = endDate;
+    } else {
+      const { data: academicYear, error: yearError } = await supabase
+        .from('academic_years')
+        .select('start_date, end_date')
+        .eq('id', activeYearId)
+        .single();
+
+      throwIfDbError(yearError);
+      if (!academicYear) {
+        throw new NotFoundException('Academic year not found');
+      }
+      dateStart = academicYear.start_date;
+      dateEnd = academicYear.end_date;
     }
 
     // Count attendance by status using database-level aggregation
@@ -988,8 +1024,8 @@ export class AttendanceService {
         .eq('student_id', studentId)
         .eq('branch_id', branchId)
         .eq('academic_year_id', activeYearId)
-        .gte('date', academicYear.start_date)
-        .lte('date', academicYear.end_date);
+        .gte('date', dateStart)
+        .lte('date', dateEnd);
 
     const [
       { count: presentCount, error: presentError },

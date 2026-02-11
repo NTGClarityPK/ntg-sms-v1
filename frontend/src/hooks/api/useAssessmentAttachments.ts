@@ -32,6 +32,7 @@ export function useAssessmentAttachments(assessmentId: string) {
       return response.data;
     },
     enabled: !!assessmentId,
+    staleTime: 2 * 60 * 1000, // 2 minutes - attachments can change
   });
 }
 

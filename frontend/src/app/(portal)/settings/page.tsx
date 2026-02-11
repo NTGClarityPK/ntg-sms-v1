@@ -62,7 +62,7 @@ import { SubjectTemplatesTabContent } from '@/components/features/settings/Subje
 export default function SettingsPage() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
-  const { user } = useAuth();
+  const { user, isLoading: isLoadingAuth } = useAuth();
   const [wizardOpened, { open: openWizard, close: closeWizard }] = useDisclosure(false);
   const [copyModalOpened, { open: openCopyModal, close: closeCopyModal }] = useDisclosure(false);
   const [activeTab, setActiveTab] = useState<string | null>('permissions');
@@ -72,9 +72,11 @@ export default function SettingsPage() {
   const qc = useQueryClient();
 
   const hasCurrentBranch = !!user?.currentBranch?.id;
-  const isInitialized = statusQuery.data?.data?.isInitialized ?? false;
+  const settingsStatusData = statusQuery.data?.data;
+  const isInitialized = settingsStatusData?.isInitialized ?? false;
   const branches = branchesQuery.data?.data ?? [];
   const hasMultipleBranches = branches.length > 1;
+  const hasSettingsStatusData = !!settingsStatusData; // Only show buttons when we have actual data
 
   const handleWizardComplete = async () => {
     await qc.invalidateQueries({ queryKey: ['settingsStatus'] });
@@ -85,8 +87,13 @@ export default function SettingsPage() {
     void qc.invalidateQueries({ queryKey: ['settingsStatus'] });
   };
 
-  // Show message if no branch is selected
-  if (!hasCurrentBranch) {
+  // Show page structure immediately, handle loading/error states inline
+  const isLoading = statusQuery.isLoading || branchesQuery.isLoading;
+  const hasError = statusQuery.error;
+
+  // Only show "No Branch Selected" when auth is loaded AND no branch is selected
+  // Don't show it during initial auth loading to prevent flash
+  if (!isLoadingAuth && !hasCurrentBranch) {
     return (
       <>
         <div className="page-title-bar">
@@ -106,49 +113,12 @@ export default function SettingsPage() {
     );
   }
 
-  if (statusQuery.isLoading || branchesQuery.isLoading) {
-    return (
-      <>
-        <div className="page-title-bar">
-          <Group justify="space-between" w="100%">
-            <Title order={1}>Settings</Title>
-          </Group>
-        </div>
-        <div className="page-sub-title-bar"></div>
-        <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
-          <Stack gap="md">
-            <Skeleton height={40} width="30%" />
-            <Skeleton height={400} />
-          </Stack>
-        </div>
-      </>
-    );
-  }
-
-  if (statusQuery.error) {
-    return (
-      <>
-        <div className="page-title-bar">
-          <Group justify="space-between" w="100%">
-            <Title order={1}>Settings</Title>
-          </Group>
-        </div>
-        <div className="page-sub-title-bar"></div>
-        <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
-          <Alert color={colors.error} title="Failed to load settings status">
-            <Text size="sm">Please try again. If the issue persists, ensure you have access to the selected branch.</Text>
-          </Alert>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Settings</Title>
-          {!isInitialized && (
+          {hasSettingsStatusData && !isInitialized && (
             <Group gap="sm">
               {hasMultipleBranches && (
                 <Button
@@ -174,16 +144,29 @@ export default function SettingsPage() {
       <div className="page-sub-title-bar"></div>
 
       <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
-        {!isInitialized && (
-          <Alert color={colors.info} title="Setup Required" mb="md">
-            <Text size="sm">
-              Your school settings are not yet configured. Click "Start School Setup" to begin the guided setup process,
-              or copy settings from another branch if available.
-            </Text>
+        {hasError && (
+          <Alert color={colors.error} title="Failed to load settings status" mb="md">
+            <Text size="sm">Please try again. If the issue persists, ensure you have access to the selected branch.</Text>
           </Alert>
         )}
 
-        <Tabs value={activeTab} onChange={setActiveTab}>
+        {isLoading ? (
+          <Stack gap="md">
+            <Skeleton height={40} width="30%" />
+            <Skeleton height={400} />
+          </Stack>
+        ) : (
+          <>
+            {!isInitialized && (
+              <Alert color={colors.info} title="Setup Required" mb="md">
+                <Text size="sm">
+                  Your school settings are not yet configured. Click "Start School Setup" to begin the guided setup process,
+                  or copy settings from another branch if available.
+                </Text>
+              </Alert>
+            )}
+
+            <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
               Permissions
@@ -251,6 +234,8 @@ export default function SettingsPage() {
             <BehaviorTabContent />
           </Tabs.Panel>
         </Tabs>
+          </>
+        )}
       </div>
 
       <SetupWizard

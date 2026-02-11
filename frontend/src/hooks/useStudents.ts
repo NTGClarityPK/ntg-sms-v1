@@ -74,6 +74,7 @@ export function useStudent(id: string | null) {
       return response.data;
     },
     enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - single student rarely changes
   });
 }
 

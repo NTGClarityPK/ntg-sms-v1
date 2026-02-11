@@ -1,3 +1,10 @@
+export enum ReportPeriodType {
+  WEEK = 'week',
+  MONTH = 'month',
+  YEAR = 'year',
+  CUSTOM = 'custom',
+}
+
 export interface AcademicEntry {
   assessmentId: string;
   subjectId: string;
@@ -39,6 +46,30 @@ export interface BehavioralSection {
   periods: BehavioralPeriod[];
 }
 
+export interface AssignmentStatistics {
+  totalAssignments: number;
+  viewedAssignments: number;
+  notViewedAssignments: number;
+  submittedAssignments: number;
+  inProgressAssignments: number;
+  notStartedAssignments: number;
+  viewingRate: number;
+  submissionRate: number;
+}
+
+export interface AssignmentEngagement {
+  assignmentId: string;
+  assignmentTitle: string;
+  subjectName: string;
+  dueDate?: string;
+  isViewed: boolean;
+  viewedAt?: string;
+  status: 'not_started' | 'in_progress' | 'submitted';
+  submittedAt?: string;
+  daysUntilDue?: number;
+  engagementScore: number;
+}
+
 export interface StudentReport {
   studentId: string;
   studentName: string;
@@ -47,6 +78,8 @@ export interface StudentReport {
   academic?: AcademicSection;
   attendance?: AttendanceSection;
   behavioral?: BehavioralSection;
+  assignmentStatistics?: AssignmentStatistics;
+  assignmentEngagement?: AssignmentEngagement[];
 }
 
 export interface ClassReportStudent {

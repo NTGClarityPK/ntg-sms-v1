@@ -12,6 +12,7 @@ import { StudentsService } from './students.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -26,8 +27,9 @@ export class StudentsController {
   async listStudents(
     @Query() query: QueryStudentsDto,
     @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: { id: string; roles?: string[] },
   ) {
-    return this.studentsService.listStudents(query, branch.branchId);
+    return this.studentsService.listStudents(query, branch.branchId, user.id, user.roles);
   }
 
   @Get('generate-id')

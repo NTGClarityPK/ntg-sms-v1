@@ -142,6 +142,7 @@ const allNavItems: NavItem[] = [
     }
   },
   { label: 'Reports', href: '/reports', icon: IconChartBar },
+  { label: 'Public Reports', href: '/reports/public', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 
@@ -274,6 +275,7 @@ export function Sidebar({
       item.href === '/parent-associations' ||
       item.href === '/events' ||
       item.href === '/reports' ||
+      item.href === '/reports/public' ||
       item.href === '/settings'
   );
 

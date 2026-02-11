@@ -2,6 +2,7 @@
 
 import { Table, Paper, Text, Skeleton } from '@mantine/core';
 import type { BehavioralSection as BehavioralSectionType } from '@/types/reports';
+import { StarRating } from '@/components/features/behavioral/StarRating';
 
 interface BehavioralSectionProps {
   data: BehavioralSectionType | null | undefined;
@@ -51,7 +52,13 @@ export function BehavioralSectionReport({ data, isLoading }: BehavioralSectionPr
               <Table.Tr key={p.period}>
                 <Table.Td>{p.period}</Table.Td>
                 {allAttributes.map((attr) => (
-                  <Table.Td key={attr}>{attrMap[attr] ?? '—'}</Table.Td>
+                  <Table.Td key={attr}>
+                    {attrMap[attr] != null ? (
+                      <StarRating value={attrMap[attr]} readonly size={18} />
+                    ) : (
+                      '—'
+                    )}
+                  </Table.Td>
                 ))}
               </Table.Tr>
             );

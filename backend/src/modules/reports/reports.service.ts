@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
@@ -7,6 +7,7 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { BehavioralService } from '../behavioral/behavioral.service';
 import { StudentsService } from '../students/students.service';
 import { StudentGradeDto } from '../grades/dto/student-grade.dto';
+import puppeteer from 'puppeteer';
 import {
   AcademicEntryDto,
   AcademicSectionDto,
@@ -26,6 +27,10 @@ import {
   RankingsDto,
   RankingEntryDto,
 } from './dto/rankings.dto';
+import { QueryReportPeriodDto, ReportPeriodType } from './dto/query-report-period.dto';
+import { AssignmentStatisticsDto } from './dto/assignment-statistics.dto';
+import { AssignmentEngagementDto } from './dto/assignment-engagement.dto';
+import { ClassStudentCountDto } from './dto/class-student-count.dto';
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
@@ -48,6 +53,180 @@ export class ReportsService {
     private readonly behavioralService: BehavioralService,
     private readonly studentsService: StudentsService,
   ) {}
+
+  /**
+   * Get date range for a given period type.
+   * Returns { startDate, endDate } in YYYY-MM-DD format.
+   */
+  private async getDateRangeForPeriod(
+    periodType: ReportPeriodType | undefined,
+    startDate: string | undefined,
+    endDate: string | undefined,
+    branchId: string,
+    academicYearId: string,
+  ): Promise<{ startDate: string; endDate: string } | null> {
+    if (!periodType || periodType === ReportPeriodType.YEAR) {
+      // Default to academic year - get academic year dates
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+      if (!activeYear) return null;
+      const today = new Date().toISOString().split('T')[0];
+      const yearEnd = activeYear.endDate.split('T')[0];
+      return {
+        startDate: activeYear.startDate.split('T')[0],
+        endDate: today <= yearEnd ? today : yearEnd,
+      };
+    }
+
+    if (periodType === ReportPeriodType.CUSTOM) {
+      if (!startDate || !endDate) return null;
+      return { startDate, endDate };
+    }
+
+    const now = new Date();
+    let periodStart: Date;
+    let periodEnd: Date;
+
+    if (periodType === ReportPeriodType.WEEK) {
+      // Monday to Sunday of current week
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust Sunday to previous Monday
+      periodStart = new Date(now);
+      periodStart.setDate(now.getDate() + mondayOffset);
+      periodStart.setHours(0, 0, 0, 0);
+      periodEnd = new Date(periodStart);
+      periodEnd.setDate(periodStart.getDate() + 6);
+      periodEnd.setHours(23, 59, 59, 999);
+    } else if (periodType === ReportPeriodType.MONTH) {
+      // First day to last day of current month
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      periodStart.setHours(0, 0, 0, 0);
+      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      periodEnd.setHours(23, 59, 59, 999);
+    } else {
+      return null;
+    }
+
+    return {
+      startDate: periodStart.toISOString().split('T')[0],
+      endDate: periodEnd.toISOString().split('T')[0],
+    };
+  }
+
+  /**
+   * Ensure user can access student report based on their role:
+   * - Student: can only access their own report
+   * - Parent/Guardian: can only access their children's reports
+   * - Teacher: can access reports for students in classes they teach
+   * - Admin/Staff: can access all reports
+   */
+  async ensureUserCanAccessStudent(
+    studentId: string,
+    userId: string,
+    userRoles?: string[],
+  ): Promise<void> {
+    if (!userRoles || userRoles.length === 0) {
+      return; // No roles, allow (will be handled by auth guard)
+    }
+
+    const roles = userRoles.map((r) => r.toLowerCase());
+    const isStudent = roles.some((r) => r === 'student');
+    const isParent = roles.some((r) => ['parent', 'guardian'].includes(r));
+    const isTeacher = roles.some((r) => ['teacher'].includes(r));
+    const isAdmin = roles.some((r) => ['admin', 'principal', 'staff'].includes(r));
+
+    // Admin/staff can access all
+    if (isAdmin) {
+      return;
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+
+    // Student can only access their own report
+    if (isStudent) {
+      const { data: studentRecord } = await supabase
+        .from('students')
+        .select('id')
+        .eq('id', studentId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!studentRecord) {
+        throw new ForbiddenException('You can only access your own report');
+      }
+      return;
+    }
+
+    // Parent/guardian can only access their children's reports
+    if (isParent) {
+      const { data: parentStudent } = await supabase
+        .from('parent_students')
+        .select('id')
+        .eq('parent_user_id', userId)
+        .eq('student_id', studentId)
+        .maybeSingle();
+
+      if (!parentStudent) {
+        throw new ForbiddenException('You can only access reports for your own children');
+      }
+      return;
+    }
+
+    // Teacher can access if they teach the student's class section
+    if (isTeacher) {
+      // Get student's class section
+      const { data: student } = await supabase
+        .from('students')
+        .select('class_id, section_id')
+        .eq('id', studentId)
+        .maybeSingle();
+
+      if (!student || !student.class_id || !student.section_id) {
+        throw new NotFoundException('Student class section not found');
+      }
+
+      // Get class section ID
+      const { data: classSection } = await supabase
+        .from('class_sections')
+        .select('id, class_teacher_id')
+        .eq('class_id', student.class_id)
+        .eq('section_id', student.section_id)
+        .maybeSingle();
+
+      if (!classSection) {
+        throw new NotFoundException('Class section not found');
+      }
+
+      // Check if teacher is class teacher
+      const { data: staff } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (staff && classSection.class_teacher_id === staff.id) {
+        return; // Is class teacher, allow
+      }
+
+      // Check if teacher teaches any subject in this class section
+      if (staff) {
+        const { data: teacherAssignment } = await supabase
+          .from('teacher_assignments')
+          .select('id')
+          .eq('staff_id', staff.id)
+          .eq('class_section_id', classSection.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (teacherAssignment) {
+          return; // Teacher teaches this class section, allow
+        }
+      }
+
+      throw new ForbiddenException('You can only access reports for students in classes you teach');
+    }
+
+    // Default: allow (for other roles or no specific restriction)
+  }
 
   /**
    * Load letter grade ranges for a class (single query batch for buildAcademicSection).
@@ -117,6 +296,7 @@ export class ReportsService {
     studentId: string,
     branchId: string,
     academicYearId?: string,
+    periodParams?: QueryReportPeriodDto,
   ): Promise<{ data: StudentReportDto }> {
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) {
@@ -126,14 +306,56 @@ export class ReportsService {
 
     const student = await this.studentsService.getStudentById(studentId, branchId);
 
+    // Get date range for period filtering
+    const dateRange = periodParams?.periodType
+      ? await this.getDateRangeForPeriod(
+          periodParams.periodType,
+          periodParams.startDate,
+          periodParams.endDate,
+          branchId,
+          yearId,
+        )
+      : null;
+
     const [grades, attendanceSummary, behavioralRes] = await Promise.all([
       this.gradesService.getGradesByStudent(studentId, branchId).catch(() => [] as StudentGradeDto[]),
-      this.attendanceService.getAttendanceSummaryByStudent(studentId, branchId, yearId),
+      this.attendanceService.getAttendanceSummaryByStudent(
+        studentId,
+        branchId,
+        yearId,
+        dateRange?.startDate,
+        dateRange?.endDate,
+      ),
       this.behavioralService.getByStudent(studentId, branchId, yearId),
     ]);
 
+    // Filter grades by date range if provided
+    let filteredGrades = grades;
+    if (dateRange && grades.length > 0) {
+      // Need to fetch assessments to filter by date
+      const supabase = this.supabaseConfig.getClient();
+      const assessmentIds = [...new Set(grades.map((g) => g.assessmentId))];
+      const { data: assessments } = await supabase
+        .from('assessments')
+        .select('id, created_at, due_date')
+        .in('id', assessmentIds);
+      const assessmentDateMap = new Map(
+        (assessments || []).map((a: { id: string; created_at: string; due_date: string | null }) => [
+          a.id,
+          { createdAt: a.created_at, dueDate: a.due_date },
+        ]),
+      );
+      filteredGrades = grades.filter((g) => {
+        const assessment = assessmentDateMap.get(g.assessmentId);
+        if (!assessment) return false;
+        const assessmentDate = assessment.dueDate || assessment.createdAt;
+        const dateStr = assessmentDate.split('T')[0];
+        return dateStr >= dateRange.startDate && dateStr <= dateRange.endDate;
+      });
+    }
+
     const academic = await this.buildAcademicSection(
-      grades,
+      filteredGrades,
       student.classId ?? undefined,
       studentId,
       branchId,
@@ -147,7 +369,23 @@ export class ReportsService {
       excusedDays: attendanceSummary.excusedDays,
       percentage: attendanceSummary.percentage,
     });
-    const behavioral = this.buildBehavioralSection(behavioralRes.data);
+    
+    // Filter behavioral by date range if provided
+    let behavioral = this.buildBehavioralSection(behavioralRes.data);
+    if (dateRange && behavioral.periods.length > 0) {
+      behavioral = new BehavioralSectionDto({
+        periods: behavioral.periods.filter((p) => {
+          const periodDate = `${p.period}-01`;
+          return periodDate >= dateRange.startDate && periodDate <= dateRange.endDate;
+        }),
+      });
+    }
+
+    // Build assignment statistics and engagement
+    const [assignmentStatistics, assignmentEngagement] = await Promise.all([
+      this.buildAssignmentStatisticsSection(studentId, branchId, yearId, dateRange),
+      this.buildAssignmentEngagementSection(studentId, branchId, yearId, dateRange),
+    ]);
 
     return {
       data: new StudentReportDto({
@@ -158,6 +396,8 @@ export class ReportsService {
         academic,
         attendance,
         behavioral,
+        assignmentStatistics: assignmentStatistics || undefined,
+        assignmentEngagement: assignmentEngagement.length > 0 ? assignmentEngagement : undefined,
       }),
     };
   }
@@ -499,10 +739,338 @@ export class ReportsService {
     return new BehavioralSectionDto({ periods });
   }
 
+  /**
+   * Build assignment statistics section for a student.
+   */
+  private async buildAssignmentStatisticsSection(
+    studentId: string,
+    branchId: string,
+    academicYearId: string,
+    dateRange: { startDate: string; endDate: string } | null,
+  ): Promise<AssignmentStatisticsDto | null> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Get student's class section
+    const classSectionId = await this.getStudentClassSectionId(studentId, branchId, academicYearId);
+    if (!classSectionId) {
+      return null; // Student not in a class section
+    }
+
+    // Build query for assessments
+    let assessmentsQuery = supabase
+      .from('assessments')
+      .select('id')
+      .eq('class_section_id', classSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId)
+      .eq('is_published', true);
+
+    // Filter by date range if provided
+    if (dateRange) {
+      assessmentsQuery = assessmentsQuery
+        .gte('created_at', dateRange.startDate)
+        .lte('created_at', dateRange.endDate);
+    }
+
+    const { data: assessments } = await assessmentsQuery;
+    const assessmentIds = (assessments || []).map((a: { id: string }) => a.id);
+    if (assessmentIds.length === 0) {
+      return new AssignmentStatisticsDto({
+        totalAssignments: 0,
+        viewedAssignments: 0,
+        notViewedAssignments: 0,
+        submittedAssignments: 0,
+        inProgressAssignments: 0,
+        notStartedAssignments: 0,
+        viewingRate: 0,
+        submissionRate: 0,
+      });
+    }
+
+    // Get student's statuses for these assessments
+    const { data: statuses } = await supabase
+      .from('student_assessment_statuses')
+      .select('assessment_id, status, is_read')
+      .eq('student_id', studentId)
+      .in('assessment_id', assessmentIds);
+
+    const statusMap = new Map(
+      (statuses || []).map((s: { assessment_id: string; status: string; is_read: boolean }) => [
+        s.assessment_id,
+        { status: s.status, isRead: s.is_read },
+      ]),
+    );
+
+    let totalAssignments = assessmentIds.length;
+    let viewedAssignments = 0;
+    let submittedAssignments = 0;
+    let inProgressAssignments = 0;
+    let notStartedAssignments = 0;
+
+    for (const assessmentId of assessmentIds) {
+      const status = statusMap.get(assessmentId);
+      if (status?.isRead) {
+        viewedAssignments++;
+      }
+      if (status?.status === 'submitted') {
+        submittedAssignments++;
+      } else if (status?.status === 'in_progress') {
+        inProgressAssignments++;
+      } else {
+        notStartedAssignments++;
+      }
+    }
+
+    const notViewedAssignments = totalAssignments - viewedAssignments;
+    const viewingRate = totalAssignments > 0 ? Math.round((viewedAssignments / totalAssignments) * 100) : 0;
+    const submissionRate = totalAssignments > 0 ? Math.round((submittedAssignments / totalAssignments) * 100) : 0;
+
+    return new AssignmentStatisticsDto({
+      totalAssignments,
+      viewedAssignments,
+      notViewedAssignments,
+      submittedAssignments,
+      inProgressAssignments,
+      notStartedAssignments,
+      viewingRate,
+      submissionRate,
+    });
+  }
+
+  /**
+   * Build assignment engagement section for a student.
+   */
+  private async buildAssignmentEngagementSection(
+    studentId: string,
+    branchId: string,
+    academicYearId: string,
+    dateRange: { startDate: string; endDate: string } | null,
+  ): Promise<AssignmentEngagementDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Get student's class section
+    const classSectionId = await this.getStudentClassSectionId(studentId, branchId, academicYearId);
+    if (!classSectionId) {
+      return []; // Student not in a class section
+    }
+
+    // Build query for assessments
+    let assessmentsQuery = supabase
+      .from('assessments')
+      .select('id, title, due_date, subject_id, created_at')
+      .eq('class_section_id', classSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId)
+      .eq('is_published', true);
+
+    // Filter by date range if provided
+    if (dateRange) {
+      assessmentsQuery = assessmentsQuery
+        .gte('created_at', dateRange.startDate)
+        .lte('created_at', dateRange.endDate);
+    }
+
+    const { data: assessments } = await assessmentsQuery;
+    if (!assessments || assessments.length === 0) {
+      return [];
+    }
+
+    const assessmentIds = assessments.map((a: { id: string }) => a.id);
+
+    // Get subjects
+    const subjectIds = [...new Set(assessments.map((a: { subject_id: string }) => a.subject_id))];
+    const { data: subjects } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .in('id', subjectIds);
+    const subjectMap = new Map(
+      (subjects || []).map((s: { id: string; name: string }) => [s.id, s.name]),
+    );
+
+    // Get student's statuses for these assessments
+    const { data: statuses } = await supabase
+      .from('student_assessment_statuses')
+      .select('assessment_id, status, is_read, updated_at')
+      .eq('student_id', studentId)
+      .in('assessment_id', assessmentIds);
+
+    const statusMap = new Map(
+      (statuses || []).map((s: {
+        assessment_id: string;
+        status: string;
+        is_read: boolean;
+        updated_at: string;
+      }) => [
+        s.assessment_id,
+        { status: s.status, isRead: s.is_read, updatedAt: s.updated_at },
+      ]),
+    );
+
+    // Get graded status from student_grades table
+    const { data: grades } = await supabase
+      .from('student_grades')
+      .select('assessment_id, graded_at')
+      .eq('student_id', studentId)
+      .eq('branch_id', branchId)
+      .in('assessment_id', assessmentIds);
+
+    const gradedMap = new Map(
+      (grades || []).map((g: { assessment_id: string; graded_at: string | null }) => [
+        g.assessment_id,
+        !!g.graded_at, // true if graded_at is not null
+      ]),
+    );
+
+    const now = new Date();
+    const engagement: AssignmentEngagementDto[] = [];
+
+    for (const assessment of assessments) {
+      const a = assessment as {
+        id: string;
+        title: string;
+        due_date: string | null;
+        subject_id: string;
+        created_at: string;
+      };
+      const status = statusMap.get(a.id);
+      const isGraded = gradedMap.get(a.id) ?? false;
+
+      const isViewed = status?.isRead ?? false;
+      const viewedAt = status?.isRead ? status.updatedAt : undefined;
+      const assignmentStatus = (status?.status as 'not_started' | 'in_progress' | 'submitted') || 'not_started';
+      const submittedAt = assignmentStatus === 'submitted' ? status?.updatedAt : undefined;
+
+      // Calculate days until due
+      let daysUntilDue: number | undefined;
+      if (a.due_date) {
+        const dueDate = new Date(a.due_date);
+        const diffTime = dueDate.getTime() - now.getTime();
+        daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      // Calculate engagement score:
+      // - Viewed: 30%
+      // - In Progress: +30% (total 60%)
+      // - Submitted (not graded): +50% (total 80%)
+      // - Submitted + Graded: 100% (overrides all)
+      let engagementScore = 0;
+      if (assignmentStatus === 'submitted' && isGraded) {
+        engagementScore = 100; // Graded = 100%
+      } else {
+        if (isViewed) engagementScore += 30;
+        if (assignmentStatus === 'in_progress') engagementScore += 30;
+        if (assignmentStatus === 'submitted') {
+          engagementScore += 50; // Total: 80% (30% viewed + 50% submitted)
+        }
+      }
+
+      engagement.push(
+        new AssignmentEngagementDto({
+          assignmentId: a.id,
+          assignmentTitle: a.title,
+          subjectName: subjectMap.get(a.subject_id) ?? 'Unknown',
+          dueDate: a.due_date || undefined,
+          isViewed,
+          viewedAt,
+          status: assignmentStatus,
+          submittedAt,
+          daysUntilDue,
+          engagementScore,
+        }),
+      );
+    }
+
+    // Sort by engagement score (lowest first) or due date
+    engagement.sort((a, b) => {
+      if (a.engagementScore !== b.engagementScore) {
+        return a.engagementScore - b.engagementScore;
+      }
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      return 0;
+    });
+
+    return engagement;
+  }
+
+  /**
+   * Ensure teacher can only access reports for class sections they teach.
+   */
+  async ensureTeacherCanAccessClassSection(
+    classSectionId: string,
+    userId: string,
+    userRoles?: string[],
+    branchId?: string,
+  ): Promise<void> {
+    if (!userRoles || userRoles.length === 0) {
+      return; // No roles, allow (will be handled by auth guard)
+    }
+
+    const roles = userRoles.map((r) => r.toLowerCase());
+    const isTeacher = roles.some((r) => r === 'teacher');
+    const isAdmin = roles.some((r) => ['admin', 'principal', 'staff'].includes(r));
+
+    // Admin/staff can access all
+    if (isAdmin) {
+      return;
+    }
+
+    // If not a teacher, allow (other roles handled elsewhere)
+    if (!isTeacher) {
+      return;
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+
+    // Get staff record for user
+    const { data: staff } = await supabase
+      .from('staff')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!staff) {
+      throw new ForbiddenException('Staff record not found');
+    }
+
+    // Check if teacher is class teacher
+    const { data: classSection } = await supabase
+      .from('class_sections')
+      .select('id, class_teacher_id')
+      .eq('id', classSectionId)
+      .maybeSingle();
+
+    if (!classSection) {
+      throw new NotFoundException('Class section not found');
+    }
+
+    if (classSection.class_teacher_id === staff.id) {
+      return; // Is class teacher, allow
+    }
+
+    // Check if teacher teaches any subject in this class section
+    const { data: teacherAssignment } = await supabase
+      .from('teacher_assignments')
+      .select('id')
+      .eq('staff_id', staff.id)
+      .eq('class_section_id', classSectionId)
+      .limit(1)
+      .maybeSingle();
+
+    if (teacherAssignment) {
+      return; // Teacher teaches this class section, allow
+    }
+
+    throw new ForbiddenException('You can only access reports for class sections you teach');
+  }
+
   async getClassReport(
     classSectionId: string,
     branchId: string,
     academicYearId?: string,
+    userId?: string,
+    userRoles?: string[],
   ): Promise<{ data: ClassReportDto }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -714,46 +1282,489 @@ export class ReportsService {
     academicYearId?: string,
   ): Promise<Buffer> {
     const { data: report } = await this.getStudentReport(studentId, branchId, academicYearId);
-    const PDFDocument = require('pdfkit');
-    const chunks: Buffer[] = [];
-    const doc = new PDFDocument({ margin: 50 });
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-    await new Promise<void>((resolve, reject) => {
-      doc.on('end', () => resolve());
-      doc.on('error', reject);
-      doc.fontSize(18).text(`Student Report: ${report.studentName}`, { continued: false });
-      doc.fontSize(10).text(`Academic Year: ${report.academicYearName}`, { continued: false });
-      doc.moveDown();
-      if (report.academic?.entries?.length) {
-        doc.fontSize(12).text('Academic', { continued: false });
-        report.academic.entries.forEach((e) => {
-          doc.fontSize(10).text(
-            `${e.subjectName} - ${e.assessmentTitle}: ${e.marksObtained}/${e.totalMarks} (${e.percentage}%) ${e.letterGrade ?? ''}`,
-            { continued: false },
-          );
+
+    // Helper function to render star rating
+    const renderStars = (value: number): string => {
+      const fullStars = Math.floor(value);
+      const hasHalfStar = value % 1 >= 0.5;
+      let stars = '★'.repeat(fullStars);
+      if (hasHalfStar) stars += '☆';
+      return stars || '—';
+    };
+
+    // Helper function to get status badge HTML
+    const getStatusBadge = (status: string, isViewed: boolean): string => {
+      let color = 'gray';
+      let text = 'Not Started';
+      if (status === 'submitted') {
+        color = 'green';
+        text = 'Submitted';
+      } else if (status === 'in_progress') {
+        color = 'yellow';
+        text = 'In Progress';
+      } else if (isViewed) {
+        color = 'blue';
+        text = 'Viewed';
+      }
+      return `<span class="badge badge-${color}">${text}</span>`;
+    };
+
+    // Helper function to get engagement color
+    const getEngagementColor = (score: number): string => {
+      if (score >= 70) return 'green';
+      if (score >= 40) return 'yellow';
+      return 'red';
+    };
+
+    // Helper function to get days until due color
+    const getDaysColor = (days?: number): string => {
+      if (days === undefined) return 'gray';
+      if (days < 0) return 'red';
+      if (days <= 3) return 'yellow';
+      return 'green';
+    };
+
+    // Build HTML content
+    let htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #212529;
+      background: #fff;
+      padding: 20px;
+    }
+    .header {
+      margin-bottom: 24px;
+    }
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #212529;
+    }
+    .header .subtitle {
+      font-size: 14px;
+      color: #868e96;
+    }
+    .section {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 16px;
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+    }
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #212529;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #dee2e6;
+    }
+    table th {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    table td {
+      border: 1px solid #dee2e6;
+      padding: 12px;
+      font-size: 13px;
+    }
+    table tr:not(:last-child) td {
+      border-bottom: 1px solid #dee2e6;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge-green {
+      background: #d4edda;
+      color: #155724;
+    }
+    .badge-yellow {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .badge-blue {
+      background: #cfe2ff;
+      color: #084298;
+    }
+    .badge-gray {
+      background: #e9ecef;
+      color: #495057;
+    }
+    .badge-red {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      text-align: center;
+      padding: 16px;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #868e96;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .stat-value.blue { color: #228be6; }
+    .stat-value.red { color: #fa5252; }
+    .stat-value.green { color: #51cf66; }
+    .stat-value.yellow { color: #ffd43b; }
+    .stat-value.gray { color: #868e96; }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e9ecef;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+    }
+    .progress-fill.green { background: #51cf66; }
+    .progress-fill.yellow { background: #ffd43b; }
+    .progress-fill.red { background: #fa5252; }
+    .attendance-group {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .attendance-item {
+      font-size: 14px;
+    }
+    .attendance-item strong {
+      font-weight: 600;
+    }
+    .stars {
+      font-size: 16px;
+      color: #ffd43b;
+      letter-spacing: 2px;
+    }
+    .ring-progress-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .ring-progress {
+      width: 120px;
+      height: 120px;
+      position: relative;
+    }
+    .ring-progress svg {
+      transform: rotate(-90deg);
+    }
+    .ring-progress-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .ring-progress-label {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .ring-progress-desc {
+      font-size: 12px;
+      color: #868e96;
+    }
+    @media print {
+      .section {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${this.escapeHtml(report.studentName)}</h1>
+    <div class="subtitle">${this.escapeHtml(report.academicYearName)}</div>
+  </div>
+`;
+
+    // Academic Section
+    if (report.academic?.entries?.length) {
+      htmlContent += `
+  <div class="section">
+    <div class="section-title">Academic</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Assessment</th>
+          <th>Marks</th>
+          <th>Grade</th>
+          <th>Rank / Percentile</th>
+        </tr>
+      </thead>
+      <tbody>
+`;
+      report.academic.entries.forEach((e) => {
+        const rankText = e.rank ? `Rank ${e.rank}` : e.percentile ? `Top ${e.percentile}%` : '—';
+        htmlContent += `
+        <tr>
+          <td>${this.escapeHtml(e.subjectName)}</td>
+          <td>${this.escapeHtml(e.assessmentTitle)}</td>
+          <td>${e.marksObtained} / ${e.totalMarks} (${e.percentage}%)</td>
+          <td>${e.letterGrade ?? '—'}</td>
+          <td>${rankText}</td>
+        </tr>
+`;
+      });
+      htmlContent += `
+      </tbody>
+    </table>
+  </div>
+`;
+    }
+
+    // Attendance Section
+    if (report.attendance) {
+      htmlContent += `
+  <div class="section">
+    <div class="section-title">Attendance</div>
+    <div class="attendance-group">
+      <div class="attendance-item">Present: <strong>${report.attendance.presentDays}</strong></div>
+      <div class="attendance-item">Absent: <strong>${report.attendance.absentDays}</strong></div>
+      <div class="attendance-item">Late: <strong>${report.attendance.lateDays}</strong></div>
+      <div class="attendance-item">Excused: <strong>${report.attendance.excusedDays}</strong></div>
+    </div>
+    <div class="attendance-item">
+      Total days: ${report.attendance.totalDays} · Attendance: <strong>${report.attendance.percentage}%</strong>
+    </div>
+  </div>
+`;
+    }
+
+    // Behavioral Section
+    if (report.behavioral?.periods?.length) {
+      const allAttributes = Array.from(
+        new Set(report.behavioral.periods.flatMap((p) => p.attributes.map((a) => a.attributeName))),
+      ).sort();
+
+      htmlContent += `
+  <div class="section">
+    <div class="section-title">Behavioral</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Period</th>
+`;
+      allAttributes.forEach((attr) => {
+        htmlContent += `          <th>${this.escapeHtml(attr)}</th>\n`;
+      });
+      htmlContent += `
+        </tr>
+      </thead>
+      <tbody>
+`;
+      report.behavioral.periods.forEach((p) => {
+        const attrMap = Object.fromEntries(p.attributes.map((a) => [a.attributeName, a.average]));
+        htmlContent += `
+        <tr>
+          <td>${this.escapeHtml(p.period)}</td>
+`;
+        allAttributes.forEach((attr) => {
+          const value = attrMap[attr];
+          htmlContent += `          <td>${value != null ? `<span class="stars">${renderStars(value)} ${value.toFixed(1)}</span>` : '—'}</td>\n`;
         });
-        doc.moveDown();
-      }
-      if (report.attendance) {
-        doc.fontSize(12).text('Attendance', { continued: false });
-        doc
-          .fontSize(10)
-          .text(
-            `Present: ${report.attendance.presentDays}, Absent: ${report.attendance.absentDays}, Late: ${report.attendance.lateDays}, Excused: ${report.attendance.excusedDays}. Total: ${report.attendance.totalDays} days, ${report.attendance.percentage}%`,
-            { continued: false },
-          );
-        doc.moveDown();
-      }
-      if (report.behavioral?.periods?.length) {
-        doc.fontSize(12).text('Behavioral', { continued: false });
-        report.behavioral.periods.forEach((p) => {
-          const line = p.attributes.map((a) => `${a.attributeName}: ${a.average}`).join(', ');
-          doc.fontSize(10).text(`${p.period}: ${line}`, { continued: false });
-        });
-      }
-      doc.end();
+        htmlContent += `
+        </tr>
+`;
+      });
+      htmlContent += `
+      </tbody>
+    </table>
+  </div>
+`;
+    }
+
+    // Assignment Statistics Section
+    if (report.assignmentStatistics) {
+      const stats = report.assignmentStatistics;
+      htmlContent += `
+  <div class="section">
+    <div class="section-title">Assignment Statistics</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Assignments</div>
+        <div class="stat-value">${stats.totalAssignments}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Viewed</div>
+        <div class="stat-value blue">${stats.viewedAssignments}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Not Viewed</div>
+        <div class="stat-value red">${stats.notViewedAssignments}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Submitted</div>
+        <div class="stat-value green">${stats.submittedAssignments}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">In Progress</div>
+        <div class="stat-value yellow">${stats.inProgressAssignments}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Not Started</div>
+        <div class="stat-value gray">${stats.notStartedAssignments}</div>
+      </div>
+    </div>
+    <div class="ring-progress-container">
+      <div class="ring-progress">
+        <svg width="120" height="120">
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#e9ecef" stroke-width="12"/>
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#228be6" stroke-width="12"
+            stroke-dasharray="${(stats.viewingRate / 100) * 339.292} 339.292"
+            stroke-dashoffset="0" stroke-linecap="round"/>
+        </svg>
+        <div class="ring-progress-text" style="color: #228be6;">${stats.viewingRate}%</div>
+      </div>
+      <div>
+        <div class="ring-progress-label">Viewing Rate</div>
+        <div class="ring-progress-desc">${stats.viewedAssignments} of ${stats.totalAssignments} assignments viewed</div>
+      </div>
+    </div>
+    <div class="ring-progress-container">
+      <div class="ring-progress">
+        <svg width="120" height="120">
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#e9ecef" stroke-width="12"/>
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#51cf66" stroke-width="12"
+            stroke-dasharray="${(stats.submissionRate / 100) * 339.292} 339.292"
+            stroke-dashoffset="0" stroke-linecap="round"/>
+        </svg>
+        <div class="ring-progress-text" style="color: #51cf66;">${stats.submissionRate}%</div>
+      </div>
+      <div>
+        <div class="ring-progress-label">Submission Rate</div>
+        <div class="ring-progress-desc">${stats.submittedAssignments} of ${stats.totalAssignments} assignments submitted</div>
+      </div>
+    </div>
+  </div>
+`;
+    }
+
+    // Assignment Engagement Section
+    if (report.assignmentEngagement && report.assignmentEngagement.length > 0) {
+      htmlContent += `
+  <div class="section">
+    <div class="section-title">Assignment Engagement</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Assignment</th>
+          <th>Subject</th>
+          <th>Due Date</th>
+          <th>Status</th>
+          <th>Engagement</th>
+          <th>Days Until Due</th>
+        </tr>
+      </thead>
+      <tbody>
+`;
+      report.assignmentEngagement.forEach((a) => {
+        const dueDateText = a.dueDate ? new Date(a.dueDate).toLocaleDateString() : '—';
+        const dueText = a.daysUntilDue !== undefined
+          ? (a.daysUntilDue < 0 ? `${Math.abs(a.daysUntilDue)} days overdue` : `${a.daysUntilDue} days left`)
+          : '—';
+        const engagementColor = getEngagementColor(a.engagementScore);
+        const daysColor = getDaysColor(a.daysUntilDue);
+        htmlContent += `
+        <tr>
+          <td>${this.escapeHtml(a.assignmentTitle)}</td>
+          <td>${this.escapeHtml(a.subjectName)}</td>
+          <td>${dueDateText}</td>
+          <td>${getStatusBadge(a.status, a.isViewed)}</td>
+          <td>
+            <div class="progress-bar">
+              <div class="progress-fill ${engagementColor}" style="width: ${a.engagementScore}%"></div>
+            </div>
+            <div style="font-size: 12px; color: #868e96;">${a.engagementScore}%</div>
+          </td>
+          <td style="color: ${daysColor};">${dueText}</td>
+        </tr>
+`;
+      });
+      htmlContent += `
+      </tbody>
+    </table>
+  </div>
+`;
+    }
+
+    htmlContent += `
+</body>
+</html>
+`;
+
+    // Generate PDF using Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
-    return Buffer.concat(chunks);
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      const pdf = await page.pdf({
+        format: 'A4',
+        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        printBackground: true,
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private escapeHtml(text: string): string {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;',
+    };
+    return text.replace(/[&<>"']/g, (m) => map[m]);
   }
 
   async exportStudentReportExcel(
@@ -837,5 +1848,155 @@ export class ReportsService {
       });
     });
     return (await workbook.xlsx.writeBuffer()) as Buffer;
+  }
+
+  /**
+   * Get student counts (total, male, female) for a specific class section.
+   */
+  async getClassStudentCounts(
+    classSectionId: string,
+    branchId: string,
+    academicYearId?: string,
+  ): Promise<{ data: ClassStudentCountDto }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      throw new BadRequestException('No active academic year found');
+    }
+    const yearId = academicYearId ?? activeYear.id;
+
+    const { data: cs, error: csErr } = await supabase
+      .from('class_sections')
+      .select('id, class_id, section_id')
+      .eq('id', classSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', yearId)
+      .maybeSingle();
+    throwIfDbError(csErr);
+    if (!cs) throw new NotFoundException('Class section not found');
+
+    const c = cs as { class_id: string; section_id: string };
+    const [classRes, sectionRes] = await Promise.all([
+      supabase.from('classes').select('display_name').eq('id', c.class_id).single(),
+      supabase.from('sections').select('name').eq('id', c.section_id).single(),
+    ]);
+    const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
+    const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
+
+    const { data: students } = await supabase
+      .from('students')
+      .select('id, gender')
+      .eq('class_id', c.class_id)
+      .eq('section_id', c.section_id)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', yearId)
+      .eq('is_active', true);
+
+    const studentList = (students || []) as { id: string; gender: string | null }[];
+    const totalStudents = studentList.length;
+    const maleCount = studentList.filter((s) => s.gender === 'male').length;
+    const femaleCount = studentList.filter((s) => s.gender === 'female').length;
+
+    return {
+      data: new ClassStudentCountDto({
+        classSectionId,
+        className,
+        sectionName,
+        totalStudents,
+        maleCount,
+        femaleCount,
+      }),
+    };
+  }
+
+  /**
+   * Get student counts for all class sections in a branch (public endpoint).
+   */
+  async getAllClassStudentCounts(
+    branchId: string,
+    academicYearId?: string,
+  ): Promise<{ data: ClassStudentCountDto[] }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      throw new BadRequestException('No active academic year found');
+    }
+    const yearId = academicYearId ?? activeYear.id;
+
+    // Get all class sections
+    const { data: classSections } = await supabase
+      .from('class_sections')
+      .select('id, class_id, section_id')
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', yearId);
+
+    if (!classSections || classSections.length === 0) {
+      return { data: [] };
+    }
+
+    const classIds = [...new Set(classSections.map((cs) => cs.class_id))];
+    const sectionIds = [...new Set(classSections.map((cs) => cs.section_id))];
+
+    const [classesData, sectionsData] = await Promise.all([
+      supabase.from('classes').select('id, display_name').in('id', classIds),
+      supabase.from('sections').select('id, name').in('id', sectionIds),
+    ]);
+
+    const classMap = new Map(
+      (classesData.data || []).map((c: { id: string; display_name: string }) => [c.id, c.display_name]),
+    );
+    const sectionMap = new Map(
+      (sectionsData.data || []).map((s: { id: string; name: string }) => [s.id, s.name]),
+    );
+
+    // Get all students grouped by class_id and section_id
+    const { data: allStudents } = await supabase
+      .from('students')
+      .select('id, class_id, section_id, gender')
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', yearId)
+      .eq('is_active', true)
+      .in('class_id', classIds)
+      .in('section_id', sectionIds);
+
+    const studentList = (allStudents || []) as {
+      id: string;
+      class_id: string;
+      section_id: string;
+      gender: string | null;
+    }[];
+
+    // Group students by class_section_id
+    const studentsBySection = new Map<string, { gender: string | null }[]>();
+    for (const student of studentList) {
+      const cs = classSections.find(
+        (cs) => cs.class_id === student.class_id && cs.section_id === student.section_id,
+      );
+      if (cs) {
+        const list = studentsBySection.get(cs.id) || [];
+        list.push({ gender: student.gender });
+        studentsBySection.set(cs.id, list);
+      }
+    }
+
+    const counts: ClassStudentCountDto[] = classSections.map((cs) => {
+      const students = studentsBySection.get(cs.id) || [];
+      const totalStudents = students.length;
+      const maleCount = students.filter((s) => s.gender === 'male').length;
+      const femaleCount = students.filter((s) => s.gender === 'female').length;
+
+      return new ClassStudentCountDto({
+        classSectionId: cs.id,
+        className: classMap.get(cs.class_id) ?? 'Unknown',
+        sectionName: sectionMap.get(cs.section_id) ?? 'Unknown',
+        totalStudents,
+        maleCount,
+        femaleCount,
+      });
+    });
+
+    return { data: counts };
   }
 }

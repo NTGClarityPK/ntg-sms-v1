@@ -93,6 +93,7 @@ export function useMyStaff() {
       return response;
     },
     enabled: !!branchId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - staff record rarely changes
   });
 }
 

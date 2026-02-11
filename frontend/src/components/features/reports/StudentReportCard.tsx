@@ -4,6 +4,8 @@ import { Stack, Title, Text, Skeleton } from '@mantine/core';
 import { AcademicSection } from './AcademicSection';
 import { AttendanceSection } from './AttendanceSection';
 import { BehavioralSectionReport } from './BehavioralSection';
+import { AssignmentStatisticsSection } from './AssignmentStatisticsSection';
+import { AssignmentEngagementSection } from './AssignmentEngagementSection';
 import type { StudentReport as StudentReportType } from '@/types/reports';
 
 interface StudentReportCardProps {
@@ -44,6 +46,12 @@ export function StudentReportCard({ report, isLoading }: StudentReportCardProps)
       )}
       {report.behavioral && (
         <BehavioralSectionReport data={report.behavioral} isLoading={false} />
+      )}
+      {report.assignmentStatistics && (
+        <AssignmentStatisticsSection data={report.assignmentStatistics} />
+      )}
+      {report.assignmentEngagement && report.assignmentEngagement.length > 0 && (
+        <AssignmentEngagementSection data={report.assignmentEngagement} />
       )}
     </Stack>
   );

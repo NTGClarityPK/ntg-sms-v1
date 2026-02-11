@@ -15,6 +15,7 @@ export function useTenantBranches() {
       const res = await apiClient.get<Branch[]>('/api/v1/branches/by-tenant');
       return res;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes - branches rarely change
   });
 }
 

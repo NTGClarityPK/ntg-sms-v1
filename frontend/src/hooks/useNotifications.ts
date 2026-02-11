@@ -53,6 +53,7 @@ export function useNotification(id: string | null) {
       return response;
     },
     enabled: !!id && !!userId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - single notification rarely changes
   });
 }
 
@@ -73,6 +74,7 @@ export function useUnreadCount() {
       return unreadCount > 0 ? unreadCount : 0;
     },
     enabled: !!userId,
+    staleTime: 30 * 1000, // 30 seconds - unread count needs to be fresh
   });
 }
 

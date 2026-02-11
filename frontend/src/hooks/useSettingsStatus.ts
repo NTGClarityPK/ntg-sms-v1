@@ -36,6 +36,7 @@ export function useSettingsStatus() {
       return res;
     },
     enabled: hasCurrentBranch, // Only fetch if user has a current branch selected
+    staleTime: 5 * 60 * 1000, // 5 minutes - settings status rarely changes
   });
 }
 

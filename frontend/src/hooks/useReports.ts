@@ -9,25 +9,36 @@ import type {
   ClassReport,
   Rankings,
 } from '@/types/reports';
+import { ReportPeriodType } from '@/types/reports';
 import { useAuth } from './useAuth';
 
 /** No meta on report endpoints → return response.data. */
 
-export function useStudentReport(studentId: string | null, academicYearId?: string) {
+export function useStudentReport(
+  studentId: string | null,
+  academicYearId?: string,
+  periodType?: ReportPeriodType | null,
+  startDate?: string | null,
+  endDate?: string | null,
+) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
 
   return useQuery({
-    queryKey: ['reports', 'student', studentId, academicYearId, branchId],
+    queryKey: ['reports', 'student', studentId, academicYearId, branchId, periodType, startDate, endDate],
     queryFn: async (): Promise<StudentReport | null> => {
       if (!studentId || !branchId) return null;
-      const params = academicYearId ? `?academicYearId=${academicYearId}` : '';
-      const response = await apiClient.get<StudentReport>(
-        `/api/v1/reports/student/${studentId}${params}`,
-      );
+      const params = new URLSearchParams();
+      if (academicYearId) params.append('academicYearId', academicYearId);
+      if (periodType) params.append('periodType', periodType);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      const queryString = params.toString();
+      const url = `/api/v1/reports/student/${studentId}${queryString ? `?${queryString}` : ''}`;
+      const response = await apiClient.get<StudentReport>(url);
       return response.data;
     },
-    enabled: !!studentId && !!branchId,
+    enabled: !!studentId && !!branchId && !(periodType === ReportPeriodType.CUSTOM && (!startDate || !endDate)),
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -109,5 +120,52 @@ export function useRankings(
     },
     enabled: !!classSectionId && !!subjectId && !!branchId,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export interface ClassStudentCount {
+  classSectionId: string;
+  className: string;
+  sectionName: string;
+  totalStudents: number;
+  maleCount: number;
+  femaleCount: number;
+}
+
+export function usePublicClassCounts(academicYearId?: string) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['reports', 'public', 'class-counts', branchId, academicYearId],
+    queryFn: async (): Promise<ClassStudentCount[]> => {
+      if (!branchId) return [];
+      const params = academicYearId ? `?academicYearId=${academicYearId}` : '';
+      const response = await apiClient.get<ClassStudentCount[]>(
+        `/api/v1/reports/public/class-counts${params}`,
+      );
+      return response.data;
+    },
+    enabled: !!branchId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - counts don't change frequently
+  });
+}
+
+export function useClassStudentCounts(classSectionId: string | null, academicYearId?: string) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['reports', 'public', 'class-counts', classSectionId, branchId, academicYearId],
+    queryFn: async (): Promise<ClassStudentCount | null> => {
+      if (!classSectionId || !branchId) return null;
+      const params = academicYearId ? `?academicYearId=${academicYearId}` : '';
+      const response = await apiClient.get<ClassStudentCount>(
+        `/api/v1/reports/public/class/${classSectionId}/counts${params}`,
+      );
+      return response.data;
+    },
+    enabled: !!classSectionId && !!branchId,
+    staleTime: 5 * 60 * 1000,
   });
 }
