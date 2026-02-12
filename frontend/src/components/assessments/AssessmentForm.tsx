@@ -16,6 +16,9 @@ import { useAssessmentTypes } from '@/hooks/useAssessmentSettings';
 import { useSubjects, useClasses } from '@/hooks/useCoreLookups';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useTemplatesForClass } from '@/hooks/useSubjectTemplates';
+import { useMyStaff } from '@/hooks/useStaff';
+import { useAssignmentsByTeacher } from '@/hooks/useTeacherAssignments';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { FileUpload } from './FileUpload';
@@ -106,6 +109,23 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const isEditMode = !!assessment;
+
+  // Current user as staff (teacher) and their assignments for dropdown filtering
+  const { data: myStaffResponse } = useMyStaff();
+  const myStaff = myStaffResponse?.data ?? null;
+  const { data: activeYearResponse } = useActiveAcademicYear();
+  const activeYearId = activeYearResponse?.data?.id;
+  const { data: teacherAssignments } = useAssignmentsByTeacher(myStaff?.id ?? null, activeYearId);
+  const assignmentsList = teacherAssignments ?? [];
+  const isTeacherWithAssignments = !!myStaff && assignmentsList.length > 0;
+  const allowedSubjectIds = useMemo(
+    () => new Set(assignmentsList.map((a) => a.subjectId)),
+    [assignmentsList],
+  );
+  const allowedClassSectionIds = useMemo(
+    () => new Set(assignmentsList.map((a) => a.classSectionId)),
+    [assignmentsList],
+  );
 
   // Fetch data for dropdowns
   const { data: assessmentTypesData, isLoading: assessmentTypesLoading } = useAssessmentTypes();
@@ -221,14 +241,17 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     [assessmentTypesData],
   );
 
-  const allSubjects = useMemo(
-    () =>
+  const allSubjects = useMemo(() => {
+    const list =
       subjectsData?.data?.map((subject) => ({
         value: subject.id,
         label: subject.name,
-      })) || [],
-    [subjectsData],
-  );
+      })) || [];
+    if (isTeacherWithAssignments) {
+      return list.filter((s) => allowedSubjectIds.has(s.value));
+    }
+    return list;
+  }, [subjectsData, isTeacherWithAssignments, allowedSubjectIds]);
 
   // Filter subjects based on selected subject template
   const subjects = useMemo(() => {
@@ -247,27 +270,33 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     return filteredSubjects.sort((a, b) => a.label.localeCompare(b.label));
   }, [allSubjects, templatesData, form.values, isEditMode]);
 
-  const classes = useMemo(
-    () =>
-      (classesData?.data || [])
-        .map((cls) => ({
-          value: cls.id,
-          label: cls.displayName || cls.name,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [classesData],
-  );
+  const classes = useMemo(() => {
+    let list = (classesData?.data || []).map((cls) => ({
+      value: cls.id,
+      label: cls.displayName || cls.name,
+    }));
+    if (isTeacherWithAssignments) {
+      const allowedClassIds = new Set(
+        (classSectionsData?.data || [])
+          .filter((cs) => allowedClassSectionIds.has(cs.id))
+          .map((cs) => cs.classId),
+      );
+      list = list.filter((c) => allowedClassIds.has(c.value));
+    }
+    return list.sort((a, b) => a.label.localeCompare(b.label));
+  }, [classesData, classSectionsData, isTeacherWithAssignments, allowedClassSectionIds]);
 
-  const classSections = useMemo(
-    () =>
-      (classSectionsData?.data || [])
-        .map((cs) => ({
-          value: cs.id,
-          label: `${cs.className} - ${cs.sectionName}`,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [classSectionsData],
-  );
+  const classSections = useMemo(() => {
+    let list = (classSectionsData?.data || [])
+      .map((cs) => ({
+        value: cs.id,
+        label: `${cs.className} - ${cs.sectionName}`,
+      }));
+    if (isTeacherWithAssignments) {
+      list = list.filter((cs) => allowedClassSectionIds.has(cs.value));
+    }
+    return list.sort((a, b) => a.label.localeCompare(b.label));
+  }, [classSectionsData, isTeacherWithAssignments, allowedClassSectionIds]);
 
   const subjectTemplates = useMemo(
     () =>
@@ -284,17 +313,17 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     if (isEditMode) return [];
     const createValues = form.values as CreateFormValues;
     if (createValues.mode === 'class-sections' && createValues.classId) {
-      return (
-        (classSectionsForClassData?.data || [])
-          .map((cs) => ({
-            value: cs.id,
-            label: `${cs.className} - ${cs.sectionName}`,
-          }))
-          .sort((a, b) => a.label.localeCompare(b.label))
-      );
+      let list = (classSectionsForClassData?.data || []).map((cs) => ({
+        value: cs.id,
+        label: `${cs.className} - ${cs.sectionName}`,
+      }));
+      if (isTeacherWithAssignments) {
+        list = list.filter((cs) => allowedClassSectionIds.has(cs.value));
+      }
+      return list.sort((a, b) => a.label.localeCompare(b.label));
     }
     return [];
-  }, [classSectionsForClassData, form.values, isEditMode]);
+  }, [classSectionsForClassData, form.values, isEditMode, isTeacherWithAssignments, allowedClassSectionIds]);
 
   const dataLoading =
     assessmentTypesLoading ||

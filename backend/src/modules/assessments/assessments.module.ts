@@ -5,11 +5,12 @@ import { AssessmentModule } from '../assessment/assessment.module';
 import { AcademicYearsModule } from '../academic-years/academic-years.module';
 import { ClassSectionsModule } from '../class-sections/class-sections.module';
 import { TeacherAssignmentsModule } from '../teacher-assignments/teacher-assignments.module';
+import { StaffModule } from '../staff/staff.module';
 import { AssessmentsService } from './assessments.service';
 import { AssessmentsController } from './assessments.controller';
 
 @Module({
-  imports: [AssessmentModule, AcademicYearsModule, ClassSectionsModule, TeacherAssignmentsModule, NotificationsModule],
+  imports: [AssessmentModule, AcademicYearsModule, ClassSectionsModule, TeacherAssignmentsModule, StaffModule, NotificationsModule],
   controllers: [AssessmentsController],
   providers: [AssessmentsService, SupabaseConfig],
   exports: [AssessmentsService], // Export so GradesModule can use it

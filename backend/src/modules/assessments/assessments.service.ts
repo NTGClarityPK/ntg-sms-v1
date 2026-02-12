@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ClassSectionsService } from '../class-sections/class-sections.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
+import { StaffService } from '../staff/staff.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AssessmentDto } from './dto/assessment.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
@@ -109,6 +111,7 @@ export class AssessmentsService {
     private readonly academicYearsService: AcademicYearsService,
     private readonly classSectionsService: ClassSectionsService,
     private readonly teacherAssignmentsService: TeacherAssignmentsService,
+    private readonly staffService: StaffService,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -275,6 +278,27 @@ export class AssessmentsService {
       }
     } else {
       throw new BadRequestException('Either classSectionId or classId must be provided');
+    }
+
+    // If creator is a teacher (has staff record), restrict to their assigned class-sections and subjects only
+    const staff = await this.staffService.getStaffByUserId(createdByUserId, branchId);
+    if (staff) {
+      const { data: assignments } = await this.teacherAssignmentsService.getAssignmentsByTeacher(
+        staff.id,
+        branchId,
+        academicYearId,
+      );
+      const allowedPairs = new Set(
+        (assignments || []).map((a) => `${a.subjectId}:${a.classSectionId}`),
+      );
+      for (const classSectionId of classSectionIdsToCreate) {
+        const key = `${input.subjectId}:${classSectionId}`;
+        if (!allowedPairs.has(key)) {
+          throw new ForbiddenException(
+            'You can only create assessments for class-sections and subjects you are assigned to.',
+          );
+        }
+      }
     }
 
     // Ensure assessment type exists for branch
