@@ -24,34 +24,72 @@ export function usePermissions() {
 
   const permissions = data || [];
 
+  const hasPermissionForCodes = (
+    roleId: string,
+    candidateCodes: string[],
+    required: 'view' | 'edit',
+  ): boolean => {
+    const matches = permissions.filter(
+      (p) =>
+        p.roleId === roleId &&
+        p.branchId === branchId &&
+        candidateCodes.includes(p.featureCode),
+    );
+    if (matches.length === 0) return false;
+    return required === 'edit'
+      ? matches.some((m) => m.permission === 'edit')
+      : matches.some((m) => m.permission === 'view' || m.permission === 'edit');
+  };
+
+  // Backward-safe fallback while old feature codes may still exist in DB.
+  const resolveFeatureCandidates = (featureCode: string): string[] => {
+    switch (featureCode) {
+      case 'events_management':
+        return ['events_management', 'events'];
+      case 'events_personal':
+      case 'my_events':
+        return ['events_personal', 'my_events', 'events'];
+      case 'timetable_management':
+        return ['timetable_management', 'timetable'];
+      case 'timetable_personal':
+      case 'my_timetable':
+      case 'my_schedule':
+        return ['timetable_personal', 'my_timetable', 'my_schedule', 'timetable'];
+      default:
+        return [featureCode];
+    }
+  };
+
   const canView = (featureCode: string): boolean => {
     if (!user?.roles || !branchId) return false;
-    
+
+    const isSchoolAdmin = user.roles.some(
+      (r) => r.roleName?.toLowerCase() === 'school_admin',
+    );
+    if (isSchoolAdmin) return true;
+
+    const candidateCodes = resolveFeatureCandidates(featureCode);
+
     // Check if user has any role with view or edit permission for this feature
-    return user.roles.some((userRole) => {
-      const perm = permissions.find(
-        (p) =>
-          p.roleId === userRole.roleId &&
-          p.featureCode === featureCode &&
-          p.branchId === branchId,
-      );
-      return perm?.permission === 'view' || perm?.permission === 'edit';
-    });
+    return user.roles.some((userRole) =>
+      hasPermissionForCodes(userRole.roleId, candidateCodes, 'view'),
+    );
   };
 
   const canEdit = (featureCode: string): boolean => {
     if (!user?.roles || !branchId) return false;
-    
+
+    const isSchoolAdmin = user.roles.some(
+      (r) => r.roleName?.toLowerCase() === 'school_admin',
+    );
+    if (isSchoolAdmin) return true;
+
+    const candidateCodes = resolveFeatureCandidates(featureCode);
+
     // Check if user has any role with edit permission for this feature
-    return user.roles.some((userRole) => {
-      const perm = permissions.find(
-        (p) =>
-          p.roleId === userRole.roleId &&
-          p.featureCode === featureCode &&
-          p.branchId === branchId,
-      );
-      return perm?.permission === 'edit';
-    });
+    return user.roles.some((userRole) =>
+      hasPermissionForCodes(userRole.roleId, candidateCodes, 'edit'),
+    );
   };
 
   return {
@@ -61,6 +99,14 @@ export function usePermissions() {
     refetch,
     canView,
     canEdit,
+  };
+}
+
+export function useFeaturePermission(featureCode: string) {
+  const { canView, canEdit } = usePermissions();
+  return {
+    canView: canView(featureCode),
+    canEdit: canEdit(featureCode),
   };
 }
 

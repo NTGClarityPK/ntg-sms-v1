@@ -550,7 +550,9 @@ export class AttendanceService {
       activeYearId = activeYear.id;
     }
 
-    // Verify student exists and get user_id for profile lookup
+    // Verify student exists and get user_id for profile lookup.
+    // Use maybeSingle to avoid throwing on stale parent-child links;
+    // in such cases we return an empty result instead of a hard 404.
     const { data: studentData, error: studentError } = await supabase
       .from('students')
       .select('id, user_id')
@@ -558,7 +560,7 @@ export class AttendanceService {
       .maybeSingle();
     throwIfDbError(studentError);
     if (!studentData) {
-      throw new NotFoundException('Student not found');
+      return [];
     }
 
     // Check if student has attendance records in this branch/academic year
@@ -580,7 +582,7 @@ export class AttendanceService {
         .eq('branch_id', branchId)
         .maybeSingle();
       if (!studentInBranch) {
-        throw new NotFoundException('Student not found in this branch');
+        return [];
       }
     }
 
@@ -981,17 +983,25 @@ export class AttendanceService {
       activeYearId = activeYear.id;
     }
 
-    // Verify student exists
+    // Verify student exists.
+    // For stale links, return a zero summary rather than throwing 404.
     const { data: studentData, error: studentError } = await supabase
       .from('students')
       .select('id')
       .eq('id', studentId)
       .eq('branch_id', branchId)
-      .single();
+      .maybeSingle();
 
     throwIfDbError(studentError);
     if (!studentData) {
-      throw new NotFoundException('Student not found');
+      return new AttendanceSummaryDto({
+        presentDays: 0,
+        absentDays: 0,
+        lateDays: 0,
+        excusedDays: 0,
+        totalDays: 0,
+        percentage: 0,
+      });
     }
 
     // Get academic year dates or use provided date range

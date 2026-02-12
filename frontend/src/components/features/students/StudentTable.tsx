@@ -19,9 +19,10 @@ interface StudentTableProps {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   onSort?: (field: string) => void;
+  canEdit?: boolean;
 }
 
-export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, onSort }: StudentTableProps) {
+export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: StudentTableProps) {
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
@@ -96,9 +97,11 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  <ActionIcon variant="light" onClick={() => handleEdit(student)}>
-                    <IconEdit size={16} />
-                  </ActionIcon>
+                  {canEdit && (
+                    <ActionIcon variant="light" onClick={() => handleEdit(student)}>
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                  )}
                 </Table.Td>
               </Table.Tr>
             ))

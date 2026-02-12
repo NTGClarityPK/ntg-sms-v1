@@ -19,9 +19,10 @@ interface StaffTableProps {
     totalPages: number;
   };
   onPageChange?: (page: number) => void;
+  canEdit?: boolean;
 }
 
-export function StaffTable({ staff, meta, onPageChange }: StaffTableProps) {
+export function StaffTable({ staff, meta, onPageChange, canEdit = true }: StaffTableProps) {
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const { data: rolesData } = useRoles();
@@ -88,9 +89,11 @@ export function StaffTable({ staff, meta, onPageChange }: StaffTableProps) {
                   >
                     <IconCalendar size={16} />
                   </ActionIcon>
-                  <ActionIcon variant="light" onClick={() => handleEdit(staffMember)} title="Edit">
-                    <IconEdit size={16} />
-                  </ActionIcon>
+                  {canEdit && (
+                    <ActionIcon variant="light" onClick={() => handleEdit(staffMember)} title="Edit">
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                  )}
                 </Group>
               </Table.Td>
             </Table.Tr>

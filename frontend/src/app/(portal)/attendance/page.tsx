@@ -4,10 +4,12 @@ import { Group, Title, Button, Card, Stack, Text } from '@mantine/core';
 import { IconCalendarCheck, IconHistory, IconUserCheck } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 import type { User } from '@/types/auth';
 
 export default function AttendancePage() {
   const { user } = useAuth();
+  const { canEdit } = useFeaturePermission('attendance');
   const userTyped = user as User | undefined;
   const isTeacher = userTyped?.roles?.some(
     (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher',
@@ -31,7 +33,7 @@ export default function AttendancePage() {
         }}
       >
         <Stack gap="md">
-          {isTeacher && (
+          {isTeacher && canEdit && (
             <Card withBorder p="lg">
               <Stack gap="md">
                 <Title order={3}>Mark Attendance</Title>

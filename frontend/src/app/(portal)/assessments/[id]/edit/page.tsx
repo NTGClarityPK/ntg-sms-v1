@@ -4,19 +4,26 @@
  * Edit Assessment Page
  */
 
+import { useEffect } from 'react';
 import { Title, Paper, Stack, Skeleton, Text, Group, Button } from '@mantine/core';
 import { useRouter, useParams } from 'next/navigation';
 import { AssessmentForm } from '@/components/assessments/AssessmentForm';
 import { useAssessment, useUpdateAssessment } from '@/hooks/api/useAssessments';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 import type { UpdateAssessmentInput } from '@/types/assessment';
 
 export default function EditAssessmentPage() {
   const router = useRouter();
   const params = useParams();
+  const { canEdit } = useFeaturePermission('assessment');
   const assessmentId = params.id as string;
   const { data: assessmentData, isLoading } = useAssessment(assessmentId);
   const assessment = assessmentData; // Hook already returns response.data, so assessmentData is the Assessment directly
   const updateAssessment = useUpdateAssessment(assessmentId);
+
+  useEffect(() => {
+    if (!canEdit) router.replace('/assessments');
+  }, [canEdit, router]);
 
   const handleSubmit = (values: UpdateAssessmentInput) => {
     updateAssessment.mutate(values, {

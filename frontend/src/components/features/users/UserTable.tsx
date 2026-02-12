@@ -22,9 +22,10 @@ interface UserTableProps {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   onSort?: (field: string) => void;
+  canEdit?: boolean;
 }
 
-export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort }: UserTableProps) {
+export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: UserTableProps) {
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { data: rolesData } = useRoles();
@@ -116,12 +117,16 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
               </Table.Td>
               <Table.Td>
                 <Group gap="xs">
-                  <ActionIcon variant="light" onClick={() => handleEdit(user)}>
-                    <IconEdit size={16} />
-                  </ActionIcon>
-                  <ActionIcon variant="light" color="red" onClick={() => handleDelete(user)}>
-                    <IconTrash size={16} />
-                  </ActionIcon>
+                  {canEdit && (
+                    <>
+                      <ActionIcon variant="light" onClick={() => handleEdit(user)}>
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon variant="light" color="red" onClick={() => handleDelete(user)}>
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </>
+                  )}
                 </Group>
               </Table.Td>
             </Table.Tr>

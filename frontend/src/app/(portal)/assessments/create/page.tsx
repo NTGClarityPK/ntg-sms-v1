@@ -4,17 +4,23 @@
  * Create Assessment Page
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Title, Paper, Button, Group, Stack } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 import { AssessmentForm } from '@/components/assessments/AssessmentForm';
 import { useCreateAssessment } from '@/hooks/api/useAssessments';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabase/client';
 import type { CreateAssessmentInput, UpdateAssessmentInput } from '@/types/assessment';
 
 export default function CreateAssessmentPage() {
   const router = useRouter();
+  const { canEdit } = useFeaturePermission('assessment');
   const createAssessment = useCreateAssessment();
+
+  useEffect(() => {
+    if (!canEdit) router.replace('/assessments');
+  }, [canEdit, router]);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
 
   const handleSubmit = async (values: CreateAssessmentInput | UpdateAssessmentInput) => {

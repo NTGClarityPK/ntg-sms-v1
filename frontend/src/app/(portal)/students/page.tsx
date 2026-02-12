@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { StudentTable } from '@/components/features/students/StudentTable';
 import { StudentForm } from '@/components/features/students/StudentForm';
 import { useStudents } from '@/hooks/useStudents';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 import { useCoreLookups } from '@/hooks/useCoreLookups';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { ClassEntity } from '@/types/settings';
@@ -14,6 +15,7 @@ import type { Student } from '@/types/students';
 
 export default function StudentsPage() {
   const colors = useThemeColors();
+  const { canEdit } = useFeaturePermission('students');
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -58,9 +60,11 @@ export default function StudentsPage() {
           <div>
             <Title order={1}>Student Management</Title>
           </div>
-          <Button leftSection={<IconPlus size={16} />} onClick={open}>
-            Create Student
-          </Button>
+          {canEdit && (
+            <Button leftSection={<IconPlus size={16} />} onClick={open}>
+              Create Student
+            </Button>
+          )}
         </Group>
       </div>
 
@@ -134,6 +138,7 @@ export default function StudentsPage() {
           </Alert>
         ) : (
           <StudentTable
+            canEdit={canEdit}
             students={studentsResponse.data}
             meta={studentsResponse.meta}
             onPageChange={setPage}

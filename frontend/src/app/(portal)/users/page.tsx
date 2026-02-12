@@ -8,10 +8,12 @@ import { UserTable } from '@/components/features/users/UserTable';
 import { UserForm } from '@/components/features/users/UserForm';
 import { useUsers } from '@/hooks/useUsers';
 import { useRoles } from '@/hooks/useRoles';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function UsersPage() {
   const colors = useThemeColors();
+  const { canEdit } = useFeaturePermission('user_management');
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -51,9 +53,11 @@ export default function UsersPage() {
           <div>
             <Title order={1}>User Management</Title>
           </div>
-          <Button leftSection={<IconPlus size={16} />} onClick={open}>
-            Create User
-          </Button>
+          {canEdit && (
+            <Button leftSection={<IconPlus size={16} />} onClick={open}>
+              Create User
+            </Button>
+          )}
         </Group>
       </div>
 
@@ -144,6 +148,7 @@ export default function UsersPage() {
               }
               setPage(1); // Reset to first page when sorting changes
             }}
+            canEdit={canEdit}
           />
         )}
       </Stack>

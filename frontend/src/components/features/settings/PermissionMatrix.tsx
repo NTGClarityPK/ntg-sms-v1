@@ -1,14 +1,16 @@
 'use client';
 
-import { Table, Select, Button, Stack, Group, Text } from '@mantine/core';
+import { Table, Select, Button, Stack, Group, Text, MultiSelect } from '@mantine/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { notifications } from '@mantine/notifications';
 import type { Role, Feature, PermissionMatrix, Permission, UpdatePermissionsPayload } from '@/types/permissions';
 import { useAuth } from '@/hooks/useAuth';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { User } from '@/types/auth';
+
+const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
+const DEFAULT_VISIBLE_TAB_COUNT = 5;
 
 interface PermissionMatrixProps {
   roles: Role[];
@@ -17,26 +19,50 @@ interface PermissionMatrixProps {
 }
 
 export function PermissionMatrix({ roles, features, permissions }: PermissionMatrixProps) {
-  const colors = useThemeColors();
   const { user } = useAuth();
   const userTyped = user as User | undefined;
   const branchId = userTyped?.currentBranch?.id;
   const queryClient = useQueryClient();
 
-  // State to track changes
+  const rolesInMatrix = roles.filter((r) => r.name !== SCHOOL_ADMIN_ROLE_NAME);
+
+  // Hide deprecated legacy codes and keep explicit personal/management split.
+  const managementFeatures = features.filter(
+    (f) =>
+      ![
+        'events',
+        'my_events',
+        'timetable',
+        'my_timetable',
+        'my_schedule',
+      ].includes(f.code),
+  );
+
   const [localPermissions, setLocalPermissions] = useState<Map<string, Permission>>(new Map());
   const [hasChanges, setHasChanges] = useState(false);
+  const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>([]);
+  const hasSetInitialDefault = useRef(false);
 
-  // Sync localPermissions when permissions prop changes (e.g., after refresh)
+  const visibleFeatures =
+    selectedFeatureIds.length === 0
+      ? managementFeatures
+      : managementFeatures.filter((f) => selectedFeatureIds.includes(f.id));
+
+  const featureOptions = managementFeatures.map((f) => ({ value: f.id, label: f.name }));
+
+  useEffect(() => {
+    if (managementFeatures.length > 0 && !hasSetInitialDefault.current) {
+      hasSetInitialDefault.current = true;
+      setSelectedFeatureIds(managementFeatures.slice(0, DEFAULT_VISIBLE_TAB_COUNT).map((f) => f.id));
+    }
+  }, [managementFeatures]);
+
   useEffect(() => {
     const newMap = new Map<string, Permission>();
     permissions.forEach((p) => {
       const key = `${p.roleId}-${p.featureId}`;
       newMap.set(key, p.permission);
     });
-    
-    // Always update to ensure we have the latest data from the server
-    // This will reset any unsaved local changes, which is correct behavior
     setLocalPermissions(newMap);
     setHasChanges(false);
   }, [permissions]);
@@ -48,7 +74,6 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
     },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['permissions', branchId] });
-      // Update local state with the returned data to ensure sync
       if (response?.data?.data) {
         const newMap = new Map<string, Permission>();
         response.data.data.forEach((p) => {
@@ -83,23 +108,26 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
 
   const handleSave = () => {
     const payload: UpdatePermissionsPayload = {
-      permissions: roles.flatMap((role) =>
-        features.map((feature) => ({
+      permissions: rolesInMatrix.flatMap((role) =>
+        managementFeatures.map((feature) => ({
           roleId: role.id,
           featureId: feature.id,
           permission: localPermissions.get(`${role.id}-${feature.id}`) || 'none',
         })),
       ),
     };
-
     updateMutation.mutate(payload);
   };
 
   return (
     <Stack gap="md">
-      <Group justify="space-between">
+      <Group justify="space-between" wrap="wrap">
         <Text size="sm" c="dimmed">
-          Configure permissions for each role and feature. Changes apply to the current branch.
+          Configure permissions for each role and feature. School Admin has full access and is not shown. Changes apply to the current branch.
+          <br />
+          <Text size="xs" c="dimmed" mt={4}>
+            Use explicit split permissions: Events (Management) vs Events (Personal), and Timetable (Management) vs Timetable (Personal).
+          </Text>
         </Text>
         {hasChanges && (
           <Button onClick={handleSave} loading={updateMutation.isPending}>
@@ -108,23 +136,38 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
         )}
       </Group>
 
+      <MultiSelect
+        label="Show tabs"
+        placeholder={
+          selectedFeatureIds.length === 0
+            ? 'All tabs'
+            : `${selectedFeatureIds.length} tab${selectedFeatureIds.length === 1 ? '' : 's'} selected`
+        }
+        description="Select which tabs to show in the matrix. Five tabs are shown by default. Clear selection to show all."
+        data={featureOptions}
+        value={selectedFeatureIds}
+        onChange={setSelectedFeatureIds}
+        clearable
+        searchable
+      />
+
       <div style={{ overflowX: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Role</Table.Th>
-              {features.map((feature) => (
+              {visibleFeatures.map((feature) => (
                 <Table.Th key={feature.id}>{feature.name}</Table.Th>
               ))}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {roles.map((role) => (
+            {rolesInMatrix.map((role) => (
               <Table.Tr key={role.id}>
                 <Table.Td>
                   <Text fw={500}>{role.displayName}</Text>
                 </Table.Td>
-                {features.map((feature) => {
+                {visibleFeatures.map((feature) => {
                   const key = `${role.id}-${feature.id}`;
                   const currentPermission = localPermissions.get(key) || 'none';
 

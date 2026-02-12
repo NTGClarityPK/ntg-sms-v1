@@ -28,12 +28,14 @@ import {
 import { IconPlus, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye, IconChartBar } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useAssessments, useDeleteAssessment } from '@/hooks/api/useAssessments';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 import { modals } from '@mantine/modals';
 import dayjs from 'dayjs';
 import type { Assessment } from '@/types/assessment';
 
 export default function AssessmentsPage() {
   const router = useRouter();
+  const { canEdit } = useFeaturePermission('assessment');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
@@ -48,24 +50,6 @@ export default function AssessmentsPage() {
     subjectId: subjectId || undefined,
     isPublished: isPublished === 'true' ? true : isPublished === 'false' ? false : undefined,
   });
-
-  // Debug logging
-  if (process.env.NODE_ENV === 'development') {
-    if (data) {
-      console.log('[Assessments Page] Full data object:', data);
-      console.log('[Assessments Page] data.data:', data.data);
-      console.log('[Assessments Page] data.data type:', typeof data.data);
-      console.log('[Assessments Page] data.data is array?', Array.isArray(data.data));
-      if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
-        console.log('[Assessments Page] data.data keys:', Object.keys(data.data));
-        console.log('[Assessments Page] data.data.data:', data.data.data);
-        console.log('[Assessments Page] data.data.meta:', data.data.meta);
-      }
-    }
-    if (error) {
-      console.error('[Assessments Page] Error:', error);
-    }
-  }
 
   const deleteAssessment = useDeleteAssessment();
 
@@ -88,9 +72,11 @@ export default function AssessmentsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Assessments</Title>
-          <Button leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
-            Create Assessment
-          </Button>
+          {canEdit && (
+            <Button leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
+              Create Assessment
+            </Button>
+          )}
         </Group>
       </div>
 
@@ -196,28 +182,30 @@ export default function AssessmentsPage() {
                                 <IconEye size={16} />
                               </ActionIcon>
                             </Tooltip>
-                            <Menu position="bottom-end" withinPortal>
-                              <Menu.Target>
-                                <ActionIcon variant="subtle" color="gray">
-                                  <IconDotsVertical size={16} />
-                                </ActionIcon>
-                              </Menu.Target>
-                              <Menu.Dropdown>
-                                <Menu.Item
-                                  leftSection={<IconEdit size={14} />}
-                                  onClick={() => router.push(`/assessments/${assessment.id}/edit`)}
-                                >
-                                  Edit
-                                </Menu.Item>
-                                <Menu.Item
-                                  leftSection={<IconTrash size={14} />}
-                                  color="red"
-                                  onClick={() => handleDelete(assessment.id, assessment.title)}
-                                >
-                                  Delete
-                                </Menu.Item>
-                              </Menu.Dropdown>
-                            </Menu>
+                            {canEdit && (
+                              <Menu position="bottom-end" withinPortal>
+                                <Menu.Target>
+                                  <ActionIcon variant="subtle" color="gray">
+                                    <IconDotsVertical size={16} />
+                                  </ActionIcon>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                  <Menu.Item
+                                    leftSection={<IconEdit size={14} />}
+                                    onClick={() => router.push(`/assessments/${assessment.id}/edit`)}
+                                  >
+                                    Edit
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    leftSection={<IconTrash size={14} />}
+                                    color="red"
+                                    onClick={() => handleDelete(assessment.id, assessment.title)}
+                                  >
+                                    Delete
+                                  </Menu.Item>
+                                </Menu.Dropdown>
+                              </Menu>
+                            )}
                           </Group>
                         </Table.Td>
                       </Table.Tr>

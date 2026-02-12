@@ -35,7 +35,9 @@ import {
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
+import { getFeatureCodeForPath } from '@/lib/permission/navFeatureMap';
 
 interface NavItem {
   label: string;
@@ -55,6 +57,7 @@ const allNavItems: NavItem[] = [
   { label: 'Class Sections', href: '/academic/class-sections', icon: IconSchool },
   { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconBook },
   { label: 'Parent Associations', href: '/parent-associations', icon: IconUsersGroup },
+  { label: 'My Children', href: '/my-children', icon: IconUsersGroup },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
   {
     label: 'Assessments',
@@ -161,7 +164,8 @@ export function Sidebar({
   const pathname = usePathname();
   const theme = useMantineTheme();
   const { user } = useAuth();
-  
+  const { canView } = usePermissions();
+
   // Get theme config for navbar styling
   const themeConfig = (theme.other as any) as ThemeConfig | undefined;
   const navbarConfig = themeConfig?.components?.navbar;
@@ -211,6 +215,9 @@ export function Sidebar({
 
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
+    const featureCode = getFeatureCodeForPath(item.href);
+    if (featureCode && !canView(featureCode)) return false;
+
     // Check showCondition if it exists
     if (item.showCondition) {
       // For management Assessments page, hide for students
@@ -245,7 +252,23 @@ export function Sidebar({
       if (item.href === '/behavioral') {
         return canAssessBehavioral;
       }
+      // Parent-facing view only page
+      if (item.href === '/my-children') {
+        return isParent;
+      }
+      // Keep management label/page for non-parent roles only
+      if (item.href === '/parent-associations') {
+        return !isParent;
+      }
       return item.showCondition();
+    }
+    // Keep management label/page for non-parent roles only
+    if (item.href === '/parent-associations') {
+      return !isParent;
+    }
+    // Parent-facing view only page
+    if (item.href === '/my-children') {
+      return isParent;
     }
     return true;
   });
@@ -264,6 +287,7 @@ export function Sidebar({
       item.href === '/my-schedule' ||
       item.href === '/my-timetable' ||
       item.href === '/my-events'
+      || item.href === '/my-children'
   );
   const managementItems = navItems.filter(
     (item) =>

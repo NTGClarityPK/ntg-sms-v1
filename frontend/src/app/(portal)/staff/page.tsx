@@ -8,11 +8,13 @@ import { StaffTable } from '@/components/features/staff/StaffTable';
 import { StaffForm } from '@/components/features/staff/StaffForm';
 import { useStaff } from '@/hooks/useStaff';
 import { useRoles } from '@/hooks/useRoles';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { Staff } from '@/types/staff';
 
 export default function StaffPage() {
   const colors = useThemeColors();
+  const { canEdit } = useFeaturePermission('staff');
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -47,9 +49,11 @@ export default function StaffPage() {
           <div>
             <Title order={1}>Staff Management</Title>
           </div>
-          <Button leftSection={<IconPlus size={16} />} onClick={open}>
-            Create Staff
-          </Button>
+          {canEdit && (
+            <Button leftSection={<IconPlus size={16} />} onClick={open}>
+              Create Staff
+            </Button>
+          )}
         </Group>
       </div>
 
@@ -118,6 +122,7 @@ export default function StaffPage() {
             staff={staffData}
             meta={staffMeta}
             onPageChange={setPage}
+            canEdit={canEdit}
           />
         )}
       </Stack>
