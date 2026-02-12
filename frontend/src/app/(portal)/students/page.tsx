@@ -69,6 +69,14 @@ export default function StudentsPage() {
       </div>
 
       <Stack gap="md">
+        {!canEdit && (
+          <Alert color={colors.info} title="View only">
+            <Text size="sm">
+              You have view access for Student Management. Create and update actions are disabled.
+            </Text>
+          </Alert>
+        )}
+
         <Group>
           <TextInput
             placeholder="Search students..."
@@ -134,7 +142,11 @@ export default function StudentsPage() {
           </Alert>
         ) : !studentsResponse?.data || studentsResponse.data.length === 0 ? (
           <Alert color={colors.info} title="No students found">
-            <Text size="sm">No students have been created yet. Click "Create Student" to add one.</Text>
+            <Text size="sm">
+              {canEdit
+                ? 'No students have been created yet. Click "Create Student" to add one.'
+                : 'No students have been created yet.'}
+            </Text>
           </Alert>
         ) : (
           <StudentTable

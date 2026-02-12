@@ -9,10 +9,12 @@ import { Title, Paper, Stack, Text, Skeleton, Group, Button } from '@mantine/cor
 import { useRouter, useParams } from 'next/navigation';
 import { useAssessment } from '@/hooks/api/useAssessments';
 import { GradeEntrySheet } from '@/components/assessments/GradeEntrySheet';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 
 export default function AssessmentGradesPage() {
   const router = useRouter();
   const params = useParams();
+  const { canEdit } = useFeaturePermission('assessment');
   const assessmentId = params.id as string;
   const { data: assessmentData, isLoading } = useAssessment(assessmentId);
   const assessment = assessmentData; // Hook already returns response.data, so assessmentData is the Assessment directly
@@ -42,7 +44,7 @@ export default function AssessmentGradesPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Grade Entry</Title>
+          <Title order={1}>Grades</Title>
         </div>
         <div
           style={{
@@ -67,7 +69,7 @@ export default function AssessmentGradesPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Grade Entry: {assessment.title}</Title>
+          <Title order={1}>{canEdit ? `Grade Entry: ${assessment.title}` : `Grades: ${assessment.title}`}</Title>
           <Button variant="subtle" onClick={() => router.back()}>
             Back
           </Button>
@@ -85,7 +87,7 @@ export default function AssessmentGradesPage() {
       >
         <Stack gap="md">
           <Paper p="md" withBorder>
-            <GradeEntrySheet assessment={assessment} />
+            <GradeEntrySheet assessment={assessment} readOnly={!canEdit} />
           </Paper>
         </Stack>
       </div>

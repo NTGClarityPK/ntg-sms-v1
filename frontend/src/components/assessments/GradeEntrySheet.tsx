@@ -20,6 +20,7 @@ import {
   ScrollArea,
   Alert,
   Badge,
+  Divider,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useAssessmentGrades, useBulkCreateGrades } from '@/hooks/api/useGrades';
@@ -30,13 +31,14 @@ import type { Assessment, CreateStudentGradeInput } from '@/types/assessment';
 
 interface GradeEntrySheetProps {
   assessment: Assessment;
+  readOnly?: boolean;
 }
 
 interface GradeRow extends CreateStudentGradeInput {
   studentName: string;
 }
 
-export function GradeEntrySheet({ assessment }: GradeEntrySheetProps) {
+export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntrySheetProps) {
   const colors = useThemeColors();
   const { data: existingGrades, isLoading: gradesLoading } = useAssessmentGrades(assessment.id);
   const { data: classSection, isLoading: classSectionLoading } = useClassSection(assessment.classSectionId);
@@ -126,11 +128,22 @@ export function GradeEntrySheet({ assessment }: GradeEntrySheetProps) {
           <Badge variant="light" color={colors.info} size="lg">
             Total Marks: {assessment.totalMarks}
           </Badge>
-          <Button onClick={handleSubmit} loading={bulkCreateGrades.isPending}>
-            Save All Grades
-          </Button>
+          {!readOnly && (
+            <Button onClick={handleSubmit} loading={bulkCreateGrades.isPending}>
+              Save All Grades
+            </Button>
+          )}
         </Group>
       </Group>
+
+      {readOnly && (
+        <>
+          <Alert icon={<IconAlertCircle size={16} />} color={colors.info} title="View only">
+            You have view access for assessments. Grade changes are disabled.
+          </Alert>
+          <Divider />
+        </>
+      )}
 
       <ScrollArea>
         <Table striped highlightOnHover>
@@ -155,7 +168,7 @@ export function GradeEntrySheet({ assessment }: GradeEntrySheetProps) {
                     onChange={(value) => updateGrade(index, 'marksObtained', value ?? 0)}
                     min={0}
                     max={assessment.totalMarks}
-                    disabled={grade.isAbsent || grade.isExcused}
+                    disabled={readOnly || grade.isAbsent || grade.isExcused}
                     size="sm"
                     w={100}
                   />
@@ -165,6 +178,7 @@ export function GradeEntrySheet({ assessment }: GradeEntrySheetProps) {
                     checked={grade.isAbsent}
                     onChange={(e) => updateGrade(index, 'isAbsent', e.currentTarget.checked)}
                     size="sm"
+                    disabled={readOnly}
                   />
                 </Table.Td>
                 <Table.Td>
@@ -172,6 +186,7 @@ export function GradeEntrySheet({ assessment }: GradeEntrySheetProps) {
                     checked={grade.isExcused}
                     onChange={(e) => updateGrade(index, 'isExcused', e.currentTarget.checked)}
                     size="sm"
+                    disabled={readOnly}
                   />
                 </Table.Td>
                 <Table.Td>
@@ -180,6 +195,7 @@ export function GradeEntrySheet({ assessment }: GradeEntrySheetProps) {
                     onChange={(e) => updateGrade(index, 'remarks', e.currentTarget.value)}
                     placeholder="Optional remarks"
                     size="sm"
+                    disabled={readOnly}
                   />
                 </Table.Td>
               </Table.Tr>

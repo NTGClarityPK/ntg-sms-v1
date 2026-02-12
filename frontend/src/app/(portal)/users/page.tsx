@@ -62,6 +62,14 @@ export default function UsersPage() {
       </div>
 
       <Stack gap="md">
+        {!canEdit && (
+          <Alert color={colors.info} title="View only">
+            <Text size="sm">
+              You have view access for User Management. Create, update, and deactivate actions are disabled.
+            </Text>
+          </Alert>
+        )}
+
         <Group>
           <TextInput
             placeholder="Search users..."
@@ -130,7 +138,11 @@ export default function UsersPage() {
           </Alert>
         ) : !usersQuery.data.data || usersQuery.data.data.length === 0 ? (
           <Alert color={colors.info} title="No users found">
-            <Text size="sm">No users have been created yet. Click "Create User" to add one.</Text>
+            <Text size="sm">
+              {canEdit
+                ? 'No users have been created yet. Click "Create User" to add one.'
+                : 'No users have been created yet.'}
+            </Text>
           </Alert>
         ) : (
           <UserTable

@@ -34,11 +34,68 @@ import { CreateAssessmentAttachmentDto } from './dto/create-assessment-attachmen
 import { StudentAssessmentStatusDto } from './dto/student-assessment-status.dto';
 import { AssessmentStudentStatusDto } from './dto/assessment-student-status.dto';
 import { UpdateStudentAssessmentStatusDto } from './dto/update-student-assessment-status.dto';
+import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/assessments')
 export class AssessmentsController {
-  constructor(private readonly assessmentsService: AssessmentsService) {}
+  constructor(
+    private readonly assessmentsService: AssessmentsService,
+    private readonly supabaseConfig: SupabaseConfig,
+  ) {}
+
+  private async ensureAssessmentEditAccess(
+    user: CurrentUserPayload,
+    branchId: string,
+  ): Promise<void> {
+    const roleNames = user.roles || [];
+    if (roleNames.includes('school_admin')) return;
+    if (roleNames.length === 0) {
+      throw new ForbiddenException('No role assigned for this user');
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: rolesData, error: rolesError } = await supabase
+      .from('roles')
+      .select('id')
+      .in('name', roleNames);
+    if (rolesError) {
+      throw new ForbiddenException('Unable to verify role permissions');
+    }
+    const roleIds = (rolesData || []).map((r: { id: string }) => r.id);
+    if (roleIds.length === 0) {
+      throw new ForbiddenException('No valid role found for this user');
+    }
+
+    const { data: featureData, error: featureError } = await supabase
+      .from('features')
+      .select('id')
+      .eq('code', 'assessment')
+      .maybeSingle();
+    if (featureError || !featureData) {
+      throw new ForbiddenException('Assessment permission feature not configured');
+    }
+
+    const { data: permissionRows, error: permissionError } = await supabase
+      .from('role_permissions')
+      .select('permission')
+      .eq('branch_id', branchId)
+      .eq('feature_id', (featureData as { id: string }).id)
+      .in('role_id', roleIds);
+
+    if (permissionError) {
+      throw new ForbiddenException('Unable to verify assessment edit permissions');
+    }
+
+    const canEdit = (permissionRows || []).some(
+      (row: { permission: string }) => row.permission === 'edit',
+    );
+
+    if (!canEdit) {
+      throw new ForbiddenException('You do not have edit access to Assessment');
+    }
+  }
 
   @Get()
   async listAssessments(
@@ -63,10 +120,7 @@ export class AssessmentsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AssessmentDto }> {
-    // Only allow non-student roles to create assessments
-    if ((user.roles || []).includes('student')) {
-      throw new ForbiddenException('Students are not allowed to create assessments');
-    }
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
     const created = await this.assessmentsService.createAssessment(
       body,
       branch.branchId,
@@ -81,7 +135,9 @@ export class AssessmentsController {
     @Param('id') id: string,
     @Body() body: UpdateAssessmentDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AssessmentDto }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
     const updated = await this.assessmentsService.updateAssessment(
       id,
       body,
@@ -94,7 +150,9 @@ export class AssessmentsController {
   async deleteAssessment(
     @Param('id') id: string,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: { id: string } }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
     const result = await this.assessmentsService.deleteAssessment(
       id,
       branch.branchId,
@@ -107,7 +165,9 @@ export class AssessmentsController {
     @Param('id') id: string,
     @Body() body: { publishDate?: string },
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AssessmentDto }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
     const result = await this.assessmentsService.publishAssessment(
       id,
       branch.branchId,
@@ -257,7 +317,9 @@ export class AssessmentsController {
     @Param('id') id: string,
     @Body() body: Omit<CreateAssessmentAttachmentDto, 'assessmentId'>,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AssessmentAttachmentDto }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
     const dto: CreateAssessmentAttachmentDto = {
       ...body,
       assessmentId: id,
@@ -273,7 +335,9 @@ export class AssessmentsController {
   async deleteAssessmentAttachment(
     @Param('attachmentId') attachmentId: string,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: { id: string } }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
     const result = await this.assessmentsService.deleteAssessmentAttachment(attachmentId, branch.branchId);
     return { data: result };
   }

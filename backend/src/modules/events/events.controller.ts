@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -28,11 +29,62 @@ import { QueryEventsDto } from './dto/query-events.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { SubmitConsentDto } from './dto/submit-consent.dto';
+import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/events')
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly eventsService: EventsService,
+    private readonly supabaseConfig: SupabaseConfig,
+  ) {}
+
+  private async ensureFeatureEditAccess(
+    user: CurrentUserPayload,
+    branchId: string,
+    featureCode: string,
+  ): Promise<void> {
+    const roleNames = user.roles || [];
+    if (roleNames.includes('school_admin')) return;
+    if (roleNames.length === 0) throw new ForbiddenException('No role assigned for this user');
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: rolesData, error: rolesError } = await supabase
+      .from('roles')
+      .select('id')
+      .in('name', roleNames);
+    if (rolesError) throw new ForbiddenException('Unable to verify role permissions');
+
+    const roleIds = (rolesData || []).map((r: { id: string }) => r.id);
+    if (roleIds.length === 0) throw new ForbiddenException('No valid role found for this user');
+
+    const candidateFeatureCodes =
+      featureCode === 'events_management' ? ['events_management', 'events'] : [featureCode];
+
+    const { data: featureRows, error: featureError } = await supabase
+      .from('features')
+      .select('id')
+      .in('code', candidateFeatureCodes);
+    if (featureError || !featureRows || featureRows.length === 0) {
+      throw new ForbiddenException(`${featureCode} permission feature not configured`);
+    }
+
+    const featureIds = featureRows.map((f: { id: string }) => f.id);
+    const { data: permissionRows, error: permissionError } = await supabase
+      .from('role_permissions')
+      .select('permission')
+      .eq('branch_id', branchId)
+      .in('feature_id', featureIds)
+      .in('role_id', roleIds);
+    if (permissionError) {
+      throw new ForbiddenException(`Unable to verify ${featureCode} edit permissions`);
+    }
+
+    const canEdit = (permissionRows || []).some(
+      (row: { permission: string }) => row.permission === 'edit',
+    );
+    if (!canEdit) throw new ForbiddenException(`You do not have edit access to ${featureCode}`);
+  }
 
   // CRITICAL: Specific routes must come before parameterized routes
   @Get('my-events')
@@ -80,6 +132,7 @@ export class EventsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: EventDto }> {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'events_management');
     const created = await this.eventsService.createEvent(
       body,
       branch.branchId,
@@ -122,7 +175,9 @@ export class EventsController {
     @Param('id') id: string,
     @Body() body: UpdateEventDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: EventDto }> {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'events_management');
     const updated = await this.eventsService.updateEvent(
       id,
       body,
@@ -135,7 +190,9 @@ export class EventsController {
   async deleteEvent(
     @Param('id') id: string,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: { id: string } }> {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'events_management');
     const result = await this.eventsService.deleteEvent(id, branch.branchId);
     return { data: result };
   }

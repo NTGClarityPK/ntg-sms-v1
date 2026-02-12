@@ -173,7 +173,7 @@ export default function AssessmentsPage() {
                                 <IconChartBar size={16} />
                               </ActionIcon>
                             </Tooltip>
-                            <Tooltip label="Grade Entry">
+                            <Tooltip label={canEdit ? 'Grade Entry' : 'View Grades'}>
                               <ActionIcon
                                 variant="subtle"
                                 color="green"

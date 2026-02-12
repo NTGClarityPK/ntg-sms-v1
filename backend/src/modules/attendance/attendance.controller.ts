@@ -7,16 +7,21 @@ import {
   Param,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  CurrentUserPayload,
+} from '../../common/decorators/current-user.decorator';
 import { QueryAttendanceDto } from './dto/query-attendance.dto';
 import { BulkMarkAttendanceDto } from './dto/bulk-mark-attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
+import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @Controller('api/v1/attendance')
 @UseGuards(JwtAuthGuard, BranchGuard)
@@ -24,7 +29,59 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly supabaseConfig: SupabaseConfig,
   ) {}
+
+  private async ensureFeatureEditAccess(
+    user: CurrentUserPayload,
+    branchId: string,
+    featureCode: string,
+  ): Promise<void> {
+    const roleNames = user.roles || [];
+    if (roleNames.includes('school_admin')) return;
+    if (roleNames.length === 0) {
+      throw new ForbiddenException('No role assigned for this user');
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: rolesData, error: rolesError } = await supabase
+      .from('roles')
+      .select('id')
+      .in('name', roleNames);
+    if (rolesError) {
+      throw new ForbiddenException('Unable to verify role permissions');
+    }
+    const roleIds = (rolesData || []).map((r: { id: string }) => r.id);
+    if (roleIds.length === 0) {
+      throw new ForbiddenException('No valid role found for this user');
+    }
+
+    const { data: featureData, error: featureError } = await supabase
+      .from('features')
+      .select('id')
+      .eq('code', featureCode)
+      .maybeSingle();
+    if (featureError || !featureData) {
+      throw new ForbiddenException(`${featureCode} permission feature not configured`);
+    }
+
+    const { data: permissionRows, error: permissionError } = await supabase
+      .from('role_permissions')
+      .select('permission')
+      .eq('branch_id', branchId)
+      .eq('feature_id', (featureData as { id: string }).id)
+      .in('role_id', roleIds);
+    if (permissionError) {
+      throw new ForbiddenException(`Unable to verify ${featureCode} edit permissions`);
+    }
+
+    const canEdit = (permissionRows || []).some(
+      (row: { permission: string }) => row.permission === 'edit',
+    );
+    if (!canEdit) {
+      throw new ForbiddenException(`You do not have edit access to ${featureCode}`);
+    }
+  }
 
   @Get()
   async listAttendance(
@@ -66,9 +123,10 @@ export class AttendanceController {
   async bulkMarkAttendance(
     @Body() input: BulkMarkAttendanceDto,
     @CurrentBranch() branch: { branchId: string },
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: CurrentUserPayload,
     @Query('academicYearId') academicYearId?: string,
   ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'attendance');
     const activeYear = await this.academicYearsService.getActiveForBranch(branch.branchId);
     if (!activeYear) {
       throw new Error('No active academic year found');
@@ -87,8 +145,9 @@ export class AttendanceController {
     @Param('id') id: string,
     @Body() input: UpdateAttendanceDto,
     @CurrentBranch() branch: { branchId: string },
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'attendance');
     const data = await this.attendanceService.updateAttendance(
       id,
       input,

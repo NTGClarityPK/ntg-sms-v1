@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -20,6 +21,7 @@ import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import { GenerateTimetableDto } from './dto/generate-timetable.dto';
 import { ReplicateDayDto } from './dto/replicate-day.dto';
 import { StaffService } from '../staff/staff.service';
+import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @Controller('api/v1/timetable')
 @UseGuards(JwtAuthGuard, BranchGuard)
@@ -27,7 +29,56 @@ export class TimetableController {
   constructor(
     private readonly timetableService: TimetableService,
     private readonly staffService: StaffService,
+    private readonly supabaseConfig: SupabaseConfig,
   ) {}
+
+  private async ensureFeatureEditAccess(
+    user: CurrentUserPayload,
+    branchId: string,
+    featureCode: string,
+  ): Promise<void> {
+    const roleNames = user.roles || [];
+    if (roleNames.includes('school_admin')) return;
+    if (roleNames.length === 0) throw new ForbiddenException('No role assigned for this user');
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: rolesData, error: rolesError } = await supabase
+      .from('roles')
+      .select('id')
+      .in('name', roleNames);
+    if (rolesError) throw new ForbiddenException('Unable to verify role permissions');
+    const roleIds = (rolesData || []).map((r: { id: string }) => r.id);
+    if (roleIds.length === 0) throw new ForbiddenException('No valid role found for this user');
+
+    const candidateFeatureCodes =
+      featureCode === 'timetable_management'
+        ? ['timetable_management', 'timetable']
+        : [featureCode];
+
+    const { data: featureRows, error: featureError } = await supabase
+      .from('features')
+      .select('id')
+      .in('code', candidateFeatureCodes);
+    if (featureError || !featureRows || featureRows.length === 0) {
+      throw new ForbiddenException(`${featureCode} permission feature not configured`);
+    }
+
+    const featureIds = featureRows.map((f: { id: string }) => f.id);
+    const { data: permissionRows, error: permissionError } = await supabase
+      .from('role_permissions')
+      .select('permission')
+      .eq('branch_id', branchId)
+      .in('feature_id', featureIds)
+      .in('role_id', roleIds);
+    if (permissionError) {
+      throw new ForbiddenException(`Unable to verify ${featureCode} edit permissions`);
+    }
+
+    const canEdit = (permissionRows || []).some(
+      (row: { permission: string }) => row.permission === 'edit',
+    );
+    if (!canEdit) throw new ForbiddenException(`You do not have edit access to ${featureCode}`);
+  }
 
   // CRITICAL: Specific routes BEFORE parameterized routes
   @Get('teacher/me')
@@ -147,7 +198,9 @@ export class TimetableController {
   async createOrUpdateSlot(
     @Body() input: CreateTimetableSlotDto,
     @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
     const data = await this.timetableService.createOrUpdateSlot(input, branch.branchId);
     return { data };
   }
@@ -156,7 +209,9 @@ export class TimetableController {
   async deleteSlot(
     @Param('id') id: string,
     @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
     const data = await this.timetableService.deleteSlot(id, branch.branchId);
     return { data };
   }
@@ -165,7 +220,9 @@ export class TimetableController {
   async generateTimetable(
     @Body() input: GenerateTimetableDto,
     @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
     const data = await this.timetableService.generateFromTimingTemplate(
       input.classSectionId,
       branch.branchId,
@@ -179,7 +236,9 @@ export class TimetableController {
   async replicateDay(
     @Body() input: ReplicateDayDto,
     @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
     const data = await this.timetableService.replicateDay(input, branch.branchId);
     return { data };
   }

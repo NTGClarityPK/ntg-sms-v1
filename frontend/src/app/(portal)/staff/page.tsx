@@ -58,6 +58,14 @@ export default function StaffPage() {
       </div>
 
       <Stack gap="md">
+        {!canEdit && (
+          <Alert color={colors.info} title="View only">
+            <Text size="sm">
+              You have view access for Staff Management. Create and update actions are disabled.
+            </Text>
+          </Alert>
+        )}
+
         <Group>
           <TextInput
             placeholder="Search staff..."
@@ -107,14 +115,16 @@ export default function StaffPage() {
               <Text size="sm" c="dimmed">
                 Note: Staff records are separate from user accounts. Users with staff roles exist in User Management, but they need employment records (employee ID, department, etc.) to appear here.
               </Text>
-              <Button
-                variant="light"
-                leftSection={<IconPlus size={16} />}
-                onClick={open}
-                mt="xs"
-              >
-                Create Staff Record
-              </Button>
+              {canEdit && (
+                <Button
+                  variant="light"
+                  leftSection={<IconPlus size={16} />}
+                  onClick={open}
+                  mt="xs"
+                >
+                  Create Staff Record
+                </Button>
+              )}
             </Stack>
           </Alert>
         ) : (
