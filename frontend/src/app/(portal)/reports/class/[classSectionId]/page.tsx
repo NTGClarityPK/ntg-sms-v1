@@ -10,6 +10,7 @@ import {
   Text,
   Skeleton,
   Button,
+  Badge,
 } from '@mantine/core';
 import Link from 'next/link';
 import { IconArrowLeft } from '@tabler/icons-react';
@@ -63,6 +64,7 @@ export default function ClassReportByIdPage() {
                 {report.className} {report.sectionName}
               </Text>
               <Paper withBorder p="md">
+                <Text fw={600} mb="md">Attendance</Text>
                 <Table withTableBorder withColumnBorders>
                   <Table.Thead>
                     <Table.Tr>
@@ -70,6 +72,9 @@ export default function ClassReportByIdPage() {
                       <Table.Th>Present</Table.Th>
                       <Table.Th>Total days</Table.Th>
                       <Table.Th>Attendance %</Table.Th>
+                      <Table.Th>Average Grade %</Table.Th>
+                      <Table.Th>Assignment Viewing</Table.Th>
+                      <Table.Th>Assignment Submission</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -79,6 +84,43 @@ export default function ClassReportByIdPage() {
                         <Table.Td>{s.presentDays}</Table.Td>
                         <Table.Td>{s.totalDays}</Table.Td>
                         <Table.Td>{s.attendancePercentage}%</Table.Td>
+                        <Table.Td>
+                          {s.averagePercentage !== undefined ? (
+                            <Badge
+                              color={
+                                s.averagePercentage >= 70
+                                  ? 'green'
+                                  : s.averagePercentage >= 50
+                                    ? 'yellow'
+                                    : 'red'
+                              }
+                              variant="light"
+                              size="sm"
+                            >
+                              {s.averagePercentage}%
+                            </Badge>
+                          ) : (
+                            <Text c="dimmed">—</Text>
+                          )}
+                        </Table.Td>
+                        <Table.Td>
+                          {s.assignmentStatistics ? (
+                            <Text size="sm">
+                              {s.assignmentStatistics.viewedAssignments}/{s.assignmentStatistics.totalAssignments} ({s.assignmentStatistics.viewingRate}%)
+                            </Text>
+                          ) : (
+                            <Text c="dimmed" size="sm">—</Text>
+                          )}
+                        </Table.Td>
+                        <Table.Td>
+                          {s.assignmentStatistics ? (
+                            <Text size="sm">
+                              {s.assignmentStatistics.submittedAssignments}/{s.assignmentStatistics.totalAssignments} ({s.assignmentStatistics.submissionRate}%)
+                            </Text>
+                          ) : (
+                            <Text c="dimmed" size="sm">—</Text>
+                          )}
+                        </Table.Td>
                       </Table.Tr>
                     ))}
                   </Table.Tbody>

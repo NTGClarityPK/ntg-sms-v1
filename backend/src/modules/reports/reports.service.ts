@@ -1118,11 +1118,15 @@ export class ReportsService {
     );
 
     const studentIds = students.map((s) => s.id);
-    const summaryMap = await this.attendanceService.getAttendanceSummariesByStudents(
-      studentIds,
-      branchId,
-      yearId,
-    );
+    const [summaryMap, gradesMap, assignmentStatsMap] = await Promise.all([
+      this.attendanceService.getAttendanceSummariesByStudents(
+        studentIds,
+        branchId,
+        yearId,
+      ),
+      this.getAveragePercentagesForStudents(studentIds, branchId),
+      this.getAssignmentStatisticsForStudents(studentIds, classSectionId, branchId, yearId),
+    ]);
 
     const studentDtos: ClassReportStudentDto[] = students.map((s) => {
       const summary = summaryMap.get(s.id);
@@ -1136,6 +1140,8 @@ export class ReportsService {
         presentDays: summary?.presentDays ?? 0,
         totalDays: summary?.totalDays ?? 0,
         attendancePercentage: pct,
+        averagePercentage: gradesMap.get(s.id),
+        assignmentStatistics: assignmentStatsMap.get(s.id),
       });
     });
 
@@ -1148,6 +1154,181 @@ export class ReportsService {
         students: studentDtos,
       }),
     };
+  }
+
+  /**
+   * Calculate average percentage across all subjects for multiple students.
+   */
+  private async getAveragePercentagesForStudents(
+    studentIds: string[],
+    branchId: string,
+  ): Promise<Map<string, number>> {
+    const supabase = this.supabaseConfig.getClient();
+    const result = new Map<string, number>();
+
+    if (studentIds.length === 0) return result;
+
+    // Get all grades for these students
+    const { data: grades } = await supabase
+      .from('student_grades')
+      .select('student_id, marks_obtained, assessment_id')
+      .in('student_id', studentIds)
+      .eq('branch_id', branchId);
+
+    if (!grades || grades.length === 0) return result;
+
+    // Get assessment totals
+    const assessmentIds = [...new Set(grades.map((g: { assessment_id: string }) => g.assessment_id))];
+    const { data: assessments } = await supabase
+      .from('assessments')
+      .select('id, total_marks')
+      .in('id', assessmentIds);
+
+    const assessmentTotalMap = new Map(
+      (assessments || []).map((a: { id: string; total_marks: number }) => [
+        a.id,
+        a.total_marks || 1,
+      ]),
+    );
+
+    // Calculate percentages per student
+    const studentPercentages = new Map<string, number[]>();
+    for (const g of grades) {
+      const grade = g as { student_id: string; marks_obtained: number; assessment_id: string };
+      const total = assessmentTotalMap.get(grade.assessment_id) || 1;
+      const percentage = Math.round((Number(grade.marks_obtained) / total) * 100);
+      const list = studentPercentages.get(grade.student_id) || [];
+      list.push(percentage);
+      studentPercentages.set(grade.student_id, list);
+    }
+
+    // Calculate averages
+    studentPercentages.forEach((pcts, studentId) => {
+      if (pcts.length > 0) {
+        const avg = Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+        result.set(studentId, avg);
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Calculate assignment statistics for multiple students.
+   */
+  private async getAssignmentStatisticsForStudents(
+    studentIds: string[],
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string,
+  ): Promise<Map<string, AssignmentStatisticsDto>> {
+    const supabase = this.supabaseConfig.getClient();
+    const result = new Map<string, AssignmentStatisticsDto>();
+
+    if (studentIds.length === 0) return result;
+
+    // Get all assessments for this class section
+    const { data: assessments } = await supabase
+      .from('assessments')
+      .select('id')
+      .eq('class_section_id', classSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId)
+      .eq('is_published', true);
+
+    if (!assessments || assessments.length === 0) {
+      // Return empty stats for all students
+      studentIds.forEach((id) => {
+        result.set(
+          id,
+          new AssignmentStatisticsDto({
+            totalAssignments: 0,
+            viewedAssignments: 0,
+            notViewedAssignments: 0,
+            submittedAssignments: 0,
+            inProgressAssignments: 0,
+            notStartedAssignments: 0,
+            viewingRate: 0,
+            submissionRate: 0,
+          }),
+        );
+      });
+      return result;
+    }
+
+    const assessmentIds = assessments.map((a: { id: string }) => a.id);
+    const totalAssignments = assessmentIds.length;
+
+    // Get statuses for all students and assessments
+    const { data: statuses } = await supabase
+      .from('student_assessment_statuses')
+      .select('student_id, assessment_id, status, is_read')
+      .in('student_id', studentIds)
+      .in('assessment_id', assessmentIds);
+
+    // Build status map: studentId -> assessmentId -> { status, isRead }
+    const statusMap = new Map<string, Map<string, { status: string; isRead: boolean }>>();
+    studentIds.forEach((id) => {
+      statusMap.set(id, new Map());
+    });
+
+    (statuses || []).forEach((s: {
+      student_id: string;
+      assessment_id: string;
+      status: string;
+      is_read: boolean;
+    }) => {
+      const studentMap = statusMap.get(s.student_id);
+      if (studentMap) {
+        studentMap.set(s.assessment_id, {
+          status: s.status || 'not_started',
+          isRead: s.is_read || false,
+        });
+      }
+    });
+
+    // Calculate statistics per student
+    studentIds.forEach((studentId) => {
+      const studentStatusMap = statusMap.get(studentId) || new Map();
+      let viewedAssignments = 0;
+      let submittedAssignments = 0;
+      let inProgressAssignments = 0;
+      let notStartedAssignments = 0;
+
+      assessmentIds.forEach((assessmentId) => {
+        const status = studentStatusMap.get(assessmentId);
+        if (status?.isRead) {
+          viewedAssignments++;
+        }
+        if (status?.status === 'submitted') {
+          submittedAssignments++;
+        } else if (status?.status === 'in_progress') {
+          inProgressAssignments++;
+        } else {
+          notStartedAssignments++;
+        }
+      });
+
+      const notViewedAssignments = totalAssignments - viewedAssignments;
+      const viewingRate = totalAssignments > 0 ? Math.round((viewedAssignments / totalAssignments) * 100) : 0;
+      const submissionRate = totalAssignments > 0 ? Math.round((submittedAssignments / totalAssignments) * 100) : 0;
+
+      result.set(
+        studentId,
+        new AssignmentStatisticsDto({
+          totalAssignments,
+          viewedAssignments,
+          notViewedAssignments,
+          submittedAssignments,
+          inProgressAssignments,
+          notStartedAssignments,
+          viewingRate,
+          submissionRate,
+        }),
+      );
+    });
+
+    return result;
   }
 
   async getRankings(
@@ -1886,17 +2067,32 @@ export class ReportsService {
 
     const { data: students } = await supabase
       .from('students')
-      .select('id, gender')
+      .select('id, user_id')
       .eq('class_id', c.class_id)
       .eq('section_id', c.section_id)
       .eq('branch_id', branchId)
       .eq('academic_year_id', yearId)
       .eq('is_active', true);
 
-    const studentList = (students || []) as { id: string; gender: string | null }[];
+    const studentList = (students || []) as { id: string; user_id: string | null }[];
+    const userIds = studentList.map((s) => s.user_id).filter(Boolean) as string[];
+    let maleCount = 0;
+    let femaleCount = 0;
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, gender')
+        .in('id', userIds);
+      const profileGenderMap = new Map(
+        (profiles || []).map((p: { id: string; gender: string | null }) => [p.id, p.gender]),
+      );
+      studentList.forEach((s) => {
+        const g = s.user_id ? profileGenderMap.get(s.user_id) : null;
+        if (g === 'male') maleCount++;
+        else if (g === 'female') femaleCount++;
+      });
+    }
     const totalStudents = studentList.length;
-    const maleCount = studentList.filter((s) => s.gender === 'male').length;
-    const femaleCount = studentList.filter((s) => s.gender === 'female').length;
 
     return {
       data: new ClassStudentCountDto({
@@ -1951,10 +2147,10 @@ export class ReportsService {
       (sectionsData.data || []).map((s: { id: string; name: string }) => [s.id, s.name]),
     );
 
-    // Get all students grouped by class_id and section_id
+    // Get all students (gender is on profiles, not students)
     const { data: allStudents } = await supabase
       .from('students')
-      .select('id, class_id, section_id, gender')
+      .select('id, class_id, section_id, user_id')
       .eq('branch_id', branchId)
       .eq('academic_year_id', yearId)
       .eq('is_active', true)
@@ -1965,18 +2161,32 @@ export class ReportsService {
       id: string;
       class_id: string;
       section_id: string;
-      gender: string | null;
+      user_id: string | null;
     }[];
 
-    // Group students by class_section_id
+    // Fetch gender from profiles
+    const userIds = [...new Set(studentList.map((s) => s.user_id).filter(Boolean))] as string[];
+    let profileGenderMap = new Map<string, string | null>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, gender')
+        .in('id', userIds);
+      profileGenderMap = new Map(
+        (profiles || []).map((p: { id: string; gender: string | null }) => [p.id, p.gender]),
+      );
+    }
+
+    // Group students by class_section_id with gender from profile
     const studentsBySection = new Map<string, { gender: string | null }[]>();
     for (const student of studentList) {
       const cs = classSections.find(
-        (cs) => cs.class_id === student.class_id && cs.section_id === student.section_id,
+        (c) => c.class_id === student.class_id && c.section_id === student.section_id,
       );
       if (cs) {
+        const gender = student.user_id ? profileGenderMap.get(student.user_id) ?? null : null;
         const list = studentsBySection.get(cs.id) || [];
-        list.push({ gender: student.gender });
+        list.push({ gender });
         studentsBySection.set(cs.id, list);
       }
     }
@@ -1995,6 +2205,13 @@ export class ReportsService {
         maleCount,
         femaleCount,
       });
+    });
+
+    // Sort by class name alphabetically, then by section name
+    counts.sort((a, b) => {
+      const classCompare = (a.className || '').localeCompare(b.className || '', undefined, { sensitivity: 'base' });
+      if (classCompare !== 0) return classCompare;
+      return (a.sectionName || '').localeCompare(b.sectionName || '', undefined, { sensitivity: 'base' });
     });
 
     return { data: counts };

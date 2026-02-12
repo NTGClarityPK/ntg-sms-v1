@@ -1,3 +1,5 @@
+import { AssignmentStatisticsDto } from './assignment-statistics.dto';
+
 export class ClassReportStudentDto {
   constructor(partial: Partial<ClassReportStudentDto>) {
     Object.assign(this, partial);
@@ -9,6 +11,7 @@ export class ClassReportStudentDto {
   totalDays!: number;
   attendancePercentage!: number;
   averagePercentage?: number; // average marks percentage across subjects
+  assignmentStatistics?: AssignmentStatisticsDto; // assignment viewing/submission statistics
 }
 
 export class ClassReportDto {

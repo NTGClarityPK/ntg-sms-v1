@@ -89,6 +89,7 @@ export interface ClassReportStudent {
   totalDays: number;
   attendancePercentage: number;
   averagePercentage?: number;
+  assignmentStatistics?: AssignmentStatistics;
 }
 
 export interface ClassReport {
