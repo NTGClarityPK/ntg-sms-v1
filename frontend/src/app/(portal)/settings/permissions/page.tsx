@@ -1,8 +1,9 @@
 'use client';
 
-import { Group, Title, Skeleton, Stack, Alert, Text, Button } from '@mantine/core';
+import { Group, Title, Skeleton, Stack, Alert, Text, Button, Tabs } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
 import { PermissionMatrix } from '@/components/features/settings/PermissionMatrix';
+import { RoleAccessSummary } from '@/components/features/settings/RoleAccessSummary';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRoles, useFeatures } from '@/hooks/useRoles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -41,7 +42,20 @@ export default function PermissionsPage() {
             </Group>
           </Alert>
         ) : (
-          <PermissionMatrix roles={roles} features={features} permissions={permissions} />
+          <Tabs defaultValue="matrix">
+            <Tabs.List>
+              <Tabs.Tab value="matrix">Matrix View</Tabs.Tab>
+              <Tabs.Tab value="role-access">Role Access View</Tabs.Tab>
+            </Tabs.List>
+
+            <Tabs.Panel value="matrix" pt="md">
+              <PermissionMatrix roles={roles} features={features} permissions={permissions} />
+            </Tabs.Panel>
+
+            <Tabs.Panel value="role-access" pt="md">
+              <RoleAccessSummary roles={roles} features={features} permissions={permissions} />
+            </Tabs.Panel>
+          </Tabs>
         )}
         </Stack>
       </div>

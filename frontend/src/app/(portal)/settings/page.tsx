@@ -16,6 +16,7 @@ import { notifications } from '@mantine/notifications';
 
 // Import components for each tab
 import { PermissionMatrix } from '@/components/features/settings/PermissionMatrix';
+import { RoleAccessSummary } from '@/components/features/settings/RoleAccessSummary';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRoles, useFeatures } from '@/hooks/useRoles';
 
@@ -285,7 +286,22 @@ function PermissionsTabContent() {
     );
   }
 
-  return <PermissionMatrix roles={roles} features={features} permissions={permissions} />;
+  return (
+    <Tabs defaultValue="matrix">
+      <Tabs.List>
+        <Tabs.Tab value="matrix">Matrix View</Tabs.Tab>
+        <Tabs.Tab value="role-access">Role Access View</Tabs.Tab>
+      </Tabs.List>
+
+      <Tabs.Panel value="matrix" pt="md">
+        <PermissionMatrix roles={roles} features={features} permissions={permissions} />
+      </Tabs.Panel>
+
+      <Tabs.Panel value="role-access" pt="md">
+        <RoleAccessSummary roles={roles} features={features} permissions={permissions} />
+      </Tabs.Panel>
+    </Tabs>
+  );
 }
 
 function AcademicYearsTabContent() {
