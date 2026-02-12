@@ -4,6 +4,7 @@ export interface Tenant {
   code: string;
   domain?: string | null;
   isActive?: boolean;
+  logoUrl?: string | null;
 }
 
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Group, Text, Badge, Tooltip, Box, Image, Skeleton } from '@mantine/core';
-import { IconCircle } from '@tabler/icons-react';
+import { Group, Text, Badge, Tooltip, Box, Image } from '@mantine/core';
+import { IconCircle, IconSchool } from '@tabler/icons-react';
 import { UserMenu } from './UserMenu';
 import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranchBadge';
 import { NotificationBell } from './NotificationBell';
@@ -10,13 +10,14 @@ import { useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTenantMe } from '@/hooks/useTenant';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyStudent } from '@/hooks/useStudents';
+import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
 
 export function Header() {
   const successColor = useSuccessColor();
   const errorColor = useErrorColor();
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const tenantQuery = useTenantMe();
-  const tenantName = tenantQuery.data?.data?.name;
+  const { name: tenantName, logoUrl: tenantLogo, setBranding } = useTenantBrandingStore();
   const { user } = useAuth();
   
   // Check if user is a student and get class name
@@ -25,6 +26,16 @@ export function Header() {
   const studentClassName = myStudentData?.data?.className && myStudentData?.data?.sectionName
     ? `${myStudentData.data.className} - ${myStudentData.data.sectionName}`
     : null;
+
+  useEffect(() => {
+    const data = tenantQuery.data?.data;
+    if (!data) return;
+
+    setBranding({
+      name: data.name || 'School',
+      logoUrl: data.logoUrl || null,
+    });
+  }, [tenantQuery.data?.data, setBranding]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -46,13 +57,41 @@ export function Header() {
   return (
     <Group justify="space-between" style={{ flex: 1 }}>
       <Group gap="sm" align="center">
-        {tenantQuery.isLoading ? (
-          <Skeleton height={22} width={220} />
-        ) : (
-          <Text fw={600} size="lg">
-            {tenantName || 'School Management System'}
-          </Text>
-        )}
+        <Group gap="xs" align="center">
+          <Box
+            style={{
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              flexShrink: 0,
+            }}
+          >
+            {tenantLogo ? (
+              <Image
+                src={tenantLogo}
+                alt={tenantName || 'School logo'}
+                width="100%"
+                height="100%"
+                fit="contain"
+                style={{ objectFit: 'contain' }}
+              />
+            ) : (
+              <IconSchool size={26} stroke={1.5} />
+            )}
+          </Box>
+          <div>
+            <Text fw={700} size="lg" style={{ lineHeight: 1 }}>
+              {tenantName || 'School'}
+            </Text>
+            <Text size="xs" c="dimmed" style={{ lineHeight: 1 }}>
+              School Management System
+            </Text>
+          </div>
+        </Group>
         {isStudent && studentClassName && (
           <Badge variant="light" color="blue" size="lg">
             {studentClassName}

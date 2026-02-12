@@ -18,6 +18,10 @@ export class TenantDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @IsOptional()
+  @IsString()
+  logoUrl?: string | null;
+
   constructor(partial: Partial<TenantDto>) {
     Object.assign(this, partial);
   }

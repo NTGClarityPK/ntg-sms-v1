@@ -14,6 +14,7 @@ type TenantRow = {
   code: string;
   domain: string | null;
   is_active: boolean;
+  logo_url: string | null;
 };
 
 function mapTenant(row: TenantRow): TenantDto {
@@ -23,8 +24,15 @@ function mapTenant(row: TenantRow): TenantDto {
     code: row.code,
     domain: row.domain,
     isActive: row.is_active,
+    logoUrl: row.logo_url,
   });
 }
+
+type UploadedLogoFile = {
+  originalname: string;
+  mimetype: string;
+  buffer: Buffer;
+};
 
 @Injectable()
 export class TenantsService {
@@ -36,7 +44,7 @@ export class TenantsService {
 
     const { data, error } = await supabase
       .from('tenants')
-      .select('id, name, code, domain, is_active')
+      .select('id, name, code, domain, is_active, logo_url')
       .eq('id', tenantId)
       .maybeSingle();
 
@@ -54,7 +62,41 @@ export class TenantsService {
       .from('tenants')
       .update({ name: updates.name })
       .eq('id', tenantId)
-      .select('id, name, code, domain, is_active')
+      .select('id, name, code, domain, is_active, logo_url')
+      .single();
+
+    throwIfDbError(error);
+    return { data: mapTenant(data as TenantRow) };
+  }
+
+  async uploadLogo(tenantId: string | null, file: UploadedLogoFile): Promise<{ data: TenantDto }> {
+    if (!tenantId) throw new BadRequestException('Tenant not resolved from branch');
+    if (!file) throw new BadRequestException('Logo file is required');
+
+    const supabase = this.supabaseConfig.getClient();
+    const extension = (file.originalname.split('.').pop() || 'png').toLowerCase();
+    const fileName = `${tenantId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('school-logos')
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      throw new BadRequestException(uploadError.message);
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('school-logos').getPublicUrl(fileName);
+
+    const { data, error } = await supabase
+      .from('tenants')
+      .update({ logo_url: publicUrl })
+      .eq('id', tenantId)
+      .select('id, name, code, domain, is_active, logo_url')
       .single();
 
     throwIfDbError(error);

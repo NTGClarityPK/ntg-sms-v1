@@ -32,5 +32,26 @@ export function useUpdateTenantMe() {
   });
 }
 
+export function useUploadTenantLogo() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await apiClient.post<Tenant>('/api/v1/tenants/logo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return res;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: tenantKeys.me() });
+      await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+    },
+  });
+}
+
 
 

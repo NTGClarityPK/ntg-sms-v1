@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -59,6 +59,7 @@ import { LibraryCategoryEditor } from '@/components/features/settings/LibraryCat
 import { BehaviorSettings } from '@/components/features/settings/BehaviorSettings';
 import { useTenantMe, useUpdateTenantMe } from '@/hooks/useTenant';
 import { SubjectTemplatesTabContent } from '@/components/features/settings/SubjectTemplatesTabContent';
+import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettingsPanel';
 
 export default function SettingsPage() {
   const colors = useThemeColors();
@@ -73,6 +74,7 @@ export default function SettingsPage() {
   const qc = useQueryClient();
 
   const hasCurrentBranch = !!user?.currentBranch?.id;
+  const isSchoolAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
   const settingsStatusData = statusQuery.data?.data;
   const isInitialized = settingsStatusData?.isInitialized ?? false;
   const branches = branchesQuery.data?.data ?? [];
@@ -193,6 +195,11 @@ export default function SettingsPage() {
             <Tabs.Tab value="behavior" leftSection={<IconMoodHappy size={16} />}>
               Behavior
             </Tabs.Tab>
+            {isSchoolAdmin && (
+              <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
+                Theme Settings
+              </Tabs.Tab>
+            )}
           </Tabs.List>
 
           {/* Permissions Tab */}
@@ -234,6 +241,12 @@ export default function SettingsPage() {
           <Tabs.Panel value="behavior" pt="md" px="md" pb="md">
             <BehaviorTabContent />
           </Tabs.Panel>
+
+          {isSchoolAdmin && (
+            <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">
+              <ThemeSettingsPanel showTitle={false} />
+            </Tabs.Panel>
+          )}
         </Tabs>
           </>
         )}

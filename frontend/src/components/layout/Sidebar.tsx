@@ -32,6 +32,7 @@ import {
   IconCalendarEvent,
   IconBell,
   IconStar,
+  IconPalette,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -147,6 +148,7 @@ const allNavItems: NavItem[] = [
   },
   { label: 'Reports', href: '/reports', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
+  { label: 'Theme Settings', href: '/theme-settings', icon: IconPalette },
 ];
 
 interface SidebarProps {
@@ -212,6 +214,7 @@ export function Sidebar({
       roleName === 'school_admin'
     );
   }) || false;
+  const isSchoolAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
 
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
@@ -252,6 +255,10 @@ export function Sidebar({
       if (item.href === '/behavioral') {
         return canAssessBehavioral;
       }
+      // Theme settings page is for non-school-admin users (school admin uses settings tab)
+      if (item.href === '/theme-settings') {
+        return !isSchoolAdmin;
+      }
       // Parent-facing view only page
       if (item.href === '/my-children') {
         return isParent;
@@ -277,6 +284,9 @@ export function Sidebar({
     // Parent-facing children timetable page
     if (item.href === '/children-timetable') {
       return isParent;
+    }
+    if (item.href === '/theme-settings') {
+      return !isSchoolAdmin;
     }
     return true;
   });
@@ -308,7 +318,8 @@ export function Sidebar({
       item.href === '/parent-associations' ||
       item.href === '/events' ||
       item.href === '/reports' ||
-      item.href === '/settings'
+      item.href === '/settings' ||
+      item.href === '/theme-settings'
   );
 
   const isActive = (href: string) =>
