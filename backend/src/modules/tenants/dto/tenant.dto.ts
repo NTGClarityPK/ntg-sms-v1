@@ -22,6 +22,10 @@ export class TenantDto {
   @IsString()
   logoUrl?: string | null;
 
+  @IsOptional()
+  @IsString()
+  primaryColor?: string | null;
+
   constructor(partial: Partial<TenantDto>) {
     Object.assign(this, partial);
   }

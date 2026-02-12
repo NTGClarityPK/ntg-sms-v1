@@ -2,8 +2,14 @@
 
 import { Group, Title } from '@mantine/core';
 import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettingsPanel';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function ThemeSettingsPage() {
+  const { user } = useAuth();
+  const isSchoolAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
+
+  if (!isSchoolAdmin) return null;
+
   return (
     <>
       <div className="page-title-bar">

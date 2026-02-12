@@ -11,6 +11,8 @@ import { useTenantMe } from '@/hooks/useTenant';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyStudent } from '@/hooks/useStudents';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
+import { useThemeStore } from '@/lib/store/theme-store';
+import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 
 export function Header() {
   const successColor = useSuccessColor();
@@ -18,6 +20,7 @@ export function Header() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const tenantQuery = useTenantMe();
   const { name: tenantName, logoUrl: tenantLogo, setBranding } = useTenantBrandingStore();
+  const { setPrimaryColor } = useThemeStore();
   const { user } = useAuth();
   
   // Check if user is a student and get class name
@@ -35,7 +38,8 @@ export function Header() {
       name: data.name || 'School',
       logoUrl: data.logoUrl || null,
     });
-  }, [tenantQuery.data?.data, setBranding]);
+    setPrimaryColor(data.primaryColor || DEFAULT_THEME_COLOR);
+  }, [tenantQuery.data?.data, setBranding, setPrimaryColor]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

@@ -22,7 +22,7 @@ export function useUpdateTenantMe() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: { name: string }) => {
+    mutationFn: async (payload: { name?: string; primaryColor?: string }) => {
       const res = await apiClient.patch<Tenant>('/api/v1/tenants/me', payload);
       return res;
     },

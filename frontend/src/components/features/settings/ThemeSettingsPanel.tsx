@@ -19,7 +19,7 @@ import { notifications } from '@mantine/notifications';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useNotificationColors } from '@/lib/hooks/use-theme-colors';
-import { useTenantMe, useUploadTenantLogo } from '@/hooks/useTenant';
+import { useTenantMe, useUpdateTenantMe, useUploadTenantLogo } from '@/hooks/useTenant';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
 const COLOR_SWATCHES = [
   DEFAULT_THEME_COLOR,
@@ -41,6 +41,7 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
   const { primaryColor, setPrimaryColor } = useThemeStore();
   const { setBranding } = useTenantBrandingStore();
   const tenantQuery = useTenantMe();
+  const updateTenantMutation = useUpdateTenantMe();
   const uploadLogoMutation = useUploadTenantLogo();
   const [draftColor, setDraftColor] = useState<string>(primaryColor || DEFAULT_THEME_COLOR);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -53,12 +54,15 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
   useEffect(() => {
     const data = tenantQuery.data?.data;
     if (!data) return;
+    const effectiveColor = data.primaryColor || DEFAULT_THEME_COLOR;
+    setPrimaryColor(effectiveColor);
+    setDraftColor(effectiveColor);
     setLogoPreview(data.logoUrl || null);
     setBranding({
       name: data.name || 'School',
       logoUrl: data.logoUrl || null,
     });
-  }, [tenantQuery.data?.data, setBranding]);
+  }, [tenantQuery.data?.data, setBranding, setPrimaryColor]);
 
   const handleLogoUpload = async (file: File | null) => {
     if (!file) return;
@@ -85,15 +89,24 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaving(true);
     try {
-      setPrimaryColor(draftColor);
+      const response = await updateTenantMutation.mutateAsync({ primaryColor: draftColor });
+      setPrimaryColor(response.data?.primaryColor || draftColor);
+      await tenantQuery.refetch();
       notifications.show({
         title: 'Success',
         message: 'Theme settings saved successfully',
         color: notifyColors.success,
         icon: <IconCheck size={16} />,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save theme settings';
+      notifications.show({
+        title: 'Error',
+        message,
+        color: notifyColors.error,
       });
     } finally {
       setSaving(false);

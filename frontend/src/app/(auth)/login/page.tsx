@@ -26,6 +26,8 @@ import { useThemeColor } from '@/lib/hooks/use-theme-color';
 import { generateThemeColors } from '@/lib/utils/themeColors';
 import { apiClient } from '@/lib/api-client';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
+import { useThemeStore } from '@/lib/store/theme-store';
+import type { Tenant } from '@/types/tenant';
 
 interface Branch {
   id: string;
@@ -49,6 +51,7 @@ export default function LoginPage() {
   const [showBranchSelection, setShowBranchSelection] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchSelectionLoading, setBranchSelectionLoading] = useState(false);
+  const { setPrimaryColor } = useThemeStore();
 
   const form = useForm({
     initialValues: {
@@ -140,6 +143,17 @@ export default function LoginPage() {
       
       // Store in localStorage for immediate use
       localStorage.setItem('currentBranchId', branchId);
+
+      // Fetch tenant theme before redirect so first dashboard paint uses DB colour
+      try {
+        const tenantResponse = await apiClient.get<Tenant>('/api/v1/tenants/me');
+        const tenantTheme = tenantResponse.data?.primaryColor;
+        if (tenantTheme) {
+          setPrimaryColor(tenantTheme);
+        }
+      } catch {
+        // Non-blocking: dashboard will still bootstrap theme via AuthGuard/Header
+      }
       
       // Close modal and redirect
       setShowBranchSelection(false);

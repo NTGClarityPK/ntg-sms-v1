@@ -5,6 +5,7 @@ export interface Tenant {
   domain?: string | null;
   isActive?: boolean;
   logoUrl?: string | null;
+  primaryColor?: string | null;
 }
 
 

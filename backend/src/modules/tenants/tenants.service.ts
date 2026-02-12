@@ -17,7 +17,12 @@ type TenantRow = {
   logo_url: string | null;
 };
 
-function mapTenant(row: TenantRow): TenantDto {
+type SystemSettingRow = {
+  key: string;
+  value: unknown;
+};
+
+function mapTenant(row: TenantRow, primaryColor?: string | null): TenantDto {
   return new TenantDto({
     id: row.id,
     name: row.name,
@@ -25,6 +30,7 @@ function mapTenant(row: TenantRow): TenantDto {
     domain: row.domain,
     isActive: row.is_active,
     logoUrl: row.logo_url,
+    primaryColor: primaryColor ?? null,
   });
 }
 
@@ -38,6 +44,10 @@ type UploadedLogoFile = {
 export class TenantsService {
   constructor(private readonly supabaseConfig: SupabaseConfig) {}
 
+  private getThemeSettingKey(tenantId: string): string {
+    return `tenant_theme_primary_color:${tenantId}`;
+  }
+
   async getMe(tenantId: string | null): Promise<{ data: TenantDto }> {
     if (!tenantId) throw new BadRequestException('Tenant not resolved from branch');
     const supabase = this.supabaseConfig.getClient();
@@ -50,23 +60,82 @@ export class TenantsService {
 
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Tenant not found');
-    return { data: mapTenant(data as TenantRow) };
+
+    const themeSettingKey = this.getThemeSettingKey(tenantId);
+    const { data: themeSetting, error: themeError } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .eq('key', themeSettingKey)
+      .maybeSingle();
+
+    throwIfDbError(themeError);
+    const primaryColor =
+      (themeSetting as SystemSettingRow | null)?.value &&
+      typeof (themeSetting as SystemSettingRow).value === 'string'
+        ? ((themeSetting as SystemSettingRow).value as string)
+        : null;
+
+    return { data: mapTenant(data as TenantRow, primaryColor) };
   }
 
-  async updateMe(tenantId: string | null, updates: { name?: string }): Promise<{ data: TenantDto }> {
+  async updateMe(
+    tenantId: string | null,
+    updates: { name?: string; primaryColor?: string },
+  ): Promise<{ data: TenantDto }> {
     if (!tenantId) throw new BadRequestException('Tenant not resolved from branch');
-    if (!updates.name) throw new BadRequestException('No fields to update');
+    if (!updates.name && !updates.primaryColor) {
+      throw new BadRequestException('No fields to update');
+    }
 
     const supabase = this.supabaseConfig.getClient();
-    const { data, error } = await supabase
-      .from('tenants')
-      .update({ name: updates.name })
-      .eq('id', tenantId)
-      .select('id, name, code, domain, is_active, logo_url')
-      .single();
+    let tenantData: TenantRow | null = null;
 
-    throwIfDbError(error);
-    return { data: mapTenant(data as TenantRow) };
+    if (updates.name) {
+      const { data, error } = await supabase
+        .from('tenants')
+        .update({ name: updates.name })
+        .eq('id', tenantId)
+        .select('id, name, code, domain, is_active, logo_url')
+        .single();
+
+      throwIfDbError(error);
+      tenantData = data as TenantRow;
+    } else {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name, code, domain, is_active, logo_url')
+        .eq('id', tenantId)
+        .single();
+      throwIfDbError(error);
+      tenantData = data as TenantRow;
+    }
+
+    let primaryColor: string | null = null;
+    if (updates.primaryColor) {
+      const themeSettingKey = this.getThemeSettingKey(tenantId);
+      const { error: upsertThemeError } = await supabase.from('system_settings').upsert(
+        {
+          key: themeSettingKey,
+          value: updates.primaryColor,
+        },
+        { onConflict: 'key' },
+      );
+      throwIfDbError(upsertThemeError);
+      primaryColor = updates.primaryColor;
+    } else {
+      const themeSettingKey = this.getThemeSettingKey(tenantId);
+      const { data: themeSetting, error: themeError } = await supabase
+        .from('system_settings')
+        .select('key, value')
+        .eq('key', themeSettingKey)
+        .maybeSingle();
+      throwIfDbError(themeError);
+      if (themeSetting && typeof (themeSetting as SystemSettingRow).value === 'string') {
+        primaryColor = (themeSetting as SystemSettingRow).value as string;
+      }
+    }
+
+    return { data: mapTenant(tenantData, primaryColor) };
   }
 
   async uploadLogo(tenantId: string | null, file: UploadedLogoFile): Promise<{ data: TenantDto }> {
@@ -100,7 +169,19 @@ export class TenantsService {
       .single();
 
     throwIfDbError(error);
-    return { data: mapTenant(data as TenantRow) };
+    const themeSettingKey = this.getThemeSettingKey(tenantId);
+    const { data: themeSetting, error: themeError } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .eq('key', themeSettingKey)
+      .maybeSingle();
+    throwIfDbError(themeError);
+    const primaryColor =
+      themeSetting && typeof (themeSetting as SystemSettingRow).value === 'string'
+        ? ((themeSetting as SystemSettingRow).value as string)
+        : null;
+
+    return { data: mapTenant(data as TenantRow, primaryColor) };
   }
 }
 

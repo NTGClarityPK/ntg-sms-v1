@@ -109,4 +109,3 @@ export function useFeaturePermission(featureCode: string) {
     canEdit: canEdit(featureCode),
   };
 }
-

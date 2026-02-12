@@ -39,7 +39,10 @@ export class TenantsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @Body() body: UpdateTenantDto,
   ): Promise<{ data: TenantDto }> {
-    const updated = await this.tenantsService.updateMe(branch.tenantId, { name: body.name });
+    const updated = await this.tenantsService.updateMe(branch.tenantId, {
+      name: body.name,
+      primaryColor: body.primaryColor,
+    });
     return { data: updated.data };
   }
 

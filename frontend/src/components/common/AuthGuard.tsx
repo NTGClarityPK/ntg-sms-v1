@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton, Container, Stack } from '@mantine/core';
 import { getSession } from '@/lib/auth';
+import { apiClient } from '@/lib/api-client';
+import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
+import { useThemeStore } from '@/lib/store/theme-store';
+import type { Tenant } from '@/types/tenant';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -20,6 +24,15 @@ export function AuthGuard({ children }: AuthGuardProps) {
       try {
         const session = await getSession();
         if (session?.access_token) {
+          // Bootstrap tenant theme before rendering protected pages.
+          // This keeps colour consistent for all users in the tenant on first paint.
+          try {
+            const tenantResponse = await apiClient.get<Tenant>('/api/v1/tenants/me');
+            const tenantTheme = tenantResponse.data?.primaryColor || DEFAULT_THEME_COLOR;
+            useThemeStore.getState().setPrimaryColor(tenantTheme);
+          } catch {
+            useThemeStore.getState().setPrimaryColor(DEFAULT_THEME_COLOR);
+          }
           setHasSession(true);
         } else {
           router.push('/login');
