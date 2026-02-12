@@ -41,6 +41,7 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   const [localPermissions, setLocalPermissions] = useState<Map<string, Permission>>(new Map());
   const [hasChanges, setHasChanges] = useState(false);
   const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const hasSetInitialDefault = useRef(false);
 
   const visibleFeatures =
@@ -49,6 +50,11 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
       : managementFeatures.filter((f) => selectedFeatureIds.includes(f.id));
 
   const featureOptions = managementFeatures.map((f) => ({ value: f.id, label: f.name }));
+  const roleOptions = rolesInMatrix.map((r) => ({ value: r.id, label: r.displayName }));
+  const visibleRoles =
+    selectedRoleIds.length === 0
+      ? rolesInMatrix
+      : rolesInMatrix.filter((r) => selectedRoleIds.includes(r.id));
 
   useEffect(() => {
     if (managementFeatures.length > 0 && !hasSetInitialDefault.current) {
@@ -151,6 +157,21 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
         searchable
       />
 
+      <MultiSelect
+        label="Show roles"
+        placeholder={
+          selectedRoleIds.length === 0
+            ? 'All roles'
+            : `${selectedRoleIds.length} role${selectedRoleIds.length === 1 ? '' : 's'} selected`
+        }
+        description="Select which roles to show on the left side. Clear selection to show all."
+        data={roleOptions}
+        value={selectedRoleIds}
+        onChange={setSelectedRoleIds}
+        clearable
+        searchable
+      />
+
       <div style={{ overflowX: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
@@ -162,7 +183,7 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {rolesInMatrix.map((role) => (
+            {visibleRoles.map((role) => (
               <Table.Tr key={role.id}>
                 <Table.Td>
                   <Text fw={500}>{role.displayName}</Text>

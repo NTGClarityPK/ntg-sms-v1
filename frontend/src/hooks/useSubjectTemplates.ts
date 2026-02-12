@@ -234,10 +234,10 @@ export function useStudentTemplate(
       if (academicYearId) {
         params.append('academicYearId', academicYearId);
       }
-      const response = await apiClient.get<{ data: SubjectTemplate | null }>(
+      const response = await apiClient.get<SubjectTemplate | null>(
         `/api/v1/subject-templates/students/${studentId}?${params.toString()}`,
       );
-      return response.data;
+      return response;
     },
     enabled: !!studentId && !!branchId && !!academicYearId,
     staleTime: 5 * 60 * 1000, // 5 minutes

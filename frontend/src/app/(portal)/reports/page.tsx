@@ -55,6 +55,23 @@ export default function ReportsPage() {
               </Button>
             </Stack>
           </Card>
+
+          <Card withBorder p="lg">
+            <Stack gap="md">
+              <Title order={3}>Public report</Title>
+              <Text c="dimmed" size="sm">
+                View public class-level student counts. This opens the public report screen from within Reports.
+              </Text>
+              <Button
+                component={Link}
+                href="/reports/public"
+                leftSection={<IconUsersGroup size={18} />}
+                variant="light"
+              >
+                Open public report
+              </Button>
+            </Stack>
+          </Card>
         </Stack>
       </div>
     </>

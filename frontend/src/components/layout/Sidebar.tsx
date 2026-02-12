@@ -58,6 +58,7 @@ const allNavItems: NavItem[] = [
   { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconBook },
   { label: 'Parent Associations', href: '/parent-associations', icon: IconUsersGroup },
   { label: 'My Children', href: '/my-children', icon: IconUsersGroup },
+  { label: 'Children Timetable', href: '/children-timetable', icon: IconCalendarClock },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
   {
     label: 'Assessments',
@@ -145,7 +146,6 @@ const allNavItems: NavItem[] = [
     }
   },
   { label: 'Reports', href: '/reports', icon: IconChartBar },
-  { label: 'Public Reports', href: '/reports/public', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 
@@ -256,6 +256,10 @@ export function Sidebar({
       if (item.href === '/my-children') {
         return isParent;
       }
+      // Parent-facing children timetable page
+      if (item.href === '/children-timetable') {
+        return isParent;
+      }
       // Keep management label/page for non-parent roles only
       if (item.href === '/parent-associations') {
         return !isParent;
@@ -268,6 +272,10 @@ export function Sidebar({
     }
     // Parent-facing view only page
     if (item.href === '/my-children') {
+      return isParent;
+    }
+    // Parent-facing children timetable page
+    if (item.href === '/children-timetable') {
       return isParent;
     }
     return true;
@@ -288,6 +296,7 @@ export function Sidebar({
       item.href === '/my-timetable' ||
       item.href === '/my-events'
       || item.href === '/my-children'
+      || item.href === '/children-timetable'
   );
   const managementItems = navItems.filter(
     (item) =>
@@ -299,7 +308,6 @@ export function Sidebar({
       item.href === '/parent-associations' ||
       item.href === '/events' ||
       item.href === '/reports' ||
-      item.href === '/reports/public' ||
       item.href === '/settings'
   );
 

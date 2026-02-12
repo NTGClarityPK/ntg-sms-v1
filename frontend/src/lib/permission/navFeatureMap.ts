@@ -13,6 +13,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/academic/teacher-mapping': 'teacher_mapping',
   '/parent-associations': 'parent_associations',
   '/my-children': 'parent_associations',
+  '/children-timetable': 'timetable_personal',
   '/attendance': 'attendance',
   '/assessments': 'assessment',
   '/my-assessments': 'my_assessments',

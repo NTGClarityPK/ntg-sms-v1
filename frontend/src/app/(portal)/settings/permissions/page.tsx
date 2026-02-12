@@ -44,7 +44,7 @@ export default function PermissionsPage() {
         ) : (
           <Tabs defaultValue="matrix">
             <Tabs.List>
-              <Tabs.Tab value="matrix">Matrix View</Tabs.Tab>
+              <Tabs.Tab value="matrix">Assign Access</Tabs.Tab>
               <Tabs.Tab value="role-access">Role Access View</Tabs.Tab>
             </Tabs.List>
 

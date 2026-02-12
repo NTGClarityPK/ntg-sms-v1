@@ -170,7 +170,7 @@ export function useAssignmentsByTeacher(staffId: string | null, academicYearId?:
       const queryParams = new URLSearchParams();
       if (academicYearId) queryParams.append('academicYearId', academicYearId);
 
-      const response = await apiClient.get<{ data: TeacherAssignment[] }>(
+      const response = await apiClient.get<TeacherAssignment[]>(
         `/api/v1/teacher-assignments/by-teacher/${staffId}?${queryParams.toString()}`,
       );
       return response.data;
@@ -190,7 +190,7 @@ export function useAssignmentsByClassSection(classSectionId: string | null, acad
       const queryParams = new URLSearchParams();
       if (academicYearId) queryParams.append('academicYearId', academicYearId);
 
-      const response = await apiClient.get<{ data: TeacherAssignment[] }>(
+      const response = await apiClient.get<TeacherAssignment[]>(
         `/api/v1/teacher-assignments/by-class/${classSectionId}?${queryParams.toString()}`,
       );
       return response.data;
