@@ -18,14 +18,34 @@ import {
   Skeleton,
   ActionIcon,
   Tooltip,
+  Modal,
+  Image,
 } from '@mantine/core';
-import { IconDownload } from '@tabler/icons-react';
+import { IconDownload, IconEye } from '@tabler/icons-react';
 import dayjs from 'dayjs';
+import { useMemo, useState } from 'react';
 import { useMyAssessments, useUpdateMyAssessmentStatus } from '@/hooks/api/useMyAssessments';
+import type { MyAssessmentAttachment } from '@/hooks/api/useMyAssessments';
 
 export default function MyAssessmentsPage() {
   const { data, isLoading, error } = useMyAssessments();
   const updateStatus = useUpdateMyAssessmentStatus();
+  const [previewAttachment, setPreviewAttachment] = useState<MyAssessmentAttachment | null>(null);
+
+  const previewType = useMemo(() => {
+    if (!previewAttachment) return 'none' as const;
+
+    const fileName = previewAttachment.fileName.toLowerCase();
+    const mimeType = previewAttachment.mimeType?.toLowerCase() ?? '';
+
+    const isImage = mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(fileName);
+    if (isImage) return 'image' as const;
+
+    const isPdf = mimeType.includes('pdf') || fileName.endsWith('.pdf');
+    if (isPdf) return 'pdf' as const;
+
+    return 'unsupported' as const;
+  }, [previewAttachment]);
 
   const handleMarkRead = (assessmentId: string, currentStatus?: string, isRead?: boolean) => {
     if (isRead) {
@@ -78,6 +98,10 @@ export default function MyAssessmentsPage() {
         {status}
       </Badge>
     );
+  };
+
+  const openInNewTab = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -149,14 +173,24 @@ export default function MyAssessmentsPage() {
                             {item.attachments.length > 0 ? (
                               <Group gap="xs">
                                 {item.attachments.map((att) => (
-                                  <Tooltip key={att.id} label={att.fileName}>
-                                    <ActionIcon
-                                      variant="subtle"
-                                      onClick={() => window.open(att.fileUrl, '_blank')}
-                                    >
-                                      <IconDownload size={16} />
-                                    </ActionIcon>
-                                  </Tooltip>
+                                  <Group key={att.id} gap={4}>
+                                    <Tooltip label={`Preview: ${att.fileName}`}>
+                                      <ActionIcon
+                                        variant="subtle"
+                                        onClick={() => setPreviewAttachment(att)}
+                                      >
+                                        <IconEye size={16} />
+                                      </ActionIcon>
+                                    </Tooltip>
+                                    <Tooltip label={`Download: ${att.fileName}`}>
+                                      <ActionIcon
+                                        variant="subtle"
+                                        onClick={() => openInNewTab(att.fileUrl)}
+                                      >
+                                        <IconDownload size={16} />
+                                      </ActionIcon>
+                                    </Tooltip>
+                                  </Group>
                                 ))}
                               </Group>
                             ) : (
@@ -197,6 +231,45 @@ export default function MyAssessmentsPage() {
           </Paper>
         </Stack>
       </div>
+
+      <Modal
+        opened={!!previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+        title={previewAttachment?.fileName ?? 'Attachment preview'}
+        size="xl"
+        centered
+      >
+        {!previewAttachment ? null : previewType === 'image' ? (
+          <Image src={previewAttachment.fileUrl} alt={previewAttachment.fileName} fit="contain" radius="sm" />
+        ) : previewType === 'pdf' ? (
+          <Stack gap="sm">
+            <Text size="xs" c="dimmed">
+              PDF preview depends on browser support. If it does not render, use download.
+            </Text>
+            <iframe
+              src={previewAttachment.fileUrl}
+              title={previewAttachment.fileName}
+              style={{
+                width: '100%',
+                minHeight: '70vh',
+                border: '1px solid var(--mantine-color-gray-3)',
+                borderRadius: '8px',
+              }}
+            />
+          </Stack>
+        ) : (
+          <Stack gap="sm">
+            <Text size="sm" c="dimmed">
+              In-app preview is not available for this file type yet. Please download to view.
+            </Text>
+            <Group justify="flex-end">
+              <Button onClick={() => openInNewTab(previewAttachment.fileUrl)} leftSection={<IconDownload size={16} />}>
+                Download file
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
     </>
   );
 }
