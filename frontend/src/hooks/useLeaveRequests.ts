@@ -51,7 +51,7 @@ export function useLeaveRequests(params?: QueryLeaveParams) {
 }
 
 export function useLeaveQuota(studentId: string | null) {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const branchId = user?.currentBranch?.id;
 
   return useQuery({
@@ -63,7 +63,7 @@ export function useLeaveQuota(studentId: string | null) {
       );
       return response.data;
     },
-    enabled: !!studentId && !!branchId,
+    enabled: !!studentId && !!branchId && !!user && !isAuthLoading,
   });
 }
 
@@ -106,11 +106,17 @@ export function useCreateLeaveRequest() {
       });
     },
     onError: (error: unknown) => {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
+      let message = 'Failed to submit leave request';
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const res = (error as { response?: { data?: { error?: { message?: string | string[] }; message?: string | string[] } } }).response?.data;
+        const msg = res?.error?.message ?? res?.message;
+        if (msg) message = Array.isArray(msg) ? msg.join(', ') : msg;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
       notifications.show({
         title: 'Error',
-        message: message || 'Failed to submit leave request',
+        message,
         color: notifyColors.error,
       });
     },
@@ -155,27 +161,25 @@ export function useUpdateLeaveStatus() {
 }
 
 export function useStudentLeaveStats(studentId: string | null) {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const branchId = user?.currentBranch?.id;
 
   return useQuery({
     queryKey: ['leaves', 'stats', studentId, branchId],
     queryFn: async () => {
       if (!studentId || !branchId) return null;
-      
-      // OPTIMISED: Use dedicated stats endpoint (single request with DB aggregation)
-      // instead of 3 separate requests
+
       const response = await apiClient.get<{
         pending: number;
         approved: number;
         rejected: number;
         cancelled: number;
       }>(`/api/v1/leave-requests/stats/${studentId}`);
-      
+
       return response.data;
     },
-    enabled: !!studentId && !!branchId,
-    staleTime: 2 * 60 * 1000,  // 2 minutes - stats don't change frequently
+    enabled: !!studentId && !!branchId && !!user && !isAuthLoading,
+    staleTime: 2 * 60 * 1000,
   });
 }
 

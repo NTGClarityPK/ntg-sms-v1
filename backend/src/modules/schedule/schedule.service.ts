@@ -314,14 +314,22 @@ export class ScheduleService {
 
     const unique = Array.from(new Set(classIds));
 
-    // For each class, upsert single assignment row to this template.
-    // Strategy: delete existing assignments for these classes, then insert new ones.
+    // Full replacement semantics:
+    // 1) remove old assignments for this template
+    // 2) remove selected classes from other templates (global exclusivity)
+    // 3) insert selected assignments for this template
+    const { error: removeCurrentTemplateError } = await supabase
+      .from('class_timing_assignments')
+      .delete()
+      .eq('timing_template_id', timingTemplateId);
+    throwIfDbError(removeCurrentTemplateError);
+
     if (unique.length > 0) {
-      const { error: deleteError } = await supabase
+      const { error: removeSelectedFromOthersError } = await supabase
         .from('class_timing_assignments')
         .delete()
         .in('class_id', unique);
-      throwIfDbError(deleteError);
+      throwIfDbError(removeSelectedFromOthersError);
 
       const payload = unique.map((classId) => ({
         class_id: classId,

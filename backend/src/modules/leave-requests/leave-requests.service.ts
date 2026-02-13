@@ -90,6 +90,18 @@ export class LeaveRequestsService {
     }
   }
 
+  /**
+   * Check if [startA, endA] overlaps with [startB, endB] (inclusive dates).
+   */
+  private static dateRangesOverlap(
+    startA: string,
+    endA: string,
+    startB: string,
+    endB: string,
+  ): boolean {
+    return startA <= endB && endA >= startB;
+  }
+
   async createLeaveRequest(
     input: CreateLeaveRequestDto,
     userId: string,
@@ -107,6 +119,30 @@ export class LeaveRequestsService {
 
     if (input.endDate < input.startDate) {
       throw new BadRequestException('End date cannot be before start date');
+    }
+
+    const { data: existing, error: conflictError } = await supabase
+      .from('leave_requests')
+      .select('id, start_date, end_date, status')
+      .eq('student_id', input.studentId)
+      .eq('academic_year_id', activeYear.id)
+      .in('status', ['pending', 'approved']);
+
+    throwIfDbError(conflictError);
+
+    const overlaps = (existing ?? []).some(
+      (row: { start_date: string; end_date: string }) =>
+        LeaveRequestsService.dateRangesOverlap(
+          input.startDate,
+          input.endDate,
+          row.start_date,
+          row.end_date,
+        ),
+    );
+    if (overlaps) {
+      throw new BadRequestException(
+        'A leave request for this student already exists for the same or overlapping dates (pending or approved). Please cancel or use the existing request.',
+      );
     }
 
     const { data, error } = await supabase
@@ -528,9 +564,12 @@ export class LeaveRequestsService {
         ? quotaRow.annual_quota
         : 0;
 
+    const UNREQUESTED_ABSENCE_REASON =
+      'Unrequested absence - automatically created from attendance record';
+
     const { data: approvedLeaves, error: leavesError } = await supabase
       .from('leave_requests')
-      .select('start_date, end_date')
+      .select('start_date, end_date, reason')
       .eq('student_id', studentId)
       .eq('academic_year_id', activeYear.id)
       .eq('status', 'approved');
@@ -538,7 +577,8 @@ export class LeaveRequestsService {
     throwIfDbError(leavesError);
 
     let usedDays = 0;
-    (approvedLeaves ?? []).forEach((row) => {
+    let daysFromAbsences = 0;
+    (approvedLeaves ?? []).forEach((row: { start_date: string; end_date: string; reason?: string | null }) => {
       const start = new Date(row.start_date);
       const end = new Date(row.end_date);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
@@ -546,7 +586,11 @@ export class LeaveRequestsService {
       }
       const diffMs = end.getTime() - start.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      usedDays += diffDays >= 0 ? diffDays + 1 : 0;
+      const days = diffDays >= 0 ? diffDays + 1 : 0;
+      usedDays += days;
+      if (row.reason === UNREQUESTED_ABSENCE_REASON) {
+        daysFromAbsences += days;
+      }
     });
 
     const remainingDays = Math.max(totalQuota - usedDays, 0);
@@ -555,6 +599,7 @@ export class LeaveRequestsService {
       totalQuota,
       usedDays,
       remainingDays,
+      daysFromAbsences,
     });
   }
 }

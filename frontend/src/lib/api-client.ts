@@ -51,10 +51,14 @@ class ApiClient {
       (response) => response,
       async (error: AxiosError<ApiResponse<unknown>>) => {
         if (error.response?.status === 401) {
-          // Unauthorized:
-          // - If we *don't* have a Supabase session, force logout + redirect to login.
-          // - If we *do* have a session, do NOT auto-logout (prevents redirect loops during startup/race conditions).
-          if (typeof window !== 'undefined') {
+          const body = error.response.data as { error?: { message?: string } } | undefined;
+          const message = body?.error?.message ?? (body as { message?: string })?.message ?? '';
+
+            // Only force logout when the token was sent but invalid/expired.
+            // "No token provided" means the request went out without a token (e.g. session not
+            // ready yet or race on page load) – do NOT logout so the user isn’t kicked out unnecessarily.
+          const isNoToken = typeof message === 'string' && message.toLowerCase().includes('no token provided');
+          if (!isNoToken && typeof window !== 'undefined') {
             const {
               data: { session },
             } = await supabase.auth.getSession();

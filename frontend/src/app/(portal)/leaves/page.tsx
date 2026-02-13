@@ -228,9 +228,16 @@ export default function LeavesPage() {
                               </Group>
                               {quotaQuery.data && isQuotaExceeded && (
                                 <Alert color="red" title="Leave quota exceeded">
-                                  <Text size="sm">
-                                    Leave quota used: {quotaQuery.data.usedDays}/{quotaQuery.data.totalQuota} days (Limit exceeded)
-                                  </Text>
+                                  <Stack gap={4}>
+                                    <Text size="sm">
+                                      Leave quota used: {quotaQuery.data.usedDays}/{quotaQuery.data.totalQuota} days (Limit exceeded)
+                                    </Text>
+                                    {(quotaQuery.data.daysFromAbsences ?? 0) > 0 && (
+                                      <Text size="xs" c="dimmed">
+                                        This includes {quotaQuery.data.daysFromAbsences} day{quotaQuery.data.daysFromAbsences === 1 ? '' : 's'} marked absent (counted in quota).
+                                      </Text>
+                                    )}
+                                  </Stack>
                                 </Alert>
                               )}
                             </Stack>
@@ -274,9 +281,16 @@ export default function LeavesPage() {
                         </Paper>
                         {quotaQuery.data && isQuotaExceeded && (
                           <Alert color="red" title="Leave quota exceeded">
-                            <Text size="sm">
-                              Leave quota used: {quotaQuery.data.usedDays}/{quotaQuery.data.totalQuota} days (Limit exceeded)
-                            </Text>
+                            <Stack gap={4}>
+                              <Text size="sm">
+                                Leave quota used: {quotaQuery.data.usedDays}/{quotaQuery.data.totalQuota} days (Limit exceeded)
+                              </Text>
+                              {(quotaQuery.data.daysFromAbsences ?? 0) > 0 && (
+                                <Text size="xs" c="dimmed">
+                                  This includes {quotaQuery.data.daysFromAbsences} day{quotaQuery.data.daysFromAbsences === 1 ? '' : 's'} marked absent (counted in quota).
+                                </Text>
+                              )}
+                            </Stack>
                           </Alert>
                         )}
                       </Stack>

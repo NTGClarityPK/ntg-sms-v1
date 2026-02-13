@@ -17,7 +17,18 @@ const statusColorMap: Record<LeaveRequest['status'], string> = {
   cancelled: 'gray',
 };
 
+/** Format date string. Parses YYYY-MM-DD as local date to avoid timezone shift. */
 const formatDate = (dateString: string): string => {
+  const s = dateString.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
   const date = new Date(dateString);
   return date.toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -27,15 +38,7 @@ const formatDate = (dateString: string): string => {
 };
 
 const formatDateRange = (startDate: string, endDate: string): string => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  // If same date, show once
-  if (start.toDateString() === end.toDateString()) {
-    return formatDate(startDate);
-  }
-  
-  // Otherwise show range
+  if (startDate === endDate) return formatDate(startDate);
   return `${formatDate(startDate)} – ${formatDate(endDate)}`;
 };
 

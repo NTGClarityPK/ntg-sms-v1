@@ -24,6 +24,8 @@ export interface LeaveQuota {
   totalQuota: number;
   usedDays: number;
   remainingDays: number;
+  /** Days counted from absences (marked absent in attendance). */
+  daysFromAbsences?: number;
 }
 
 

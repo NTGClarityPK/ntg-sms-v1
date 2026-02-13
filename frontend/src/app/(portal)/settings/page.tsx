@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette } from '@tabler/icons-react';
@@ -612,6 +612,26 @@ function ScheduleTabContent() {
     }
   };
 
+  const unavailableClassIdsByTemplate = useMemo(() => {
+    const templates = templatesQuery.data?.data ?? [];
+    const allAssignedClassIds = new Set<string>();
+
+    templates.forEach((template) => {
+      template.assignedClassIds.forEach((classId) => {
+        allAssignedClassIds.add(classId);
+      });
+    });
+
+    const map: Record<string, string[]> = {};
+    templates.forEach((template) => {
+      const unavailable = new Set(allAssignedClassIds);
+      template.assignedClassIds.forEach((classId) => unavailable.delete(classId));
+      map[template.id] = Array.from(unavailable);
+    });
+
+    return map;
+  }, [templatesQuery.data?.data]);
+
   if (isLoading) {
     return (
       <Stack gap="md">
@@ -673,6 +693,7 @@ function ScheduleTabContent() {
                 key={t.id}
                 template={t}
                 classes={classesQuery.data?.data ?? []}
+                unavailableClassIds={unavailableClassIdsByTemplate[t.id] ?? []}
                 isSavingAssignments={assignClasses.isPending}
                 onAssignClasses={handleAssignClasses}
               />

@@ -49,23 +49,25 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
     validate: zodResolver(schema),
   });
 
+  /** Format date as local YYYY-MM-DD so the calendar date is preserved (avoids UTC shift). */
+  const toLocalDateString = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const handleSubmit = async (values: typeof form.values) => {
     try {
       await createLeave.mutateAsync({
         studentId: values.studentId,
-        startDate: values.startDate.toISOString().slice(0, 10),
-        endDate: values.endDate.toISOString().slice(0, 10),
+        startDate: toLocalDateString(values.startDate),
+        endDate: toLocalDateString(values.endDate),
         reason: values.reason,
       });
       form.reset();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      notifications.show({
-        title: 'Error',
-        message,
-        color: colors.error,
-      });
+    } catch {
+      // Error notification is shown by useCreateLeaveRequest onError with backend message
     }
   };
 
@@ -78,14 +80,21 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
         <Stack gap="md">
           <Text fw={600}>Request leave</Text>
           {quota && (
-            <Text 
-              size="sm" 
-              c={isQuotaExceeded ? 'red' : 'dimmed'}
-              fw={isQuotaExceeded ? 600 : 400}
-            >
-              Leave quota used: {quota.usedDays}/{quota.totalQuota} days
-              {isQuotaExceeded ? ' (Limit exceeded)' : ` (${quota.remainingDays} remaining)`}
-            </Text>
+            <Stack gap={4}>
+              <Text
+                size="sm"
+                c={isQuotaExceeded ? 'red' : 'dimmed'}
+                fw={isQuotaExceeded ? 600 : 400}
+              >
+                Leave quota used: {quota.usedDays}/{quota.totalQuota} days
+                {isQuotaExceeded ? ' (Limit exceeded)' : ` (${quota.remainingDays} remaining)`}
+              </Text>
+              {(quota.daysFromAbsences ?? 0) > 0 && (
+                <Text size="xs" c="dimmed">
+                  This includes {quota.daysFromAbsences} day{quota.daysFromAbsences === 1 ? '' : 's'} marked absent (counted in quota).
+                </Text>
+              )}
+            </Stack>
           )}
           <DatePickerInput
             label="Start date"

@@ -3,6 +3,7 @@
 import { Alert, Button, Group, Skeleton, Stack, Title } from '@mantine/core';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
+import { useMemo } from 'react';
 import { notifications } from '@mantine/notifications';
 import { SchoolDaysSelector } from '@/components/features/settings/SchoolDaysSelector';
 import { TimingTemplateForm, type TimingTemplateFormValues } from '@/components/features/settings/TimingTemplateForm';
@@ -119,6 +120,26 @@ export default function ScheduleSettingsPage() {
     }
   };
 
+  const unavailableClassIdsByTemplate = useMemo(() => {
+    const templates = templatesQuery.data?.data ?? [];
+    const allAssignedClassIds = new Set<string>();
+
+    templates.forEach((template) => {
+      template.assignedClassIds.forEach((classId) => {
+        allAssignedClassIds.add(classId);
+      });
+    });
+
+    const map: Record<string, string[]> = {};
+    templates.forEach((template) => {
+      const unavailable = new Set(allAssignedClassIds);
+      template.assignedClassIds.forEach((classId) => unavailable.delete(classId));
+      map[template.id] = Array.from(unavailable);
+    });
+
+    return map;
+  }, [templatesQuery.data?.data]);
+
   return (
     <>
       <div className="page-title-bar">
@@ -180,6 +201,7 @@ export default function ScheduleSettingsPage() {
                   key={t.id}
                   template={t}
                   classes={classesQuery.data?.data ?? []}
+                  unavailableClassIds={unavailableClassIdsByTemplate[t.id] ?? []}
                   isSavingAssignments={assignClasses.isPending}
                   onAssignClasses={handleAssignClasses}
                 />

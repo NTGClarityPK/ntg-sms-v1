@@ -3,25 +3,50 @@
 import { Badge, Button, Card, Group, MultiSelect, Stack, Text } from '@mantine/core';
 import type { ClassEntity, TimingTemplate } from '@/types/settings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface TimingTemplateCardProps {
   template: TimingTemplate;
   classes: ClassEntity[];
+  unavailableClassIds: string[];
   isSavingAssignments: boolean;
   onAssignClasses: (templateId: string, classIds: string[]) => Promise<void>;
 }
 
-export function TimingTemplateCard({ template, classes, isSavingAssignments, onAssignClasses }: TimingTemplateCardProps) {
+export function TimingTemplateCard({
+  template,
+  classes,
+  unavailableClassIds,
+  isSavingAssignments,
+  onAssignClasses,
+}: TimingTemplateCardProps) {
   const colors = useThemeColors();
   const [selected, setSelected] = useState<string[]>(template.assignedClassIds);
 
+  useEffect(() => {
+    setSelected(template.assignedClassIds);
+  }, [template.assignedClassIds]);
+
   const options = useMemo(() => {
+    const unavailableSet = new Set(unavailableClassIds);
     const sortedClasses = [...classes].sort((a, b) => 
       a.displayName.localeCompare(b.displayName)
     );
-    return sortedClasses.map((c) => ({ value: c.id, label: c.displayName }));
-  }, [classes]);
+    return sortedClasses
+      .filter((c) => !unavailableSet.has(c.id) || selected.includes(c.id))
+      .map((c) => ({
+        value: c.id,
+        label: c.displayName,
+      }));
+  }, [classes, selected, unavailableClassIds]);
+
+  const handleSelectionChange = (nextSelected: string[]) => {
+    const unavailableSet = new Set(unavailableClassIds);
+    const safeSelection = nextSelected.filter(
+      (classId) => !unavailableSet.has(classId) || selected.includes(classId),
+    );
+    setSelected(safeSelection);
+  };
 
   const hasChanges =
     selected.length !== template.assignedClassIds.length ||
@@ -56,7 +81,7 @@ export function TimingTemplateCard({ template, classes, isSavingAssignments, onA
           label="Assigned classes"
           data={options}
           value={selected}
-          onChange={setSelected}
+          onChange={handleSelectionChange}
           searchable
           placeholder="Select classes"
         />
