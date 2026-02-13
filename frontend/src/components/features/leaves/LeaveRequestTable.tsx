@@ -18,6 +18,10 @@ interface LeaveRequestTableProps {
   onPageChange?: (page: number) => void;
   isStaffView?: boolean;
   studentNameMap?: Map<string, string>;
+  /** Active school days (0–6, 0=Sun). When set, Days column shows only these days in the range. */
+  activeSchoolDays?: number[];
+  /** Dates to exclude (public holidays + vacations). When set with activeSchoolDays, Days column matches quota logic. */
+  excludedDates?: Set<string>;
 }
 
 const statusColorMap: Record<LeaveRequest['status'], string> = {
@@ -52,12 +56,112 @@ const formatDateRange = (startDate: string, endDate: string): string => {
   return `${formatDate(startDate)} – ${formatDate(endDate)}`;
 };
 
+/** Compute inclusive number of days between start and end (YYYY-MM-DD). */
+const getLeaveDays = (startDate: string, endDate: string): number => {
+  const parse = (s: string) => {
+    const parts = s.trim().split('-').map(Number);
+    if (parts.length !== 3) return null;
+    const [y, m, d] = parts;
+    const date = new Date(y, m - 1, d);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+  const start = parse(startDate);
+  const end = parse(endDate);
+  if (!start || !end) return 0;
+  const diffMs = end.getTime() - start.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays + 1);
+};
+
+/** Expand [startDate, endDate] to Set of YYYY-MM-DD strings (inclusive, local date). */
+function rangeToDateSet(startDate: string, endDate: string): Set<string> {
+  const parse = (s: string): Date | null => {
+    const parts = s.trim().split('-').map(Number);
+    if (parts.length !== 3) return null;
+    const [y, m, d] = parts;
+    const date = new Date(y, m - 1, d);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+  const start = parse(startDate);
+  const end = parse(endDate);
+  const out = new Set<string>();
+  if (!start || !end || start > end) return out;
+  const cur = new Date(start.getTime());
+  while (cur <= end) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    out.add(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+/** Count days in [startDate, endDate] that fall on active school days (0=Sun .. 6=Sat). */
+function countActiveSchoolDaysInRange(
+  startDate: string,
+  endDate: string,
+  activeDayOfWeeks: number[],
+): number {
+  const parse = (s: string): Date | null => {
+    const parts = s.trim().split('-').map(Number);
+    if (parts.length !== 3) return null;
+    const [y, m, d] = parts;
+    const date = new Date(y, m - 1, d);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+  const startParsed = parse(startDate);
+  const endParsed = parse(endDate);
+  if (!startParsed || !endParsed || startParsed > endParsed) return 0;
+  const set = new Set(activeDayOfWeeks);
+  let count = 0;
+  const cur = new Date(startParsed.getTime());
+  while (cur <= endParsed) {
+    if (set.has(cur.getDay())) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+/** Count active school days in range, excluding dates in excludedDates. */
+function countActiveSchoolDaysInRangeExcluding(
+  startDate: string,
+  endDate: string,
+  activeDayOfWeeks: number[],
+  excludedDates: Set<string>,
+): number {
+  const parse = (s: string): Date | null => {
+    const parts = s.trim().split('-').map(Number);
+    if (parts.length !== 3) return null;
+    const [y, m, d] = parts;
+    const date = new Date(y, m - 1, d);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+  const startParsed = parse(startDate);
+  const endParsed = parse(endDate);
+  if (!startParsed || !endParsed || startParsed > endParsed) return 0;
+  const daySet = new Set(activeDayOfWeeks);
+  let count = 0;
+  const cur = new Date(startParsed.getTime());
+  while (cur <= endParsed) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${d}`;
+    if (daySet.has(cur.getDay()) && !excludedDates.has(dateStr)) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
 export function LeaveRequestTable({
   requests,
   meta,
   onPageChange,
   isStaffView = false,
   studentNameMap,
+  activeSchoolDays,
+  excludedDates,
 }: LeaveRequestTableProps) {
   const [reviewModalOpened, { open: openReviewModal, close: closeReviewModal }] = useDisclosure(false);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
@@ -124,6 +228,7 @@ export function LeaveRequestTable({
           <Table.Tr>
             <Table.Th>Date Requested</Table.Th>
             <Table.Th>Leave Period</Table.Th>
+            <Table.Th>Days</Table.Th>
             <Table.Th>Student</Table.Th>
             <Table.Th>Reason</Table.Th>
             <Table.Th>Status</Table.Th>
@@ -136,7 +241,7 @@ export function LeaveRequestTable({
         <Table.Tbody>
           {requests.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={9}>
+              <Table.Td colSpan={10}>
                 <Text c="dimmed" ta="center" py="md">
                   No leave requests found
                 </Text>
@@ -158,6 +263,24 @@ export function LeaveRequestTable({
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm">{formatDateRange(request.startDate, request.endDate)}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">
+                      {activeSchoolDays?.length && excludedDates !== undefined
+                        ? countActiveSchoolDaysInRangeExcluding(
+                            request.startDate,
+                            request.endDate,
+                            activeSchoolDays,
+                            excludedDates,
+                          )
+                        : activeSchoolDays?.length
+                          ? countActiveSchoolDaysInRange(
+                              request.startDate,
+                              request.endDate,
+                              activeSchoolDays,
+                            )
+                          : getLeaveDays(request.startDate, request.endDate)}
+                    </Text>
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm" fw={500}>

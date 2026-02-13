@@ -20,6 +20,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
 import { useLeaveRequests, useStudentLeaveStats, useLeaveQuota } from '@/hooks/useLeaveRequests';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
+import { useSchoolDays, usePublicHolidays, useVacations } from '@/hooks/useScheduleSettings';
 import { LeaveRequestForm } from '@/components/features/leaves/LeaveRequestForm';
 import { LeaveRequestTable } from '@/components/features/leaves/LeaveRequestTable';
 import { apiClient } from '@/lib/api-client';
@@ -44,6 +46,7 @@ export default function LeavesPage() {
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
   const [page, setPage] = useState(1);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
 
   // For parents, fetch their children; for staff, fetch all students
   const userId = (user as User | undefined)?.id;
@@ -116,6 +119,35 @@ export default function LeavesPage() {
     page,
     limit: 20,
   });
+  const schoolDaysQuery = useSchoolDays();
+  const activeSchoolDays = schoolDaysQuery.data?.data ?? [];
+
+  const activeYearQuery = useActiveAcademicYear();
+  const activeYearId = activeYearQuery.data?.data?.id;
+  const holidaysQuery = usePublicHolidays(activeYearId);
+  const vacationsQuery = useVacations(activeYearId);
+
+  const excludedDates =
+    activeYearId && !holidaysQuery.isLoading && !vacationsQuery.isLoading
+      ? (() => {
+          const set = new Set<string>();
+          const addRange = (start: string, end: string) => {
+            const startD = new Date(start + 'T12:00:00');
+            const endD = new Date(end + 'T12:00:00');
+            const cur = new Date(startD.getTime());
+            while (cur <= endD) {
+              const y = cur.getFullYear();
+              const m = String(cur.getMonth() + 1).padStart(2, '0');
+              const d = String(cur.getDate()).padStart(2, '0');
+              set.add(`${y}-${m}-${d}`);
+              cur.setDate(cur.getDate() + 1);
+            }
+          };
+          (holidaysQuery.data?.data ?? []).forEach((h: { startDate: string; endDate: string }) => addRange(h.startDate, h.endDate));
+          (vacationsQuery.data?.data ?? []).forEach((v: { startDate: string; endDate: string }) => addRange(v.startDate, v.endDate));
+          return set;
+        })()
+      : undefined;
 
   const requests = leaveQuery.data?.data ?? [];
 
@@ -143,10 +175,10 @@ export default function LeavesPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs 
-          defaultValue={isParent ? 'my-requests' : 'all-requests'}
+        <Tabs
+          value={activeTab ?? (isParent ? 'my-requests' : 'all-requests')}
           onChange={(value) => {
-            // Refetch leave requests when switching to "all-requests" tab
+            setActiveTab(value);
             if (value === 'all-requests') {
               leaveQuery.refetch();
             }
@@ -298,7 +330,11 @@ export default function LeavesPage() {
                     <Card withBorder p="md">
                       <Stack gap="sm">
                         <Title order={3}>Request leave</Title>
-                        <LeaveRequestForm key={selectedStudent?.id || 'no-student'} student={selectedStudent} />
+                        <LeaveRequestForm
+                          key={selectedStudent?.id || 'no-student'}
+                          student={selectedStudent}
+                          onSuccess={() => setActiveTab('all-requests')}
+                        />
                       </Stack>
                     </Card>
                   </>
@@ -361,6 +397,8 @@ export default function LeavesPage() {
                   onPageChange={setPage}
                   isStaffView={!isParent}
                   studentNameMap={studentNameMap}
+                  activeSchoolDays={activeSchoolDays}
+                  excludedDates={excludedDates}
                 />
               )}
             </Stack>

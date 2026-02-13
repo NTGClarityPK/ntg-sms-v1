@@ -8,6 +8,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ScheduleService } from '../schedule/schedule.service';
 import { LeaveRequestDto } from './dto/leave-request.dto';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { UpdateLeaveStatusDto } from './dto/update-leave-status.dto';
@@ -40,12 +41,54 @@ function throwIfDbError(error: PostgrestError | null): void {
   );
 }
 
+/** Expand [startDate, endDate] to Set of YYYY-MM-DD strings (inclusive). */
+function rangeToDateSet(startDate: string, endDate: string): Set<string> {
+  const start = new Date(startDate + 'T12:00:00Z');
+  const end = new Date(endDate + 'T12:00:00Z');
+  const set = new Set<string>();
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return set;
+  const cur = new Date(start);
+  while (cur <= end) {
+    const y = cur.getUTCFullYear();
+    const m = String(cur.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(cur.getUTCDate()).padStart(2, '0');
+    set.add(`${y}-${m}-${d}`);
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return set;
+}
+
+/** Count days in [startDate, endDate] that are active school days and not in excludedDates. */
+function countActiveSchoolDaysInRangeExcluding(
+  startDate: string,
+  endDate: string,
+  activeDayOfWeeks: number[],
+  excludedDates: Set<string>,
+): number {
+  const start = new Date(startDate + 'T12:00:00Z');
+  const end = new Date(endDate + 'T12:00:00Z');
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return 0;
+  let count = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    const y = cur.getUTCFullYear();
+    const m = String(cur.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(cur.getUTCDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${d}`;
+    const dayOfWeek = cur.getUTCDay();
+    if (activeDayOfWeeks.includes(dayOfWeek) && !excludedDates.has(dateStr)) count++;
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return count;
+}
+
 @Injectable()
 export class LeaveRequestsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
     private readonly notificationsService: NotificationsService,
+    private readonly scheduleService: ScheduleService,
   ) {}
 
   private mapRowToDto(row: LeaveRequestRow): LeaveRequestDto {
@@ -576,17 +619,30 @@ export class LeaveRequestsService {
 
     throwIfDbError(leavesError);
 
+    const { data: activeSchoolDays } = await this.scheduleService.getSchoolDays();
+    const activeDaySet = activeSchoolDays ?? [];
+
+    const [holidaysRes, vacationsRes] = await Promise.all([
+      this.scheduleService.listPublicHolidays(activeYear.id, branchId),
+      this.scheduleService.listVacations(activeYear.id),
+    ]);
+    const excludedDates = new Set<string>();
+    (holidaysRes.data ?? []).forEach((h: { startDate: string; endDate: string }) => {
+      rangeToDateSet(h.startDate, h.endDate).forEach((d) => excludedDates.add(d));
+    });
+    (vacationsRes.data ?? []).forEach((v: { startDate: string; endDate: string }) => {
+      rangeToDateSet(v.startDate, v.endDate).forEach((d) => excludedDates.add(d));
+    });
+
     let usedDays = 0;
     let daysFromAbsences = 0;
     (approvedLeaves ?? []).forEach((row: { start_date: string; end_date: string; reason?: string | null }) => {
-      const start = new Date(row.start_date);
-      const end = new Date(row.end_date);
-      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-        return;
-      }
-      const diffMs = end.getTime() - start.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      const days = diffDays >= 0 ? diffDays + 1 : 0;
+      const days = countActiveSchoolDaysInRangeExcluding(
+        row.start_date,
+        row.end_date,
+        activeDaySet,
+        excludedDates,
+      );
       usedDays += days;
       if (row.reason === UNREQUESTED_ABSENCE_REASON) {
         daysFromAbsences += days;

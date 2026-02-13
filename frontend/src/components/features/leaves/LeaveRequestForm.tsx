@@ -32,9 +32,11 @@ const schema = z
 
 interface LeaveRequestFormProps {
   student: Student | null;
+  /** Called after a leave request is successfully submitted (e.g. switch to All requests tab). */
+  onSuccess?: () => void;
 }
 
-export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
+export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) {
   const colors = useThemeColors();
   const createLeave = useCreateLeaveRequest();
   const quotaQuery = useLeaveQuota(student?.id ?? null);
@@ -66,6 +68,7 @@ export function LeaveRequestForm({ student }: LeaveRequestFormProps) {
         reason: values.reason,
       });
       form.reset();
+      onSuccess?.();
     } catch {
       // Error notification is shown by useCreateLeaveRequest onError with backend message
     }
