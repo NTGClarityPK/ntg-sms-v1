@@ -12,6 +12,7 @@ export class ParentStudentDto {
   studentName?: string;
   studentStudentId?: string;
   parentPhone?: string; // Phone number from profiles table
+  parentEmail?: string; // Email from auth.users
 
   constructor(partial: Partial<ParentStudentDto>) {
     Object.assign(this, partial);

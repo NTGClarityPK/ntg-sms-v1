@@ -178,6 +178,21 @@ export class EarlyDepartureController {
     );
     return { data };
   }
+
+  @Post('authorize')
+  async authorizeEarlyDeparture(
+    @Body() input: CreateEarlyDepartureRequestDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'early_departure');
+    const data = await this.earlyDepartureService.authorizeEarlyDeparture(
+      input,
+      user.id,
+      branch.branchId,
+    );
+    return { data };
+  }
 }
 
 

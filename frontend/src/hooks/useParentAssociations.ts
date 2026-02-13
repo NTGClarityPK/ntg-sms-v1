@@ -17,6 +17,7 @@ export interface ParentAssociation {
   studentName?: string;
   studentStudentId?: string;
   parentPhone?: string; // Phone number from profiles table
+  parentEmail?: string; // Email from auth.users
 }
 
 export interface CreateParentAssociationInput {

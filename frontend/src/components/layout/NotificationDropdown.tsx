@@ -47,11 +47,16 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
       const date = notification.data.date as string;
       router.push(`/attendance/child?date=${date}`);
     } else if (notification.type === 'leave' && notification.data) {
-      // Future: Navigate to leave request page
       router.push('/leaves');
     } else if (notification.type === 'grade' && notification.data) {
-      // Future: Navigate to grades page
       router.push('/grades');
+    } else if (
+      (notification.type === 'early_departure' ||
+        notification.type === 'early_departure_request_raised' ||
+        notification.type === 'early_departure_excused') &&
+      notification.data
+    ) {
+      router.push('/early-departure');
     }
 
     onClose();
@@ -63,6 +68,8 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
         return notifyColors.info;
       case 'leave':
       case 'early_departure':
+      case 'early_departure_request_raised':
+      case 'early_departure_excused':
         return notifyColors.warning;
       case 'grade':
       case 'assessment_read':
@@ -148,6 +155,11 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
                       >
                         {notification.type}
                       </Badge>
+                      {notification.isCritical && (
+                        <Badge variant="filled" size="xs" color="red">
+                          Critical
+                        </Badge>
+                      )}
                       <Text fw={500} size="sm" lineClamp={1}>
                         {notification.title}
                       </Text>

@@ -10,7 +10,8 @@ export type NotificationType =
   | 'message'
   | 'assessment_read'
   | 'early_departure'
-  | 'early_departure_request_raised';
+  | 'early_departure_request_raised'
+  | 'early_departure_excused';
 
 export interface Notification {
   id: string;
@@ -20,6 +21,7 @@ export interface Notification {
   body?: string;
   data?: Record<string, unknown>;
   isRead: boolean;
+  isCritical?: boolean;
   createdAt: string;
 }
 

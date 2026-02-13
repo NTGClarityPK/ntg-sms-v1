@@ -219,21 +219,23 @@ export class EarlyDepartureService {
       throw new BadRequestException('No active academic year found');
     }
 
-    // One early departure per student per day: block if same date already has pending or approved request
+    // One early departure per student per day: block if same date already has pending, approved, or excused request
     const { data: existing } = await supabase
       .from('early_departure_requests')
       .select('id, status')
       .eq('branch_id', branchId)
       .eq('student_id', input.studentId)
       .eq('date', input.date)
-      .in('status', ['pending', 'approved'])
+      .in('status', ['pending', 'approved', 'excused'])
       .maybeSingle();
 
     if (existing) {
       const message =
         existing.status === 'pending'
           ? 'A request for this day is already pending. Please wait for it to be reviewed before submitting another.'
-          : 'An early departure for this day has already been approved. You cannot submit another request for the same day.';
+          : existing.status === 'excused'
+            ? 'An early departure for this day has already been authorized by staff.'
+            : 'An early departure for this day has already been approved. You cannot submit another request for the same day.';
       throw new BadRequestException(message);
     }
 
@@ -275,6 +277,101 @@ export class EarlyDepartureService {
           studentName,
           date: row.date,
           time: row.departure_time,
+          earlyDepartureRequestId: row.id,
+        });
+      }
+    } catch {
+      // ignore notification errors
+    }
+
+    // Map with conflict detection
+    return this.mapRowToDtoWithConflict(row, branchId);
+  }
+
+  /**
+   * Staff authorization: Create an early departure request with 'excused' status (no approval workflow).
+   * Notifies parent(s) with critical notification.
+   */
+  async authorizeEarlyDeparture(
+    input: CreateEarlyDepartureRequestDto,
+    authorizedByUserId: string,
+    branchId: string,
+  ): Promise<EarlyDepartureRequestDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const activeYear =
+      await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      throw new BadRequestException('No active academic year found');
+    }
+
+    // Check for existing approved or excused request on same date
+    // Allow authorization even if there's a pending request (staff can override in emergencies)
+    const { data: existing } = await supabase
+      .from('early_departure_requests')
+      .select('id, status')
+      .eq('branch_id', branchId)
+      .eq('student_id', input.studentId)
+      .eq('date', input.date)
+      .in('status', ['approved', 'excused'])
+      .maybeSingle();
+
+    if (existing) {
+      const message =
+        existing.status === 'excused'
+          ? 'An early departure for this day has already been authorized.'
+          : 'An early departure for this day has already been approved.';
+      throw new BadRequestException(message);
+    }
+
+    const { data, error } = await supabase
+      .from('early_departure_requests')
+      .insert({
+        student_id: input.studentId,
+        requested_by: authorizedByUserId,
+        date: input.date,
+        departure_time: input.departureTime,
+        reason: input.reason ?? null,
+        attachment_url: input.attachmentUrl ?? null,
+        status: 'excused',
+        branch_id: branchId,
+        academic_year_id: activeYear.id,
+      })
+      .select()
+      .single();
+
+    throwIfDbError(error);
+    if (!data) {
+      throw new BadRequestException('Failed to authorize early departure');
+    }
+
+    const row = data as EarlyDepartureRow;
+
+    // Notify parent(s) with critical notification
+    try {
+      const { data: parentStudents } = await supabase
+        .from('parent_students')
+        .select('parent_user_id')
+        .eq('student_id', input.studentId);
+
+      if (parentStudents && parentStudents.length > 0) {
+        const parentUserIds = parentStudents.map((ps) => ps.parent_user_id);
+        const studentName = await this.getStudentNameForNotification(input.studentId);
+        
+        // Get authorized by name
+        const { data: authorizedByProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', authorizedByUserId)
+          .maybeSingle();
+        const authorizedByName = (authorizedByProfile as { full_name?: string } | null)?.full_name || 'Staff';
+
+        await this.notificationsService.createEarlyDepartureExcusedNotification({
+          recipientUserIds: parentUserIds,
+          studentName,
+          date: row.date,
+          time: row.departure_time,
+          authorizedBy: authorizedByName,
           earlyDepartureRequestId: row.id,
         });
       }
@@ -682,6 +779,7 @@ export class EarlyDepartureService {
       totalRejected: number;
       totalCancelled: number;
       totalPending: number;
+      totalExcused: number;
     }>
   > {
     const supabase = this.supabaseConfig.getClient();
@@ -783,6 +881,7 @@ export class EarlyDepartureService {
         totalRejected: number;
         totalCancelled: number;
         totalPending: number;
+        totalExcused: number;
       }
     >();
 
@@ -794,6 +893,7 @@ export class EarlyDepartureService {
           totalRejected: 0,
           totalCancelled: 0,
           totalPending: 0,
+          totalExcused: 0,
         });
       }
 
@@ -812,6 +912,9 @@ export class EarlyDepartureService {
           break;
         case 'pending':
           stats.totalPending++;
+          break;
+        case 'excused':
+          stats.totalExcused++;
           break;
       }
     });

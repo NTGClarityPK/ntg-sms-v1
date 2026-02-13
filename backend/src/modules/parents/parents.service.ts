@@ -65,6 +65,18 @@ export class ParentsService {
       ]),
     );
 
+    // Fetch emails from auth.users
+    const emailMap = new Map<string, string>();
+    if (parentUserIds.length > 0) {
+      const emailPromises = parentUserIds.map((id) =>
+        supabase.auth.admin.getUserById(id).then((res) => [id, res.data.user?.email || ''] as const).catch(() => [id, ''] as const),
+      );
+      const emailEntries = await Promise.all(emailPromises);
+      emailEntries.forEach(([id, email]) => {
+        if (email) emailMap.set(id, email);
+      });
+    }
+
     const { data: students, error: studentsError } = await supabase
       .from('students')
       .select('id, student_id, user_id')
@@ -117,6 +129,7 @@ export class ParentsService {
         studentName,
         studentStudentId: student?.student_id,
         parentPhone: parentPhoneById.get(row.parent_user_id),
+        parentEmail: emailMap.get(row.parent_user_id),
       });
     });
   }

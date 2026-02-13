@@ -45,6 +45,8 @@ export default function NotificationsPage() {
         return notifyColors.info;
       case 'leave':
       case 'early_departure':
+      case 'early_departure_request_raised':
+      case 'early_departure_excused':
         return notifyColors.warning;
       case 'grade':
       case 'assessment_read':
@@ -114,9 +116,16 @@ export default function NotificationsPage() {
               onClick={() => handleNotificationClick(notification)}
             >
               <Table.Td>
-                <Badge variant="light" color={getTypeColor(notification.type)}>
-                  {notification.type}
-                </Badge>
+                <Group gap="xs">
+                  <Badge variant="light" color={getTypeColor(notification.type)}>
+                    {notification.type}
+                  </Badge>
+                  {notification.isCritical && (
+                    <Badge variant="filled" color="red" size="sm">
+                      Critical
+                    </Badge>
+                  )}
+                </Group>
               </Table.Td>
               <Table.Td>
                 <Text fw={notification.isRead ? 400 : 600}>

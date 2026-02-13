@@ -74,6 +74,13 @@ interface CreateEarlyDepartureInput {
   attachmentUrl?: string;
 }
 
+interface AuthorizeEarlyDepartureInput {
+  studentId: string;
+  date: string;
+  departureTime: string;
+  reason?: string;
+}
+
 export function useCreateEarlyDeparture() {
   const queryClient = useQueryClient();
   const notifyColors = useThemeColors();
@@ -102,6 +109,41 @@ export function useCreateEarlyDeparture() {
       const message = getApiErrorMessage(
         error,
         'Failed to submit early departure request',
+      );
+      notifications.show({
+        title: 'Error',
+        message,
+        color: notifyColors.error,
+      });
+    },
+  });
+}
+
+export function useAuthorizeEarlyDeparture() {
+  const queryClient = useQueryClient();
+  const notifyColors = useThemeColors();
+
+  return useMutation({
+    mutationFn: async (input: AuthorizeEarlyDepartureInput) => {
+      const response = await apiClient.post<{ data: EarlyDepartureRequest }>(
+        '/api/v1/early-departures/authorize',
+        input,
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['early-departures'] });
+      queryClient.invalidateQueries({ queryKey: ['early-departures', 'statistics'] });
+      notifications.show({
+        title: 'Success',
+        message: 'Early departure authorized successfully',
+        color: notifyColors.success,
+      });
+    },
+    onError: (error: unknown) => {
+      const message = getApiErrorMessage(
+        error,
+        'Failed to authorize early departure',
       );
       notifications.show({
         title: 'Error',
@@ -230,6 +272,7 @@ export interface StudentEarlyDepartureStatistics {
   totalRejected: number;
   totalCancelled: number;
   totalPending: number;
+  totalExcused: number;
 }
 
 export function useEarlyDepartureStatistics() {

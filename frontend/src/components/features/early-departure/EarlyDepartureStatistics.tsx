@@ -32,7 +32,7 @@ export function EarlyDepartureStatistics({
   }
 
   return (
-    <Table striped highlightOnHover>
+      <Table striped highlightOnHover>
       <Table.Thead>
         <Table.Tr>
           <Table.Th>Student</Table.Th>
@@ -41,6 +41,7 @@ export function EarlyDepartureStatistics({
           <Table.Th>Rejected</Table.Th>
           <Table.Th>Cancelled</Table.Th>
           <Table.Th>Pending</Table.Th>
+          <Table.Th>Excused</Table.Th>
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
@@ -74,6 +75,11 @@ export function EarlyDepartureStatistics({
             <Table.Td>
               <Badge variant="light" color="yellow" size="sm">
                 {stat.totalPending}
+              </Badge>
+            </Table.Td>
+            <Table.Td>
+              <Badge variant="light" color="blue" size="sm">
+                {stat.totalExcused}
               </Badge>
             </Table.Td>
           </Table.Tr>

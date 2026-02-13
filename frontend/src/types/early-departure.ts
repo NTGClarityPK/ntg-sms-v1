@@ -1,4 +1,4 @@
-export type EarlyDepartureStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type EarlyDepartureStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'excused';
 
 export interface EarlyDepartureRequest {
   id: string;

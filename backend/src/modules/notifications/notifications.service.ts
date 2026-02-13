@@ -17,6 +17,7 @@ type NotificationRow = {
   body: string | null;
   data: Record<string, unknown> | null;
   is_read: boolean;
+  is_critical: boolean | null;
   created_at: string;
 };
 
@@ -46,7 +47,7 @@ export class NotificationsService {
 
     let dbQuery = supabase
       .from('notifications')
-      .select('id, user_id, type, title, body, data, is_read, created_at', { count: 'exact' })
+      .select('id, user_id, type, title, body, data, is_read, is_critical, created_at', { count: 'exact' })
       .eq('user_id', userId);
 
     if (query.isRead !== undefined) {
@@ -118,7 +119,7 @@ export class NotificationsService {
 
     const { data, error, count } = await supabase
       .from('notifications')
-      .select('id, user_id, type, title, body, data, is_read, created_at', { count: 'exact' })
+      .select('id, user_id, type, title, body, data, is_read, is_critical, created_at', { count: 'exact' })
       .eq('user_id', userId)
       .eq('is_read', false)
       .order('created_at', { ascending: false })
@@ -148,6 +149,7 @@ export class NotificationsService {
           body: row.body ?? undefined,
           data: row.data ?? undefined,
           isRead: row.is_read,
+          isCritical: row.is_critical ?? false,
           createdAt: row.created_at,
         }),
     );
@@ -182,7 +184,7 @@ export class NotificationsService {
 
     const { data, error } = await supabase
       .from('notifications')
-      .select('id, user_id, type, title, body, data, is_read, created_at')
+      .select('id, user_id, type, title, body, data, is_read, is_critical, created_at')
       .eq('id', id)
       .eq('user_id', userId)
       .single();
@@ -201,6 +203,7 @@ export class NotificationsService {
       body: row.body ?? undefined,
       data: row.data ?? undefined,
       isRead: row.is_read,
+      isCritical: row.is_critical ?? false,
       createdAt: row.created_at,
     });
   }
@@ -225,7 +228,7 @@ export class NotificationsService {
       .from('notifications')
       .update({ is_read: true })
       .eq('id', id)
-      .select()
+      .select('id, user_id, type, title, body, data, is_read, is_critical, created_at')
       .single();
 
     throwIfDbError(updateError);
@@ -242,6 +245,7 @@ export class NotificationsService {
       body: row.body ?? undefined,
       data: row.data ?? undefined,
       isRead: row.is_read,
+      isCritical: row.is_critical ?? false,
       createdAt: row.created_at,
     });
   }
@@ -270,8 +274,9 @@ export class NotificationsService {
         body: input.body || null,
         data: input.data || null,
         is_read: false,
+        is_critical: input.isCritical || false,
       })
-      .select()
+      .select('id, user_id, type, title, body, data, is_read, is_critical, created_at')
       .single();
 
     throwIfDbError(error);
@@ -288,6 +293,7 @@ export class NotificationsService {
       body: row.body ?? undefined,
       data: row.data ?? undefined,
       isRead: row.is_read,
+      isCritical: row.is_critical ?? false,
       createdAt: row.created_at,
     });
   }
@@ -530,6 +536,49 @@ export class NotificationsService {
         'Failed to create early departure notification:',
         errorMessage,
       );
+    }
+  }
+
+  async createEarlyDepartureExcusedNotification(params: {
+    recipientUserIds: string[];
+    studentName: string;
+    date: string;
+    time: string;
+    authorizedBy: string;
+    earlyDepartureRequestId: string;
+  }): Promise<void> {
+    if (params.recipientUserIds.length === 0) return;
+    try {
+      const dateFormatted = new Date(params.date).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      const notifications = params.recipientUserIds.map((user_id) => ({
+        user_id,
+        type: 'early_departure_excused',
+        title: 'Early departure authorized',
+        body: `${params.studentName}'s early departure has been authorized by staff for ${dateFormatted} at ${params.time}.`,
+        data: {
+          earlyDepartureRequestId: params.earlyDepartureRequestId,
+          date: params.date,
+          time: params.time,
+          authorizedBy: params.authorizedBy,
+        },
+        is_read: false,
+        is_critical: true,
+      }));
+
+      const supabase = this.supabaseConfig.getClient();
+      const { error } = await supabase.from('notifications').insert(notifications);
+      if (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Failed to create early departure excused notifications:', errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to create early departure excused notifications:', errorMessage);
     }
   }
 }

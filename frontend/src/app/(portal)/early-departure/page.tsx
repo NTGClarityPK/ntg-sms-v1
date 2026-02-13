@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
 import { useEarlyDepartures, useStudentEarlyDepartureStats, useEarlyDepartureStatistics } from '@/hooks/useEarlyDepartures';
 import { EarlyDepartureForm } from '@/components/features/early-departure/EarlyDepartureForm';
+import { AuthorizeEarlyDepartureForm } from '@/components/features/early-departure/AuthorizeEarlyDepartureForm';
 import { EarlyDepartureTable } from '@/components/features/early-departure/EarlyDepartureTable';
 import { EarlyDepartureStatistics } from '@/components/features/early-departure/EarlyDepartureStatistics';
 import { apiClient } from '@/lib/api-client';
@@ -149,7 +150,7 @@ export default function EarlyDeparturePage() {
         }}
       >
         <Tabs
-          value={activeTab ?? (isParent ? 'my-requests' : 'all-requests')}
+          value={activeTab ?? (isParent ? 'my-requests' : 'authorize')}
           onChange={(value) => {
             setActiveTab(value);
             if (value === 'all-requests') {
@@ -161,6 +162,7 @@ export default function EarlyDeparturePage() {
         >
           <Tabs.List>
             {isParent && <Tabs.Tab value="my-requests">Raise a request</Tabs.Tab>}
+            {!isParent && <Tabs.Tab value="authorize">Authorize Early Departure</Tabs.Tab>}
             <Tabs.Tab value="all-requests">All requests</Tabs.Tab>
             <Tabs.Tab value="statistics">Past Statistics</Tabs.Tab>
           </Tabs.List>
@@ -290,6 +292,22 @@ export default function EarlyDeparturePage() {
                     No student found for your account. {children.length > 0 ? `Found ${children.length} linked children, but no matching students.` : 'No children linked to your account.'}
                   </Text>
                 )}
+              </Stack>
+            </Tabs.Panel>
+          )}
+
+          {!isParent && (
+            <Tabs.Panel value="authorize" pt="md">
+              <Stack gap="md">
+                <Card withBorder p="md">
+                  <AuthorizeEarlyDepartureForm
+                    onSuccess={() => {
+                      setActiveTab('all-requests');
+                      requestsQuery.refetch();
+                      statisticsQuery.refetch();
+                    }}
+                  />
+                </Card>
               </Stack>
             </Tabs.Panel>
           )}
