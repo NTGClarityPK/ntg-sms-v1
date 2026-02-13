@@ -12,6 +12,7 @@ type ParentStudentRow = {
   relationship: 'father' | 'mother' | 'guardian';
   is_primary: boolean;
   can_approve: boolean;
+  priority: number | null;
   created_at: string;
 };
 
@@ -45,7 +46,7 @@ export class ParentsService {
       parentUserIds.length > 0
         ? await supabase
             .from('profiles')
-            .select('id, full_name')
+            .select('id, full_name, phone')
             .in('id', parentUserIds)
         : { data: [], error: null };
     throwIfDbError(parentProfilesError);
@@ -54,6 +55,13 @@ export class ParentsService {
       (parentProfiles || []).map((p) => [
         (p as { id: string }).id,
         (p as { full_name: string }).full_name,
+      ]),
+    );
+
+    const parentPhoneById = new Map(
+      (parentProfiles || []).map((p) => [
+        (p as { id: string }).id,
+        (p as { phone: string | null })?.phone ?? undefined,
       ]),
     );
 
@@ -103,10 +111,12 @@ export class ParentsService {
         relationship: row.relationship,
         isPrimary: row.is_primary,
         canApprove: row.can_approve,
+        priority: row.priority ?? undefined,
         createdAt: row.created_at,
         parentName: parentNameById.get(row.parent_user_id),
         studentName,
         studentStudentId: student?.student_id,
+        parentPhone: parentPhoneById.get(row.parent_user_id),
       });
     });
   }
@@ -134,7 +144,7 @@ export class ParentsService {
       dbQuery = dbQuery.in('student_id', studentIds);
     }
 
-    const { data, error } = await dbQuery.order('created_at', { ascending: false });
+    const { data, error } = await dbQuery.order('priority', { ascending: true, nullsFirst: false });
 
     throwIfDbError(error);
 
@@ -167,7 +177,42 @@ export class ParentsService {
       throw new BadRequestException('Child is already linked to this parent');
     }
 
-    // If this is marked as primary, unset other primary links
+    // Check current guardian count for this student
+    const { data: existingGuardians, error: countError } = await supabase
+      .from('parent_students')
+      .select('id, priority')
+      .eq('student_id', input.studentId);
+
+    throwIfDbError(countError);
+
+    const guardianCount = (existingGuardians || []).length;
+    
+    // Enforce max 2 guardians per student
+    if (guardianCount >= 2) {
+      throw new BadRequestException('Maximum 2 guardians allowed per student');
+    }
+
+    // Determine priority: auto-assign if not provided
+    let priority: number;
+    if (input.priority !== undefined) {
+      // Validate provided priority
+      if (input.priority < 1 || input.priority > 2) {
+        throw new BadRequestException('Priority must be 1 or 2');
+      }
+      // Check if priority already exists
+      const priorityExists = (existingGuardians || []).some(
+        (g) => g.priority === input.priority,
+      );
+      if (priorityExists) {
+        throw new BadRequestException(`Priority ${input.priority} already assigned to another guardian`);
+      }
+      priority = input.priority;
+    } else {
+      // Auto-assign priority: 1 if no guardians, 2 if one guardian exists
+      priority = guardianCount === 0 ? 1 : 2;
+    }
+
+    // If this is marked as primary, unset other primary links (backward compatibility)
     if (input.isPrimary) {
       await supabase
         .from('parent_students')
@@ -183,6 +228,7 @@ export class ParentsService {
         relationship: input.relationship,
         is_primary: input.isPrimary ?? false,
         can_approve: input.canApprove ?? true,
+        priority,
       })
       .select()
       .single();
@@ -200,6 +246,14 @@ export class ParentsService {
   async unlinkChild(parentUserId: string, studentId: string): Promise<void> {
     const supabase = this.supabaseConfig.getClient();
 
+    // Get the guardian being removed to check priority
+    const { data: guardianToRemove } = await supabase
+      .from('parent_students')
+      .select('priority')
+      .eq('parent_user_id', parentUserId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
     const { error } = await supabase
       .from('parent_students')
       .delete()
@@ -207,6 +261,48 @@ export class ParentsService {
       .eq('student_id', studentId);
 
     throwIfDbError(error);
+
+    // If we removed priority 1, promote priority 2 to 1
+    if (guardianToRemove && guardianToRemove.priority === 1) {
+      await supabase
+        .from('parent_students')
+        .update({ priority: 1 })
+        .eq('student_id', studentId)
+        .eq('priority', 2);
+    }
+  }
+
+  /**
+   * Get all guardians for a student, ordered by priority (1 = Primary, 2 = Secondary)
+   */
+  async getGuardiansForStudent(studentId: string): Promise<ParentStudentDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data, error } = await supabase
+      .from('parent_students')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('priority', { ascending: true, nullsFirst: false });
+
+    throwIfDbError(error);
+
+    return this.hydrateAssociations((data || []) as unknown as ParentStudentRow[]);
+  }
+
+  /**
+   * Get primary guardian (priority 1) for a student
+   */
+  async getPrimaryGuardian(studentId: string): Promise<ParentStudentDto | null> {
+    const guardians = await this.getGuardiansForStudent(studentId);
+    return guardians.find((g) => g.priority === 1) || null;
+  }
+
+  /**
+   * Get secondary guardian (priority 2) for a student
+   */
+  async getSecondaryGuardian(studentId: string): Promise<ParentStudentDto | null> {
+    const guardians = await this.getGuardiansForStudent(studentId);
+    return guardians.find((g) => g.priority === 2) || null;
   }
 
   async selectChild(userId: string, input: SelectChildDto): Promise<void> {
@@ -314,8 +410,11 @@ export class ParentsService {
     }
 
     // Apply pagination
+    // Order by priority first (1 = Primary, 2 = Secondary), then by created_at descending
+    // This ensures guardians are sorted correctly when filtering by student
     const { data, error, count } = await dbQuery
       .range(from, to)
+      .order('priority', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false });
 
     throwIfDbError(error);

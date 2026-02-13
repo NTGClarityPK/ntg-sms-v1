@@ -11,10 +11,12 @@ export interface ParentAssociation {
   relationship: 'father' | 'mother' | 'guardian';
   isPrimary: boolean;
   canApprove: boolean;
+  priority?: number; // 1 = Primary guardian, 2 = Secondary guardian
   createdAt: string;
   parentName?: string;
   studentName?: string;
   studentStudentId?: string;
+  parentPhone?: string; // Phone number from profiles table
 }
 
 export interface CreateParentAssociationInput {
@@ -23,6 +25,7 @@ export interface CreateParentAssociationInput {
   relationship: 'father' | 'mother' | 'guardian';
   isPrimary?: boolean;
   canApprove?: boolean;
+  priority?: number; // Optional: if not provided, will be auto-assigned
 }
 
 interface QueryParentAssociationsParams {
@@ -68,6 +71,7 @@ export function useCreateParentAssociation() {
           relationship: input.relationship,
           isPrimary: input.isPrimary ?? false,
           canApprove: input.canApprove ?? true,
+          priority: input.priority,
         },
       );
       return response.data;
@@ -100,6 +104,7 @@ export function useDeleteParentAssociation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['parent-associations'] });
+      queryClient.invalidateQueries({ queryKey: ['student-guardians'] });
       notifications.show({
         title: 'Success',
         message: 'Association removed successfully',
@@ -113,6 +118,24 @@ export function useDeleteParentAssociation() {
         color: colors.error,
       });
     },
+  });
+}
+
+/**
+ * Hook to get guardians for a specific student (ordered by priority)
+ */
+export function useStudentGuardians(studentId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['student-guardians', studentId],
+    queryFn: async () => {
+      if (!studentId) return null;
+      const response = await apiClient.get<ParentAssociation[]>(
+        `/api/v1/parents/students/${studentId}/guardians`,
+      );
+      return response;
+    },
+    enabled: !!studentId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 

@@ -171,6 +171,12 @@ export function Sidebar({
   const navbarConfig = themeConfig?.components?.navbar;
   const navButtonConfig = themeConfig?.components?.navButton;
 
+  // Check if user is super admin (should see everything)
+  const isSuperAdmin = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return roleName === 'super_admin';
+  }) || false;
+
   // Check if user is a teacher (subject_teacher or class_teacher)
   const isTeacher = user?.roles?.some((r) => {
     const roleName = r.roleName?.toLowerCase();
@@ -214,6 +220,9 @@ export function Sidebar({
   }) || false;
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
+    // Super admin sees everything - bypass all filters
+    if (isSuperAdmin) return true;
+
     const featureCode = getFeatureCodeForPath(item.href);
     if (featureCode && !canView(featureCode)) return false;
 

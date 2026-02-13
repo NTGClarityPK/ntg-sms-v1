@@ -1,15 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { SimpleGrid, Text, Paper, Button, Group } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { useMemo } from 'react';
+import { SimpleGrid, Text, Paper, Group } from '@mantine/core';
 import type { ClassSection } from '@/types/class-sections';
 import { ClassSectionCard } from './ClassSectionCard';
 import { useClasses } from '@/hooks/useCoreLookups';
 import { useSections } from '@/hooks/useCoreLookups';
 import { useAcademicYears } from '@/hooks/useAcademicYears';
-import { useDisclosure } from '@mantine/hooks';
-import { CreateClassSectionModal } from './CreateClassSectionModal';
 
 interface ClassSectionGridProps {
   classSections: ClassSection[];
@@ -19,9 +16,6 @@ export function ClassSectionGrid({ classSections }: ClassSectionGridProps) {
   const { data: classesData } = useClasses();
   const { data: sectionsData } = useSections();
   const { data: academicYearsData } = useAcademicYears();
-  const [opened, { open, close }] = useDisclosure(false);
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
-  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
 
   const activeYear = academicYearsData?.data?.find((y) => y.isActive);
   const classes = classesData?.data || [];
@@ -96,34 +90,10 @@ export function ClassSectionGrid({ classSections }: ClassSectionGridProps) {
                   </Text>
                 </div>
               </Group>
-              <Group justify="flex-end" mt="md">
-                <Button
-                  leftSection={<IconPlus size={16} />}
-                  variant="light"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedClassId(combo.classId);
-                    setSelectedSectionId(combo.sectionId);
-                    open();
-                  }}
-                >
-                  Create
-                </Button>
-              </Group>
             </Paper>
           );
         })}
       </SimpleGrid>
-      <CreateClassSectionModal
-        opened={opened}
-        onClose={() => {
-          close();
-          setSelectedClassId(null);
-          setSelectedSectionId(null);
-        }}
-        initialClassId={selectedClassId}
-        initialSectionId={selectedSectionId}
-      />
     </>
   );
 }

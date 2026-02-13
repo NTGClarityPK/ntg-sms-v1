@@ -22,7 +22,16 @@ export function useUpdateTenantMe() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: { name?: string; primaryColor?: string }) => {
+    mutationFn: async (payload: {
+      name?: string;
+      domain?: string;
+      email?: string;
+      phone?: string;
+      timezone?: string;
+      fiscalYearStart?: string;
+      vatNumber?: string;
+      primaryColor?: string;
+    }) => {
       const res = await apiClient.patch<Tenant>('/api/v1/tenants/me', payload);
       return res;
     },
@@ -50,6 +59,48 @@ export function useUploadTenantLogo() {
       await qc.invalidateQueries({ queryKey: tenantKeys.me() });
       await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
     },
+  });
+}
+
+export function useAllTenants() {
+  return useQuery({
+    queryKey: [...tenantKeys.all, 'all'],
+    queryFn: async () => {
+      const res = await apiClient.get<Tenant[]>('/api/v1/tenants/all');
+      return res;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export interface TenantAdminInfo {
+  userId: string;
+  email: string;
+  fullName?: string | null;
+}
+
+export interface TenantStatistics {
+  tenantId: string;
+  tenantName: string;
+  tenantCode: string;
+  totalBranches: number;
+  totalUsers: number;
+  totalStudents: number;
+  schoolAdmins: TenantAdminInfo[];
+  domain?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  totalStaff?: number;
+}
+
+export function useTenantStatistics() {
+  return useQuery({
+    queryKey: [...tenantKeys.all, 'statistics'],
+    queryFn: async () => {
+      const res = await apiClient.get<TenantStatistics[]>('/api/v1/tenants/statistics');
+      return res;
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes - statistics change more frequently
   });
 }
 

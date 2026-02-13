@@ -1,4 +1,4 @@
-import { IsUUID, IsString, IsOptional, IsBoolean, IsIn } from 'class-validator';
+import { IsUUID, IsString, IsOptional, IsBoolean, IsIn, IsInt, Min, Max } from 'class-validator';
 
 export class LinkChildDto {
   @IsUUID()
@@ -15,5 +15,11 @@ export class LinkChildDto {
   @IsOptional()
   @IsBoolean()
   canApprove?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2)
+  priority?: number; // Optional: if not provided, will be auto-assigned
 }
 

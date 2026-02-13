@@ -23,7 +23,7 @@ export default function AssessmentSettingsPage() {
         <Tabs.List>
           <Tabs.Tab value="types">Assessment types</Tabs.Tab>
           <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
-          <Tabs.Tab value="assignments">Assignments</Tabs.Tab>
+          <Tabs.Tab value="assignments">Grading Config</Tabs.Tab>
           <Tabs.Tab value="leave">Leave quota</Tabs.Tab>
         </Tabs.List>
 

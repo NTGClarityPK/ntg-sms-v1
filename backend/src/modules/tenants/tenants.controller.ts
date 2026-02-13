@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpStatus,
   ParseFilePipeBuilder,
@@ -14,9 +15,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, type CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { TenantsService } from './tenants.service';
 import { TenantDto } from './dto/tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { TenantStatisticsDto } from './dto/tenant-statistics.dto';
 
 type UploadedLogoFile = {
   originalname: string;
@@ -41,6 +44,12 @@ export class TenantsController {
   ): Promise<{ data: TenantDto }> {
     const updated = await this.tenantsService.updateMe(branch.tenantId, {
       name: body.name,
+      domain: body.domain,
+      email: body.email,
+      phone: body.phone,
+      timezone: body.timezone,
+      fiscalYearStart: body.fiscalYearStart,
+      vatNumber: body.vatNumber,
       primaryColor: body.primaryColor,
     });
     return { data: updated.data };
@@ -65,6 +74,36 @@ export class TenantsController {
     file: UploadedLogoFile,
   ): Promise<{ data: TenantDto }> {
     return this.tenantsService.uploadLogo(branch.tenantId, file);
+  }
+
+  @Get('all')
+  @UseGuards(JwtAuthGuard)
+  async listAll(@CurrentUser() user: CurrentUserPayload): Promise<{ data: TenantDto[] }> {
+    // Super admin only access
+    const isSuperAdmin = user.roles?.includes('super_admin');
+    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
+    const isOwner = user.roles?.includes('tenant_owner');
+    
+    if (!isSuperAdmin && !isDev && !isOwner) {
+      throw new ForbiddenException('This endpoint is only accessible to super admins, developers and owners');
+    }
+
+    return this.tenantsService.listAll();
+  }
+
+  @Get('statistics')
+  @UseGuards(JwtAuthGuard)
+  async getStatistics(@CurrentUser() user: CurrentUserPayload): Promise<{ data: TenantStatisticsDto[] }> {
+    // Super admin only access
+    const isSuperAdmin = user.roles?.includes('super_admin');
+    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
+    const isOwner = user.roles?.includes('tenant_owner');
+    
+    if (!isSuperAdmin && !isDev && !isOwner) {
+      throw new ForbiddenException('This endpoint is only accessible to super admins, developers and owners');
+    }
+
+    return this.tenantsService.getTenantStatistics();
   }
 }
 

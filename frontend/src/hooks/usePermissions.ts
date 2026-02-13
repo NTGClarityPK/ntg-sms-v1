@@ -61,7 +61,15 @@ export function usePermissions() {
   };
 
   const canView = (featureCode: string): boolean => {
-    if (!user?.roles || !branchId) return false;
+    if (!user?.roles) return false;
+
+    // Super admin has access to everything (even without branch)
+    const isSuperAdmin = user.roles.some(
+      (r) => r.roleName?.toLowerCase() === 'super_admin',
+    );
+    if (isSuperAdmin) return true;
+
+    if (!branchId) return false;
 
     const isSchoolAdmin = user.roles.some(
       (r) => r.roleName?.toLowerCase() === 'school_admin',
@@ -77,7 +85,15 @@ export function usePermissions() {
   };
 
   const canEdit = (featureCode: string): boolean => {
-    if (!user?.roles || !branchId) return false;
+    if (!user?.roles) return false;
+
+    // Super admin has access to everything (even without branch)
+    const isSuperAdmin = user.roles.some(
+      (r) => r.roleName?.toLowerCase() === 'super_admin',
+    );
+    if (isSuperAdmin) return true;
+
+    if (!branchId) return false;
 
     const isSchoolAdmin = user.roles.some(
       (r) => r.roleName?.toLowerCase() === 'school_admin',

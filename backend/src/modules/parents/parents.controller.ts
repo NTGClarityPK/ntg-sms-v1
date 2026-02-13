@@ -132,5 +132,15 @@ export class ParentsController {
     await this.parentsService.unlinkChild(id, studentId);
     return { data: { success: true } };
   }
+
+  @Get('students/:studentId/guardians')
+  @UseGuards(BranchGuard)
+  async getGuardiansForStudent(
+    @Param('studentId') studentId: string,
+    @CurrentBranch() branch?: { branchId: string; tenantId: string },
+  ) {
+    const data = await this.parentsService.getGuardiansForStudent(studentId);
+    return { data };
+  }
 }
 

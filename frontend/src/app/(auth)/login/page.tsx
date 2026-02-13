@@ -88,7 +88,24 @@ export default function LoginPage() {
         throw new Error('Session not created');
       }
       
-      // Fetch user's branches
+      // Check if user is super admin first
+      try {
+        const userResponse = await apiClient.get<{ roles?: Array<{ roleName?: string }> }>('/api/v1/auth/me');
+        const isSuperAdmin = userResponse.data?.roles?.some(
+          (r) => r.roleName?.toLowerCase() === 'super_admin'
+        );
+
+        if (isSuperAdmin) {
+          // Super admin goes directly to admin portal (no branch needed)
+          window.location.href = '/adminportal';
+          return;
+        }
+      } catch (userError: any) {
+        console.error('Failed to check user role:', userError);
+        // Continue with normal flow if check fails
+      }
+
+      // Fetch user's branches for regular users
       try {
         const response = await apiClient.get<Branch[]>('/api/v1/auth/my-branches');
         const userBranches = response.data || [];

@@ -2,53 +2,51 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Skeleton, Container, Stack } from '@mantine/core';
+import { Skeleton, Container, Stack, Alert, Text } from '@mantine/core';
 import { getSession } from '@/lib/auth';
 import { apiClient } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useThemeStore } from '@/lib/store/theme-store';
-import type { Tenant } from '@/types/tenant';
+import type { User } from '@/types/auth';
 
-interface AuthGuardProps {
+interface AdminAuthGuardProps {
   children: React.ReactNode;
 }
 
-export function AuthGuard({ children }: AuthGuardProps) {
+export function AdminAuthGuard({ children }: AdminAuthGuardProps) {
   const router = useRouter();
   const [checkingSession, setCheckingSession] = useState(true);
   const [hasSession, setHasSession] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Check Supabase session directly - this is the source of truth
+  // Check Supabase session and verify super admin role
   useEffect(() => {
-    const checkSupabaseSession = async () => {
+    const checkAdminSession = async () => {
       try {
         const session = await getSession();
         if (session?.access_token) {
-          // Check if user is super admin - redirect to admin portal
+          // Fetch user data to check if super admin
           try {
-            const userResponse = await apiClient.get<{ roles?: Array<{ roleName?: string }> }>('/api/v1/auth/me');
-            const isSuperAdmin = userResponse.data?.roles?.some(
+            const userResponse = await apiClient.get<User>('/api/v1/auth/me');
+            const user = userResponse.data;
+            
+            const hasSuperAdminRole = user?.roles?.some(
               (r) => r.roleName?.toLowerCase() === 'super_admin'
             );
 
-            if (isSuperAdmin) {
-              router.push('/adminportal');
+            if (!hasSuperAdminRole) {
+              // Not super admin - redirect to regular portal
+              router.push('/dashboard');
               return;
             }
-          } catch {
-            // Continue with normal flow if check fails
-          }
 
-          // Bootstrap tenant theme before rendering protected pages.
-          // This keeps colour consistent for all users in the tenant on first paint.
-          try {
-            const tenantResponse = await apiClient.get<Tenant>('/api/v1/tenants/me');
-            const tenantTheme = tenantResponse.data?.primaryColor || DEFAULT_THEME_COLOR;
-            useThemeStore.getState().setPrimaryColor(tenantTheme);
-          } catch {
+            setIsSuperAdmin(true);
             useThemeStore.getState().setPrimaryColor(DEFAULT_THEME_COLOR);
+            setHasSession(true);
+          } catch (error) {
+            console.error('Failed to fetch user data:', error);
+            router.push('/login');
           }
-          setHasSession(true);
         } else {
           router.push('/login');
         }
@@ -59,7 +57,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
     };
 
-    checkSupabaseSession();
+    checkAdminSession();
   }, [router]);
 
   if (checkingSession) {
@@ -73,10 +71,15 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  if (!hasSession) {
-    return null;
+  if (!hasSession || !isSuperAdmin) {
+    return (
+      <Container size="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <Alert color="red" title="Access Denied">
+          <Text size="sm">This portal is only accessible to super administrators.</Text>
+        </Alert>
+      </Container>
+    );
   }
 
   return <>{children}</>;
 }
-

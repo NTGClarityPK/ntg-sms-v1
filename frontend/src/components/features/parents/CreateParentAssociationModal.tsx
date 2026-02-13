@@ -1,8 +1,8 @@
 'use client';
 
-import { Modal, Button, Stack, Select, Group, Text } from '@mantine/core';
+import { Modal, Button, Stack, Select, Group, Text, Alert, Badge } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useCreateParentAssociation } from '@/hooks/useParentAssociations';
+import { useCreateParentAssociation, useParentAssociations } from '@/hooks/useParentAssociations';
 import { useUsers } from '@/hooks/useUsers';
 import { useStudents } from '@/hooks/useStudents';
 import { useRoles } from '@/hooks/useRoles';
@@ -51,6 +51,25 @@ export function CreateParentAssociationModal({
 
   const parents = usersData?.data || [];
   const students = (studentsData as { data?: Array<{ id: string; fullName?: string | null; studentId: string }> } | null | undefined)?.data || [];
+
+  // Check current guardian count for selected student
+  const { data: existingAssociations } = useParentAssociations({
+    studentId: form.values.studentId || undefined,
+    limit: 100,
+  });
+
+  const currentGuardianCount = useMemo(() => {
+    if (!form.values.studentId || !existingAssociations?.data) return 0;
+    return existingAssociations.data.filter((a) => a.studentId === form.values.studentId).length;
+  }, [form.values.studentId, existingAssociations]);
+
+  const willBePriority = useMemo(() => {
+    if (currentGuardianCount === 0) return 1; // First guardian = Primary
+    if (currentGuardianCount === 1) return 2; // Second guardian = Secondary
+    return null; // Max reached
+  }, [currentGuardianCount]);
+
+  const canCreate = currentGuardianCount < 2;
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
@@ -113,11 +132,29 @@ export function CreateParentAssociationModal({
             {...form.getInputProps('relationship')}
           />
 
+          {/* Show guardian count and priority info */}
+          {form.values.studentId && (
+            <Alert
+              color={canCreate ? 'blue' : 'yellow'}
+              title={
+                canCreate
+                  ? `Will be set as ${willBePriority === 1 ? 'Primary' : 'Secondary'} Guardian (Priority ${willBePriority})`
+                  : 'Maximum 2 guardians reached'
+              }
+            >
+              <Text size="sm">
+                {canCreate
+                  ? `This student currently has ${currentGuardianCount} guardian(s). This will be the ${willBePriority === 1 ? 'primary' : 'secondary'} contact.`
+                  : 'This student already has 2 guardians. Please remove one before adding another.'}
+              </Text>
+            </Alert>
+          )}
+
           <Group justify="flex-end" mt="md">
             <Button variant="subtle" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={createAssociation.isPending}>
+            <Button type="submit" loading={createAssociation.isPending} disabled={!canCreate}>
               Create Association
             </Button>
           </Group>

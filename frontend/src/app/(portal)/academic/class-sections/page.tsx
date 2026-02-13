@@ -2,17 +2,14 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Title, Group, Button, Skeleton, Text, Stack } from '@mantine/core';
-import { IconPlus, IconChecklist } from '@tabler/icons-react';
+import { IconChecklist } from '@tabler/icons-react';
 import { useClassSections, useBulkCreateClassSections } from '@/hooks/useClassSections';
 import { ClassSectionGrid } from '@/components/features/academic/ClassSectionGrid';
-import { CreateClassSectionModal } from '@/components/features/academic/CreateClassSectionModal';
-import { useDisclosure } from '@mantine/hooks';
 import { useClasses } from '@/hooks/useCoreLookups';
 import { useSections } from '@/hooks/useCoreLookups';
 import { modals } from '@mantine/modals';
 
 export default function ClassSectionsPage() {
-  const [opened, { open, close }] = useDisclosure(false);
   const [isBulkCreating, setIsBulkCreating] = useState(false);
   const { data, isLoading, error } = useClassSections();
   const { data: classesData } = useClasses();
@@ -111,11 +108,6 @@ export default function ClassSectionsPage() {
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
             <Title order={1}>Class Sections</Title>
-            <Group>
-              <Button leftSection={<IconPlus size={16} />} onClick={open}>
-                Create Class-Section
-              </Button>
-            </Group>
           </Group>
         </div>
         <div
@@ -143,11 +135,6 @@ export default function ClassSectionsPage() {
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
             <Title order={1}>Class Sections</Title>
-            <Group>
-              <Button leftSection={<IconPlus size={16} />} onClick={open}>
-                Create Class-Section
-              </Button>
-            </Group>
           </Group>
         </div>
         <div
@@ -170,22 +157,17 @@ export default function ClassSectionsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Class Sections</Title>
-          <Group>
-            {missingCombinations.length > 0 && (
-              <Button
-                leftSection={<IconChecklist size={16} />}
-                variant="light"
-                onClick={handleBulkCreate}
-                loading={isBulkCreating}
-                disabled={isBulkCreating}
-              >
-                Create All ({missingCombinations.length})
-              </Button>
-            )}
-            <Button leftSection={<IconPlus size={16} />} onClick={open}>
-              Create Class-Section
+          {missingCombinations.length > 0 && (
+            <Button
+              leftSection={<IconChecklist size={16} />}
+              variant="light"
+              onClick={handleBulkCreate}
+              loading={isBulkCreating}
+              disabled={isBulkCreating}
+            >
+              Create All ({missingCombinations.length})
             </Button>
-          </Group>
+          )}
         </Group>
       </div>
       <div
@@ -199,7 +181,6 @@ export default function ClassSectionsPage() {
       >
         <ClassSectionGrid classSections={classSections} />
       </div>
-      <CreateClassSectionModal opened={opened} onClose={close} />
     </>
   );
 }

@@ -68,7 +68,8 @@ export function ParentAssociationTable({
               <Table.Th>Student Name</Table.Th>
               <Table.Th>Student ID</Table.Th>
               <Table.Th>Relationship</Table.Th>
-              <Table.Th>Primary</Table.Th>
+              <Table.Th>Priority</Table.Th>
+              <Table.Th>Phone</Table.Th>
               <Table.Th>Can Approve</Table.Th>
               <Table.Th style={{ width: 100 }}>Actions</Table.Th>
             </Table.Tr>
@@ -89,15 +90,22 @@ export function ParentAssociationTable({
                 </Table.Td>
                 <Table.Td>{getRelationshipBadge(association.relationship)}</Table.Td>
                 <Table.Td>
-                  {association.isPrimary ? (
-                    <Badge size="sm" variant="light" color="green">
-                      Yes
+                  {association.priority ? (
+                    <Badge
+                      size="sm"
+                      variant="light"
+                      color={association.priority === 1 ? 'green' : 'blue'}
+                    >
+                      {association.priority === 1 ? 'Primary' : 'Secondary'}
                     </Badge>
                   ) : (
                     <Text c="dimmed" size="sm">
-                      No
+                      —
                     </Text>
                   )}
+                </Table.Td>
+                <Table.Td>
+                  <Text size="sm">{association.parentPhone || '—'}</Text>
                 </Table.Td>
                 <Table.Td>
                   {association.canApprove ? (

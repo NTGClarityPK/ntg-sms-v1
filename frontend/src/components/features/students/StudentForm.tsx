@@ -1,6 +1,6 @@
 'use client';
 
-import { Modal, TextInput, Select, Button, Stack, Textarea, Group } from '@mantine/core';
+import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Badge, Alert, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Student, CreateStudentInput, UpdateStudentInput } from '@/types/students';
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useStudentGuardians } from '@/hooks/useParentAssociations';
+import { IconPhone, IconUser } from '@tabler/icons-react';
 
 const createStudentSchema = z.object({
   email: z.string().email('Invalid email'),
@@ -105,6 +107,10 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
   const availableTemplates = templatesData?.data ?? [];
   const currentTemplate = studentTemplateData?.data;
+
+  // Fetch guardians for this student (when editing)
+  const { data: guardiansData } = useStudentGuardians(isEdit ? student?.id : null);
+  const guardians = guardiansData?.data || [];
 
   // Reset form when student prop changes (for edit mode)
   useEffect(() => {
@@ -306,6 +312,54 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
             value={form.values.isActive ? 'true' : 'false'}
             onChange={(value) => form.setFieldValue('isActive', value === 'true')}
           />
+
+          {/* Emergency Contacts (only shown when editing) */}
+          {isEdit && student && (
+            <>
+              <Divider my="md" />
+              <Paper p="md" withBorder>
+                <Stack gap="sm">
+                  <Group>
+                    <IconUser size={20} />
+                    <Text fw={500}>Emergency Contacts</Text>
+                  </Group>
+                  {guardians.length === 0 ? (
+                    <Alert color="yellow" size="sm">
+                      No guardians assigned. Add guardians from Parent Associations page.
+                    </Alert>
+                  ) : (
+                    <Stack gap="xs">
+                      {guardians.map((guardian) => (
+                        <Group key={guardian.id} justify="space-between" p="xs" style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: '4px' }}>
+                          <Group gap="xs">
+                            <Badge
+                              size="sm"
+                              color={guardian.priority === 1 ? 'green' : 'blue'}
+                              variant="light"
+                            >
+                              {guardian.priority === 1 ? 'Primary' : 'Secondary'}
+                            </Badge>
+                            <Text size="sm" fw={500}>
+                              {guardian.parentName || 'N/A'}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                              ({guardian.relationship})
+                            </Text>
+                          </Group>
+                          {guardian.parentPhone && (
+                            <Group gap={4}>
+                              <IconPhone size={14} />
+                              <Text size="sm">{guardian.parentPhone}</Text>
+                            </Group>
+                          )}
+                        </Group>
+                      ))}
+                    </Stack>
+                  )}
+                </Stack>
+              </Paper>
+            </>
+          )}
 
           <Group justify="flex-end" mt="md">
             <Button variant="subtle" onClick={onClose}>

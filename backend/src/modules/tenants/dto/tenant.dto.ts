@@ -15,6 +15,26 @@ export class TenantDto {
   domain?: string | null;
 
   @IsOptional()
+  @IsString()
+  email?: string | null;
+
+  @IsOptional()
+  @IsString()
+  phone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  timezone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  fiscalYearStart?: string | null;
+
+  @IsOptional()
+  @IsString()
+  vatNumber?: string | null;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 

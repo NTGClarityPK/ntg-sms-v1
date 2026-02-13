@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput } from '@mantine/core';
+import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
@@ -58,8 +58,104 @@ import { LibraryCategoryEditor } from '@/components/features/settings/LibraryCat
 
 import { BehaviorSettings } from '@/components/features/settings/BehaviorSettings';
 import { useTenantMe, useUpdateTenantMe } from '@/hooks/useTenant';
+import { useBranchById, useUpdateBranch } from '@/hooks/useBranches';
 import { SubjectTemplatesTabContent } from '@/components/features/settings/SubjectTemplatesTabContent';
 import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettingsPanel';
+
+// Common timezones list with GMT offsets (matching RMS)
+const TIMEZONE_DATA = [
+  { value: 'Asia/Baghdad', label: 'Asia/Baghdad', country: 'Iraq' },
+  { value: 'Asia/Dubai', label: 'Asia/Dubai', country: 'UAE' },
+  { value: 'Asia/Riyadh', label: 'Asia/Riyadh', country: 'Saudi Arabia' },
+  { value: 'Asia/Kuwait', label: 'Asia/Kuwait', country: 'Kuwait' },
+  { value: 'Asia/Qatar', label: 'Asia/Qatar', country: 'Qatar' },
+  { value: 'Asia/Tehran', label: 'Asia/Tehran', country: 'Iran' },
+  { value: 'Asia/Beirut', label: 'Asia/Beirut', country: 'Lebanon' },
+  { value: 'Asia/Amman', label: 'Asia/Amman', country: 'Jordan' },
+  { value: 'Asia/Damascus', label: 'Asia/Damascus', country: 'Syria' },
+  { value: 'Asia/Jerusalem', label: 'Asia/Jerusalem', country: 'Israel' },
+  { value: 'Europe/London', label: 'Europe/London', country: 'UK' },
+  { value: 'Europe/Paris', label: 'Europe/Paris', country: 'France' },
+  { value: 'Europe/Berlin', label: 'Europe/Berlin', country: 'Germany' },
+  { value: 'Europe/Rome', label: 'Europe/Rome', country: 'Italy' },
+  { value: 'Europe/Madrid', label: 'Europe/Madrid', country: 'Spain' },
+  { value: 'America/New_York', label: 'America/New_York', country: 'US Eastern' },
+  { value: 'America/Chicago', label: 'America/Chicago', country: 'US Central' },
+  { value: 'America/Denver', label: 'America/Denver', country: 'US Mountain' },
+  { value: 'America/Los_Angeles', label: 'America/Los_Angeles', country: 'US Pacific' },
+  { value: 'America/Toronto', label: 'America/Toronto', country: 'Canada' },
+  { value: 'Asia/Tokyo', label: 'Asia/Tokyo', country: 'Japan' },
+  { value: 'Asia/Shanghai', label: 'Asia/Shanghai', country: 'China' },
+  { value: 'Asia/Hong_Kong', label: 'Asia/Hong_Kong', country: 'Hong Kong' },
+  { value: 'Asia/Singapore', label: 'Asia/Singapore', country: 'Singapore' },
+  { value: 'Asia/Kolkata', label: 'Asia/Kolkata', country: 'India' },
+  { value: 'Australia/Sydney', label: 'Australia/Sydney', country: 'Australia' },
+  { value: 'Australia/Melbourne', label: 'Australia/Melbourne', country: 'Australia' },
+];
+
+// Function to get GMT offset for a timezone
+const getGMTOffset = (timezone: string): number => {
+  try {
+    const now = new Date();
+    const utcFormatter = new Intl.DateTimeFormat('en', {
+      timeZone: 'UTC',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const tzFormatter = new Intl.DateTimeFormat('en', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    
+    const utcParts = utcFormatter.formatToParts(now);
+    const tzParts = tzFormatter.formatToParts(now);
+    
+    const utcHour = parseInt(utcParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const utcMinute = parseInt(utcParts.find(p => p.type === 'minute')?.value || '0', 10);
+    const tzHour = parseInt(tzParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const tzMinute = parseInt(tzParts.find(p => p.type === 'minute')?.value || '0', 10);
+    
+    const utcMinutes = utcHour * 60 + utcMinute;
+    const tzMinutes = tzHour * 60 + tzMinute;
+    let offsetMinutes = tzMinutes - utcMinutes;
+    
+    if (Math.abs(offsetMinutes) > 12 * 60) {
+      if (offsetMinutes > 0) {
+        offsetMinutes -= 24 * 60;
+      } else {
+        offsetMinutes += 24 * 60;
+      }
+    }
+    
+    return offsetMinutes / 60;
+  } catch {
+    return 0;
+  }
+};
+
+// Function to format GMT offset as string
+const formatGMTOffset = (offset: number): string => {
+  const sign = offset >= 0 ? '+' : '-';
+  const hours = Math.floor(Math.abs(offset));
+  const minutes = Math.round((Math.abs(offset) - hours) * 60);
+  return `GMT${sign}${hours}:${minutes.toString().padStart(2, '0')}`;
+};
+
+// Generate timezones with GMT offsets, sorted by offset
+const getTimezones = () => {
+  return TIMEZONE_DATA.map(tz => {
+    const offset = getGMTOffset(tz.value);
+    const offsetStr = formatGMTOffset(offset);
+    return {
+      value: tz.value,
+      label: `${tz.label} (${offsetStr})${tz.country ? ` - ${tz.country}` : ''}`,
+      offset,
+    };
+  }).sort((a, b) => a.offset - b.offset);
+};
 
 export default function SettingsPage() {
   const colors = useThemeColors();
@@ -407,26 +503,93 @@ function AcademicYearsTabContent() {
 function BusinessInformationTabContent() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const { user } = useAuth();
   const tenantQuery = useTenantMe();
   const updateTenant = useUpdateTenantMe();
+  const currentBranchId = user?.currentBranch?.id;
+  const branchQuery = useBranchById(currentBranchId);
+  const updateBranch = useUpdateBranch();
+
+  // Debug: Log current branch info
+  useEffect(() => {
+    if (user?.currentBranch) {
+      console.log('Current Branch:', user.currentBranch);
+      console.log('Current Branch ID:', currentBranchId);
+    } else {
+      console.log('No current branch found in user object');
+      console.log('User object:', user);
+    }
+  }, [user, currentBranchId]);
 
   const [name, setName] = useState<string>('');
-  const [hasInitialised, setHasInitialised] = useState(false);
+  const [code, setCode] = useState<string>('');
+  const [domain, setDomain] = useState<string>('');
+  const [email, setEmail] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
+  const [timezone, setTimezone] = useState<string>('Asia/Baghdad');
+  const [fiscalYearStart, setFiscalYearStart] = useState<string>('');
+  const [vatNumber, setVatNumber] = useState<string>('');
 
-  // Initialise local state once when tenant loads
+  // Branch fields
+  const [branchName, setBranchName] = useState<string>('');
+  const [branchCode, setBranchCode] = useState<string>('');
+  const [branchAddress, setBranchAddress] = useState<string>('');
+  const [branchPhone, setBranchPhone] = useState<string>('');
+  const [branchEmail, setBranchEmail] = useState<string>('');
+
+  const [hasInitialised, setHasInitialised] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Initialise local state once when tenant and branch load
   useEffect(() => {
-    const remoteName = tenantQuery.data?.data?.name;
+    const tenant = tenantQuery.data?.data;
+    const branch = branchQuery.data?.data;
+    
     if (hasInitialised) return;
-    if (!remoteName) return;
-    setName(remoteName);
+    if (!tenant) return;
+    
+    // Tenant fields
+    setName(tenant.name || '');
+    setCode(tenant.code || '');
+    setDomain(tenant.domain || '');
+    setEmail(tenant.email || '');
+    setPhone(tenant.phone || '');
+    setTimezone(tenant.timezone || 'Asia/Baghdad');
+    setFiscalYearStart(tenant.fiscalYearStart || '');
+    setVatNumber(tenant.vatNumber || '');
+
+    // Branch fields - only initialize if we have branch data
+    // Don't wait for branch to initialize tenant fields
+    if (branch) {
+      setBranchName(branch.name || '');
+      setBranchCode(branch.code || '');
+      setBranchAddress(branch.address || '');
+      setBranchPhone(branch.phone || '');
+      setBranchEmail(branch.email || '');
+    }
+    
     setHasInitialised(true);
-  }, [hasInitialised, tenantQuery.data?.data?.name]);
+  }, [hasInitialised, tenantQuery.data?.data, branchQuery.data?.data]);
+
+  // Update branch fields when branch data loads (separate effect to handle late loading)
+  useEffect(() => {
+    const branch = branchQuery.data?.data;
+    if (branch && hasInitialised) {
+      setBranchName(branch.name || '');
+      setBranchCode(branch.code || '');
+      setBranchAddress(branch.address || '');
+      setBranchPhone(branch.phone || '');
+      setBranchEmail(branch.email || '');
+    }
+  }, [branchQuery.data?.data, hasInitialised]);
 
   if (tenantQuery.isLoading) {
     return (
       <Stack gap="md">
         <Skeleton height={40} width="30%" />
-        <Skeleton height={140} />
+        <Skeleton height={200} />
+        <Skeleton height={200} />
+        {currentBranchId && <Skeleton height={200} />}
       </Stack>
     );
   }
@@ -439,9 +602,13 @@ function BusinessInformationTabContent() {
     );
   }
 
+  // Show branch error separately if it exists
+  const branchError = branchQuery.error;
+  const isLoadingBranch = branchQuery.isLoading && currentBranchId;
+
   const onSave = async () => {
-    const trimmed = name.trim();
-    if (trimmed.length === 0) {
+    const trimmedName = name.trim();
+    if (trimmedName.length === 0) {
       notifications.show({
         title: 'Validation error',
         message: 'School name is required.',
@@ -451,10 +618,35 @@ function BusinessInformationTabContent() {
     }
 
     try {
-      await updateTenant.mutateAsync({ name: trimmed });
+      setSaving(true);
+      
+      // Update tenant
+      await updateTenant.mutateAsync({
+        name: trimmedName,
+        domain: domain.trim() || undefined,
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+        timezone: timezone || undefined,
+        fiscalYearStart: fiscalYearStart.trim() || undefined,
+        vatNumber: vatNumber.trim() || undefined,
+      });
+
+      // Update branch if we have a current branch
+      if (currentBranchId) {
+        await updateBranch.mutateAsync({
+          id: currentBranchId,
+          payload: {
+            name: branchName.trim() || undefined,
+            address: branchAddress.trim() || undefined,
+            phone: branchPhone.trim() || undefined,
+            email: branchEmail.trim() || undefined,
+          },
+        });
+      }
+
       notifications.show({
         title: 'Success',
-        message: 'School name updated.',
+        message: 'Business information updated successfully.',
         color: notifyColors.success,
       });
     } catch (error) {
@@ -464,28 +656,173 @@ function BusinessInformationTabContent() {
         message,
         color: notifyColors.error,
       });
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <Stack gap="md">
-      <Title order={2}>Business Information</Title>
-      <Paper withBorder p="md">
-        <Stack gap="md">
-          <TextInput
-            label="School name"
-            placeholder="Enter school name"
-            value={name}
-            onChange={(e) => setName(e.currentTarget.value)}
-          />
-          <Group justify="flex-end">
-            <Button variant="light" onClick={onSave} loading={updateTenant.isPending}>
-              Save
-            </Button>
-          </Group>
-        </Stack>
-      </Paper>
-    </Stack>
+    <form onSubmit={(e) => { e.preventDefault(); onSave(); }}>
+      <Stack gap="lg">
+        <Paper withBorder p="md">
+          <Title order={3} mb="md">
+            Basic Details
+          </Title>
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <TextInput
+                label="School Name"
+                placeholder="Enter school name"
+                required
+                value={name}
+                onChange={(e) => setName(e.currentTarget.value)}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <TextInput
+                label="School Code"
+                value={code}
+                disabled
+                readOnly
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <TextInput
+                label="Domain"
+                placeholder="Enter domain (e.g., alekaf.edu)"
+                value={domain}
+                onChange={(e) => setDomain(e.currentTarget.value)}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <TextInput
+                label="Email"
+                type="email"
+                placeholder="Enter contact email"
+                value={email}
+                onChange={(e) => setEmail(e.currentTarget.value)}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <TextInput
+                label="Phone"
+                placeholder="Enter contact phone"
+                value={phone}
+                onChange={(e) => setPhone(e.currentTarget.value)}
+              />
+            </Grid.Col>
+          </Grid>
+        </Paper>
+
+        <Paper withBorder p="md">
+          <Title order={3} mb="md">
+            Business Settings
+          </Title>
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Select
+                label="Timezone"
+                data={getTimezones().map(tz => ({
+                  value: tz.value,
+                  label: tz.label
+                }))}
+                searchable
+                value={timezone}
+                onChange={(value) => setTimezone(value || 'Asia/Baghdad')}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <TextInput
+                label="Fiscal Year Start"
+                type="date"
+                value={fiscalYearStart}
+                onChange={(e) => setFiscalYearStart(e.currentTarget.value)}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <TextInput
+                label="VAT Number"
+                placeholder="Enter VAT/Tax identification number"
+                value={vatNumber}
+                onChange={(e) => setVatNumber(e.currentTarget.value)}
+              />
+            </Grid.Col>
+          </Grid>
+        </Paper>
+
+        {currentBranchId && (
+          <Paper withBorder p="md">
+            <Title order={3} mb="md">
+              Branch Details
+            </Title>
+            {branchError && (
+              <Alert color={colors.error} mb="md" title="Failed to load branch information">
+                <Text size="sm">Branch ID: {currentBranchId}</Text>
+                <Text size="sm">Error: {branchError instanceof Error ? branchError.message : 'Unknown error'}</Text>
+              </Alert>
+            )}
+            {isLoadingBranch ? (
+              <Stack gap="md">
+                <Skeleton height={40} />
+                <Skeleton height={40} />
+                <Skeleton height={40} />
+              </Stack>
+            ) : (
+              <Grid>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <TextInput
+                    label="Branch Name"
+                    placeholder="Enter branch name"
+                    required
+                    value={branchName}
+                    onChange={(e) => setBranchName(e.currentTarget.value)}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <TextInput
+                    label="Branch Code"
+                    value={branchCode}
+                    disabled
+                    readOnly
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <TextInput
+                    label="Address"
+                    placeholder="Enter branch address"
+                    value={branchAddress}
+                    onChange={(e) => setBranchAddress(e.currentTarget.value)}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <TextInput
+                    label="Phone"
+                    placeholder="Enter branch phone"
+                    value={branchPhone}
+                    onChange={(e) => setBranchPhone(e.currentTarget.value)}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <TextInput
+                    label="Email"
+                    type="email"
+                    placeholder="Enter branch email"
+                    value={branchEmail}
+                    onChange={(e) => setBranchEmail(e.currentTarget.value)}
+                  />
+                </Grid.Col>
+              </Grid>
+            )}
+          </Paper>
+        )}
+
+        <Group justify="flex-end" mt="xl">
+          <Button type="submit" loading={saving || updateTenant.isPending || updateBranch.isPending}>
+            Save Changes
+          </Button>
+        </Group>
+      </Stack>
+    </form>
   );
 }
 
@@ -743,7 +1080,7 @@ function AssessmentTabContent() {
       <Tabs.List>
         <Tabs.Tab value="types">Assessment types</Tabs.Tab>
         <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
-        <Tabs.Tab value="assignments">Assignments</Tabs.Tab>
+        <Tabs.Tab value="assignments">Grading Config</Tabs.Tab>
         <Tabs.Tab value="leave">Leave quota</Tabs.Tab>
       </Tabs.List>
 

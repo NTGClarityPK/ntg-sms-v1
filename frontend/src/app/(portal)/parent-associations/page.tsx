@@ -68,7 +68,8 @@ export default function ParentAssociationsPage() {
         </Group>
       </div>
 
-      <Stack gap="md">
+      <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
+        <Stack gap="md">
         <Flex gap="md" wrap="wrap" align="flex-end">
           <TextInput
             placeholder="Search by parent name or email..."
@@ -151,7 +152,8 @@ export default function ParentAssociationsPage() {
             onPageChange={setPage}
           />
         )}
-      </Stack>
+        </Stack>
+      </div>
 
       <CreateParentAssociationModal opened={opened} onClose={close} />
     </>

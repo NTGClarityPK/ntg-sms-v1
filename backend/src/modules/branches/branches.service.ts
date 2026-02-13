@@ -5,6 +5,7 @@ import { BranchDto } from './dto/branch.dto';
 import { QueryBranchesDto } from './dto/query-branches.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
+import { AssignBranchToTenantDto } from './dto/assign-branch-to-tenant.dto';
 
 type BranchRow = {
   id: string;
@@ -214,6 +215,106 @@ export class BranchesService {
     return {
       data: ((branches as BranchRow[]) ?? []).map(mapBranch),
     };
+  }
+
+  async assignBranchToTenant(input: AssignBranchToTenantDto): Promise<BranchDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Verify tenant exists
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('id', input.tenantId)
+      .maybeSingle();
+
+    throwIfDbError(tenantError);
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    // Create branch with tenant_id
+    const { data: branch, error: branchError } = await supabase
+      .from('branches')
+      .insert({
+        tenant_id: input.tenantId,
+        name: input.name,
+        name_ar: input.nameAr ?? null,
+        code: input.code ?? null,
+        address: input.address ?? null,
+        phone: input.phone ?? null,
+        email: input.email ?? null,
+        storage_quota_gb: input.storageQuotaGb ?? 100,
+        is_active: input.isActive ?? true,
+      })
+      .select('*')
+      .single();
+
+    throwIfDbError(branchError);
+    const newBranch = mapBranch(branch as BranchRow);
+
+    // Find all school_admin users for this tenant (from existing branches)
+    const { data: existingBranches, error: branchesError } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('tenant_id', input.tenantId)
+      .neq('id', newBranch.id);
+
+    throwIfDbError(branchesError);
+    const existingBranchIds = (existingBranches || []).map((b: { id: string }) => b.id);
+
+    if (existingBranchIds.length > 0) {
+      // Get school_admin role ID
+      const { data: adminRole, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'school_admin')
+        .maybeSingle();
+
+      throwIfDbError(roleError);
+      if (adminRole) {
+        // Find users who have school_admin role in any of the tenant's existing branches
+        const { data: userRoles, error: userRolesError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role_id', adminRole.id)
+          .in('branch_id', existingBranchIds);
+
+        throwIfDbError(userRolesError);
+        const adminUserIds = [
+          ...new Set((userRoles || []).map((ur: { user_id: string }) => ur.user_id)),
+        ];
+
+        if (adminUserIds.length > 0) {
+          // Assign these users to the new branch
+          const userBranchInserts = adminUserIds.map((userId: string) => ({
+            user_id: userId,
+            branch_id: newBranch.id,
+            is_primary: false, // Don't set as primary automatically
+          }));
+
+          const { error: userBranchError } = await supabase
+            .from('user_branches')
+            .insert(userBranchInserts);
+
+          throwIfDbError(userBranchError);
+
+          // Assign school_admin role to these users for the new branch
+          const userRoleInserts = adminUserIds.map((userId: string) => ({
+            user_id: userId,
+            role_id: adminRole.id,
+            branch_id: newBranch.id,
+          }));
+
+          const { error: userRoleError } = await supabase
+            .from('user_roles')
+            .insert(userRoleInserts);
+
+          throwIfDbError(userRoleError);
+        }
+      }
+    }
+
+    return newBranch;
   }
 }
 

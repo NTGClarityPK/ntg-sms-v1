@@ -87,9 +87,9 @@ export class AttendanceService {
 
     const { data, error } = await supabase
       .from('parent_students')
-      .select('parent_user_id, is_primary')
+      .select('parent_user_id, is_primary, priority')
       .eq('student_id', studentId)
-      .order('is_primary', { ascending: false })
+      .order('priority', { ascending: true, nullsFirst: false })
       .limit(1);
 
     throwIfDbError(error);

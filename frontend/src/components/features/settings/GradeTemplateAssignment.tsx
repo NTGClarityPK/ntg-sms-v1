@@ -57,7 +57,7 @@ export function GradeTemplateAssignment() {
     <Stack gap="md">
       <Paper withBorder p="md">
         <Stack gap="md">
-          <Text fw={600}>Assign template to class</Text>
+          <Text fw={600}>Assign Grade template to class</Text>
 
           <Select
             label="Grade template"
