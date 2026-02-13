@@ -5,13 +5,14 @@ import {
   Group,
   Avatar,
   Text,
-  SegmentedControl,
   TextInput,
   Textarea,
-  Badge,
-  Stack,
-  Paper,
+  Table,
+  Button,
+  Popover,
+  ActionIcon,
 } from '@mantine/core';
+import { IconNotes } from '@tabler/icons-react';
 import type { Attendance, AttendanceStatus } from '@/types/attendance';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -40,23 +41,8 @@ export function StudentRow({
     setNotes(attendance.notes || '');
   }, [attendance]);
 
-  const getStatusColor = (status: AttendanceStatus) => {
-    switch (status) {
-      case 'present':
-        return notifyColors.success;
-      case 'absent':
-        return notifyColors.error;
-      case 'late':
-        return notifyColors.warning;
-      case 'excused':
-        return notifyColors.info;
-      default:
-        return notifyColors.primary;
-    }
-  };
-
-  const handleStatusChange = (value: string) => {
-    onStatusChange(value as AttendanceStatus);
+  const handleStatusChange = (value: AttendanceStatus) => {
+    onStatusChange(value);
     // Auto-fill entry time for present/late
     if (value === 'present' || value === 'late') {
       const now = new Date();
@@ -69,80 +55,115 @@ export function StudentRow({
     }
   };
 
+  const statusButtons: { value: AttendanceStatus; label: string; color: string }[] = [
+    { value: 'present', label: 'P', color: notifyColors.success },
+    { value: 'absent', label: 'A', color: notifyColors.error },
+    { value: 'late', label: 'L', color: notifyColors.warning },
+  ];
+
   return (
-    <Paper withBorder p="md">
-      <Stack gap="sm">
-        <Group justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap">
-            <Avatar size="md" radius="xl">
-              {attendance.studentName
-                .split(' ')
-                .map((n) => n[0])
-                .join('')
-                .toUpperCase()
-                .slice(0, 2)}
-            </Avatar>
-            <Stack gap={2}>
-              <Text fw={500}>{attendance.studentName}</Text>
-              <Text size="xs" c="dimmed">
-                {attendance.studentIdNumber || 'Student ID: N/A'}
-              </Text>
-            </Stack>
-          </Group>
-          <Badge variant="light" color={getStatusColor(attendance.status)}>
-            {attendance.status.toUpperCase()}
-          </Badge>
+    <Table.Tr>
+      <Table.Td>
+        <Group gap="sm" wrap="nowrap">
+          <Avatar size="sm" radius="xl">
+            {attendance.studentName
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2)}
+          </Avatar>
+          <div>
+            <Text fw={500} size="sm" lineClamp={1}>
+              {attendance.studentName}
+            </Text>
+            <Text size="xs" c="dimmed" lineClamp={1}>
+              {attendance.studentIdNumber || 'N/A'}
+            </Text>
+          </div>
         </Group>
-
-        <SegmentedControl
-          value={attendance.status}
-          onChange={handleStatusChange}
-          data={[
-            { label: 'Present', value: 'present' },
-            { label: 'Absent', value: 'absent' },
-            { label: 'Late', value: 'late' },
-            { label: 'Excused', value: 'excused' },
-          ]}
-          fullWidth
-        />
-
-        <Group grow>
-          <TextInput
-            label="Entry Time"
-            type="time"
-            value={entryTime}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setEntryTime(value);
-              onTimeChange('entryTime', value);
-            }}
-            disabled={attendance.status === 'absent'}
-          />
-          <TextInput
-            label="Exit Time"
-            type="time"
-            value={exitTime}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              setExitTime(value);
-              onTimeChange('exitTime', value);
-            }}
-          />
+      </Table.Td>
+      <Table.Td>
+        <Group gap={4}>
+          {statusButtons.map((btn) => (
+            <Button
+              key={btn.value}
+              size="xs"
+              variant={attendance.status === btn.value ? 'filled' : 'light'}
+              color={btn.color}
+              onClick={() => handleStatusChange(btn.value)}
+              style={{ minWidth: '32px', padding: '0 8px' }}
+              title={btn.value.charAt(0).toUpperCase() + btn.value.slice(1)}
+            >
+              {btn.label}
+            </Button>
+          ))}
         </Group>
-
-        <Textarea
-          label="Notes"
-          placeholder="Optional notes..."
-          value={notes}
+      </Table.Td>
+      <Table.Td>
+        <TextInput
+          type="time"
+          value={entryTime}
           onChange={(e) => {
             const value = e.currentTarget.value;
-            setNotes(value);
-            onNotesChange(value);
+            setEntryTime(value);
+            onTimeChange('entryTime', value);
           }}
-          minRows={2}
+          disabled={attendance.status === 'absent'}
+          size="xs"
+          style={{ width: '100px' }}
         />
-      </Stack>
-    </Paper>
+      </Table.Td>
+      <Table.Td>
+        <TextInput
+          type="time"
+          value={exitTime}
+          onChange={(e) => {
+            const value = e.currentTarget.value;
+            setExitTime(value);
+            onTimeChange('exitTime', value);
+          }}
+          size="xs"
+          style={{ width: '100px' }}
+        />
+      </Table.Td>
+      <Table.Td>
+        <Group gap="xs" wrap="nowrap">
+          <Popover width={300} position="bottom" withArrow shadow="md">
+            <Popover.Target>
+              <ActionIcon
+                variant={notes ? 'light' : 'subtle'}
+                color={notes ? notifyColors.primary : 'gray'}
+                size="sm"
+                title={notes || 'Add notes'}
+              >
+                <IconNotes size={16} />
+              </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Textarea
+                label="Notes"
+                placeholder="Optional notes..."
+                value={notes}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setNotes(value);
+                  onNotesChange(value);
+                }}
+                minRows={3}
+                autosize
+                maxRows={6}
+              />
+            </Popover.Dropdown>
+          </Popover>
+          {notes && (
+            <Text size="xs" c="dimmed" style={{ maxWidth: '200px' }} lineClamp={1} title={notes}>
+              {notes}
+            </Text>
+          )}
+        </Group>
+      </Table.Td>
+    </Table.Tr>
   );
 }
 

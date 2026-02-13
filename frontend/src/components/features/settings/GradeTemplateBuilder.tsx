@@ -23,6 +23,7 @@ import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import type { GradeTemplate } from '@/types/settings';
 import { useState } from 'react';
+import { GradeTemplateAssignment } from './GradeTemplateAssignment';
 
 interface RangeInput {
   letter: string;
@@ -163,11 +164,17 @@ export function GradeTemplateBuilder() {
 
   return (
     <>
-      <Group justify="flex-end" mb="md">
+      <Group justify="space-between" mb="xs">
+        <Text size="lg" fw={500}>Grade Templates</Text>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add template
         </Button>
       </Group>
+      <Text size="sm" c="dimmed" mb="md">
+        Grade templates define the grading scale used to evaluate student performance. Each template consists of grade ranges 
+        (e.g., A, B, C) with corresponding percentage thresholds. Create different templates for different academic levels 
+        or assessment types.
+      </Text>
 
       <Paper withBorder p="md">
         {templates.length === 0 ? (
@@ -226,6 +233,15 @@ export function GradeTemplateBuilder() {
           </Table>
         )}
       </Paper>
+
+      <Stack gap="md" mt="xl">
+        <Text size="lg" fw={500}>Grading Config</Text>
+        <Text size="sm" c="dimmed" mb="md">
+          Assign grade templates to classes and set the minimum passing grade for each class. This configuration determines 
+          how student assessments are graded and which grade threshold students must achieve to pass.
+        </Text>
+        <GradeTemplateAssignment />
+      </Stack>
 
       <Modal opened={opened} onClose={close} title={editingTemplate ? 'Edit grade template' : 'Create grade template'} size="lg">
         <form onSubmit={handleSubmit}>

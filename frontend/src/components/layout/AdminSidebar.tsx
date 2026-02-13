@@ -16,6 +16,7 @@ import {
   IconBuilding,
   IconCreditCard,
   IconHome,
+  IconLockOpen,
   type IconProps,
 } from '@tabler/icons-react';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
@@ -32,6 +33,7 @@ const NAV_ICON_SIZE = 22;
 const adminNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/adminportal', icon: IconHome },
   { label: 'Assign Branch', href: '/adminportal/assign-branch', icon: IconBuilding },
+  { label: 'Unlock Academic Year', href: '/adminportal/unlock-academic-year', icon: IconLockOpen },
   { label: 'Payment Models', href: '/adminportal/payment-models', icon: IconCreditCard },
 ];
 

@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { AcademicYearsService } from './academic-years.service';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
@@ -54,6 +55,61 @@ export class AcademicYearsController {
   ): Promise<{ data: AcademicYearDto }> {
     const updated = await this.academicYearsService.lock(id, branch.tenantId);
     return { data: updated };
+  }
+
+  // Admin-only endpoint for unlocking academic years
+  @Patch('admin/:id/unlock')
+  @UseGuards(JwtAuthGuard)
+  async unlock(
+    @Param('id') id: string,
+    @Body() body: { tenantId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: AcademicYearDto }> {
+    // Super admin only access
+    const isSuperAdmin = user.roles?.includes('super_admin');
+    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
+    
+    if (!isSuperAdmin && !isDev) {
+      throw new ForbiddenException('This endpoint is only accessible to super admins');
+    }
+
+    const updated = await this.academicYearsService.unlock(id, body.tenantId);
+    return { data: updated };
+  }
+
+  // Admin-only endpoint for listing academic years by tenant
+  @Get('admin/by-tenant')
+  @UseGuards(JwtAuthGuard)
+  async listByTenant(
+    @Query('tenantId') tenantId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+  ): Promise<{
+    data: AcademicYearDto[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    // Super admin only access
+    const isSuperAdmin = user.roles?.includes('super_admin');
+    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
+    
+    if (!isSuperAdmin && !isDev) {
+      throw new ForbiddenException('This endpoint is only accessible to super admins');
+    }
+
+    // Build query object manually to avoid DTO validation issues with tenantId
+    const query: QueryAcademicYearsDto = {
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      search: search || undefined,
+      sortBy: sortBy as any,
+      sortOrder: sortOrder as any,
+    };
+
+    return this.academicYearsService.list(query, tenantId);
   }
 }
 

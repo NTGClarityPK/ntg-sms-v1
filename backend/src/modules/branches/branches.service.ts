@@ -217,6 +217,23 @@ export class BranchesService {
     };
   }
 
+  async listByTenantAdmin(tenantId: string): Promise<{ data: BranchDto[] }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Admin method: get all branches for the tenant without user access filtering
+    const { data: branches, error: branchesError } = await supabase
+      .from('branches')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('name', { ascending: true });
+
+    throwIfDbError(branchesError);
+
+    return {
+      data: ((branches as BranchRow[]) ?? []).map(mapBranch),
+    };
+  }
+
   async assignBranchToTenant(input: AssignBranchToTenantDto): Promise<BranchDto> {
     const supabase = this.supabaseConfig.getClient();
 

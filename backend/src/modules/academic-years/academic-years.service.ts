@@ -202,6 +202,32 @@ export class AcademicYearsService {
     throwIfDbError(error);
     return mapAcademicYear(data as AcademicYearRow);
   }
+
+  async unlock(id: string, tenantId: string | null): Promise<AcademicYearDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: existing, error: existingError } = await supabase
+      .from('academic_years')
+      .select('*')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single();
+    if (existingError || !existing) throw new NotFoundException('Academic year not found');
+    if (!(existing as AcademicYearRow).is_locked) {
+      throw new BadRequestException('Academic year is not locked');
+    }
+
+    const { data, error } = await supabase
+      .from('academic_years')
+      .update({ is_locked: false })
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .select('*')
+      .single();
+
+    throwIfDbError(error);
+    return mapAcademicYear(data as AcademicYearRow);
+  }
 }
 
 

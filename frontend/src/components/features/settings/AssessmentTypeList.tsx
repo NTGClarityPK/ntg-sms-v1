@@ -60,11 +60,16 @@ export function AssessmentTypeList() {
 
   return (
     <>
-      <Group justify="flex-end" mb="md">
+      <Group justify="space-between" mb="xs">
+        <Text size="lg" fw={500}>Assessment Types</Text>
         <Button leftSection={<IconPlus size={16} />} onClick={open}>
           Add type
         </Button>
       </Group>
+      <Text size="sm" c="dimmed" mb="md">
+        Assessment types categorise different forms of evaluation such as quizzes, assignments, exams, and projects. 
+        These types help organise and track student performance across various assessment methods throughout the academic year.
+      </Text>
 
       <Paper withBorder p="md">
         {types.length === 0 ? (

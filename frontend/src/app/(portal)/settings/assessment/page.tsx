@@ -3,7 +3,6 @@
 import { Group, Tabs, Title } from '@mantine/core';
 import { AssessmentTypeList } from '@/components/features/settings/AssessmentTypeList';
 import { GradeTemplateBuilder } from '@/components/features/settings/GradeTemplateBuilder';
-import { GradeTemplateAssignment } from '@/components/features/settings/GradeTemplateAssignment';
 import { LeaveQuotaSetting } from '@/components/features/settings/LeaveQuotaSetting';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 
@@ -23,7 +22,6 @@ export default function AssessmentSettingsPage() {
         <Tabs.List>
           <Tabs.Tab value="types">Assessment types</Tabs.Tab>
           <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
-          <Tabs.Tab value="assignments">Grading Config</Tabs.Tab>
           <Tabs.Tab value="leave">Leave quota</Tabs.Tab>
         </Tabs.List>
 
@@ -32,9 +30,6 @@ export default function AssessmentSettingsPage() {
         </Tabs.Panel>
         <Tabs.Panel value="templates" pt="md" px="md" pb="md">
           <GradeTemplateBuilder />
-        </Tabs.Panel>
-        <Tabs.Panel value="assignments" pt="md" px="md" pb="md">
-          <GradeTemplateAssignment />
         </Tabs.Panel>
         <Tabs.Panel value="leave" pt="md" px="md" pb="md">
           <LeaveQuotaSetting academicYearId={activeYearId} />

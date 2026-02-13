@@ -189,6 +189,11 @@ export default function ScheduleSettingsPage() {
                 New template
               </Button>
             </Group>
+            <Text size="sm" c="dimmed">
+              Timing templates define the daily schedule structure for your school, including school start and end times, 
+              period duration, and special slots like assembly and breaks. Assign templates to classes to establish 
+              their timetable framework.
+            </Text>
             {(templatesQuery.data?.data ?? []).length === 0 && (
               <Alert color={colors.warning} title="School start and end times are set in timing templates">
                 Create at least one timing template and provide <strong>school start time</strong> and{' '}

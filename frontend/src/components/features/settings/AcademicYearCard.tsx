@@ -7,7 +7,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 interface AcademicYearCardProps {
   year: AcademicYear;
   onActivate: (id: string) => void;
-  onLock: (id: string) => void;
+  onLock: (year: AcademicYear) => void;
   isActivating: boolean;
   isLocking: boolean;
 }
@@ -42,7 +42,12 @@ export function AcademicYearCard({ year, onActivate, onLock, isActivating, isLoc
         >
           Activate
         </Button>
-        <Button variant="light" disabled={year.isLocked} loading={isLocking} onClick={() => onLock(year.id)}>
+        <Button
+          variant="light"
+          disabled={year.isLocked || !year.isActive}
+          loading={isLocking}
+          onClick={() => onLock(year)}
+        >
           Lock
         </Button>
       </Group>

@@ -3,11 +3,13 @@
 import { Alert, Button, Group, Skeleton, Stack, Text, Title } from '@mantine/core';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
+import { modals } from '@mantine/modals';
 import { AcademicYearForm, type AcademicYearFormValues } from '@/components/features/settings/AcademicYearForm';
 import { AcademicYearCard } from '@/components/features/settings/AcademicYearCard';
 import { useAcademicYearsList, useActivateAcademicYear, useCreateAcademicYear, useLockAcademicYear } from '@/hooks/useAcademicYears';
 import { useThemeColors, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { notifications } from '@mantine/notifications';
+import type { AcademicYear } from '@/types/settings';
 
 export default function AcademicYearsPage() {
   const colors = useThemeColors();
@@ -33,13 +35,40 @@ export default function AcademicYearsPage() {
     }
   };
 
-  const handleLock = async (id: string) => {
-    try {
-      await lockMutation.mutateAsync(id);
-      notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+  const handleLock = async (year: AcademicYear) => {
+    // Check if this is the active year
+    if (year.isActive) {
+      modals.openConfirmModal({
+        title: 'Lock Active Academic Year',
+        children: (
+          <Text size="sm">
+            You are about to lock the <strong>active</strong> academic year. This will make it read-only and prevent all modifications.
+            <br />
+            <br />
+            <strong>Warning:</strong> Once locked, this action cannot be undone. If you need to revert this change, please contact Super Admin Support.
+          </Text>
+        ),
+        labels: { confirm: 'Lock Year', cancel: 'Cancel' },
+        confirmProps: { color: 'orange' },
+        onConfirm: async () => {
+          try {
+            await lockMutation.mutateAsync(year.id);
+            notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            notifications.show({ title: 'Error', message, color: notifyColors.error });
+          }
+        },
+      });
+    } else {
+      // For non-active years, proceed directly
+      try {
+        await lockMutation.mutateAsync(year.id);
+        notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        notifications.show({ title: 'Error', message, color: notifyColors.error });
+      }
     }
   };
 

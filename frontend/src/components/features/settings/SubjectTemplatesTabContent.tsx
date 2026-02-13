@@ -148,12 +148,17 @@ export function SubjectTemplatesTabContent() {
 
   return (
     <>
-      <Group justify="space-between" mb="md">
+      <Group justify="space-between" mb="xs">
         <Text size="lg" fw={500}>Subject Templates</Text>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
           New Template
         </Button>
       </Group>
+      <Text size="sm" c="dimmed" mb="md">
+        Subject templates allow you to group subjects together and assign them to classes or levels. 
+        They help streamline timetable creation and assessment management by defining which subjects 
+        are available for specific class groups.
+      </Text>
 
       {isLoading ? (
         <Stack gap="md">

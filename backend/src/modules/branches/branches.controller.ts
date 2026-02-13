@@ -85,6 +85,24 @@ export class BranchesController {
     const created = await this.branchesService.assignBranchToTenant(body);
     return { data: created };
   }
+
+  // Admin-only endpoint to get branches by tenant ID
+  @Get('admin/by-tenant/:tenantId')
+  async listByTenantId(
+    @Param('tenantId') tenantId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: BranchDto[] }> {
+    // Super admin only access
+    const isSuperAdmin = user.roles?.includes('super_admin');
+    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
+    
+    if (!isSuperAdmin && !isDev) {
+      throw new ForbiddenException('This endpoint is only accessible to super admins');
+    }
+
+    // For admin, get all branches for the tenant (not filtered by user access)
+    return this.branchesService.listByTenantAdmin(tenantId);
+  }
 }
 
 

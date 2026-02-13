@@ -98,4 +98,18 @@ export function useAssignBranchToTenant() {
   });
 }
 
+// Admin hook to get branches by tenant ID
+export function useBranchesByTenantId(tenantId: string | null) {
+  return useQuery({
+    queryKey: [...branchesKeys.all, 'admin', 'byTenant', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const res = await apiClient.get<BranchDetails[]>(`/api/v1/branches/admin/by-tenant/${tenantId}`);
+      return res;
+    },
+    enabled: !!tenantId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 

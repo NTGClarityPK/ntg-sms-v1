@@ -77,6 +77,35 @@ export function useLockAcademicYear() {
   });
 }
 
+export function useUnlockAcademicYear() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, tenantId }: { id: string; tenantId: string }) => {
+      const res = await apiClient.patch<AcademicYear>(`/api/v1/academic-years/admin/${id}/unlock`, { tenantId });
+      return res;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: academicYearsKeys.all });
+    },
+  });
+}
+
+// Admin hook to list academic years by tenant
+export function useAcademicYearsByTenant(tenantId: string | null) {
+  return useQuery({
+    queryKey: [...academicYearsKeys.all, 'byTenant', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      const res = await apiClient.get<AcademicYear[]>('/api/v1/academic-years/admin/by-tenant', {
+        params: { tenantId, page: 1, limit: 100, sortBy: 'created_at', sortOrder: 'desc' },
+      });
+      return res;
+    },
+    enabled: !!tenantId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
 // Type helper (keeps hooks strongly typed)
 export type AcademicYearsListResponse = ApiResponse<AcademicYear[]>;
 

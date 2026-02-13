@@ -23,6 +23,8 @@ import { useRoles, useFeatures } from '@/hooks/useRoles';
 import { AcademicYearForm, type AcademicYearFormValues } from '@/components/features/settings/AcademicYearForm';
 import { AcademicYearCard } from '@/components/features/settings/AcademicYearCard';
 import { useAcademicYearsList, useActivateAcademicYear, useCreateAcademicYear, useLockAcademicYear } from '@/hooks/useAcademicYears';
+import { modals } from '@mantine/modals';
+import type { AcademicYear } from '@/types/settings';
 
 import { SubjectList } from '@/components/features/settings/SubjectList';
 import { ClassList } from '@/components/features/settings/ClassList';
@@ -50,7 +52,6 @@ import {
 
 import { AssessmentTypeList } from '@/components/features/settings/AssessmentTypeList';
 import { GradeTemplateBuilder } from '@/components/features/settings/GradeTemplateBuilder';
-import { GradeTemplateAssignment } from '@/components/features/settings/GradeTemplateAssignment';
 import { LeaveQuotaSetting } from '@/components/features/settings/LeaveQuotaSetting';
 
 import { CommunicationSettings } from '@/components/features/settings/CommunicationSettings';
@@ -437,13 +438,40 @@ function AcademicYearsTabContent() {
     }
   };
 
-  const handleLock = async (id: string) => {
-    try {
-      await lockMutation.mutateAsync(id);
-      notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+  const handleLock = async (year: AcademicYear) => {
+    // Check if this is the active year
+    if (year.isActive) {
+      modals.openConfirmModal({
+        title: 'Lock Active Academic Year',
+        children: (
+          <Text size="sm">
+            You are about to lock the <strong>active</strong> academic year. This will make it read-only and prevent all modifications.
+            <br />
+            <br />
+            <strong>Warning:</strong> Once locked, this action cannot be undone. If you need to revert this change, please contact Super Admin Support.
+          </Text>
+        ),
+        labels: { confirm: 'Lock Year', cancel: 'Cancel' },
+        confirmProps: { color: 'orange' },
+        onConfirm: async () => {
+          try {
+            await lockMutation.mutateAsync(year.id);
+            notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            notifications.show({ title: 'Error', message, color: notifyColors.error });
+          }
+        },
+      });
+    } else {
+      // For non-active years, proceed directly
+      try {
+        await lockMutation.mutateAsync(year.id);
+        notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        notifications.show({ title: 'Error', message, color: notifyColors.error });
+      }
     }
   };
 
@@ -1018,6 +1046,11 @@ function ScheduleTabContent() {
               New template
             </Button>
           </Group>
+          <Text size="sm" c="dimmed">
+            Timing templates define the daily schedule structure for your school, including school start and end times, 
+            period duration, and special slots like assembly and breaks. Assign templates to classes to establish 
+            their timetable framework.
+          </Text>
           {(templatesQuery.data?.data ?? []).length === 0 && (
             <Alert color={colors.warning} title="School start and end times are set in timing templates">
               Create at least one timing template and provide <strong>school start time</strong> and{' '}
@@ -1080,7 +1113,6 @@ function AssessmentTabContent() {
       <Tabs.List>
         <Tabs.Tab value="types">Assessment types</Tabs.Tab>
         <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
-        <Tabs.Tab value="assignments">Grading Config</Tabs.Tab>
         <Tabs.Tab value="leave">Leave quota</Tabs.Tab>
       </Tabs.List>
 
@@ -1089,9 +1121,6 @@ function AssessmentTabContent() {
       </Tabs.Panel>
       <Tabs.Panel value="templates" pt="md">
         <GradeTemplateBuilder />
-      </Tabs.Panel>
-      <Tabs.Panel value="assignments" pt="md">
-        <GradeTemplateAssignment />
       </Tabs.Panel>
       <Tabs.Panel value="leave" pt="md">
         <LeaveQuotaSetting academicYearId={activeYearId} />

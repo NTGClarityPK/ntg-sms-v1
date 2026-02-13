@@ -92,11 +92,17 @@ export function LevelManager() {
 
   return (
     <>
-      <Group justify="flex-end" mb="md">
+      <Group justify="space-between" mb="xs">
+        <Text size="lg" fw={500}>Levels</Text>
         <Button leftSection={<IconPlus size={16} />} onClick={open}>
           Add level
         </Button>
       </Group>
+      <Text size="sm" c="dimmed" mb="md">
+        Levels help organise classes into groups such as Primary, Secondary, or Foundation. 
+        Each level can contain multiple classes, making it easier to manage academic structures 
+        and assign subject templates across related classes.
+      </Text>
 
       <Paper withBorder p="md">
         {levels.length === 0 ? (

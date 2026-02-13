@@ -48,9 +48,15 @@ export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
   };
 
   return (
-    <Paper withBorder p="md">
-      <Stack gap="md">
-        <Text fw={600}>Annual leave quota</Text>
+    <>
+      <Text size="lg" fw={500} mb="xs">Leave Quota</Text>
+      <Text size="sm" c="dimmed" mb="md">
+        Set the annual leave quota for students per academic year. This limit determines the maximum number of leave days 
+        a student can take during the academic year. The system tracks used and remaining leave days for each student.
+      </Text>
+      <Paper withBorder p="md">
+        <Stack gap="md">
+          <Text fw={600}>Annual leave quota</Text>
         <NumberInput label="Quota" min={0} value={value} onChange={(v) => setValue(Number(v) || 0)} />
         <Group justify="flex-end">
           <Button variant="light" onClick={onSave} loading={setQuota.isPending || quotaQuery.isLoading}>
@@ -59,6 +65,7 @@ export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
         </Group>
       </Stack>
     </Paper>
+    </>
   );
 }
 
