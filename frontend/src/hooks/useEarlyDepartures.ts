@@ -8,6 +8,21 @@ import { useAuth } from './useAuth';
 import { notifications } from '@mantine/notifications';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+/** Extract backend error message from Axios response. Nest HttpExceptionFilter returns { error: { code, message } }. */
+function getApiErrorMessage(
+  error: unknown,
+  fallback: string,
+): string {
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const res = (error as { response?: { data?: { error?: { message?: string | string[] }; message?: string | string[] } } })
+      .response?.data;
+    const msg = res?.error?.message ?? res?.message;
+    if (msg) return Array.isArray(msg) ? msg.join(', ') : msg;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
 interface QueryEarlyDepartureParams {
   page?: number;
   limit?: number;
@@ -84,11 +99,13 @@ export function useCreateEarlyDeparture() {
       });
     },
     onError: (error: unknown) => {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
+      const message = getApiErrorMessage(
+        error,
+        'Failed to submit early departure request',
+      );
       notifications.show({
         title: 'Error',
-        message: message || 'Failed to submit early departure request',
+        message,
         color: notifyColors.error,
       });
     },
@@ -135,11 +152,13 @@ export function useUpdateEarlyDepartureStatus() {
       });
     },
     onError: (error: unknown) => {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
+      const message = getApiErrorMessage(
+        error,
+        'Failed to update early departure request',
+      );
       notifications.show({
         title: 'Error',
-        message: message || 'Failed to update early departure request',
+        message,
         color: notifyColors.error,
       });
     },

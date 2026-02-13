@@ -34,9 +34,12 @@ type EarlyDepartureRow = {
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
-  throw new BadRequestException(
-    error instanceof Error ? error.message : 'Unknown error',
-  );
+  // PostgrestError is a plain object with .message, not necessarily an instance of Error
+  const message =
+    (error as PostgrestError).message ||
+    (error instanceof Error ? error.message : null) ||
+    'Unknown error';
+  throw new BadRequestException(message);
 }
 
 @Injectable()
@@ -104,6 +107,24 @@ export class EarlyDepartureService {
       throw new BadRequestException('No active academic year found');
     }
 
+    // One early departure per student per day: block if same date already has pending or approved request
+    const { data: existing } = await supabase
+      .from('early_departure_requests')
+      .select('id, status')
+      .eq('branch_id', branchId)
+      .eq('student_id', input.studentId)
+      .eq('date', input.date)
+      .in('status', ['pending', 'approved'])
+      .maybeSingle();
+
+    if (existing) {
+      const message =
+        existing.status === 'pending'
+          ? 'A request for this day is already pending. Please wait for it to be reviewed before submitting another.'
+          : 'An early departure for this day has already been approved. You cannot submit another request for the same day.';
+      throw new BadRequestException(message);
+    }
+
     const { data, error } = await supabase
       .from('early_departure_requests')
       .insert({
@@ -125,7 +146,31 @@ export class EarlyDepartureService {
       throw new BadRequestException('Failed to create early departure request');
     }
 
-    return this.mapRowToDto(data as EarlyDepartureRow);
+    const row = data as EarlyDepartureRow;
+
+    // Notify school admin, admin assistant, and class teacher (best-effort)
+    try {
+      const recipientUserIds = await this.getEarlyDepartureRequestRaisedRecipients(
+        input.studentId,
+        branchId,
+        activeYear.id,
+        userId,
+      );
+      if (recipientUserIds.length > 0) {
+        const studentName = await this.getStudentNameForNotification(input.studentId);
+        await this.notificationsService.createEarlyDepartureRequestRaisedNotifications({
+          recipientUserIds,
+          studentName,
+          date: row.date,
+          time: row.departure_time,
+          earlyDepartureRequestId: row.id,
+        });
+      }
+    } catch {
+      // ignore notification errors
+    }
+
+    return this.mapRowToDto(row);
   }
 
   async listEarlyDepartureRequests(
@@ -407,6 +452,99 @@ export class EarlyDepartureService {
 
     const updatedRow = data as EarlyDepartureRow;
     return this.mapRowToDto(updatedRow);
+  }
+
+  /**
+   * Get student display name for notifications (profiles.full_name or 'Student').
+   */
+  private async getStudentNameForNotification(studentId: string): Promise<string> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: studentData } = await supabase
+      .from('students')
+      .select('user_id')
+      .eq('id', studentId)
+      .single();
+    if (!studentData) return 'Student';
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', (studentData as { user_id: string }).user_id)
+      .maybeSingle();
+    return (profile as { full_name?: string } | null)?.full_name || 'Student';
+  }
+
+  /**
+   * Get user IDs to notify when an early departure request is raised: school_admin, admin_assistant, and class teacher for the student (same branch). Excludes requester.
+   */
+  private async getEarlyDepartureRequestRaisedRecipients(
+    studentId: string,
+    branchId: string,
+    academicYearId: string,
+    requestedByUserId: string,
+  ): Promise<string[]> {
+    const supabase = this.supabaseConfig.getClient();
+    const recipientIds = new Set<string>();
+
+    // School admin and admin assistant: user_roles for this branch with role name in ('school_admin', 'admin_assistant')
+    const { data: userRolesData, error: urError } = await supabase
+      .from('user_roles')
+      .select('user_id, role_id')
+      .eq('branch_id', branchId);
+
+    if (urError || !userRolesData || userRolesData.length === 0) {
+      // Continue to try class teacher; if no admin/assistant roles, recipientIds stays empty for them
+    } else {
+      const roleIds = [...new Set((userRolesData as { role_id: string }[]).map((ur) => ur.role_id))];
+      const { data: rolesData } = await supabase
+        .from('roles')
+        .select('id, name')
+        .in('id', roleIds);
+      const adminRoleNames = new Set(['school_admin', 'admin_assistant']);
+      const adminRoleIds = new Set(
+        (rolesData ?? [])
+          .filter((r: { name: string }) => adminRoleNames.has(r.name))
+          .map((r: { id: string }) => r.id),
+      );
+      for (const ur of userRolesData as { user_id: string; role_id: string }[]) {
+        if (adminRoleIds.has(ur.role_id)) recipientIds.add(ur.user_id);
+      }
+    }
+
+    // Class teacher of the student's class section (for this branch and academic year)
+    const { data: studentRow } = await supabase
+      .from('students')
+      .select('class_id, section_id')
+      .eq('id', studentId)
+      .eq('branch_id', branchId)
+      .single();
+
+    if (studentRow && (studentRow as { class_id: string | null }).class_id && (studentRow as { section_id: string | null }).section_id) {
+      const st = studentRow as { class_id: string; section_id: string };
+      const { data: classSection } = await supabase
+        .from('class_sections')
+        .select('class_teacher_id')
+        .eq('class_id', st.class_id)
+        .eq('section_id', st.section_id)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', academicYearId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (classSection && (classSection as { class_teacher_id: string | null }).class_teacher_id) {
+        const ctId = (classSection as { class_teacher_id: string }).class_teacher_id;
+        const { data: staffRow } = await supabase
+          .from('staff')
+          .select('user_id')
+          .eq('id', ctId)
+          .maybeSingle();
+        if (staffRow && (staffRow as { user_id: string }).user_id) {
+          recipientIds.add((staffRow as { user_id: string }).user_id);
+        }
+      }
+    }
+
+    recipientIds.delete(requestedByUserId);
+    return [...recipientIds];
   }
 }
 

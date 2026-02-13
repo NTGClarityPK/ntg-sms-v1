@@ -18,6 +18,8 @@ export class LeaveRequestDto {
   academicYearId!: string;
   createdAt!: string;
   updatedAt!: string;
+  /** Student's leave quota usage (used days / total quota) for display in list. */
+  quotaUsage?: { usedDays: number; totalQuota: number };
 
   constructor(partial: LeaveRequestDto) {
     Object.assign(this, partial);

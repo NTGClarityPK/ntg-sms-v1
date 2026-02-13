@@ -461,6 +461,46 @@ export class NotificationsService {
     }
   }
 
+  async createEarlyDepartureRequestRaisedNotifications(params: {
+    recipientUserIds: string[];
+    studentName: string;
+    date: string;
+    time: string;
+    earlyDepartureRequestId: string;
+  }): Promise<void> {
+    if (params.recipientUserIds.length === 0) return;
+    try {
+      const dateFormatted = new Date(params.date).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      const notifications = params.recipientUserIds.map((user_id) => ({
+        user_id,
+        type: 'early_departure_request_raised',
+        title: 'New early departure request',
+        body: `${params.studentName}'s early departure request for ${dateFormatted} at ${params.time} is pending review.`,
+        data: {
+          earlyDepartureRequestId: params.earlyDepartureRequestId,
+          date: params.date,
+          time: params.time,
+        },
+        is_read: false,
+      }));
+
+      const supabase = this.supabaseConfig.getClient();
+      const { error } = await supabase.from('notifications').insert(notifications);
+      if (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Failed to create early departure request raised notifications:', errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to create early departure request raised notifications:', errorMessage);
+    }
+  }
+
   async createEarlyDepartureNotification(params: {
     userId: string;
     studentName: string;

@@ -18,6 +18,8 @@ export interface LeaveRequest {
   academicYearId: string;
   createdAt: string;
   updatedAt: string;
+  /** Student's leave quota usage (used days / total quota) for list display. */
+  quotaUsage?: { usedDays: number; totalQuota: number };
 }
 
 export interface LeaveQuota {

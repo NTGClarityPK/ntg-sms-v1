@@ -1,6 +1,7 @@
 export type NotificationType = 
   | 'attendance' 
   | 'leave' 
+  | 'leave_request_raised'
   | 'event' 
   | 'event_created'
   | 'event_updated'
@@ -8,7 +9,8 @@ export type NotificationType =
   | 'grade' 
   | 'message'
   | 'assessment_read'
-  | 'early_departure';
+  | 'early_departure'
+  | 'early_departure_request_raised';
 
 export interface Notification {
   id: string;

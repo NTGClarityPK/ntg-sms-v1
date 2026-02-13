@@ -42,6 +42,7 @@ export default function EarlyDeparturePage() {
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
   const [page, setPage] = useState(1);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
 
   // For parents, fetch their children; for staff, fetch all students
   const userId = (user as User | undefined)?.id;
@@ -145,10 +146,10 @@ export default function EarlyDeparturePage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs 
-          defaultValue={isParent ? 'my-requests' : 'all-requests'}
+        <Tabs
+          value={activeTab ?? (isParent ? 'my-requests' : 'all-requests')}
           onChange={(value) => {
-            // Refetch requests when switching to "all-requests" tab
+            setActiveTab(value);
             if (value === 'all-requests') {
               requestsQuery.refetch();
             }
@@ -272,7 +273,10 @@ export default function EarlyDeparturePage() {
                     <Card withBorder p="md">
                       <Stack gap="sm">
                         <Title order={3}>Request early departure</Title>
-                        <EarlyDepartureForm student={selectedStudent} />
+                        <EarlyDepartureForm
+                          student={selectedStudent}
+                          onSuccess={() => setActiveTab('all-requests')}
+                        />
                       </Stack>
                     </Card>
                   </>

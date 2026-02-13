@@ -1,21 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Button,
   Group,
   Paper,
+  Select,
   Stack,
   Text,
   Textarea,
-  TextInput,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconCalendar, IconClock } from '@tabler/icons-react';
 import { useForm, zodResolver } from '@mantine/form';
 import { z } from 'zod';
-import { notifications } from '@mantine/notifications';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCreateEarlyDeparture } from '@/hooks/useEarlyDepartures';
 import { useTimingTemplates } from '@/hooks/useScheduleSettings';
@@ -31,13 +30,26 @@ const schema = z.object({
 
 interface EarlyDepartureFormProps {
   student: Student | null;
+  /** Called after a request is successfully submitted (e.g. switch to All requests tab). */
+  onSuccess?: () => void;
 }
 
-export function EarlyDepartureForm({ student }: EarlyDepartureFormProps) {
+// Build list of time options at 5-minute intervals between start and end (inclusive).
+function buildTimeOptions(startMinutes: number, endMinutes: number): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = [];
+  for (let m = startMinutes; m <= endMinutes; m += 5) {
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    const value = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    options.push({ value, label: value });
+  }
+  return options;
+}
+
+export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormProps) {
   const colors = useThemeColors();
   const createRequest = useCreateEarlyDeparture();
   const { data: timingTemplatesData } = useTimingTemplates();
-  const timeInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fetch full student details to get classId
   // The hook returns response.data where response is ApiResponse<Student>
@@ -80,11 +92,19 @@ export function EarlyDepartureForm({ student }: EarlyDepartureFormProps) {
     return {
       startTime: parseTime(timingTemplate.startTime),
       endTime: parseTime(timingTemplate.endTime),
-      // Format for HTML time input (HH:MM)
-      minTime: timingTemplate.startTime.slice(0, 5), // Extract HH:MM from HH:MM:SS
-      maxTime: timingTemplate.endTime.slice(0, 5),
     };
   }, [timingTemplate]);
+
+  // Departure time options: 5-minute steps only, between school start and end (or default 07:00–18:00)
+  const departureTimeOptions = useMemo(() => {
+    const startMinutes = schoolHours
+      ? schoolHours.startTime.getHours() * 60 + schoolHours.startTime.getMinutes()
+      : 7 * 60; // 07:00 default
+    const endMinutes = schoolHours
+      ? schoolHours.endTime.getHours() * 60 + schoolHours.endTime.getMinutes()
+      : 18 * 60; // 18:00 default
+    return buildTimeOptions(startMinutes, endMinutes);
+  }, [schoolHours]);
 
   // Validation function that uses current schoolHours and timingTemplate
   const validateDepartureTime = (value: string): string | null => {
@@ -160,14 +180,9 @@ export function EarlyDepartureForm({ student }: EarlyDepartureFormProps) {
         reason: values.reason,
       });
       form.reset();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      notifications.show({
-        title: 'Error',
-        message,
-        color: colors.error,
-      });
+      onSuccess?.();
+    } catch {
+      // Error notification is shown by useCreateEarlyDeparture onError with backend message
     }
   };
 
@@ -182,59 +197,31 @@ export function EarlyDepartureForm({ student }: EarlyDepartureFormProps) {
             placeholder="Select date"
             leftSection={<IconCalendar size={16} />}
           />
-          <TextInput
-            ref={timeInputRef}
+          <Select
             label="Departure time"
-            type="time"
+            placeholder="Select time"
+            leftSection={<IconClock size={16} />}
+            data={departureTimeOptions}
             value={form.values.departureTime}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-              const value = e.currentTarget.value;
-              form.setFieldValue('departureTime', value);
-              // Validate immediately when time changes using the current validation function
-              // Use setTimeout to ensure the value is set before validation
-              setTimeout(() => {
-                const error = validateDepartureTime(value);
-                if (error) {
-                  form.setFieldError('departureTime', error);
-                } else {
-                  form.clearFieldError('departureTime');
-                }
-              }, 0);
-            }}
-            onBlur={() => {
-              // Validate on blur as well
-              const error = validateDepartureTime(form.values.departureTime);
+            onChange={(value) => {
+              form.setFieldValue('departureTime', value ?? '');
+              const error = value ? validateDepartureTime(value) : 'Departure time is required';
               if (error) {
                 form.setFieldError('departureTime', error);
               } else {
                 form.clearFieldError('departureTime');
               }
             }}
-            placeholder="Select time"
-            leftSection={<IconClock size={16} />}
             error={form.errors.departureTime}
-            min={schoolHours?.minTime}
-            max={schoolHours?.maxTime}
             description={
               timingTemplate
                 ? `School hours: ${timingTemplate.startTime.slice(0, 5)} - ${timingTemplate.endTime.slice(0, 5)}`
                 : 'School hours not configured'
             }
-            onClick={() => {
-              // Open the native time picker when clicking anywhere on the input
-              const input = timeInputRef.current;
-              if (input) {
-                if ('showPicker' in input && typeof input.showPicker === 'function') {
-                  input.showPicker();
-                } else {
-                  input.focus();
-                }
-              }
-            }}
+            clearable
+            searchable
             styles={{
               input: {
-                cursor: 'pointer',
-                // Highlight field in red when there's an error
                 ...(form.errors.departureTime && {
                   borderColor: colors.error,
                   '&:focus': {
@@ -242,16 +229,6 @@ export function EarlyDepartureForm({ student }: EarlyDepartureFormProps) {
                     boxShadow: `0 0 0 1px ${colors.error}`,
                   },
                 }),
-                // Hide the native browser clock icon on the right
-                '&::-webkit-calendar-picker-indicator': {
-                  display: 'none',
-                },
-                '&::-webkit-inner-spin-button': {
-                  display: 'none',
-                },
-                '&::-webkit-outer-spin-button': {
-                  display: 'none',
-                },
               },
             }}
           />

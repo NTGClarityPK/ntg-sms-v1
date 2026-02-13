@@ -230,6 +230,7 @@ export function LeaveRequestTable({
             <Table.Th>Leave Period</Table.Th>
             <Table.Th>Days</Table.Th>
             <Table.Th>Student</Table.Th>
+            <Table.Th>Quota usage</Table.Th>
             <Table.Th>Reason</Table.Th>
             <Table.Th>Status</Table.Th>
             <Table.Th>Reviewed By</Table.Th>
@@ -241,7 +242,7 @@ export function LeaveRequestTable({
         <Table.Tbody>
           {requests.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={10}>
+              <Table.Td colSpan={11}>
                 <Text c="dimmed" ta="center" py="md">
                   No leave requests found
                 </Text>
@@ -285,6 +286,13 @@ export function LeaveRequestTable({
                   <Table.Td>
                     <Text size="sm" fw={500}>
                       {studentName || 'N/A'}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">
+                      {request.quotaUsage != null
+                        ? `${request.quotaUsage.usedDays}/${request.quotaUsage.totalQuota}`
+                        : '–'}
                     </Text>
                   </Table.Td>
                   <Table.Td>

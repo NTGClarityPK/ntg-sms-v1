@@ -472,24 +472,38 @@ export class LeaveRequestsService {
       }
     }
 
+    // Quota usage per student (for distinct students on this page)
+    const distinctStudentIds = Array.from(new Set(rows.map((r) => r.student_id)));
+    const quotaMap = new Map<string, { usedDays: number; totalQuota: number }>();
+    await Promise.all(
+      distinctStudentIds.map(async (sid) => {
+        try {
+          const quota = await this.getStudentQuotaUsage(sid, branchId);
+          quotaMap.set(sid, { usedDays: quota.usedDays, totalQuota: quota.totalQuota });
+        } catch {
+          // omit quota for this student on error
+        }
+      }),
+    );
+
     const items = rows.map((row) => {
       const baseDto = this.mapRowToDto(row);
-      
+      const quotaUsage = quotaMap.get(row.student_id);
+
       // Add reviewer information if available
       if (row.reviewed_by) {
         const reviewerName = reviewerProfileMap.get(row.reviewed_by);
         const reviewerRole = reviewerRoleMap.get(row.reviewed_by);
-        
-        if (reviewerName) {
-          return new LeaveRequestDto({
-            ...baseDto,
-            reviewerName,
-            reviewerRole: reviewerRole || undefined,
-          });
-        }
+
+        return new LeaveRequestDto({
+          ...baseDto,
+          quotaUsage,
+          reviewerName: reviewerName || undefined,
+          reviewerRole: reviewerRole || undefined,
+        });
       }
-      
-      return baseDto;
+
+      return new LeaveRequestDto({ ...baseDto, quotaUsage });
     });
 
     const total = count ?? items.length;
