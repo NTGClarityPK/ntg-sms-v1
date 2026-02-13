@@ -18,6 +18,8 @@ export interface EarlyDepartureRequest {
   academicYearId: string;
   createdAt: string;
   updatedAt: string;
+  hasConflict?: boolean;
+  conflictDetails?: string;
 }
 
 

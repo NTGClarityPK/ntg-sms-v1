@@ -5,6 +5,8 @@ export class EventParticipantDto {
   studentId?: string;
   branchId!: string;
   createdAt!: string;
+  className?: string;
+  sectionName?: string;
 
   constructor(partial: Partial<EventParticipantDto>) {
     Object.assign(this, partial);

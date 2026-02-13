@@ -103,6 +103,40 @@ export function useEventConflicts(eventId: string | undefined) {
 }
 
 /**
+ * Hook to check conflicts before creating an event
+ */
+export function useCheckEventConflicts(
+  startDate: string | null,
+  endDate: string | null,
+  classSectionIds: string[],
+) {
+  return useQuery({
+    queryKey: ['events', 'check-conflicts', startDate, endDate, classSectionIds.sort().join(',')],
+    queryFn: async () => {
+      if (!startDate || !endDate || classSectionIds.length === 0) {
+        return { data: { assessmentConflicts: [], eventConflicts: [] } };
+      }
+
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+      });
+      classSectionIds.forEach((id) => {
+        params.append('classSectionIds', id);
+      });
+
+      const response = await apiClient.get<EventConflict>(
+        `/api/v1/events/conflicts?${params.toString()}`,
+      );
+      // apiClient.get() returns ApiResponse<EventConflict> = { data: EventConflict }
+      return response;
+    },
+    enabled: !!startDate && !!endDate && classSectionIds.length > 0,
+    staleTime: 1000 * 60 * 1, // 1 minute - shorter since it's for real-time checking
+  });
+}
+
+/**
  * Hook to create a new event
  */
 export function useCreateEvent() {

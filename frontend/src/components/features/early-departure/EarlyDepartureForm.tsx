@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import {
+  Alert,
   Button,
   Group,
   Paper,
@@ -16,7 +17,7 @@ import { IconCalendar, IconClock } from '@tabler/icons-react';
 import { useForm, zodResolver } from '@mantine/form';
 import { z } from 'zod';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useCreateEarlyDeparture } from '@/hooks/useEarlyDepartures';
+import { useCreateEarlyDeparture, useCheckEarlyDepartureConflict } from '@/hooks/useEarlyDepartures';
 import { useTimingTemplates } from '@/hooks/useScheduleSettings';
 import { useStudent } from '@/hooks/useStudents';
 import type { Student } from '@/types/students';
@@ -171,6 +172,16 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schoolHours, timingTemplate]);
 
+  // Check for class conflicts when date and time are selected
+  const dateStr = form.values.date ? form.values.date.toISOString().slice(0, 10) : null;
+  const conflictCheck = useCheckEarlyDepartureConflict(
+    student?.id || null,
+    dateStr,
+    form.values.departureTime || null,
+  );
+  const hasConflict = conflictCheck.data?.hasConflict ?? false;
+  const conflictDetails = conflictCheck.data?.conflictDetails;
+
   const handleSubmit = async (values: typeof form.values) => {
     try {
       await createRequest.mutateAsync({
@@ -232,6 +243,14 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
               },
             }}
           />
+          {hasConflict && conflictDetails && (
+            <Alert color="yellow" title="Class Conflict Warning">
+              <Text size="sm">
+                The selected departure time conflicts with an ongoing class: <strong>{conflictDetails}</strong>.
+                You can still submit the request, but please be aware of this conflict.
+              </Text>
+            </Alert>
+          )}
           <Textarea
             label="Reason"
             minRows={2}

@@ -18,6 +18,7 @@ import {
   Skeleton,
   MultiSelect,
   Alert,
+  Text,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
@@ -25,6 +26,8 @@ import { z } from 'zod';
 import type { Event, CreateEventInput, UpdateEventInput } from '@/types/events';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStudents } from '@/hooks/useStudents';
+import { useCheckEventConflicts } from '@/hooks/api/useEvents';
+import dayjs from 'dayjs';
 
 const eventSchema = z
   .object({
@@ -136,6 +139,26 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
     setSelectedClassSectionIds(form.values.classSectionIds);
   }, [form.values.classSectionIds]);
 
+  /** Format date as local YYYY-MM-DD so the calendar date is preserved (avoids UTC shift). */
+  const toLocalDateString = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // Check for conflicts when dates and class sections are entered
+  const startDateStr = form.values.startDate ? toLocalDateString(form.values.startDate) : null;
+  const endDateStr = form.values.endDate ? toLocalDateString(form.values.endDate) : null;
+
+  const { data: conflictsData } = useCheckEventConflicts(
+    startDateStr,
+    endDateStr,
+    form.values.classSectionIds,
+  );
+
+  const conflicts = conflictsData?.data;
+
   // CRITICAL: Pre-populate form when editing
   // Use a ref to track if we've already initialized to prevent infinite loops
   const eventIdRef = useRef<string | undefined>(undefined);
@@ -179,11 +202,11 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
     const payload: CreateEventInput | UpdateEventInput = {
       title: values.title,
       description: values.description || undefined,
-      startDate: values.startDate ? values.startDate.toISOString().split('T')[0] : '',
-      endDate: values.endDate ? values.endDate.toISOString().split('T')[0] : '',
+      startDate: values.startDate ? toLocalDateString(values.startDate) : '',
+      endDate: values.endDate ? toLocalDateString(values.endDate) : '',
       requiresConsent: values.requiresConsent,
       consentDeadline: values.consentDeadline
-        ? values.consentDeadline.toISOString().split('T')[0]
+        ? toLocalDateString(values.consentDeadline)
         : undefined,
       classSectionIds: values.classSectionIds.length > 0 ? values.classSectionIds : undefined,
       studentIds: values.studentIds.length > 0 ? values.studentIds : undefined,
@@ -316,6 +339,41 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
             Please select at least one class section or individual student.
           </Alert>
         )}
+
+        {/* Conflicts Warning */}
+        {conflicts &&
+          (conflicts.assessmentConflicts.length > 0 || conflicts.eventConflicts.length > 0) && (
+            <Alert color="yellow" title="Conflicts Detected">
+              <Stack gap="xs">
+                {conflicts.assessmentConflicts.length > 0 && (
+                  <div>
+                    <Text fw={500}>Assessment Conflicts:</Text>
+                    <ul>
+                      {conflicts.assessmentConflicts.map((conflict) => (
+                        <li key={conflict.id}>
+                          {conflict.title} (Due: {dayjs(conflict.dueDate).format('MMM D, YYYY')})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {conflicts.eventConflicts.length > 0 && (
+                  <div>
+                    <Text fw={500}>Event Conflicts:</Text>
+                    <ul>
+                      {conflicts.eventConflicts.map((conflict) => (
+                        <li key={conflict.id}>
+                          {conflict.title} (
+                          {dayjs(conflict.startDate).format('MMM D')} –{' '}
+                          {dayjs(conflict.endDate).format('MMM D, YYYY')})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Stack>
+            </Alert>
+          )}
 
         <Group justify="flex-end" mt="md">
           <Button type="submit" loading={isLoading}>

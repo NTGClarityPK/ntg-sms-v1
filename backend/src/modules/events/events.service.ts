@@ -82,7 +82,11 @@ function mapEvent(row: EventRow): EventDto {
   });
 }
 
-function mapEventParticipant(row: EventParticipantRow): EventParticipantDto {
+function mapEventParticipant(
+  row: EventParticipantRow,
+  className?: string,
+  sectionName?: string,
+): EventParticipantDto {
   return new EventParticipantDto({
     id: row.id,
     eventId: row.event_id,
@@ -90,6 +94,8 @@ function mapEventParticipant(row: EventParticipantRow): EventParticipantDto {
     studentId: row.student_id ?? undefined,
     branchId: row.branch_id,
     createdAt: row.created_at,
+    className,
+    sectionName,
   });
 }
 
@@ -181,20 +187,66 @@ export class EventsService {
     }
 
     const events = (data as EventRow[]).map(mapEvent);
+    const eventIds = events.map((e) => e.id);
+
+    // Fetch participants with class section details for all events
+    const { data: participantsData } = await supabase
+      .from('event_participants')
+      .select(
+        'id, event_id, class_section_id, student_id, branch_id, created_at, class_sections:class_section_id(class_id, section_id, classes:class_id(name, display_name), sections:section_id(name))',
+      )
+      .in('event_id', eventIds)
+      .eq('branch_id', branchId);
+
+    // Group participants by event ID
+    const participantsByEventId = new Map<string, EventParticipantDto[]>();
+    for (const p of (participantsData || []) as any[]) {
+      const eventId = p.event_id as string;
+      if (!participantsByEventId.has(eventId)) {
+        participantsByEventId.set(eventId, []);
+      }
+
+      const classSection = p.class_sections;
+      let className: string | undefined;
+      let sectionName: string | undefined;
+
+      if (classSection) {
+        const classData = Array.isArray(classSection.classes)
+          ? classSection.classes[0]
+          : classSection.classes;
+        const sectionData = Array.isArray(classSection.sections)
+          ? classSection.sections[0]
+          : classSection.sections;
+        className = classData?.display_name || classData?.name;
+        sectionName = sectionData?.name;
+      }
+
+      participantsByEventId.get(eventId)!.push(
+        mapEventParticipant(
+          {
+            id: p.id as string,
+            event_id: eventId,
+            class_section_id: p.class_section_id,
+            student_id: p.student_id,
+            branch_id: p.branch_id as string,
+            created_at: p.created_at as string,
+          },
+          className,
+          sectionName,
+        ),
+      );
+    }
+
+    // Attach participants to events
+    for (const event of events) {
+      event.participants = participantsByEventId.get(event.id) || [];
+    }
 
     // Filter by class section if provided
     if (query.classSectionId) {
-      const eventIds = events.map((e) => e.id);
-      const { data: participants } = await supabase
-        .from('event_participants')
-        .select('event_id')
-        .in('event_id', eventIds)
-        .eq('class_section_id', query.classSectionId);
-
-      const participantEventIds = new Set(
-        (participants || []).map((p) => p.event_id as string),
+      const filteredEvents = events.filter((e) =>
+        e.participants?.some((p) => p.classSectionId === query.classSectionId),
       );
-      const filteredEvents = events.filter((e) => participantEventIds.has(e.id));
 
       return {
         data: filteredEvents,
@@ -235,16 +287,35 @@ export class EventsService {
 
     const event = mapEvent(data as EventRow);
 
-    // Fetch participants for this event
+    // Fetch participants for this event with class section details
     const { data: participantsData, error: participantsError } = await supabase
       .from('event_participants')
-      .select('*')
+      .select(
+        '*, class_sections:class_section_id(class_id, section_id, classes:class_id(name, display_name), sections:section_id(name))',
+      )
       .eq('event_id', id)
       .eq('branch_id', branchId);
 
     throwIfDbError(participantsError);
 
-    const participants = (participantsData || []).map(mapEventParticipant);
+    const participants = (participantsData || []).map((p: any) => {
+      const classSection = p.class_sections;
+      let className: string | undefined;
+      let sectionName: string | undefined;
+
+      if (classSection) {
+        const classData = Array.isArray(classSection.classes)
+          ? classSection.classes[0]
+          : classSection.classes;
+        const sectionData = Array.isArray(classSection.sections)
+          ? classSection.sections[0]
+          : classSection.sections;
+        className = classData?.display_name || classData?.name;
+        sectionName = sectionData?.name;
+      }
+
+      return mapEventParticipant(p as EventParticipantRow, className, sectionName);
+    });
     event.participants = participants;
 
     return event;
@@ -815,6 +886,57 @@ export class EventsService {
       .eq('branch_id', branchId)
       .or(
         `and(start_date.lte.${event.endDate},end_date.gte.${event.startDate})`,
+      );
+
+    const eventConflicts = (conflictingEvents || []).map((e) => ({
+      id: e.id as string,
+      title: e.title as string,
+      startDate: e.start_date as string,
+      endDate: e.end_date as string,
+    }));
+
+    return { assessmentConflicts, eventConflicts };
+  }
+
+  async checkConflicts(
+    startDate: string,
+    endDate: string,
+    classSectionIds: string[],
+    branchId: string,
+  ): Promise<{
+    assessmentConflicts: Array<{ id: string; title: string; dueDate: string; classSectionId: string }>;
+    eventConflicts: Array<{ id: string; title: string; startDate: string; endDate: string }>;
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    if (classSectionIds.length === 0) {
+      return { assessmentConflicts: [], eventConflicts: [] };
+    }
+
+    // Check assessment conflicts
+    const { data: assessments } = await supabase
+      .from('assessments')
+      .select('id, title, due_date, class_section_id')
+      .in('class_section_id', classSectionIds)
+      .eq('branch_id', branchId)
+      .gte('due_date', startDate)
+      .lte('due_date', endDate);
+
+    const assessmentConflicts = (assessments || []).map((a) => ({
+      id: a.id as string,
+      title: a.title as string,
+      dueDate: a.due_date as string,
+      classSectionId: a.class_section_id as string,
+    }));
+
+    // Check event conflicts (overlapping events)
+    // Events overlap if: startDate <= other.endDate && endDate >= other.startDate
+    const { data: conflictingEvents } = await supabase
+      .from('events')
+      .select('id, title, start_date, end_date')
+      .eq('branch_id', branchId)
+      .or(
+        `and(start_date.lte.${endDate},end_date.gte.${startDate})`,
       );
 
     const eventConflicts = (conflictingEvents || []).map((e) => ({

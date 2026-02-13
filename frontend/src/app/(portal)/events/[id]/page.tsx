@@ -173,6 +173,34 @@ export default function EventDetailPage() {
                   </Group>
                 </>
               )}
+
+              {/* Class Sections */}
+              {event.participants && event.participants.length > 0 && (
+                <>
+                  <Divider />
+                  <Group>
+                    <IconUsers size={20} />
+                    <Text fw={500}>Participating Classes:</Text>
+                  </Group>
+                  <Group gap="xs">
+                    {event.participants
+                      .filter((p) => p.classSectionId)
+                      .map((participant) => {
+                        const displayName = participant.className && participant.sectionName
+                          ? `${participant.className} - ${participant.sectionName}`
+                          : participant.classSectionId || 'Unknown';
+                        return (
+                          <Badge key={participant.id} variant="light" color="blue">
+                            {displayName}
+                          </Badge>
+                        );
+                      })}
+                    {event.participants.filter((p) => p.classSectionId).length === 0 && (
+                        <Text c="dimmed" size="sm">No class sections assigned</Text>
+                      )}
+                  </Group>
+                </>
+              )}
             </Stack>
           </Paper>
 

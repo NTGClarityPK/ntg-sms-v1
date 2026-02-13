@@ -165,6 +165,32 @@ export function useUpdateEarlyDepartureStatus() {
   });
 }
 
+export function useCheckEarlyDepartureConflict(
+  studentId: string | null,
+  date: string | null,
+  departureTime: string | null,
+) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['early-departures', 'check-conflict', studentId, date, departureTime, branchId],
+    queryFn: async () => {
+      if (!studentId || !date || !departureTime || !branchId) return null;
+      const queryParams = new URLSearchParams();
+      queryParams.append('studentId', studentId);
+      queryParams.append('date', date);
+      queryParams.append('departureTime', departureTime);
+      const response = await apiClient.get<{ hasConflict: boolean; conflictDetails?: string }>(
+        `/api/v1/early-departures/check-conflict?${queryParams.toString()}`,
+      );
+      return response.data;
+    },
+    enabled: !!studentId && !!date && !!departureTime && !!branchId,
+    staleTime: 30 * 1000, // Cache for 30 seconds
+  });
+}
+
 export function useStudentEarlyDepartureStats(studentId: string | null) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
@@ -193,6 +219,34 @@ export function useStudentEarlyDepartureStats(studentId: string | null) {
       return { pending, rejected, approved };
     },
     enabled: !!studentId && !!branchId,
+  });
+}
+
+export interface StudentEarlyDepartureStatistics {
+  studentId: string;
+  studentName: string;
+  totalRequests: number;
+  totalApproved: number;
+  totalRejected: number;
+  totalCancelled: number;
+  totalPending: number;
+}
+
+export function useEarlyDepartureStatistics() {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['early-departures', 'statistics', branchId],
+    queryFn: async () => {
+      if (!branchId) return null;
+      const response = await apiClient.get<StudentEarlyDepartureStatistics[]>(
+        '/api/v1/early-departures/statistics',
+      );
+      return response.data;
+    },
+    enabled: !!branchId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 

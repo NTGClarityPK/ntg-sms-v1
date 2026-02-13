@@ -36,6 +36,8 @@ export interface EventParticipant {
   studentId?: string;
   branchId: string;
   createdAt: string;
+  className?: string;
+  sectionName?: string;
 }
 
 export interface EventConsent {

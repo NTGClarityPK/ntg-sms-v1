@@ -18,6 +18,8 @@ export class EarlyDepartureRequestDto {
   academicYearId!: string;
   createdAt!: string;
   updatedAt!: string;
+  hasConflict?: boolean;
+  conflictDetails?: string;
 
   constructor(partial: EarlyDepartureRequestDto) {
     Object.assign(this, partial);

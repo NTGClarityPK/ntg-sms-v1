@@ -106,13 +106,22 @@ export class EventsController {
     assessmentConflicts: Array<{ id: string; title: string; dueDate: string; classSectionId: string }>;
     eventConflicts: Array<{ id: string; title: string; startDate: string; endDate: string }>;
   }> {
+    if (!startDate || !endDate) {
+      return { assessmentConflicts: [], eventConflicts: [] };
+    }
+
     const classSectionIdsArray = Array.isArray(classSectionIds)
       ? classSectionIds
       : classSectionIds
         ? [classSectionIds]
         : [];
-    // This is a simplified check - full implementation would be in service
-    return { assessmentConflicts: [], eventConflicts: [] };
+
+    return this.eventsService.checkConflicts(
+      startDate,
+      endDate,
+      classSectionIdsArray,
+      branch.branchId,
+    );
   }
 
   @Get()

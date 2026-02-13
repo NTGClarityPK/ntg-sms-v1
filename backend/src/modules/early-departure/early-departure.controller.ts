@@ -149,6 +149,35 @@ export class EarlyDepartureController {
     );
     return { data };
   }
+
+  @Get('check-conflict')
+  async checkConflict(
+    @Query('studentId') studentId: string,
+    @Query('date') date: string,
+    @Query('departureTime') departureTime: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const result = await this.earlyDepartureService.checkClassConflict(
+      studentId,
+      date,
+      departureTime,
+      branch.branchId,
+    );
+    return { data: result };
+  }
+
+  @Get('statistics')
+  async getStatistics(
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const data = await this.earlyDepartureService.getStudentStatistics(
+      user.id,
+      branch.branchId,
+    );
+    return { data };
+  }
 }
 
 

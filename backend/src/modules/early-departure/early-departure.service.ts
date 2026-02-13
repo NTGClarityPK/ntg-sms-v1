@@ -8,6 +8,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TimetableService } from '../timetable/timetable.service';
 import { EarlyDepartureRequestDto } from './dto/early-departure.dto';
 import { CreateEarlyDepartureRequestDto } from './dto/create-early-departure.dto';
 import { UpdateEarlyDepartureStatusDto } from './dto/update-early-departure-status.dto';
@@ -48,7 +49,118 @@ export class EarlyDepartureService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
     private readonly notificationsService: NotificationsService,
+    private readonly timetableService: TimetableService,
   ) {}
+
+  /**
+   * Check if student has an ongoing class at the given date and time.
+   * Returns conflict details if found, null otherwise.
+   */
+  async checkClassConflict(
+    studentId: string,
+    date: string,
+    departureTime: string,
+    branchId: string,
+    academicYearId?: string,
+  ): Promise<{ hasConflict: boolean; conflictDetails?: string }> {
+    try {
+      // Get active academic year if not provided
+      let activeYearId = academicYearId;
+      if (!activeYearId) {
+        const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+        if (!activeYear) {
+          // If no active year, assume no conflict (best-effort)
+          return { hasConflict: false };
+        }
+        activeYearId = activeYear.id;
+      }
+
+      // Get day of week from date (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+      const dateObj = new Date(date + 'T12:00:00Z');
+      const dayOfWeek = dateObj.getUTCDay();
+
+      // Get student timetable
+      const timetable = await this.timetableService.getStudentTimetable(
+        studentId,
+        branchId,
+        activeYearId,
+      );
+
+      // Check if any slot overlaps with departure time
+      const departureMinutes = this.timeToMinutes(departureTime);
+      const conflictingSlot = timetable.slots.find((slot) => {
+        if (slot.dayOfWeek !== dayOfWeek) return false;
+        if (slot.slotType !== 'class') return false; // Only check class slots, not breaks/assembly
+        
+        const startMinutes = this.timeToMinutes(slot.startTime);
+        const endMinutes = this.timeToMinutes(slot.endTime);
+        
+        // Check if departure time falls within class time
+        return departureMinutes >= startMinutes && departureMinutes < endMinutes;
+      });
+
+      if (conflictingSlot) {
+        const subjectName = conflictingSlot.subjectName || 'Class';
+        const startTime = conflictingSlot.startTime.slice(0, 5);
+        const endTime = conflictingSlot.endTime.slice(0, 5);
+        return {
+          hasConflict: true,
+          conflictDetails: `${subjectName} (${startTime} - ${endTime})`,
+        };
+      }
+
+      return { hasConflict: false };
+    } catch {
+      // If error checking timetable, assume no conflict (best-effort)
+      return { hasConflict: false };
+    }
+  }
+
+  /**
+   * Convert time string (HH:MM or HH:MM:SS) to minutes since midnight.
+   */
+  private timeToMinutes(timeStr: string): number {
+    const parts = timeStr.split(':');
+    const hours = parseInt(parts[0] || '0', 10);
+    const minutes = parseInt(parts[1] || '0', 10);
+    return hours * 60 + minutes;
+  }
+
+  private async mapRowToDtoWithConflict(
+    row: EarlyDepartureRow,
+    branchId: string,
+  ): Promise<EarlyDepartureRequestDto> {
+    const baseDto = new EarlyDepartureRequestDto({
+      id: row.id,
+      studentId: row.student_id,
+      requestedBy: row.requested_by,
+      date: row.date,
+      departureTime: row.departure_time,
+      reason: row.reason ?? undefined,
+      attachmentUrl: row.attachment_url ?? undefined,
+      status: row.status,
+      reviewedBy: row.reviewed_by ?? undefined,
+      reviewedAt: row.reviewed_at ?? undefined,
+      reviewNotes: row.review_notes ?? undefined,
+      branchId: row.branch_id,
+      academicYearId: row.academic_year_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    });
+
+    // Check for class conflict (academicYearId is already in row)
+    const conflict = await this.checkClassConflict(
+      row.student_id,
+      row.date,
+      row.departure_time,
+      branchId,
+      row.academic_year_id,
+    );
+    baseDto.hasConflict = conflict.hasConflict;
+    baseDto.conflictDetails = conflict.conflictDetails;
+
+    return baseDto;
+  }
 
   private mapRowToDto(row: EarlyDepartureRow): EarlyDepartureRequestDto {
     return new EarlyDepartureRequestDto({
@@ -170,7 +282,8 @@ export class EarlyDepartureService {
       // ignore notification errors
     }
 
-    return this.mapRowToDto(row);
+    // Map with conflict detection
+    return this.mapRowToDtoWithConflict(row, branchId);
   }
 
   async listEarlyDepartureRequests(
@@ -284,25 +397,28 @@ export class EarlyDepartureService {
       }
     }
 
-    const items = rows.map((row) => {
-      const baseDto = this.mapRowToDto(row);
-      
-      // Add reviewer information if available
-      if (row.reviewed_by) {
-        const reviewerName = reviewerProfileMap.get(row.reviewed_by);
-        const reviewerRole = reviewerRoleMap.get(row.reviewed_by);
+    // Map rows to DTOs with conflict detection (in parallel for performance)
+    const items = await Promise.all(
+      rows.map(async (row) => {
+        const baseDto = await this.mapRowToDtoWithConflict(row, branchId);
         
-        if (reviewerName) {
-          return new EarlyDepartureRequestDto({
-            ...baseDto,
-            reviewerName,
-            reviewerRole: reviewerRole || undefined,
-          });
+        // Add reviewer information if available
+        if (row.reviewed_by) {
+          const reviewerName = reviewerProfileMap.get(row.reviewed_by);
+          const reviewerRole = reviewerRoleMap.get(row.reviewed_by);
+          
+          if (reviewerName) {
+            return new EarlyDepartureRequestDto({
+              ...baseDto,
+              reviewerName,
+              reviewerRole: reviewerRole || undefined,
+            });
+          }
         }
-      }
-      
-      return baseDto;
-    });
+        
+        return baseDto;
+      })
+    );
 
     const total = count ?? items.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -368,6 +484,9 @@ export class EarlyDepartureService {
 
     const updatedRow = data as EarlyDepartureRow;
 
+    // Map with conflict detection
+    const result = await this.mapRowToDtoWithConflict(updatedRow, branchId);
+
     // Best-effort notification to parent who requested
     try {
       const { data: studentData } = await this.supabaseConfig
@@ -401,7 +520,7 @@ export class EarlyDepartureService {
       // ignore notification errors
     }
 
-    return this.mapRowToDto(updatedRow);
+    return await this.mapRowToDtoWithConflict(updatedRow, branchId);
   }
 
   async cancelEarlyDepartureRequest(
@@ -451,7 +570,7 @@ export class EarlyDepartureService {
     }
 
     const updatedRow = data as EarlyDepartureRow;
-    return this.mapRowToDto(updatedRow);
+    return await this.mapRowToDtoWithConflict(updatedRow, branchId);
   }
 
   /**
@@ -545,6 +664,169 @@ export class EarlyDepartureService {
 
     recipientIds.delete(requestedByUserId);
     return [...recipientIds];
+  }
+
+  /**
+   * Get statistics grouped by student for students who have early departure requests.
+   * For parents: only their own students. For staff: all students with requests.
+   */
+  async getStudentStatistics(
+    userId: string,
+    branchId: string,
+  ): Promise<
+    Array<{
+      studentId: string;
+      studentName: string;
+      totalRequests: number;
+      totalApproved: number;
+      totalRejected: number;
+      totalCancelled: number;
+      totalPending: number;
+    }>
+  > {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Check if user is a parent
+    const { data: parentCheck } = await supabase
+      .from('parent_students')
+      .select('student_id')
+      .eq('parent_user_id', userId)
+      .limit(1)
+      .maybeSingle();
+
+    const isParent = !!parentCheck;
+
+    // Build base query - get all requests for this branch
+    let baseQuery = supabase
+      .from('early_departure_requests')
+      .select('student_id, status')
+      .eq('branch_id', branchId);
+
+    // If parent, filter to only their students
+    if (isParent) {
+      const { data: parentStudents } = await supabase
+        .from('parent_students')
+        .select('student_id')
+        .eq('parent_user_id', userId);
+
+      if (!parentStudents || parentStudents.length === 0) {
+        return [];
+      }
+
+      const studentIds = parentStudents.map((ps) => ps.student_id);
+      baseQuery = baseQuery.in('student_id', studentIds);
+    }
+
+    const { data: requests, error } = await baseQuery;
+    throwIfDbError(error);
+
+    if (!requests || requests.length === 0) {
+      return [];
+    }
+
+    // Get unique student IDs from requests
+    const studentIds = Array.from(
+      new Set((requests as { student_id: string }[]).map((r) => r.student_id)),
+    );
+
+    // Fetch student names
+    const { data: students } = await supabase
+      .from('students')
+      .select('id, user_id')
+      .in('id', studentIds)
+      .eq('branch_id', branchId);
+
+    const userIds = Array.from(
+      new Set(
+        (students ?? [])
+          .map((s) => (s as { user_id: string }).user_id)
+          .filter((id) => id),
+      ),
+    );
+
+    const studentNameMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+
+      if (profiles) {
+        const userIdToStudentIdMap = new Map<string, string>();
+        (students ?? []).forEach((s) => {
+          if ((s as { user_id: string }).user_id) {
+            userIdToStudentIdMap.set(
+              (s as { user_id: string }).user_id,
+              (s as { id: string }).id,
+            );
+          }
+        });
+
+        profiles.forEach((profile) => {
+          const studentId = userIdToStudentIdMap.get(profile.id);
+          if (studentId) {
+            studentNameMap.set(
+              studentId,
+              (profile as { full_name?: string }).full_name || 'Unknown Student',
+            );
+          }
+        });
+      }
+    }
+
+    // Aggregate statistics by student
+    const statsMap = new Map<
+      string,
+      {
+        totalRequests: number;
+        totalApproved: number;
+        totalRejected: number;
+        totalCancelled: number;
+        totalPending: number;
+      }
+    >();
+
+    (requests as { student_id: string; status: string }[]).forEach((req) => {
+      if (!statsMap.has(req.student_id)) {
+        statsMap.set(req.student_id, {
+          totalRequests: 0,
+          totalApproved: 0,
+          totalRejected: 0,
+          totalCancelled: 0,
+          totalPending: 0,
+        });
+      }
+
+      const stats = statsMap.get(req.student_id)!;
+      stats.totalRequests++;
+
+      switch (req.status) {
+        case 'approved':
+          stats.totalApproved++;
+          break;
+        case 'rejected':
+          stats.totalRejected++;
+          break;
+        case 'cancelled':
+          stats.totalCancelled++;
+          break;
+        case 'pending':
+          stats.totalPending++;
+          break;
+      }
+    });
+
+    // Convert to array format
+    const result = Array.from(statsMap.entries()).map(([studentId, stats]) => ({
+      studentId,
+      studentName: studentNameMap.get(studentId) || 'Unknown Student',
+      ...stats,
+    }));
+
+    // Sort by student name
+    result.sort((a, b) => a.studentName.localeCompare(b.studentName));
+
+    return result;
   }
 }
 

@@ -88,12 +88,40 @@ export function EarlyDepartureTable({
     );
   };
 
-  const statusBadge = (status: EarlyDepartureRequest['status']) => {
+  const statusBadge = (request: EarlyDepartureRequest) => {
+    const status = request.status;
     const badge = (
       <Badge variant="light" color={statusColorMap[status] ?? 'gray'}>
         {status}
       </Badge>
     );
+
+    // Show CONFLICT badge if there's a class conflict
+    if (request.hasConflict) {
+      const conflictBadge = (
+        <Badge variant="light" color="orange" ml="xs">
+          CONFLICT
+        </Badge>
+      );
+      
+      if (request.conflictDetails) {
+        return (
+          <Group gap="xs">
+            {badge}
+            <Tooltip label={`Class conflict: ${request.conflictDetails}`} withArrow>
+              {conflictBadge}
+            </Tooltip>
+          </Group>
+        );
+      }
+      
+      return (
+        <Group gap="xs">
+          {badge}
+          {conflictBadge}
+        </Group>
+      );
+    }
 
     if (status === 'pending') {
       return (
@@ -158,7 +186,7 @@ export function EarlyDepartureTable({
                       {request.reason || '-'}
                     </Text>
                   </Table.Td>
-                  <Table.Td>{statusBadge(request.status)}</Table.Td>
+                  <Table.Td>{statusBadge(request)}</Table.Td>
                   <Table.Td>
                     {request.reviewerName ? (
                       <Text size="sm">

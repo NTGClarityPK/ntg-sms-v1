@@ -28,10 +28,11 @@ import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconPlus, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
-import { useEvents, useDeleteEvent } from '@/hooks/api/useEvents';
+import { useEvents, useDeleteEvent, useEventConflicts } from '@/hooks/api/useEvents';
 import { modals } from '@mantine/modals';
 import dayjs from 'dayjs';
 import type { Event } from '@/types/events';
+import { IconAlertTriangle } from '@tabler/icons-react';
 
 export default function EventsPage() {
   const router = useRouter();
@@ -81,6 +82,31 @@ export default function EventsPage() {
     }
     return <Badge color="green">Upcoming</Badge>;
   };
+
+  // Component to show conflict badge for an event
+  function EventConflictBadge({ eventId }: { eventId: string }) {
+    const { data: conflictsData } = useEventConflicts(eventId);
+    const conflicts = conflictsData?.data;
+
+    if (
+      conflicts &&
+      (conflicts.assessmentConflicts.length > 0 || conflicts.eventConflicts.length > 0)
+    ) {
+      const totalConflicts =
+        conflicts.assessmentConflicts.length + conflicts.eventConflicts.length;
+      return (
+        <Tooltip
+          label={`${totalConflicts} conflict${totalConflicts > 1 ? 's' : ''} detected`}
+          withArrow
+        >
+          <Badge color="yellow" leftSection={<IconAlertTriangle size={12} />}>
+            Conflict
+          </Badge>
+        </Tooltip>
+      );
+    }
+    return null;
+  }
 
   return (
     <>
@@ -194,7 +220,12 @@ export default function EventsPage() {
                                 ` – ${dayjs(event.endDate).format('MMM D, YYYY')}`}
                             </Text>
                           </Table.Td>
-                          <Table.Td>{getStatusBadge(event)}</Table.Td>
+                          <Table.Td>
+                            <Group gap="xs">
+                              {getStatusBadge(event)}
+                              <EventConflictBadge eventId={event.id} />
+                            </Group>
+                          </Table.Td>
                           <Table.Td>
                             {event.requiresConsent ? (
                               <Badge color="orange">Required</Badge>

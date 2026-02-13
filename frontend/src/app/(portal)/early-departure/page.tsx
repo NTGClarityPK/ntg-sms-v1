@@ -17,9 +17,10 @@ import { IconUser } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
-import { useEarlyDepartures, useStudentEarlyDepartureStats } from '@/hooks/useEarlyDepartures';
+import { useEarlyDepartures, useStudentEarlyDepartureStats, useEarlyDepartureStatistics } from '@/hooks/useEarlyDepartures';
 import { EarlyDepartureForm } from '@/components/features/early-departure/EarlyDepartureForm';
 import { EarlyDepartureTable } from '@/components/features/early-departure/EarlyDepartureTable';
+import { EarlyDepartureStatistics } from '@/components/features/early-departure/EarlyDepartureStatistics';
 import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
 import type { Student } from '@/types/students';
@@ -110,6 +111,7 @@ export default function EarlyDeparturePage() {
   });
 
   const requests = requestsQuery.data?.data ?? [];
+  const statisticsQuery = useEarlyDepartureStatistics();
 
   // Create a map of studentId -> student name for display in table
   const studentNameMap = new Map<string, string>();
@@ -152,12 +154,15 @@ export default function EarlyDeparturePage() {
             setActiveTab(value);
             if (value === 'all-requests') {
               requestsQuery.refetch();
+            } else if (value === 'statistics') {
+              statisticsQuery.refetch();
             }
           }}
         >
           <Tabs.List>
             {isParent && <Tabs.Tab value="my-requests">Raise a request</Tabs.Tab>}
             <Tabs.Tab value="all-requests">All requests</Tabs.Tab>
+            <Tabs.Tab value="statistics">Past Statistics</Tabs.Tab>
           </Tabs.List>
 
           {isParent && (
@@ -314,6 +319,25 @@ export default function EarlyDeparturePage() {
                   studentNameMap={studentNameMap}
                 />
               )}
+            </Stack>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="statistics" pt="md">
+            <Stack gap="md">
+              <Paper withBorder p="md">
+                <Stack gap="sm">
+                  <Text fw={600} size="lg">Early Departure Statistics</Text>
+                  <Text size="sm" c="dimmed">
+                    {isParent
+                      ? 'Statistics for your student(s)'
+                      : 'Statistics for all students with early departure requests'}
+                  </Text>
+                </Stack>
+              </Paper>
+              <EarlyDepartureStatistics
+                statistics={statisticsQuery.data ?? []}
+                isLoading={statisticsQuery.isLoading}
+              />
             </Stack>
           </Tabs.Panel>
         </Tabs>
