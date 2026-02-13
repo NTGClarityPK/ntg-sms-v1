@@ -362,6 +362,58 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * Notify multiple recipients (e.g. school admin, admin assistant, class teacher) when a leave request is raised.
+   */
+  async createLeaveRequestRaisedNotifications(params: {
+    recipientUserIds: string[];
+    studentName: string;
+    startDate: string;
+    endDate: string;
+    leaveRequestId: string;
+  }): Promise<void> {
+    if (params.recipientUserIds.length === 0) return;
+    try {
+      const startDateFormatted = new Date(params.startDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const endDateFormatted = new Date(params.endDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const dateRange =
+        params.startDate === params.endDate
+          ? startDateFormatted
+          : `${startDateFormatted} - ${endDateFormatted}`;
+
+      const notifications = params.recipientUserIds.map((user_id) => ({
+        user_id,
+        type: 'leave_request_raised',
+        title: 'New leave request',
+        body: `${params.studentName}'s leave request for ${dateRange} is pending review.`,
+        data: {
+          leaveRequestId: params.leaveRequestId,
+          startDate: params.startDate,
+          endDate: params.endDate,
+        },
+        is_read: false,
+      }));
+
+      const supabase = this.supabaseConfig.getClient();
+      const { error } = await supabase.from('notifications').insert(notifications);
+      if (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Failed to create leave request raised notifications:', errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to create leave request raised notifications:', errorMessage);
+    }
+  }
+
   async createLeaveRequestNotification(params: {
     userId: string;
     studentName: string;
