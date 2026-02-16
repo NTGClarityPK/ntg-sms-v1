@@ -137,14 +137,23 @@ export class UsersService {
       };
     }
 
-    // Step 2: Fetch profiles for these users
+    // Step 2: Fetch profiles for these users (request count when filtering so total is correct)
+    const needFilterCount = query.isActive !== undefined;
     let profilesQuery = supabase
       .from('profiles')
-      .select('*')
+      .select('*', needFilterCount ? { count: 'exact' } : undefined)
       .in('id', userIds);
 
-    if (query.isActive !== undefined) {
-      profilesQuery = profilesQuery.eq('is_active', query.isActive);
+    // isActive is kept as string in DTO ('true' | 'false') to avoid NestJS converting 'false' to boolean true
+    const isActiveBool: boolean | undefined =
+      query.isActive === undefined
+        ? undefined
+        : query.isActive === 'false'
+          ? false
+          : true;
+
+    if (isActiveBool !== undefined) {
+      profilesQuery = profilesQuery.eq('is_active', isActiveBool);
     }
 
     // Note: Search by email will be handled client-side after fetching auth users
@@ -172,11 +181,13 @@ export class UsersService {
 
     profilesQuery = profilesQuery.range(from, to);
 
-    const { data: profilesData, error: profilesError } = await profilesQuery;
+    const { data: profilesData, error: profilesError, count: profilesCount } =
+      await profilesQuery;
     throwIfDbError(profilesError);
 
-    // Calculate total pages based on filtered user count
-    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const totalFiltered =
+      needFilterCount && typeof profilesCount === 'number' ? profilesCount : total;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / limit));
 
     // Step 3: Fetch user_roles for these users in this branch
     const profileIds = (profilesData || []).map((p: ProfileRow) => p.id);
@@ -207,36 +218,12 @@ export class UsersService {
     throwIfDbError(rolesError);
     const roleMap = new Map((rolesData || []).map((r: RoleRow) => [r.id, r]));
 
-    // Step 5: Get user emails from auth.users via admin API
-    // Try listUsers first, fallback to individual lookups if it fails
-    const emailMap = new Map<string, string>();
-    try {
-      const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
-      if (!listError && authUsers?.users) {
-        authUsers.users
-          .filter((u) => profileIds.includes(u.id))
-          .forEach((u) => {
-            if (u.email) emailMap.set(u.id, u.email);
-          });
-      }
-    } catch (error) {
-      // If listUsers fails, fetch emails individually
-      console.warn('Failed to list users, fetching individually:', error);
-    }
-    
-    // Fill in any missing emails by fetching individually
-    for (const profileId of profileIds) {
-      if (!emailMap.has(profileId)) {
-        try {
-          const { data: authUser } = await supabase.auth.admin.getUserById(profileId);
-          if (authUser?.user?.email) {
-            emailMap.set(profileId, authUser.user.email);
-          }
-        } catch (error) {
-          // Silently continue if individual fetch fails
-        }
-      }
-    }
+    // Step 5: Get emails for this page only (never listUsers - loads all auth users)
+    const emailPromises = profileIds.map((id) =>
+      supabase.auth.admin.getUserById(id).then((res) => [id, res.data.user?.email ?? ''] as const),
+    );
+    const emailEntries = await Promise.all(emailPromises);
+    const emailMap = new Map<string, string>(emailEntries);
 
     // Step 6: Filter by email search if needed (client-side after fetching emails)
     let filteredProfiles = profilesData || [];
@@ -290,7 +277,7 @@ export class UsersService {
 
     return {
       data: users,
-      meta: { total, page, limit, totalPages },
+      meta: { total: totalFiltered, page, limit, totalPages },
     };
   }
 

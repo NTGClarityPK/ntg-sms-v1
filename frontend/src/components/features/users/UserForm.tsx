@@ -127,7 +127,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Edit Staff' : 'Create Staff'}
+      title={isEdit ? 'Edit User' : 'Create User'}
       size="lg"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>

@@ -7,7 +7,6 @@
 export const NAV_FEATURE_MAP: Record<string, string> = {
   '/dashboard': 'dashboard',
   '/students': 'students',
-  '/staff': 'staff',
   '/users': 'user_management',
   '/academic/class-sections': 'class_sections',
   '/academic/teacher-mapping': 'teacher_mapping',

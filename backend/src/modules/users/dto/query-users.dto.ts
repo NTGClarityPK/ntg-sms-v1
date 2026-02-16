@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsBoolean, IsArray, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID, IsIn } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { BasePaginationDto } from '../../../common/dto/base-pagination.dto';
 
@@ -26,13 +26,9 @@ export class QueryUsersDto extends BasePaginationDto {
   @IsString()
   branch?: string;
 
+  /** Query param: 'true' | 'false'. Kept as string so NestJS never converts 'false' to boolean true. */
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return undefined;
-  })
-  @IsBoolean()
-  isActive?: boolean;
+  @IsIn(['true', 'false'])
+  isActive?: string;
 }
 

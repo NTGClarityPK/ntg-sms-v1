@@ -32,7 +32,9 @@ export function useUsers(params?: QueryUsersParams) {
       } else if (params?.role) {
         queryParams.append('role', params.role);
       }
-      if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+      // Send explicit 'true'/'false' so backend always receives a string (avoids boolean/query param issues)
+      if (params?.isActive === true) queryParams.append('isActive', 'true');
+      else if (params?.isActive === false) queryParams.append('isActive', 'false');
       if (params?.search) queryParams.append('search', params.search);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);

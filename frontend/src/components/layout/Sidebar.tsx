@@ -15,7 +15,6 @@ import {
 import {
   IconHome,
   IconUsers,
-  IconUser,
   IconCalendar,
   IconChartBar,
   IconSettings,
@@ -52,7 +51,6 @@ const NAV_ICON_SIZE = 22;
 const allNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: IconHome },
   { label: 'Students', href: '/students', icon: IconUsers },
-  { label: 'Staff', href: '/staff', icon: IconUser },
   { label: 'Users', href: '/users', icon: IconUsers },
   { label: 'Class Sections', href: '/academic/class-sections', icon: IconSchool },
   { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconBook },
@@ -308,7 +306,6 @@ export function Sidebar({
   );
   const managementItems = navItems.filter(
     (item) =>
-      item.href === '/staff' ||
       item.href === '/users' ||
       item.href === '/academic/class-sections' ||
       item.href === '/academic/teacher-mapping' ||

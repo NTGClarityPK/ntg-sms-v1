@@ -1,6 +1,6 @@
 'use client';
 
-import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, SegmentedControl } from '@mantine/core';
+import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState, useMemo } from 'react';
@@ -8,43 +8,101 @@ import { UserTable } from '@/components/features/users/UserTable';
 import { UserForm } from '@/components/features/users/UserForm';
 import { useUsers } from '@/hooks/useUsers';
 import { useRoles } from '@/hooks/useRoles';
-import { useFeaturePermission } from '@/hooks/usePermissions';
+import { usePermissions, useFeaturePermission } from '@/hooks/usePermissions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import type { User } from '@/types/users';
+
+const PAGE_SIZE = 20;
+const FETCH_LIMIT = 500; // Fetch all branch users once; filter All/Active/Inactive on frontend
 
 export default function UsersPage() {
   const colors = useThemeColors();
+  const { isLoading: permissionsLoading } = usePermissions();
   const { canEdit } = useFeaturePermission('user_management');
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [debouncedSearch] = useDebouncedValue(search, 300); // Debounce search by 300ms
+  const [debouncedSearch] = useDebouncedValue(search, 300);
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<boolean | undefined>(undefined);
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // Single fetch: all users for branch; filter (All/Active/Inactive, role, search) and sort/paginate client-side
+  const usersQuery = useUsers({ limit: FETCH_LIMIT });
+
+  const allUsers: User[] = useMemo(() => {
+    const raw = usersQuery.data?.data;
+    if (!Array.isArray(raw)) return [];
+    return raw as User[];
+  }, [usersQuery.data?.data]);
+
+  const filteredUsers = useMemo(() => {
+    let list = allUsers;
+    if (statusFilter !== undefined) {
+      list = list.filter((u) => u.isActive === statusFilter);
+    }
+    if (roleFilter.length > 0) {
+      list = list.filter((u) =>
+        u.roles?.some((r) => roleFilter.includes(r.roleId)),
+      );
+    }
+    if (debouncedSearch) {
+      const term = debouncedSearch.toLowerCase();
+      list = list.filter(
+        (u) =>
+          u.fullName?.toLowerCase().includes(term) ||
+          u.email?.toLowerCase().includes(term),
+      );
+    }
+    return list;
+  }, [allUsers, statusFilter, roleFilter, debouncedSearch]);
+
+  const sortedUsers = useMemo(() => {
+    const sorted = [...filteredUsers];
+    const key: keyof User =
+      sortBy === 'fullName'
+        ? 'fullName'
+        : sortBy === 'email'
+          ? 'email'
+          : sortBy === 'isActive'
+            ? 'isActive'
+            : sortBy === 'created_at' || sortBy === 'createdAt'
+              ? 'createdAt'
+              : 'createdAt';
+    const order = sortOrder === 'asc' ? 1 : -1;
+    sorted.sort((a, b) => {
+      const aVal = a[key];
+      const bVal = b[key];
+      if (aVal === bVal) return 0;
+      if (aVal == null) return order;
+      if (bVal == null) return -order;
+      const cmp =
+        typeof aVal === 'string' && typeof bVal === 'string'
+          ? aVal.localeCompare(bVal, undefined, { numeric: key === 'createdAt' })
+          : String(aVal).localeCompare(String(bVal));
+      return cmp * order;
+    });
+    return sorted;
+  }, [filteredUsers, sortBy, sortOrder]);
+
+  const totalFiltered = sortedUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const paginatedUsers = useMemo(
+    () => sortedUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [sortedUsers, page],
+  );
+
+  const hasActiveFilter = statusFilter !== undefined || roleFilter.length > 0 || !!debouncedSearch;
+
   const { data: rolesData } = useRoles();
   const roles = rolesData?.data || [];
-  
-  // Filter out student role from the dropdown
-  const staffRoles = useMemo(() => {
-    return roles.filter((role) => role.name !== 'student');
-  }, [roles]);
+  const staffRoles = useMemo(
+    () => roles.filter((role) => role.name !== 'student'),
+    [roles],
+  );
 
-  // Reset to page 1 when filters change
-  const handleFilterChange = () => {
-    setPage(1);
-  };
-
-  const usersQuery = useUsers({
-    page,
-    limit: 20,
-    roles: roleFilter.length > 0 ? roleFilter : undefined,
-    isActive: statusFilter,
-    search: debouncedSearch || undefined,
-    sortBy,
-    sortOrder,
-  });
+  const handleFilterChange = () => setPage(1);
 
   return (
     <>
@@ -62,7 +120,7 @@ export default function UsersPage() {
       </div>
 
       <Stack gap="md">
-        {!canEdit && (
+        {!permissionsLoading && !canEdit && (
           <Alert color={colors.info} title="View only">
             <Text size="sm">
               You have view access for User Management. Create, update, and deactivate actions are disabled.
@@ -95,27 +153,41 @@ export default function UsersPage() {
               style={{ width: '100%' }}
             />
           </div>
-          <SegmentedControl
-            data={[
-              { label: 'All', value: 'all' },
-              { label: 'Active', value: 'active' },
-              { label: 'Inactive', value: 'inactive' },
-            ]}
-            value={
-              statusFilter === undefined
-                ? 'all'
-                : statusFilter
-                  ? 'active'
-                  : 'inactive'
-            }
-            onChange={(value) => {
-              setStatusFilter(
-                value === 'all' ? undefined : value === 'active',
-              );
-              handleFilterChange();
-            }}
-          />
         </Group>
+
+        {/* Status filter chips (All, Active, Inactive) - same pattern as /notifications */}
+        <Paper p="sm" withBorder>
+          <Group gap="xs" wrap="wrap" className="filter-chip-group">
+            <Chip
+              checked={statusFilter === undefined}
+              onChange={() => {
+                setStatusFilter(undefined);
+                handleFilterChange();
+              }}
+              variant="filled"
+            >
+              All
+            </Chip>
+            <Chip.Group
+              value={statusFilter === undefined ? '' : statusFilter ? 'active' : 'inactive'}
+              onChange={(value: string | null) => {
+                if (value === 'active') setStatusFilter(true);
+                else if (value === 'inactive') setStatusFilter(false);
+                else setStatusFilter(undefined);
+                handleFilterChange();
+              }}
+            >
+              <Group gap="xs" wrap="wrap">
+                <Chip value="active" variant="filled">
+                  Active
+                </Chip>
+                <Chip value="inactive" variant="filled">
+                  Inactive
+                </Chip>
+              </Group>
+            </Chip.Group>
+          </Group>
+        </Paper>
 
         {usersQuery.isLoading || !usersQuery.data ? (
           <Stack gap="md">
@@ -136,18 +208,27 @@ export default function UsersPage() {
               </Button>
             </Group>
           </Alert>
-        ) : !usersQuery.data.data || usersQuery.data.data.length === 0 ? (
-          <Alert color={colors.info} title="No users found">
+        ) : paginatedUsers.length === 0 && !usersQuery.isLoading ? (
+          <Alert color={colors.info} title={hasActiveFilter ? 'No users match the filter' : 'No users found'}>
             <Text size="sm">
-              {canEdit
-                ? 'No users have been created yet. Click "Create User" to add one.'
-                : 'No users have been created yet.'}
+              {hasActiveFilter
+                ? statusFilter === false
+                  ? 'No inactive users. Try "All" or "Active" to see other users.'
+                  : 'No users match the current filters. Try changing or clearing filters.'
+                : canEdit
+                  ? 'No users have been created yet. Click "Create User" to add one.'
+                  : 'No users have been created yet.'}
             </Text>
           </Alert>
         ) : (
           <UserTable
-            users={usersQuery.data.data}
-            meta={usersQuery.data.meta}
+            users={paginatedUsers}
+            meta={{
+              total: totalFiltered,
+              page,
+              limit: PAGE_SIZE,
+              totalPages,
+            }}
             onPageChange={setPage}
             sortBy={sortBy}
             sortOrder={sortOrder}
@@ -158,7 +239,7 @@ export default function UsersPage() {
                 setSortBy(field);
                 setSortOrder('asc');
               }
-              setPage(1); // Reset to first page when sorting changes
+              setPage(1);
             }}
             canEdit={canEdit}
           />
