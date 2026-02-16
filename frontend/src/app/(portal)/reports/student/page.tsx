@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Group, Title, Select, Stack, Skeleton, Alert, Text } from '@mantine/core';
 import { useStudents, useMyStudent } from '@/hooks/useStudents';
 import { StudentReportCard } from '@/components/features/reports/StudentReportCard';
@@ -11,12 +12,23 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Student } from '@/types/students';
 import { ReportPeriodType } from '@/types/reports';
 
+function periodFromQuery(param: string | null): ReportPeriodType | null {
+  if (param === 'week') return ReportPeriodType.WEEK;
+  if (param === 'month') return ReportPeriodType.MONTH;
+  if (param === 'year') return ReportPeriodType.YEAR;
+  return null;
+}
+
 export default function StudentReportSelectPage() {
+  const searchParams = useSearchParams();
+  const periodParam = searchParams.get('period');
   const { user } = useAuth();
   const isStudent = user?.roles?.some((r) => r.roleName.toLowerCase() === 'student');
   const myStudentQuery = useMyStudent();
   const [studentId, setStudentId] = useState<string | null>(null);
-  const [periodType, setPeriodType] = useState<ReportPeriodType | null>(ReportPeriodType.YEAR);
+  const [periodType, setPeriodType] = useState<ReportPeriodType | null>(
+    () => periodFromQuery(periodParam) ?? ReportPeriodType.YEAR
+  );
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
 

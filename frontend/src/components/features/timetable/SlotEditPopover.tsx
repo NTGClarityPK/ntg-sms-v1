@@ -111,7 +111,8 @@ export function SlotEditPopover({
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
   
   const templateInfo = templateInfoData;
-  const subjectTemplate = templateData?.data;
+  // useSubjectTemplate returns SubjectTemplate as query data (already unwrapped)
+  const subjectTemplate = templateData;
 
   const assignments = assignmentsData?.data || [];
   const subjects = (subjectsData as { data?: Array<{ id: string; name: string }> })?.data || [];
@@ -153,6 +154,25 @@ export function SlotEditPopover({
     },
     validate: zodResolver(slotSchema),
   });
+
+  // When subject has exactly one assigned teacher, fix that teacher (no dropdown)
+  const selectedSubjectAssignmentsForEffect = form.values.subjectId
+    ? assignments.filter((a) => a.subjectId === form.values.subjectId)
+    : [];
+  const singleTeacherId =
+    selectedSubjectAssignmentsForEffect.length === 1
+      ? selectedSubjectAssignmentsForEffect[0].staffId
+      : null;
+
+  useEffect(() => {
+    if (form.values.slotType !== 'class' || !form.values.subjectId) return;
+    if (singleTeacherId && form.values.staffId !== singleTeacherId) {
+      form.setFieldValue('staffId', singleTeacherId);
+    }
+    if (!singleTeacherId && selectedSubjectAssignmentsForEffect.length === 0) {
+      form.setFieldValue('staffId', '');
+    }
+  }, [form.values.subjectId, form.values.slotType, singleTeacherId, selectedSubjectAssignmentsForEffect.length]);
 
   // CRITICAL: Pre-populate form when slot prop changes (for editing) or timeRange changes
   useEffect(() => {
@@ -259,23 +279,20 @@ export function SlotEditPopover({
     onClose();
   };
 
-  // Get subjects assigned to this class-section
-  const classSectionSubjectIds = new Set(
-    assignments.map((a) => a.subjectId),
-  );
-  
-  // Filter subjects by template if template is selected
-  let availableSubjectIds = new Set(subjects.map((s) => s.id));
-  if (subjectTemplate && subjectTemplate.subjectIds.length > 0) {
-    availableSubjectIds = new Set(subjectTemplate.subjectIds);
-  }
-  
-  const subjectOptions = subjects
-    .filter((s) => classSectionSubjectIds.has(s.id) && availableSubjectIds.has(s.id))
-    .map((s) => ({
-      value: s.id,
-      label: s.name,
-    }));
+  // Subject list: when a subject template is selected, show ONLY subjects in that template
+  const templateSubjectIds =
+    subjectTemplateId && subjectTemplate?.subjectIds?.length
+      ? new Set(subjectTemplate.subjectIds)
+      : null;
+
+  const subjectOptions =
+    templateSubjectIds !== null
+      ? subjects
+          .filter((s) => templateSubjectIds.has(s.id))
+          .map((s) => ({ value: s.id, label: s.name }))
+      : subjectTemplateId
+        ? [] // Template selected but not loaded or has no subjects – show none
+        : subjects.map((s) => ({ value: s.id, label: s.name }));
 
   // Get teachers assigned to selected subject
   const selectedSubjectAssignments = form.values.subjectId
@@ -383,15 +400,42 @@ export function SlotEditPopover({
                   {...form.getInputProps('subjectId')}
                 />
                 {form.values.subjectId && (
-                  <Select
-                    label="Teacher"
-                    size="xs"
-                    placeholder="Select teacher"
-                    data={staffOptions}
-                    searchable
-                    comboboxProps={{ zIndex: 1002 }}
-                    {...form.getInputProps('staffId')}
-                  />
+                  <>
+                    {staffOptions.length === 0 ? (
+                      <>
+                        <Select
+                          label="Teacher"
+                          size="xs"
+                          placeholder="No teacher assigned to this subject"
+                          data={[]}
+                          disabled
+                          comboboxProps={{ zIndex: 1002 }}
+                          {...form.getInputProps('staffId')}
+                        />
+                        <Text size="xs" c="dimmed">
+                          Assign a teacher to this subject in Academic → Teacher Mapping first.
+                        </Text>
+                      </>
+                    ) : staffOptions.length === 1 ? (
+                      <TextInput
+                        label="Teacher"
+                        size="xs"
+                        value={staffOptions[0].label}
+                        readOnly
+                        styles={{ input: { backgroundColor: 'var(--mantine-color-default-hover)' } }}
+                      />
+                    ) : (
+                      <Select
+                        label="Teacher"
+                        size="xs"
+                        placeholder="Select teacher"
+                        data={staffOptions}
+                        searchable
+                        comboboxProps={{ zIndex: 1002 }}
+                        {...form.getInputProps('staffId')}
+                      />
+                    )}
+                  </>
                 )}
               </>
             )}

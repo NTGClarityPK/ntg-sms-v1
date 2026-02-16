@@ -143,6 +143,14 @@ export interface ThemeConfig {
         textBase: string; // Base color for generating text variations (primaryLight)
       };
       variationCount?: number; // Number of color variations to generate (default: 10)
+      /** Text color on green/success filled badges (e.g. onboarding Review screen, Stepper completed steps) */
+      filledSuccessTextColor: string;
+    };
+    /** Inactive state (e.g. inactive class section): badge and optional card styling */
+    statusInactive: {
+      badgeColor: string; // Gray/muted for inactive badge
+      cardBackground: string; // Optional: whole card background when inactive
+      cardBorder: string; // Optional: whole card border when inactive
     };
     avatar: {
       backgroundColor: string; // Background color of the avatar circle
@@ -324,6 +332,12 @@ export function generateThemeConfig(
           textBase: themeColors.primaryLight, // Base for text variations
         },
         variationCount: 10, // Number of color variations to generate
+        filledSuccessTextColor: themeColors.pureWhite, // White text on green/success filled badges (onboarding, Stepper)
+      },
+      statusInactive: {
+        badgeColor: themeColors.textMuted,
+        cardBackground: themeColors.colorMedium,
+        cardBorder: themeColors.borderLight,
       },
       avatar: {
         backgroundColor: themeColors.primary,

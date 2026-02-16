@@ -28,6 +28,17 @@ export function useCreateSubject() {
   });
 }
 
+export function useUpdateSubject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: { name?: string; nameAr?: string; code?: string; sortOrder?: number; isActive?: boolean } }) =>
+      apiClient.patch<Subject>(`/api/v1/subjects/${id}`, payload),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: coreKeys.subjects });
+    },
+  });
+}
+
 export function useClasses(params?: { levelId?: string }) {
   return useQuery({
     queryKey: [...coreKeys.classes, params ?? {}],
@@ -44,6 +55,18 @@ export function useCreateClass() {
   return useMutation({
     mutationFn: async (payload: { name: string; displayName: string; sortOrder: number; isActive?: boolean }) =>
       apiClient.post<ClassEntity>('/api/v1/classes', payload),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: coreKeys.classes });
+      await qc.invalidateQueries({ queryKey: coreKeys.levels });
+    },
+  });
+}
+
+export function useUpdateClass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: { name?: string; displayName?: string; sortOrder?: number; isActive?: boolean } }) =>
+      apiClient.patch<ClassEntity>(`/api/v1/classes/${id}`, payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: coreKeys.classes });
       await qc.invalidateQueries({ queryKey: coreKeys.levels });
@@ -70,6 +93,17 @@ export function useCreateSection() {
   });
 }
 
+export function useUpdateSection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: { name?: string; sortOrder?: number; isActive?: boolean } }) =>
+      apiClient.patch<Section>(`/api/v1/sections/${id}`, payload),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: coreKeys.sections });
+    },
+  });
+}
+
 export function useLevels() {
   return useQuery({
     queryKey: coreKeys.levels,
@@ -83,6 +117,17 @@ export function useCreateLevel() {
   return useMutation({
     mutationFn: async (payload: { name: string; nameAr?: string; sortOrder?: number; classIds?: string[] }) =>
       apiClient.post<Level>('/api/v1/levels', payload),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: coreKeys.levels });
+    },
+  });
+}
+
+export function useUpdateLevel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: { name?: string; nameAr?: string; sortOrder?: number; classIds?: string[] } }) =>
+      apiClient.patch<Level>(`/api/v1/levels/${id}`, payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: coreKeys.levels });
     },

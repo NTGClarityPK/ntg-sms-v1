@@ -35,7 +35,7 @@ export function ClassSectionCard({
   const [studentsOpened, { open: openStudents, close: closeStudents }] = useDisclosure(false);
   const [teacherOpened, { open: openTeacher, close: closeTeacher }] = useDisclosure(false);
 
-  const statusColor = classSection.isActive ? colors.success : colors.info;
+  const statusColor = classSection.isActive ? colors.success : colors.statusInactive.badgeColor;
   const studentCount = classSection.studentCount ?? 0;
   const capacity = classSection.capacity;
 
@@ -63,7 +63,18 @@ export function ClassSectionCard({
 
   return (
     <>
-      <Card withBorder p="md">
+      <Card
+        withBorder
+        p="md"
+        style={
+          !classSection.isActive
+            ? {
+                backgroundColor: colors.statusInactive.cardBackground,
+                borderColor: colors.statusInactive.cardBorder,
+              }
+            : undefined
+        }
+      >
         <Group justify="space-between" align="flex-start" mb="xs">
           <Stack gap="xs" style={{ flex: 1 }}>
             <Text fw={600}>

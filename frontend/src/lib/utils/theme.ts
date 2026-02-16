@@ -133,6 +133,39 @@ export function getInfoColor(): string {
 }
 
 /**
+ * Get status-inactive badge color from theme (gray/muted) – from themeConfig.components.statusInactive
+ */
+export function getStatusInactiveBadgeColor(): string {
+  if (typeof document === 'undefined') return '#868e96';
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue('--theme-status-inactive-badge')
+    .trim();
+  return value || '#868e96';
+}
+
+/**
+ * Get card background color when inactive – from themeConfig.components.statusInactive
+ */
+export function getStatusInactiveCardBackground(): string {
+  if (typeof document === 'undefined') return '#e9ecef';
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue('--theme-card-inactive-bg')
+    .trim();
+  return value || '#e9ecef';
+}
+
+/**
+ * Get card border color when inactive – from themeConfig.components.statusInactive
+ */
+export function getStatusInactiveCardBorder(): string {
+  if (typeof document === 'undefined') return '#e9ecef';
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue('--theme-card-inactive-border')
+    .trim();
+  return value || '#e9ecef';
+}
+
+/**
  * Get theme color from localStorage (legacy support)
  */
 export function getLegacyThemeColor(): string | null {

@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CoreLookupsService } from './core-lookups.service';
 import { QueryClassesDto } from './dto/query-classes.dto';
 import { CreateClassDto } from './dto/create-class.dto';
+import { UpdateClassDto } from './dto/update-class.dto';
 import { ClassDto } from './dto/class.dto';
 
 @Controller('api/v1/classes')
@@ -30,6 +31,16 @@ export class ClassesController {
   ): Promise<{ data: ClassDto }> {
     const created = await this.coreLookupsService.createClass(body, branch.branchId, branch.tenantId);
     return { data: created };
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() body: UpdateClassDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: ClassDto }> {
+    const updated = await this.coreLookupsService.updateClass(id, body, branch.branchId);
+    return { data: updated };
   }
 }
 

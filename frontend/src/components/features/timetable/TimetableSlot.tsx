@@ -4,6 +4,7 @@ import { Badge, Card, Stack, Text, Group, useMantineTheme } from '@mantine/core'
 import { IconAlertCircle } from '@tabler/icons-react';
 import type { TimetableSlot } from '@/types/timetable';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 interface TimetableSlotProps {
   slot: TimetableSlot;
@@ -11,12 +12,6 @@ interface TimetableSlotProps {
   showConflict?: boolean;
   height?: number; // Optional: card height in pixels to determine if compact layout needed
 }
-
-const slotTypeColors: Record<TimetableSlot['slotType'], string> = {
-  class: 'blue',
-  assembly: 'orange',
-  break: 'yellow',
-};
 
 // Calculate duration in minutes from time strings
 const calculateDurationMinutes = (startTime: string, endTime: string): number => {
@@ -36,9 +31,16 @@ export function TimetableSlotComponent({
   height,
 }: TimetableSlotProps) {
   const theme = useMantineTheme();
+  const colors = useThemeColors();
   const themeConfig = (theme.other as any) as ThemeConfig | undefined;
   // Use surface color which is very close to white (#f8f9fa) but still visible
   const cardBackgroundColor = themeConfig?.colors?.surface || '#f8f9fa';
+  // Class badge uses theme primary; assembly/break keep semantic colors
+  const slotTypeColors: Record<TimetableSlot['slotType'], string> = {
+    class: colors.primary,
+    assembly: 'orange',
+    break: 'yellow',
+  };
 
   // Calculate duration in minutes
   const durationMinutes = calculateDurationMinutes(slot.startTime, slot.endTime);
@@ -103,7 +105,7 @@ export function TimetableSlotComponent({
             <Badge 
               size="xs" 
               variant="light" 
-              color="blue"
+              color={colors.primary}
               style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
             >
               R:{slot.room}

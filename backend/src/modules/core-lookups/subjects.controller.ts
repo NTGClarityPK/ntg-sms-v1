@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CoreLookupsService } from './core-lookups.service';
 import { QuerySubjectsDto } from './dto/query-subjects.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
+import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { SubjectDto } from './dto/subject.dto';
 
 @Controller('api/v1/subjects')
@@ -30,6 +31,16 @@ export class SubjectsController {
   ): Promise<{ data: SubjectDto }> {
     const created = await this.coreLookupsService.createSubject(body, branch.branchId, branch.tenantId);
     return { data: created };
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() body: UpdateSubjectDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: SubjectDto }> {
+    const updated = await this.coreLookupsService.updateSubject(id, body, branch.branchId);
+    return { data: updated };
   }
 }
 

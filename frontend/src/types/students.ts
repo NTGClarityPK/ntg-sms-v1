@@ -33,7 +33,7 @@ export interface CreateStudentInput {
   address?: string;
   dateOfBirth?: string;
   gender?: 'male' | 'female';
-  studentId: string;
+  studentId?: string;
   classId?: string;
   sectionId?: string;
   bloodGroup?: string;

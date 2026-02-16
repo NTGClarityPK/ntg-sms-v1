@@ -7,6 +7,9 @@ import {
   getErrorColor,
   getWarningColor,
   getInfoColor,
+  getStatusInactiveBadgeColor,
+  getStatusInactiveCardBackground,
+  getStatusInactiveCardBorder,
 } from '@/lib/utils/theme';
 
 /**
@@ -25,6 +28,12 @@ export function useThemeColors() {
       error: getErrorColor(),
       warning: getWarningColor(),
       info: getInfoColor(),
+      /** Gray/muted for inactive state (badge and card) – from themeConfig.components.statusInactive */
+      statusInactive: {
+        badgeColor: getStatusInactiveBadgeColor(),
+        cardBackground: getStatusInactiveCardBackground(),
+        cardBorder: getStatusInactiveCardBorder(),
+      },
     }),
     [primary, themeVersion] // Re-compute when primary color or theme version changes
   );

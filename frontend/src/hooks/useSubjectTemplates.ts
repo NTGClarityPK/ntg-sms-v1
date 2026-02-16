@@ -58,11 +58,15 @@ export function useSubjectTemplates(
 }
 
 export function useSubjectTemplate(id: string | null, branchId: string | null) {
-  return useQuery<SubjectTemplateResponse>({
+  return useQuery<SubjectTemplate>({
     queryKey: ['subject-templates', id, branchId],
     queryFn: async () => {
       const response = await apiClient.get<SubjectTemplateResponse>(`/api/v1/subject-templates/${id}`);
-      return response.data;
+      // API returns { data: SubjectTemplate }; unwrap so query data is SubjectTemplate
+      const body = response.data as SubjectTemplateResponse | SubjectTemplate;
+      return (body && typeof body === 'object' && 'data' in body
+        ? (body as SubjectTemplateResponse).data
+        : body) as SubjectTemplate;
     },
     enabled: !!id && !!branchId,
     staleTime: 5 * 60 * 1000, // 5 minutes

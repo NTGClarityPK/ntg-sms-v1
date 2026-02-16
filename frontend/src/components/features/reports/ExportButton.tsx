@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Button, Group, Menu, Text } from '@mantine/core';
 import { IconFileExport, IconFileTypePdf, IconFileSpreadsheet } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api-client';
-import { ExportProgress } from './ExportProgress';
 
 export type ExportVariant = 'student' | 'class';
 
@@ -94,7 +93,7 @@ export function ExportButton({
       <Menu shadow="md" width={180} disabled={!canExport || loading}>
         <Menu.Target>
           <Button
-            leftSection={<IconFileExport size={16} />}
+            leftSection={loading ? undefined : <IconFileExport size={16} />}
             variant="light"
             loading={loading}
             disabled={!canExport}
@@ -115,7 +114,6 @@ export function ExportButton({
           ))}
         </Menu.Dropdown>
       </Menu>
-      {loading && <ExportProgress loading message="Preparing download…" />}
       {error && (
         <Text size="sm" c="red">
           {error}

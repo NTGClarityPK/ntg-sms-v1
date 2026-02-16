@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { QuerySubjectsDto } from './dto/query-subjects.dto';
@@ -9,6 +9,10 @@ import { QuerySectionsDto } from './dto/query-sections.dto';
 import { SectionDto } from './dto/section.dto';
 import { QueryLevelsDto } from './dto/query-levels.dto';
 import { LevelDto } from './dto/level.dto';
+import { UpdateSubjectDto } from './dto/update-subject.dto';
+import { UpdateClassDto } from './dto/update-class.dto';
+import { UpdateSectionDto } from './dto/update-section.dto';
+import { UpdateLevelDto } from './dto/update-level.dto';
 
 type Meta = { total: number; page: number; limit: number; totalPages: number };
 
@@ -195,6 +199,41 @@ export class CoreLookupsService {
     return mapSubject(data as SubjectRow);
   }
 
+  async updateSubject(
+    id: string,
+    input: UpdateSubjectDto,
+    branchId: string,
+  ): Promise<SubjectDto> {
+    const supabase = this.supabaseConfig.getClient();
+    const updates: Partial<SubjectRow> = {};
+    if (input.name !== undefined) updates.name = input.name;
+    if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
+    if (input.code !== undefined) updates.code = input.code || null;
+    if (input.isActive !== undefined) updates.is_active = input.isActive;
+    if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
+    if (Object.keys(updates).length === 0) {
+      const { data: existing, error: fetchError } = await supabase
+        .from('subjects')
+        .select('*')
+        .eq('id', id)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(fetchError);
+      if (!existing) throw new NotFoundException('Subject not found');
+      return mapSubject(existing as SubjectRow);
+    }
+    const { data, error } = await supabase
+      .from('subjects')
+      .update(updates)
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .select('*')
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!data) throw new NotFoundException('Subject not found');
+    return mapSubject(data as SubjectRow);
+  }
+
   async listClasses(query: QueryClassesDto, branchId: string): Promise<{ data: ClassDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
@@ -300,6 +339,40 @@ export class CoreLookupsService {
     return mapClass(data as ClassRow);
   }
 
+  async updateClass(
+    id: string,
+    input: UpdateClassDto,
+    branchId: string,
+  ): Promise<ClassDto> {
+    const supabase = this.supabaseConfig.getClient();
+    const updates: Partial<ClassRow> = {};
+    if (input.name !== undefined) updates.name = input.name;
+    if (input.displayName !== undefined) updates.display_name = input.displayName;
+    if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
+    if (input.isActive !== undefined) updates.is_active = input.isActive;
+    if (Object.keys(updates).length === 0) {
+      const { data: existing, error: fetchError } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('id', id)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(fetchError);
+      if (!existing) throw new NotFoundException('Class not found');
+      return mapClass(existing as ClassRow);
+    }
+    const { data, error } = await supabase
+      .from('classes')
+      .update(updates)
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .select('*')
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!data) throw new NotFoundException('Class not found');
+    return mapClass(data as ClassRow);
+  }
+
   async listSections(query: QuerySectionsDto, branchId: string): Promise<{ data: SectionDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
@@ -353,6 +426,39 @@ export class CoreLookupsService {
       .select('*')
       .single();
     throwIfDbError(error);
+    return mapSection(data as SectionRow);
+  }
+
+  async updateSection(
+    id: string,
+    input: UpdateSectionDto,
+    branchId: string,
+  ): Promise<SectionDto> {
+    const supabase = this.supabaseConfig.getClient();
+    const updates: Partial<SectionRow> = {};
+    if (input.name !== undefined) updates.name = input.name;
+    if (input.isActive !== undefined) updates.is_active = input.isActive;
+    if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
+    if (Object.keys(updates).length === 0) {
+      const { data: existing, error: fetchError } = await supabase
+        .from('sections')
+        .select('*')
+        .eq('id', id)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(fetchError);
+      if (!existing) throw new NotFoundException('Section not found');
+      return mapSection(existing as SectionRow);
+    }
+    const { data, error } = await supabase
+      .from('sections')
+      .update(updates)
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .select('*')
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!data) throw new NotFoundException('Section not found');
     return mapSection(data as SectionRow);
   }
 
@@ -529,6 +635,102 @@ export class CoreLookupsService {
     }
 
     return mapLevel(levelRow, classes);
+  }
+
+  async updateLevel(
+    id: string,
+    input: UpdateLevelDto,
+    branchId: string,
+  ): Promise<LevelDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: existingLevel, error: fetchError } = await supabase
+      .from('levels')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!existingLevel) throw new NotFoundException('Level not found');
+
+    const levelRow = existingLevel as LevelRow;
+    const updates: Partial<LevelRow> = {};
+    if (input.name !== undefined) updates.name = input.name;
+    if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
+    if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
+
+    if (Object.keys(updates).length > 0) {
+      const { error: updateError } = await supabase
+        .from('levels')
+        .update(updates)
+        .eq('id', id)
+        .eq('branch_id', branchId);
+      throwIfDbError(updateError);
+    }
+
+    if (input.classIds !== undefined) {
+      const { error: deleteLcError } = await supabase
+        .from('level_classes')
+        .delete()
+        .eq('level_id', id);
+      throwIfDbError(deleteLcError);
+
+      if (input.classIds.length > 0) {
+        const { data: classes, error: classError } = await supabase
+          .from('classes')
+          .select('id')
+          .in('id', input.classIds)
+          .eq('branch_id', branchId);
+        throwIfDbError(classError);
+        if (!classes || classes.length !== input.classIds.length) {
+          throw new BadRequestException('Some classes do not exist or do not belong to this branch');
+        }
+        // After delete, check if any of these classes are still assigned to other levels
+        const { data: existingAssignments, error: assignError } = await supabase
+          .from('level_classes')
+          .select('class_id, level_id')
+          .in('class_id', input.classIds);
+        throwIfDbError(assignError);
+        const otherLevelIds = (existingAssignments as LevelClassRow[] ?? []).map((a) => a.level_id);
+        if (otherLevelIds.length > 0) {
+          const { data: levelRows } = await supabase.from('levels').select('id, name').in('id', [...new Set(otherLevelIds)]);
+          const levelMap = new Map((levelRows as { id: string; name: string }[] ?? []).map((l) => [l.id, l.name]));
+          const conflictNames = otherLevelIds.map((lid) => levelMap.get(lid)).filter(Boolean);
+          throw new BadRequestException(
+            `Cannot assign classes already in other levels: ${[...new Set(conflictNames)].join(', ')}`,
+          );
+        }
+        const payload = input.classIds.map((classId) => ({ level_id: id, class_id: classId }));
+        const { error: insertLcError } = await supabase.from('level_classes').insert(payload);
+        throwIfDbError(insertLcError);
+      }
+    }
+
+    const { data: updated, error: selectError } = await supabase
+      .from('levels')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(selectError);
+    const finalRow = updated as LevelRow;
+
+    const { data: lc } = await supabase
+      .from('level_classes')
+      .select('level_id,class_id')
+      .eq('level_id', id);
+    const classIds = Array.from(new Set(((lc as LevelClassRow[]) ?? []).map((p) => p.class_id)));
+    let classes: ClassDto[] = [];
+    if (classIds.length > 0) {
+      const { data: clsRows, error: clsError } = await supabase
+        .from('classes')
+        .select('*')
+        .in('id', classIds)
+        .eq('branch_id', branchId);
+      throwIfDbError(clsError);
+      classes = (clsRows as ClassRow[]).map(mapClass).sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name));
+    }
+    return mapLevel(finalRow, classes);
   }
 }
 

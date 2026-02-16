@@ -38,8 +38,9 @@ export class CreateStudentDto {
   @IsString()
   gender?: 'male' | 'female';
 
+  @IsOptional()
   @IsString()
-  studentId!: string;
+  studentId?: string;
 
   @IsOptional()
   @IsUUID()

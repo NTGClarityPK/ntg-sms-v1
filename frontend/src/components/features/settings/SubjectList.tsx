@@ -1,19 +1,23 @@
 'use client';
 
-import { Alert, Button, Group, Skeleton, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, ActionIcon, Button, Group, Skeleton, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconRefresh } from '@tabler/icons-react';
-import { useCreateSubject, useSubjects } from '@/hooks/useCoreLookups';
+import { IconPlus, IconRefresh, IconPencil } from '@tabler/icons-react';
+import { useCreateSubject, useSubjects, useUpdateSubject } from '@/hooks/useCoreLookups';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
+import { useState } from 'react';
+import type { Subject } from '@/types/settings';
 
 export function SubjectList() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
   const [opened, { open, close }] = useDisclosure(false);
+  const [editSubject, setEditSubject] = useState<Subject | null>(null);
   const listQuery = useSubjects();
   const createMutation = useCreateSubject();
+  const updateMutation = useUpdateSubject();
 
   const form = useForm<{ name: string; code: string }>({
     initialValues: { name: '', code: '' },
@@ -23,12 +27,37 @@ export function SubjectList() {
     transformValues: (v) => ({ name: v.name.trim(), code: v.code.trim() }),
   });
 
-  const onCreate = form.onSubmit(async (values) => {
+  const openCreate = () => {
+    setEditSubject(null);
+    form.setValues({ name: '', code: '' });
+    open();
+  };
+
+  const openEdit = (s: Subject) => {
+    setEditSubject(s);
+    form.setValues({ name: s.name, code: s.code ?? '' });
+    open();
+  };
+
+  const handleClose = () => {
+    close();
+    setEditSubject(null);
+    form.reset();
+  };
+
+  const onSubmit = form.onSubmit(async (values) => {
     try {
-      await createMutation.mutateAsync({ name: values.name, code: values.code || undefined });
-      notifications.show({ title: 'Success', message: 'Subject created', color: notifyColors.success });
-      form.reset();
-      close();
+      if (editSubject) {
+        await updateMutation.mutateAsync({
+          id: editSubject.id,
+          payload: { name: values.name, code: values.code || undefined },
+        });
+        notifications.show({ title: 'Success', message: 'Subject updated', color: notifyColors.success });
+      } else {
+        await createMutation.mutateAsync({ name: values.name, code: values.code || undefined });
+        notifications.show({ title: 'Success', message: 'Subject created', color: notifyColors.success });
+      }
+      handleClose();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       notifications.show({ title: 'Error', message, color: notifyColors.error });
@@ -63,7 +92,7 @@ export function SubjectList() {
   return (
     <>
       <Group justify="flex-end" mb="md">
-        <Button leftSection={<IconPlus size={16} />} onClick={open}>
+        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add subject
         </Button>
       </Group>
@@ -79,6 +108,7 @@ export function SubjectList() {
               <Table.Tr>
                 <Table.Th>Name</Table.Th>
                 <Table.Th>Code</Table.Th>
+                <Table.Th width={80}>Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -86,6 +116,11 @@ export function SubjectList() {
                 <Table.Tr key={s.id}>
                   <Table.Td>{s.name}</Table.Td>
                   <Table.Td>{s.code ?? '-'}</Table.Td>
+                  <Table.Td>
+                    <ActionIcon variant="subtle" size="sm" onClick={() => openEdit(s)} aria-label="Edit subject">
+                      <IconPencil size={16} />
+                    </ActionIcon>
+                  </Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -93,16 +128,16 @@ export function SubjectList() {
         )}
       </Paper>
 
-      <Modal opened={opened} onClose={close} title="Add subject" size="md">
-        <form onSubmit={onCreate}>
+      <Modal opened={opened} onClose={handleClose} title={editSubject ? 'Edit subject' : 'Add subject'} size="md">
+        <form onSubmit={onSubmit}>
           <Stack gap="md">
             <TextInput label="Name" placeholder="Mathematics" {...form.getInputProps('name')} />
             <TextInput label="Code" placeholder="MATH" {...form.getInputProps('code')} />
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={close} disabled={createMutation.isPending}>
+              <Button variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
-              <Button type="submit" loading={createMutation.isPending}>
+              <Button type="submit" loading={createMutation.isPending || updateMutation.isPending}>
                 Save
               </Button>
             </Group>

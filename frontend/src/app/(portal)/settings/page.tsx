@@ -213,31 +213,14 @@ export default function SettingsPage() {
     );
   }
 
+  // Not initialized: show only "Start school setup" CTA; user must complete setup before seeing full settings
+  const showSetupOnly = !isLoading && !hasError && hasSettingsStatusData && !isInitialized;
+
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Settings</Title>
-          {hasSettingsStatusData && !isInitialized && (
-            <Group gap="sm">
-              {hasMultipleBranches && (
-                <Button
-                  variant="light"
-                  leftSection={<IconCopy size={16} />}
-                  onClick={openCopyModal}
-                >
-                  Copy Settings from Other Branch
-                </Button>
-              )}
-              <Button
-                leftSection={<IconRocket size={16} />}
-                onClick={openWizard}
-                color={colors.primary}
-              >
-                Start School Setup
-              </Button>
-            </Group>
-          )}
         </Group>
       </div>
 
@@ -255,96 +238,93 @@ export default function SettingsPage() {
             <Skeleton height={40} width="30%" />
             <Skeleton height={400} />
           </Stack>
+        ) : showSetupOnly ? (
+          <StartSchoolSetupView
+            onStartSetup={openWizard}
+            onCopyFromBranch={hasMultipleBranches ? openCopyModal : undefined}
+            colors={colors}
+          />
         ) : (
           <>
-            {!isInitialized && (
-              <Alert color={colors.info} title="Setup Required" mb="md">
-                <Text size="sm">
-                  Your school settings are not yet configured. Click "Start School Setup" to begin the guided setup process,
-                  or copy settings from another branch if available.
-                </Text>
-              </Alert>
-            )}
-
             <Tabs value={activeTab} onChange={setActiveTab}>
-          <Tabs.List>
-            <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
-              Permissions
-            </Tabs.Tab>
-            <Tabs.Tab value="business-information" leftSection={<IconBuilding size={16} />}>
-              Business Information
-            </Tabs.Tab>
-            <Tabs.Tab value="academic-years" leftSection={<IconCalendar size={16} />}>
-              Academic Years
-            </Tabs.Tab>
-            <Tabs.Tab value="academic" leftSection={<IconSchool size={16} />}>
-              Academic
-            </Tabs.Tab>
-            <Tabs.Tab value="schedule" leftSection={<IconClock size={16} />}>
-              Schedule
-            </Tabs.Tab>
-            <Tabs.Tab value="assessment" leftSection={<IconClipboardList size={16} />}>
-              Assessment
-            </Tabs.Tab>
-            <Tabs.Tab value="communication" leftSection={<IconMessage size={16} />}>
-              Communication
-            </Tabs.Tab>
-            <Tabs.Tab value="behavior" leftSection={<IconMoodHappy size={16} />}>
-              Behavior
-            </Tabs.Tab>
-            {isSchoolAdmin && (
-              <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
-                Theme Settings
-              </Tabs.Tab>
-            )}
-          </Tabs.List>
+              <Tabs.List>
+                <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
+                  Permissions
+                </Tabs.Tab>
+                <Tabs.Tab value="business-information" leftSection={<IconBuilding size={16} />}>
+                  Business Information
+                </Tabs.Tab>
+                <Tabs.Tab value="academic-years" leftSection={<IconCalendar size={16} />}>
+                  Academic Years
+                </Tabs.Tab>
+                <Tabs.Tab value="academic" leftSection={<IconSchool size={16} />}>
+                  Academic
+                </Tabs.Tab>
+                <Tabs.Tab value="schedule" leftSection={<IconClock size={16} />}>
+                  Schedule
+                </Tabs.Tab>
+                <Tabs.Tab value="assessment" leftSection={<IconClipboardList size={16} />}>
+                  Assessment
+                </Tabs.Tab>
+                <Tabs.Tab value="communication" leftSection={<IconMessage size={16} />}>
+                  Communication
+                </Tabs.Tab>
+                <Tabs.Tab value="behavior" leftSection={<IconMoodHappy size={16} />}>
+                  Behavior
+                </Tabs.Tab>
+                {isSchoolAdmin && (
+                  <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
+                    Theme Settings
+                  </Tabs.Tab>
+                )}
+              </Tabs.List>
 
-          {/* Permissions Tab */}
-          <Tabs.Panel value="permissions" pt="md" px="md" pb="md">
-            <PermissionsTabContent />
-          </Tabs.Panel>
+              {/* Permissions Tab */}
+              <Tabs.Panel value="permissions" pt="md" px="md" pb="md">
+                <PermissionsTabContent />
+              </Tabs.Panel>
 
-          {/* Business Information Tab */}
-          <Tabs.Panel value="business-information" pt="md" px="md" pb="md">
-            <BusinessInformationTabContent />
-          </Tabs.Panel>
+              {/* Business Information Tab */}
+              <Tabs.Panel value="business-information" pt="md" px="md" pb="md">
+                <BusinessInformationTabContent />
+              </Tabs.Panel>
 
-          {/* Academic Years Tab */}
-          <Tabs.Panel value="academic-years" pt="md" px="md" pb="md">
-            <AcademicYearsTabContent />
-          </Tabs.Panel>
+              {/* Academic Years Tab */}
+              <Tabs.Panel value="academic-years" pt="md" px="md" pb="md">
+                <AcademicYearsTabContent />
+              </Tabs.Panel>
 
-          {/* Academic Tab */}
-          <Tabs.Panel value="academic" pt="md" px="md" pb="md">
-            <AcademicTabContent />
-          </Tabs.Panel>
+              {/* Academic Tab */}
+              <Tabs.Panel value="academic" pt="md" px="md" pb="md">
+                <AcademicTabContent />
+              </Tabs.Panel>
 
-          {/* Schedule Tab */}
-          <Tabs.Panel value="schedule" pt="md" px="md" pb="md">
-            <ScheduleTabContent />
-          </Tabs.Panel>
+              {/* Schedule Tab */}
+              <Tabs.Panel value="schedule" pt="md" px="md" pb="md">
+                <ScheduleTabContent />
+              </Tabs.Panel>
 
-          {/* Assessment Tab */}
-          <Tabs.Panel value="assessment" pt="md" px="md" pb="md">
-            <AssessmentTabContent />
-          </Tabs.Panel>
+              {/* Assessment Tab */}
+              <Tabs.Panel value="assessment" pt="md" px="md" pb="md">
+                <AssessmentTabContent />
+              </Tabs.Panel>
 
-          {/* Communication Tab */}
-          <Tabs.Panel value="communication" pt="md" px="md" pb="md">
-            <CommunicationTabContent />
-          </Tabs.Panel>
+              {/* Communication Tab */}
+              <Tabs.Panel value="communication" pt="md" px="md" pb="md">
+                <CommunicationTabContent />
+              </Tabs.Panel>
 
-          {/* Behavior Tab */}
-          <Tabs.Panel value="behavior" pt="md" px="md" pb="md">
-            <BehaviorTabContent />
-          </Tabs.Panel>
+              {/* Behavior Tab */}
+              <Tabs.Panel value="behavior" pt="md" px="md" pb="md">
+                <BehaviorTabContent />
+              </Tabs.Panel>
 
-          {isSchoolAdmin && (
-            <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">
-              <ThemeSettingsPanel showTitle={false} />
-            </Tabs.Panel>
-          )}
-        </Tabs>
+              {isSchoolAdmin && (
+                <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">
+                  <ThemeSettingsPanel showTitle={false} />
+                </Tabs.Panel>
+              )}
+            </Tabs>
           </>
         )}
       </div>
@@ -361,6 +341,64 @@ export default function SettingsPage() {
         onSuccess={handleCopySuccess}
       />
     </>
+  );
+}
+
+interface StartSchoolSetupViewProps {
+  onStartSetup: () => void;
+  onCopyFromBranch?: () => void;
+  colors: ReturnType<typeof useThemeColors>;
+}
+
+function StartSchoolSetupView({ onStartSetup, onCopyFromBranch, colors }: StartSchoolSetupViewProps) {
+  return (
+    <Stack align="center" gap="xl" py="xl" maw={520} mx="auto">
+      <Paper withBorder shadow="sm" p="xl" radius="md" style={{ width: '100%', textAlign: 'center' }}>
+        <Stack align="center" gap="lg">
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              background: colors.primary ? `var(--mantine-color-${colors.primary}-light)` : 'var(--mantine-color-blue-1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <IconSchool size={40} style={{ color: colors.primary ? `var(--mantine-color-${colors.primary}-6)` : 'var(--mantine-color-blue-6)' }} />
+          </div>
+          <Stack gap="xs" align="center">
+            <Title order={2}>School setup required</Title>
+            <Text size="sm" c="dimmed" maw={400}>
+              Configure your school settings before using the rest of the system. Run the guided setup once to create academic years, classes, schedule, and more. You can change these later in Settings.
+            </Text>
+          </Stack>
+          <Stack gap="sm" w="100%" maw={320}>
+            <Button
+              fullWidth
+              size="md"
+              leftSection={<IconRocket size={18} />}
+              onClick={onStartSetup}
+              color={colors.primary}
+            >
+              Start school setup
+            </Button>
+            {onCopyFromBranch && (
+              <Button
+                fullWidth
+                variant="light"
+                size="md"
+                leftSection={<IconCopy size={18} />}
+                onClick={onCopyFromBranch}
+              >
+                Copy settings from another branch
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </Paper>
+    </Stack>
   );
 }
 

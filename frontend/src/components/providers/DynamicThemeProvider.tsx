@@ -90,10 +90,16 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
     root.style.setProperty('--theme-badge-bg-base', badgeConfig.backgroundBase);
     root.style.setProperty('--theme-badge-text-base', badgeConfig.textBase);
     root.style.setProperty('--theme-badge-variation-count', String(config.components.badge.variationCount ?? 10));
+    root.style.setProperty('--theme-badge-filled-success-text', config.components.badge.filledSuccessTextColor);
     
     // Avatar colors
     root.style.setProperty('--theme-avatar-bg', config.components.avatar.backgroundColor);
     root.style.setProperty('--theme-avatar-text', config.components.avatar.textColor);
+
+    // Status inactive (e.g. inactive class section card/badge)
+    root.style.setProperty('--theme-status-inactive-badge', config.components.statusInactive.badgeColor);
+    root.style.setProperty('--theme-card-inactive-bg', config.components.statusInactive.cardBackground);
+    root.style.setProperty('--theme-card-inactive-border', config.components.statusInactive.cardBorder);
 
     // 2. Apply body styles
     document.body.style.backgroundColor = config.components.page.backgroundColor;
@@ -877,6 +883,25 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       .filter-chip-group .mantine-Chip-input:checked + .mantine-Chip-label {
         background-color: ${config.components.filterChip.selectedBackgroundColor} !important;
         color: ${config.components.filterChip.selectedTextColor} !important;
+      }
+
+      /* Green/success filled badges and Stepper completed step: white text (e.g. onboarding Review screen) */
+      .mantine-Stepper-stepIcon[data-completed],
+      .mantine-Stepper-step[data-completed] .mantine-Stepper-stepIcon {
+        color: ${config.components.badge.filledSuccessTextColor} !important;
+      }
+      .mantine-Stepper-stepIcon[data-completed] svg,
+      .mantine-Stepper-step[data-completed] .mantine-Stepper-stepIcon svg {
+        color: ${config.components.badge.filledSuccessTextColor} !important;
+        fill: ${config.components.badge.filledSuccessTextColor} !important;
+      }
+      .mantine-Badge-root[data-variant="filled"][data-color="green"],
+      .mantine-Badge-root[data-variant="filled"][data-color="primary"] {
+        color: ${config.components.badge.filledSuccessTextColor} !important;
+      }
+      .mantine-Badge-root[data-variant="filled"][data-color="green"] *,
+      .mantine-Badge-root[data-variant="filled"][data-color="primary"] * {
+        color: inherit !important;
       }
     `;
   }, [themeConfig, isAuthPage]);

@@ -79,6 +79,7 @@ export default function ClassTimetablePage() {
   const { data: schoolDaysData } = useSchoolDays();
   const { data: activeYear } = useActiveAcademicYear();
   const [replicateModalOpened, { open: openReplicateModal, close: closeReplicateModal }] = useDisclosure(false);
+  const [generateModalOpened, { open: openGenerateModal, close: closeGenerateModal }] = useDisclosure(false);
   const [sourceDay, setSourceDay] = useState<number | null>(null);
   const [targetDays, setTargetDays] = useState<number[]>([]);
   const timetable = timetableData?.data;
@@ -132,6 +133,7 @@ export default function ClassTimetablePage() {
       classSectionId,
       subjectTemplateId: selectedTemplateId,
     });
+    closeGenerateModal();
   };
 
   const activeSchoolDays = schoolDaysData?.data || [];
@@ -300,8 +302,7 @@ export default function ClassTimetablePage() {
             </Button>
             <Button
               leftSection={<IconPlus size={18} />}
-              onClick={handleGenerate}
-              loading={generateMutation.isPending}
+              onClick={openGenerateModal}
               disabled={!selectedTemplateId || !classId}
             >
               Generate from Template
@@ -440,6 +441,41 @@ export default function ClassTimetablePage() {
         subjectTemplateId={selectedTemplateId ?? undefined}
         onConflictCheck={handleConflictCheck}
       />
+
+      <Modal
+        opened={generateModalOpened}
+        onClose={closeGenerateModal}
+        title="Generate from Timing Template"
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            This will create timetable slots from the <strong>timing template</strong> assigned to this class (configured in Settings → Schedule / Timing template). That template defines the structure of each day (e.g. periods, break, assembly).
+          </Text>
+          <Text size="sm">
+            For the <strong>currently selected subject template</strong>, one slot will be created for each timing slot (period, break, assembly, etc.) on every active school day. Class periods will start as empty placeholders; you can then assign subjects and teachers to them.
+          </Text>
+          {timetable?.slots?.length ? (
+            <Alert icon={<IconAlertTriangle size={16} />} color="yellow" variant="light" title="Warning">
+              <Text size="sm">
+                Any existing timetable slots for this class and subject template that match the same day and time will be <strong>replaced</strong>. If you have already assigned subjects or teachers, they will be overwritten by empty slots (you can reassign them afterwards).
+              </Text>
+            </Alert>
+          ) : null}
+          <Group justify="flex-end" gap="xs" mt="md">
+            <Button variant="subtle" onClick={closeGenerateModal}>
+              Cancel
+            </Button>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => handleGenerate()}
+              loading={generateMutation.isPending}
+            >
+              Generate
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={replicateModalOpened}

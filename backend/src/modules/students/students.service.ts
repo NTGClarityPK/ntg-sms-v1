@@ -462,19 +462,7 @@ export class StudentsService {
   async createStudent(input: CreateStudentDto, branchId: string): Promise<StudentDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Check if student_id already exists in this branch
-    const { data: existing } = await supabase
-      .from('students')
-      .select('id')
-      .eq('student_id', input.studentId)
-      .eq('branch_id', branchId)
-      .maybeSingle();
-
-    if (existing) {
-      throw new ConflictException(`Student ID ${input.studentId} already exists in this branch`);
-    }
-
-    // Get active academic year if not provided
+    // Get active academic year if not provided (needed for both generation and insert)
     let academicYearId = input.academicYearId;
     if (!academicYearId) {
       const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
@@ -482,6 +470,27 @@ export class StudentsService {
         throw new BadRequestException('No active academic year found');
       }
       academicYearId = activeYear.id;
+    }
+
+    // Resolve student ID: use provided or auto-generate
+    let studentId: string;
+    if (input.studentId?.trim()) {
+      const { data: existing } = await supabase
+        .from('students')
+        .select('id')
+        .eq('student_id', input.studentId.trim())
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      if (existing) {
+        throw new ConflictException(`Student ID ${input.studentId} already exists in this branch`);
+      }
+      studentId = input.studentId.trim();
+    } else {
+      const gen = await this.generateStudentId(
+        { academicYearId, classId: input.classId, sectionId: input.sectionId },
+        branchId,
+      );
+      studentId = gen.studentId;
     }
 
     // Create auth user
@@ -552,7 +561,7 @@ export class StudentsService {
         .insert({
           user_id: user.id,
           branch_id: branchId,
-          student_id: input.studentId,
+          student_id: studentId,
           class_id: input.classId ?? null,
           section_id: input.sectionId ?? null,
           blood_group: input.bloodGroup ?? null,

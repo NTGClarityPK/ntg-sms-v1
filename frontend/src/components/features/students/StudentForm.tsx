@@ -4,7 +4,7 @@ import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divide
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
-import { useCreateStudent, useUpdateStudent, useGenerateStudentId } from '@/hooks/useStudents';
+import { useCreateStudent, useUpdateStudent } from '@/hooks/useStudents';
 import { useClasses, useSections } from '@/hooks/useCoreLookups';
 import { useAcademicYearsList } from '@/hooks/useAcademicYears';
 import { useTemplatesForClass, useStudentTemplate } from '@/hooks/useSubjectTemplates';
@@ -23,7 +23,6 @@ const createStudentSchema = z.object({
   address: z.string().optional(),
   dateOfBirth: z.string().optional(),
   gender: z.enum(['male', 'female']).optional(),
-  studentId: z.string().min(1, 'Student ID is required'),
   classId: z.string().optional(),
   sectionId: z.string().optional(),
   bloodGroup: z.string().optional(),
@@ -59,7 +58,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const queryClient = useQueryClient();
   const createStudent = useCreateStudent();
   const updateStudent = useUpdateStudent();
-  const generateId = useGenerateStudentId();
 
   const { data: classesData } = useClasses();
   const { data: sectionsData } = useSections();
@@ -77,7 +75,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       address: '',
       dateOfBirth: '',
       gender: undefined as 'male' | 'female' | undefined,
-      studentId: '',
       classId: '',
       sectionId: '',
       bloodGroup: '',
@@ -152,26 +149,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   }, [student, currentTemplate, branchId, queryClient]);
 
   // Generate student ID when class/section/year changes
-  useEffect(() => {
-    if (!isEdit && form.values.classId && form.values.sectionId) {
-      generateId.mutate(
-        {
-          classId: form.values.classId,
-          sectionId: form.values.sectionId,
-          academicYearId: form.values.academicYearId || undefined,
-        },
-        {
-          onSuccess: (data) => {
-            // useGenerateStudentId returns { data: { studentId } }
-            if (data?.data?.studentId) {
-              form.setFieldValue('studentId', data.data.studentId);
-            }
-          },
-        },
-      );
-    }
-  }, [form.values.classId, form.values.sectionId, form.values.academicYearId, isEdit]);
-
   const handleSubmit = async (values: typeof form.values) => {
     try {
       if (isEdit && student) {
@@ -201,7 +178,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           address: values.address || undefined,
           dateOfBirth: values.dateOfBirth || undefined,
           gender: values.gender,
-          studentId: values.studentId,
           classId: values.classId || undefined,
           sectionId: values.sectionId || undefined,
           bloodGroup: values.bloodGroup || undefined,
@@ -243,7 +219,14 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
           <TextInput label="Full Name" placeholder="John Doe" required {...form.getInputProps('fullName')} />
 
-          <TextInput label="Student ID" placeholder="Auto-generated" required {...form.getInputProps('studentId')} />
+          {isEdit && (
+            <TextInput
+              label="Student ID"
+              value={form.values.studentId || student?.studentId || ''}
+              readOnly
+              styles={{ input: { backgroundColor: 'var(--mantine-color-default-hover)' } }}
+            />
+          )}
 
           <Select
             label="Academic Year"

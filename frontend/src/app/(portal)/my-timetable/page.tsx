@@ -496,7 +496,7 @@ export default function MyTimetablePage() {
                 variant="light"
                 color={
                   selectedSlot.slotType === 'class'
-                    ? 'blue'
+                    ? colors.primary
                     : selectedSlot.slotType === 'assembly'
                       ? 'orange'
                       : selectedSlot.slotType === 'break'

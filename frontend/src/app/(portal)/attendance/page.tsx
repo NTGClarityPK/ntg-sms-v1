@@ -1,13 +1,17 @@
 'use client';
 
-import { Group, Title, Button, Card, Stack, Text } from '@mantine/core';
+import { useState } from 'react';
+import { Group, Title, Tabs } from '@mantine/core';
 import { IconCalendarCheck, IconHistory, IconUserCheck } from '@tabler/icons-react';
-import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeaturePermission } from '@/hooks/usePermissions';
 import type { User } from '@/types/auth';
+import { AttendanceHistoryContent } from '@/components/features/attendance/AttendanceHistoryContent';
+import { MarkAttendanceContent } from '@/components/features/attendance/MarkAttendanceContent';
+import { ChildAttendanceContent } from '@/components/features/attendance/ChildAttendanceContent';
 
 export default function AttendancePage() {
+  const [activeTab, setActiveTab] = useState<string | null>('history');
   const { user } = useAuth();
   const { canEdit } = useFeaturePermission('attendance');
   const userTyped = user as User | undefined;
@@ -23,6 +27,7 @@ export default function AttendancePage() {
           <Title order={1}>Attendance</Title>
         </Group>
       </div>
+      <div className="page-sub-title-bar" />
       <div
         style={{
           marginTop: '60px',
@@ -32,63 +37,40 @@ export default function AttendancePage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Stack gap="md">
-          {isTeacher && canEdit && (
-            <Card withBorder p="lg">
-              <Stack gap="md">
-                <Title order={3}>Mark Attendance</Title>
-                <Text c="dimmed" size="sm">
-                  Mark daily attendance for your class-sections
-                </Text>
-                <Button
-                  component={Link}
-                  href="/attendance/mark"
-                  leftSection={<IconCalendarCheck size={18} />}
-                >
-                  Mark Attendance
-                </Button>
-              </Stack>
-            </Card>
-          )}
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>
+              History
+            </Tabs.Tab>
+            {isTeacher && canEdit && (
+              <Tabs.Tab value="mark" leftSection={<IconCalendarCheck size={16} />}>
+                Mark Attendance
+              </Tabs.Tab>
+            )}
+            {isParent && (
+              <Tabs.Tab value="child" leftSection={<IconUserCheck size={16} />}>
+                Child Attendance
+              </Tabs.Tab>
+            )}
+          </Tabs.List>
 
-          <Card withBorder p="lg">
-            <Stack gap="md">
-              <Title order={3}>View History</Title>
-              <Text c="dimmed" size="sm">
-                View attendance history and generate reports
-              </Text>
-              <Button
-                component={Link}
-                href="/attendance/history"
-                leftSection={<IconHistory size={18} />}
-                variant="light"
-              >
-                View History
-              </Button>
-            </Stack>
-          </Card>
+          <Tabs.Panel value="history" pt="md" px="md" pb="md">
+            <AttendanceHistoryContent />
+          </Tabs.Panel>
+
+          {isTeacher && canEdit && (
+            <Tabs.Panel value="mark" pt="md" px="md" pb="md">
+              <MarkAttendanceContent />
+            </Tabs.Panel>
+          )}
 
           {isParent && (
-            <Card withBorder p="lg">
-              <Stack gap="md">
-                <Title order={3}>Child Attendance</Title>
-                <Text c="dimmed" size="sm">
-                  View your child&apos;s attendance records
-                </Text>
-                <Button
-                  component={Link}
-                  href="/attendance/child"
-                  leftSection={<IconUserCheck size={18} />}
-                  variant="light"
-                >
-                  View Child Attendance
-                </Button>
-              </Stack>
-            </Card>
+            <Tabs.Panel value="child" pt="md" px="md" pb="md">
+              <ChildAttendanceContent />
+            </Tabs.Panel>
           )}
-        </Stack>
+        </Tabs>
       </div>
     </>
   );
 }
-

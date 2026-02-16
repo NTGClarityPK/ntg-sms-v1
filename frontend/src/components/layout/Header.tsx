@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { UserMenu } from './UserMenu';
 import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranchBadge';
 import { NotificationBell } from './NotificationBell';
-import { useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
+import { useThemeColors, useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTenantMe } from '@/hooks/useTenant';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyStudent } from '@/hooks/useStudents';
@@ -16,6 +16,7 @@ import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 
 export function Header() {
+  const colors = useThemeColors();
   const successColor = useSuccessColor();
   const errorColor = useErrorColor();
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -102,7 +103,7 @@ export function Header() {
           </div>
         </Group>
         {isStudent && studentClassName && (
-          <Badge variant="light" color="blue" size="lg">
+          <Badge variant="light" color={colors.primary} size="lg">
             {studentClassName}
           </Badge>
         )}
