@@ -13,6 +13,11 @@ export function ConflictWarning({ conflict }: ConflictWarningProps) {
     <Alert icon={<IconAlertTriangle size={16} />} color="red" title={conflict.type}>
       <Stack gap="xs">
         <Text size="sm">{conflict.message}</Text>
+        {conflict.subjectTemplateName && (
+          <Text size="xs" c="dimmed" fw={500}>
+            Subject Template: {conflict.subjectTemplateName}
+          </Text>
+        )}
         {conflict.conflictingSlots.length > 0 && (
           <Stack gap={4}>
             <Text size="xs" fw={500}>

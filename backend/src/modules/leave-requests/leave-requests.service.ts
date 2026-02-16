@@ -134,6 +134,37 @@ export class LeaveRequestsService {
   }
 
   /**
+   * Check if parent has approval permission for a student
+   */
+  private async ensureParentCanApprove(
+    parentUserId: string,
+    studentId: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data, error } = await supabase
+      .from('parent_students')
+      .select('can_approve')
+      .eq('parent_user_id', parentUserId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    throwIfDbError(error);
+
+    if (!data) {
+      throw new ForbiddenException(
+        'You are not linked to this student',
+      );
+    }
+
+    if (!(data as { can_approve: boolean }).can_approve) {
+      throw new ForbiddenException(
+        'You do not have approval permission for this student. Please contact the school administrator.',
+      );
+    }
+  }
+
+  /**
    * Check if [startA, endA] overlaps with [startB, endB] (inclusive dates).
    */
   private static dateRangesOverlap(
@@ -542,6 +573,7 @@ export class LeaveRequestsService {
     input: UpdateLeaveStatusDto,
     reviewerUserId: string,
     branchId: string,
+    isParent: boolean = false,
   ): Promise<LeaveRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -568,6 +600,11 @@ export class LeaveRequestsService {
     // Ensure status is provided (controller should always set it)
     if (!input.status) {
       throw new BadRequestException('Status is required');
+    }
+
+    // If reviewer is a parent and trying to approve, check canApprove permission
+    if (isParent && input.status === 'approved') {
+      await this.ensureParentCanApprove(reviewerUserId, existingRow.student_id);
     }
 
     const { data, error } = await supabase

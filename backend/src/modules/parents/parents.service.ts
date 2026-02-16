@@ -4,6 +4,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { ParentStudentDto } from './dto/parent-student.dto';
 import { LinkChildDto } from './dto/link-child.dto';
 import { SelectChildDto } from './dto/select-child.dto';
+import { UpdateParentAssociationDto } from './dto/update-parent-association.dto';
 
 type ParentStudentRow = {
   id: string;
@@ -254,6 +255,56 @@ export class ParentsService {
     const row = data as ParentStudentRow;
     const children = await this.getChildren(parentUserId);
     return children.find((c) => c.id === row.id)!;
+  }
+
+  async updateParentAssociation(
+    parentUserId: string,
+    studentId: string,
+    input: UpdateParentAssociationDto,
+  ): Promise<ParentStudentDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Verify association exists
+    const { data: existing, error: checkError } = await supabase
+      .from('parent_students')
+      .select('*')
+      .eq('parent_user_id', parentUserId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    throwIfDbError(checkError);
+    if (!existing) {
+      throw new NotFoundException('Parent-student association not found');
+    }
+
+    // Build update object
+    const updateData: Partial<ParentStudentRow> = {};
+    if (input.canApprove !== undefined) {
+      updateData.can_approve = input.canApprove;
+    }
+
+    // Update if there are changes
+    if (Object.keys(updateData).length > 0) {
+      const { data, error } = await supabase
+        .from('parent_students')
+        .update(updateData)
+        .eq('parent_user_id', parentUserId)
+        .eq('student_id', studentId)
+        .select()
+        .single();
+
+      throwIfDbError(error);
+      if (!data) {
+        throw new BadRequestException('Failed to update association');
+      }
+
+      const hydrated = await this.hydrateAssociations([data as unknown as ParentStudentRow]);
+      return hydrated[0]!;
+    }
+
+    // No changes, return existing
+    const hydrated = await this.hydrateAssociations([existing as unknown as ParentStudentRow]);
+    return hydrated[0]!;
   }
 
   async unlinkChild(parentUserId: string, studentId: string): Promise<void> {

@@ -108,12 +108,18 @@ export class EarlyDepartureController {
     @CurrentUser() user: CurrentUserPayload,
     @CurrentBranch() branch: { branchId: string },
   ) {
-    await this.ensureFeatureEditAccess(user, branch.branchId, 'early_departure');
+    const isParent = user.roles?.includes('parent');
+    // Parents can approve if they have canApprove permission (checked in service)
+    // Staff/admin need feature edit access
+    if (!isParent) {
+      await this.ensureFeatureEditAccess(user, branch.branchId, 'early_departure');
+    }
     const data = await this.earlyDepartureService.updateEarlyDepartureStatus(
       id,
       { ...input, status: 'approved' },
       user.id,
       branch.branchId,
+      isParent,
     );
     return { data };
   }
@@ -125,12 +131,18 @@ export class EarlyDepartureController {
     @CurrentUser() user: CurrentUserPayload,
     @CurrentBranch() branch: { branchId: string },
   ) {
-    await this.ensureFeatureEditAccess(user, branch.branchId, 'early_departure');
+    const isParent = user.roles?.includes('parent');
+    // Parents can reject if they have canApprove permission (checked in service)
+    // Staff/admin need feature edit access
+    if (!isParent) {
+      await this.ensureFeatureEditAccess(user, branch.branchId, 'early_departure');
+    }
     const data = await this.earlyDepartureService.updateEarlyDepartureStatus(
       id,
       { ...input, status: 'rejected' },
       user.id,
       branch.branchId,
+      isParent,
     );
     return { data };
   }

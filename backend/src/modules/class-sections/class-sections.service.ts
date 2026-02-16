@@ -27,8 +27,8 @@ type ClassSectionRow = {
 };
 
 type ClassSectionWithRelations = ClassSectionRow & {
-  classes?: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
-  sections?: { name: string } | { name: string }[] | null;
+  classes?: { name: string; display_name: string; sort_order: number } | { name: string; display_name: string; sort_order: number }[] | null;
+  sections?: { name: string; sort_order: number } | { name: string; sort_order: number }[] | null;
   staff?: { id: string; user_id: string } | { id: string; user_id: string }[] | null;
 };
 
@@ -72,7 +72,7 @@ export class ClassSectionsService {
     let dbQuery = supabase
       .from('class_sections')
       .select(
-        '*, classes:class_id(name, display_name), sections:section_id(name)',
+        '*, classes:class_id(name, display_name, sort_order), sections:section_id(name, sort_order)',
         { count: 'exact' },
       )
       .eq('branch_id', branchId)
@@ -137,7 +137,9 @@ export class ClassSectionsService {
         updatedAt: row.updated_at,
         className: classData?.name,
         classDisplayName: classData?.display_name,
+        classSortOrder: classData?.sort_order,
         sectionName: sectionData?.name,
+        sectionSortOrder: sectionData?.sort_order,
         studentCount: studentCounts.get(row.id) ?? 0,
         classTeacherId: row.class_teacher_id ?? undefined,
         classTeacherName: row.class_teacher_id ? teacherNames.get(row.class_teacher_id) : undefined,
@@ -156,7 +158,7 @@ export class ClassSectionsService {
     const { data, error } = await supabase
       .from('class_sections')
       .select(
-        '*, classes:class_id(name, display_name), sections:section_id(name), staff:class_teacher_id(id, user_id)',
+        '*, classes:class_id(name, display_name, sort_order), sections:section_id(name, sort_order), staff:class_teacher_id(id, user_id)',
       )
       .eq('id', id)
       .eq('branch_id', branchId)
@@ -193,7 +195,9 @@ export class ClassSectionsService {
       updatedAt: row.updated_at,
       className: classData?.name,
       classDisplayName: classData?.display_name,
+      classSortOrder: classData?.sort_order,
       sectionName: sectionData?.name,
+      sectionSortOrder: sectionData?.sort_order,
       studentCount,
       classTeacherId: row.class_teacher_id ?? undefined,
       classTeacherName: teacherName,

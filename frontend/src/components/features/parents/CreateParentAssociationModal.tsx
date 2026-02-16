@@ -1,6 +1,6 @@
 'use client';
 
-import { Modal, Button, Stack, Select, Group, Text, Alert, Badge } from '@mantine/core';
+import { Modal, Button, Stack, Select, Group, Text, Alert, Badge, Switch } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useCreateParentAssociation, useParentAssociations } from '@/hooks/useParentAssociations';
 import { useUsers } from '@/hooks/useUsers';
@@ -149,6 +149,14 @@ export function CreateParentAssociationModal({
               </Text>
             </Alert>
           )}
+
+          <Switch
+            label="Can approve requests"
+            description="Allow this parent to approve child-related requests (e.g., leave requests, early departure, consent forms)"
+            checked={form.values.canApprove}
+            onChange={(e) => form.setFieldValue('canApprove', e.currentTarget.checked)}
+            mt="md"
+          />
 
           <Group justify="flex-end" mt="md">
             <Button variant="subtle" onClick={onClose}>

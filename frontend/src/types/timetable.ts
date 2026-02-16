@@ -42,7 +42,7 @@ export interface TeacherTimetable {
   freePeriods: FreePeriod[];
 }
 
-export type ConflictType = 'teacher_double_booking' | 'invalid_school_day' | 'timing_mismatch';
+export type ConflictType = 'teacher_double_booking' | 'invalid_school_day' | 'timing_mismatch' | 'class_section_slot_overlap';
 
 export interface ConflictingSlot {
   id: string;
@@ -60,6 +60,8 @@ export interface Conflict {
   dayOfWeek: number;
   slotIds: string[];
   conflictingSlots: ConflictingSlot[];
+  subjectTemplateId?: string;
+  subjectTemplateName?: string;
 }
 
 export interface CreateTimetableSlotInput {

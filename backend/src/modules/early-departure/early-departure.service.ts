@@ -204,6 +204,37 @@ export class EarlyDepartureService {
     }
   }
 
+  /**
+   * Check if parent has approval permission for a student
+   */
+  private async ensureParentCanApprove(
+    parentUserId: string,
+    studentId: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data, error } = await supabase
+      .from('parent_students')
+      .select('can_approve')
+      .eq('parent_user_id', parentUserId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    throwIfDbError(error);
+
+    if (!data) {
+      throw new ForbiddenException(
+        'You are not linked to this student',
+      );
+    }
+
+    if (!(data as { can_approve: boolean }).can_approve) {
+      throw new ForbiddenException(
+        'You do not have approval permission for this student. Please contact the school administrator.',
+      );
+    }
+  }
+
   async createEarlyDepartureRequest(
     input: CreateEarlyDepartureRequestDto,
     userId: string,
@@ -531,6 +562,7 @@ export class EarlyDepartureService {
     input: UpdateEarlyDepartureStatusDto,
     reviewerUserId: string,
     branchId: string,
+    isParent: boolean = false,
   ): Promise<EarlyDepartureRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -557,6 +589,11 @@ export class EarlyDepartureService {
     // Ensure status is provided (controller should set it, but validate for safety)
     if (!input.status) {
       throw new BadRequestException('Status is required');
+    }
+
+    // If reviewer is a parent and trying to approve, check canApprove permission
+    if (isParent && input.status === 'approved') {
+      await this.ensureParentCanApprove(reviewerUserId, existingRow.student_id);
     }
 
     const { data, error } = await supabase

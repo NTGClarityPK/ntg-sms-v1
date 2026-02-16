@@ -10,7 +10,9 @@ export class ClassSectionDto {
   updatedAt!: string;
   className?: string;
   classDisplayName?: string;
+  classSortOrder?: number;
   sectionName?: string;
+  sectionSortOrder?: number;
   studentCount?: number;
   classTeacherId?: string;
   classTeacherName?: string;

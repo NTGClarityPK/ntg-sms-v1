@@ -122,12 +122,18 @@ export class LeaveRequestsController {
     @CurrentUser() user: CurrentUserPayload,
     @CurrentBranch() branch: { branchId: string },
   ) {
-    await this.ensureFeatureEditAccess(user, branch.branchId, 'leaves');
+    const isParent = user.roles?.includes('parent');
+    // Parents can approve if they have canApprove permission (checked in service)
+    // Staff/admin need feature edit access
+    if (!isParent) {
+      await this.ensureFeatureEditAccess(user, branch.branchId, 'leaves');
+    }
     const data = await this.leaveRequestsService.updateLeaveStatus(
       id,
       { ...input, status: 'approved' },
       user.id,
       branch.branchId,
+      isParent,
     );
     return { data };
   }
@@ -139,12 +145,18 @@ export class LeaveRequestsController {
     @CurrentUser() user: CurrentUserPayload,
     @CurrentBranch() branch: { branchId: string },
   ) {
-    await this.ensureFeatureEditAccess(user, branch.branchId, 'leaves');
+    const isParent = user.roles?.includes('parent');
+    // Parents can reject if they have canApprove permission (checked in service)
+    // Staff/admin need feature edit access
+    if (!isParent) {
+      await this.ensureFeatureEditAccess(user, branch.branchId, 'leaves');
+    }
     const data = await this.leaveRequestsService.updateLeaveStatus(
       id,
       { ...input, status: 'rejected' },
       user.id,
       branch.branchId,
+      isParent,
     );
     return { data };
   }

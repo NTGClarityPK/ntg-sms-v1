@@ -17,6 +17,8 @@ import { ConflictDto, ConflictType, ConflictingSlot } from './dto/conflict.dto';
 import { TimingTemplateInfoDto } from './dto/timing-template-info.dto';
 import { ReplicateDayDto } from './dto/replicate-day.dto';
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 type TimetableSlotRow = {
   id: string;
   class_section_id: string;
@@ -1136,6 +1138,101 @@ export class TimetableService {
     const slotsArray = (slots as TimetableSlotWithRelations[]) ?? [];
     const conflicts: ConflictDto[] = [];
 
+    // Fetch class-section names for better conflict messages (used by multiple conflict types)
+    const classSectionIds = [
+      ...new Set(slotsArray.map((s) => s.class_section_id)),
+    ];
+    const classSectionMap = new Map<string, { className: string; sectionName: string }>();
+
+    if (classSectionIds.length > 0) {
+      const { data: classSections, error: csError } = await supabase
+        .from('class_sections')
+        .select('id, class_id, section_id, classes:class_id(name), sections:section_id(name)')
+        .in('id', classSectionIds);
+      throwIfDbError(csError);
+
+      for (const cs of (classSections as any[]) ?? []) {
+        const classData = Array.isArray(cs.classes) ? cs.classes[0] : cs.classes;
+        const sectionData = Array.isArray(cs.sections) ? cs.sections[0] : cs.sections;
+        classSectionMap.set(cs.id, {
+          className: classData?.name ?? '',
+          sectionName: sectionData?.name ?? '',
+        });
+      }
+    }
+
+    // Fetch subject template names for better conflict messages
+    const subjectTemplateIds = [
+      ...new Set(
+        slotsArray
+          .map((s) => (s as any).subject_template_id)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    const subjectTemplateMap = new Map<string, string>();
+
+    if (subjectTemplateIds.length > 0) {
+      const { data: templates, error: templateError } = await supabase
+        .from('subject_templates')
+        .select('id, name')
+        .in('id', subjectTemplateIds);
+      throwIfDbError(templateError);
+
+      for (const template of (templates as Array<{ id: string; name: string }>) ?? []) {
+        subjectTemplateMap.set(template.id, template.name);
+      }
+    }
+
+    // Fetch staff names for better conflict messages
+    const staffUserIds = [
+      ...new Set(
+        slotsArray
+          .filter((s) => s.staff_id)
+          .map((s) => {
+            const staffData = Array.isArray(s.staff) ? s.staff[0] : s.staff;
+            return staffData?.user_id;
+          })
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    const staffNameMap = new Map<string, string>();
+
+    if (staffUserIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', staffUserIds);
+      throwIfDbError(profilesError);
+
+      for (const profile of (profiles as Array<{ id: string; full_name: string }>) ?? []) {
+        staffNameMap.set(profile.id, profile.full_name);
+      }
+    }
+
+    // Helper function to get staff name
+    const getStaffName = (staffId: string | null | undefined): string | undefined => {
+      if (!staffId) return undefined;
+      const staffData = slotsArray.find((s) => s.staff_id === staffId);
+      if (!staffData) return undefined;
+      const staff = Array.isArray(staffData.staff) ? staffData.staff[0] : staffData.staff;
+      if (!staff?.user_id) return undefined;
+      return staffNameMap.get(staff.user_id);
+    };
+
+    // Helper function to get class-section info
+    const getClassSectionInfo = (classSectionId: string) => {
+      return classSectionMap.get(classSectionId) || { className: '', sectionName: '' };
+    };
+
+    // Helper function to get subject template info
+    const getSubjectTemplateInfo = (subjectTemplateId: string | null | undefined) => {
+      if (!subjectTemplateId) return { id: undefined, name: undefined };
+      return {
+        id: subjectTemplateId,
+        name: subjectTemplateMap.get(subjectTemplateId) || 'Unknown Template',
+      };
+    };
+
     // Get active school days
     const schoolDays = await this.scheduleService.getSchoolDays();
     const activeDays = schoolDays.data;
@@ -1143,6 +1240,7 @@ export class TimetableService {
     // Check for invalid school days
     for (const slot of slotsArray) {
       if (!activeDays.includes(slot.day_of_week)) {
+        const csInfo = getClassSectionInfo(slot.class_section_id);
         conflicts.push(
           new ConflictDto({
             type: 'invalid_school_day',
@@ -1153,6 +1251,8 @@ export class TimetableService {
               {
                 id: slot.id,
                 classSectionId: slot.class_section_id,
+                className: csInfo.className,
+                sectionName: csInfo.sectionName,
                 startTime: slot.start_time,
                 endTime: slot.end_time,
               },
@@ -1176,43 +1276,168 @@ export class TimetableService {
     for (const [key, daySlots] of staffSlotsMap.entries()) {
       if (daySlots.length < 2) continue;
 
-      for (let i = 0; i < daySlots.length; i++) {
-        for (let j = i + 1; j < daySlots.length; j++) {
-          const slot1 = daySlots[i];
-          const slot2 = daySlots[j];
+      // Group overlapping slots together to avoid duplicate conflicts
+      const slotGroups: TimetableSlotWithRelations[][] = daySlots.map((slot) => [slot]);
 
-          if (timesOverlap(slot1.start_time, slot1.end_time, slot2.start_time, slot2.end_time)) {
-            const classSection1 = Array.isArray(slot1.class_sections)
-              ? slot1.class_sections[0]
-              : slot1.class_sections;
-            const classSection2 = Array.isArray(slot2.class_sections)
-              ? slot2.class_sections[0]
-              : slot2.class_sections;
+      // Merge groups that have overlapping slots
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = 0; i < slotGroups.length; i++) {
+          for (let j = i + 1; j < slotGroups.length; j++) {
+            const group1 = slotGroups[i];
+            const group2 = slotGroups[j];
 
-            conflicts.push(
-              new ConflictDto({
-                type: 'teacher_double_booking',
-                message: `Teacher has overlapping slots on day ${slot1.day_of_week}`,
-                staffId: slot1.staff_id ?? undefined,
-                dayOfWeek: slot1.day_of_week,
-                slotIds: [slot1.id, slot2.id],
-                conflictingSlots: [
-                  {
-                    id: slot1.id,
-                    classSectionId: slot1.class_section_id,
-                    startTime: slot1.start_time,
-                    endTime: slot1.end_time,
-                  },
-                  {
-                    id: slot2.id,
-                    classSectionId: slot2.class_section_id,
-                    startTime: slot2.start_time,
-                    endTime: slot2.end_time,
-                  },
-                ],
-              }),
-            );
+            // Check if any slot in group1 overlaps with any slot in group2
+            let hasOverlap = false;
+            for (const slot1 of group1) {
+              for (const slot2 of group2) {
+                if (timesOverlap(slot1.start_time, slot1.end_time, slot2.start_time, slot2.end_time)) {
+                  hasOverlap = true;
+                  break;
+                }
+              }
+              if (hasOverlap) break;
+            }
+
+            // If groups overlap, merge them
+            if (hasOverlap) {
+              slotGroups[i] = [...group1, ...group2];
+              slotGroups.splice(j, 1);
+              changed = true;
+              break;
+            }
           }
+          if (changed) break;
+        }
+      }
+
+      // Create one conflict per group of overlapping slots (groups with 2+ slots)
+      for (const group of slotGroups) {
+        if (group.length >= 2) {
+          const slotIds = group.map((s) => s.id);
+          const staffId = group[0].staff_id ?? undefined;
+          const staffName = getStaffName(staffId);
+          const conflictingSlots = group.map((slot) => {
+            const csInfo = getClassSectionInfo(slot.class_section_id);
+            return {
+              id: slot.id,
+              classSectionId: slot.class_section_id,
+              className: csInfo.className,
+              sectionName: csInfo.sectionName,
+              startTime: slot.start_time,
+              endTime: slot.end_time,
+            };
+          });
+
+          // Build a more descriptive message
+          const classSectionNames = conflictingSlots
+            .map((cs) => `${cs.className} ${cs.sectionName}`)
+            .filter((name, index, arr) => arr.indexOf(name) === index); // Remove duplicates
+          const classSectionText =
+            classSectionNames.length === 1
+              ? classSectionNames[0]
+              : `${classSectionNames.length} different class-sections`;
+          const teacherText = staffName ? `Teacher ${staffName}` : 'A teacher';
+
+          conflicts.push(
+            new ConflictDto({
+              type: 'teacher_double_booking',
+              message: `${teacherText} is assigned to ${group.length} overlapping slot${group.length > 1 ? 's' : ''} on ${DAY_NAMES[group[0].day_of_week] || `day ${group[0].day_of_week}`} across ${classSectionText}`,
+              staffId,
+              dayOfWeek: group[0].day_of_week,
+              slotIds,
+              conflictingSlots,
+            }),
+          );
+        }
+      }
+    }
+
+    // Check for class-section slot overlaps (same class-section, same day, same subject template, overlapping times)
+    // This detects when a class-section has multiple slots scheduled at the same time for the same subject template
+    // Different subject templates can have slots at the same time (they represent different student groups/course tracks)
+    // Group overlapping slots together to avoid duplicate conflicts
+    const classSectionSlotsMap = new Map<string, TimetableSlotWithRelations[]>();
+    for (const slot of slotsArray) {
+      // Include subject_template_id in the key - slots with different templates don't conflict
+      const templateId = (slot as any).subject_template_id || 'null';
+      const key = `${slot.class_section_id}-${slot.day_of_week}-${templateId}`;
+      const existing = classSectionSlotsMap.get(key) ?? [];
+      existing.push(slot);
+      classSectionSlotsMap.set(key, existing);
+    }
+
+    for (const [key, daySlots] of classSectionSlotsMap.entries()) {
+      if (daySlots.length < 2) continue;
+
+      // Group overlapping slots using union-find approach
+      // Each slot starts in its own group
+      const slotGroups: TimetableSlotWithRelations[][] = daySlots.map((slot) => [slot]);
+
+      // Merge groups that have overlapping slots
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = 0; i < slotGroups.length; i++) {
+          for (let j = i + 1; j < slotGroups.length; j++) {
+            const group1 = slotGroups[i];
+            const group2 = slotGroups[j];
+
+            // Check if any slot in group1 overlaps with any slot in group2
+            let hasOverlap = false;
+            for (const slot1 of group1) {
+              for (const slot2 of group2) {
+                if (timesOverlap(slot1.start_time, slot1.end_time, slot2.start_time, slot2.end_time)) {
+                  hasOverlap = true;
+                  break;
+                }
+              }
+              if (hasOverlap) break;
+            }
+
+            // If groups overlap, merge them
+            if (hasOverlap) {
+              slotGroups[i] = [...group1, ...group2];
+              slotGroups.splice(j, 1);
+              changed = true;
+              break;
+            }
+          }
+          if (changed) break;
+        }
+      }
+
+      // Create one conflict per group of overlapping slots (groups with 2+ slots)
+      for (const group of slotGroups) {
+        if (group.length >= 2) {
+          const csInfo = getClassSectionInfo(group[0].class_section_id);
+          const templateInfo = getSubjectTemplateInfo((group[0] as any).subject_template_id);
+          const slotIds = group.map((s) => s.id);
+          const conflictingSlots = group.map((slot) => ({
+            id: slot.id,
+            classSectionId: slot.class_section_id,
+            className: csInfo.className,
+            sectionName: csInfo.sectionName,
+            startTime: slot.start_time,
+            endTime: slot.end_time,
+          }));
+
+          const templateText = templateInfo.name
+            ? ` (Subject Template: ${templateInfo.name})`
+            : '';
+
+          conflicts.push(
+            new ConflictDto({
+              type: 'class_section_slot_overlap',
+              message: `Class-section ${csInfo.className} ${csInfo.sectionName} has ${group.length} overlapping slot${group.length > 1 ? 's' : ''} on day ${group[0].day_of_week}${templateText}`,
+              dayOfWeek: group[0].day_of_week,
+              slotIds,
+              conflictingSlots,
+              subjectTemplateId: templateInfo.id,
+              subjectTemplateName: templateInfo.name,
+            }),
+          );
         }
       }
     }

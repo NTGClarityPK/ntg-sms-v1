@@ -29,6 +29,10 @@ export interface CreateParentAssociationInput {
   priority?: number; // Optional: if not provided, will be auto-assigned
 }
 
+export interface UpdateParentAssociationInput {
+  canApprove?: boolean;
+}
+
 interface QueryParentAssociationsParams {
   page?: number;
   limit?: number;
@@ -89,6 +93,45 @@ export function useCreateParentAssociation() {
       notifications.show({
         title: 'Error',
         message: error.message || 'Failed to create association',
+        color: colors.error,
+      });
+    },
+  });
+}
+
+export function useUpdateParentAssociation() {
+  const queryClient = useQueryClient();
+  const colors = useThemeColors();
+
+  return useMutation({
+    mutationFn: async ({
+      parentUserId,
+      studentId,
+      input,
+    }: {
+      parentUserId: string;
+      studentId: string;
+      input: UpdateParentAssociationInput;
+    }) => {
+      const response = await apiClient.put<ParentAssociation>(
+        `/api/v1/parents/${parentUserId}/children/${studentId}`,
+        input,
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parent-associations'] });
+      queryClient.invalidateQueries({ queryKey: ['student-guardians'] });
+      notifications.show({
+        title: 'Success',
+        message: 'Association updated successfully',
+        color: colors.success,
+      });
+    },
+    onError: (error: Error) => {
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'Failed to update association',
         color: colors.error,
       });
     },

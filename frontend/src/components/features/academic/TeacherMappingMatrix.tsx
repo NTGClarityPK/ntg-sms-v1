@@ -12,6 +12,7 @@ import {
   Group,
   Box,
   Switch,
+  Skeleton,
 } from '@mantine/core';
 import { IconSearch, IconFilter } from '@tabler/icons-react';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
@@ -25,8 +26,12 @@ interface TeacherMappingMatrixProps {
 }
 
 export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps) {
-  const { data: classSectionsData } = useClassSections();
-  const { data: subjectsData } = useSubjects();
+  // Fetch all class sections (no pagination) for proper sorting
+  const { data: classSectionsData, isLoading: isLoadingClassSections } = useClassSections({
+    limit: 500, // Maximum allowed limit - fetch all class sections
+    minimal: true, // Skip student counts for performance
+  });
+  const { data: subjectsData, isLoading: isLoadingSubjects } = useSubjects();
   const createAssignment = useCreateTeacherAssignment();
   const deleteAssignment = useDeleteTeacherAssignment();
 
@@ -51,22 +56,44 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
     return map;
   }, [assignments]);
 
-  // Get unique class-sections and subjects
+  // Get unique class-sections and subjects, sorted appropriately
   const uniqueClassSections = useMemo(() => {
     const seen = new Set<string>();
-    return classSections.filter((cs) => {
+    const unique = classSections.filter((cs) => {
       if (seen.has(cs.id)) return false;
       seen.add(cs.id);
       return true;
+    });
+    // Sort by class sortOrder (ascending), then by section sortOrder (ascending), then by section name (alphabetical)
+    return unique.sort((a, b) => {
+      const classSortA = a.classSortOrder ?? 999;
+      const classSortB = b.classSortOrder ?? 999;
+      if (classSortA !== classSortB) {
+        return classSortA - classSortB;
+      }
+      const sectionSortA = a.sectionSortOrder ?? 999;
+      const sectionSortB = b.sectionSortOrder ?? 999;
+      if (sectionSortA !== sectionSortB) {
+        return sectionSortA - sectionSortB;
+      }
+      const sectionA = (a.sectionName || '').toLowerCase();
+      const sectionB = (b.sectionName || '').toLowerCase();
+      return sectionA.localeCompare(sectionB);
     });
   }, [classSections]);
 
   const uniqueSubjects = useMemo(() => {
     const seen = new Set<string>();
-    return subjects.filter((s) => {
+    const unique = subjects.filter((s) => {
       if (seen.has(s.id)) return false;
       seen.add(s.id);
       return true;
+    });
+    // Sort alphabetically by name
+    return unique.sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
     });
   }, [subjects]);
 
@@ -138,11 +165,25 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
     assignedSubjectIds,
   ]);
 
+  // Options already sorted since uniqueClassSections and uniqueSubjects are sorted
   const classSectionOptions = uniqueClassSections.map((cs) => ({
     value: cs.id,
     label: `${cs.classDisplayName ?? cs.className ?? 'Unknown'} - ${cs.sectionName ?? 'Unknown'}`,
   }));
   const subjectOptions = uniqueSubjects.map((s) => ({ value: s.id, label: s.name }));
+
+  // Show skeleton while loading class sections or subjects
+  if (isLoadingClassSections || isLoadingSubjects || !classSectionsData || !subjectsData) {
+    return (
+      <Paper p="md" withBorder>
+        <Stack gap="md">
+          <Skeleton height={40} width="30%" />
+          <Skeleton height={200} />
+          <Skeleton height={400} />
+        </Stack>
+      </Paper>
+    );
+  }
 
   if (uniqueClassSections.length === 0 || uniqueSubjects.length === 0) {
     return (

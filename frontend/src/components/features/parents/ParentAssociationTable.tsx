@@ -1,10 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core';
-import { IconTrash } from '@tabler/icons-react';
+import { IconTrash, IconEdit } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
+import { useDisclosure } from '@mantine/hooks';
 import type { ParentAssociation } from '@/hooks/useParentAssociations';
 import { useDeleteParentAssociation } from '@/hooks/useParentAssociations';
+import { EditParentAssociationModal } from './EditParentAssociationModal';
 
 interface ParentAssociationTableProps {
   associations: ParentAssociation[];
@@ -23,6 +26,13 @@ export function ParentAssociationTable({
   onPageChange,
 }: ParentAssociationTableProps) {
   const deleteAssociation = useDeleteParentAssociation();
+  const [opened, { open, close }] = useDisclosure(false);
+  const [selectedAssociation, setSelectedAssociation] = useState<ParentAssociation | null>(null);
+
+  const handleEdit = (association: ParentAssociation) => {
+    setSelectedAssociation(association);
+    open();
+  };
 
   const handleDelete = (association: ParentAssociation) => {
     modals.openConfirmModal({
@@ -121,6 +131,12 @@ export function ParentAssociationTable({
                 <Table.Td>
                   <Group gap="xs" justify="flex-end">
                     <ActionIcon
+                      variant="light"
+                      onClick={() => handleEdit(association)}
+                    >
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                    <ActionIcon
                       color="red"
                       variant="light"
                       onClick={() => handleDelete(association)}
@@ -150,6 +166,15 @@ export function ParentAssociationTable({
           />
         </Group>
       )}
+
+      <EditParentAssociationModal
+        opened={opened}
+        onClose={() => {
+          close();
+          setSelectedAssociation(null);
+        }}
+        association={selectedAssociation}
+      />
     </>
   );
 }

@@ -16,7 +16,8 @@ export default function TeacherMappingPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const { data, isLoading, error } = useTeacherAssignments();
 
-  if (isLoading) {
+  // Show skeleton when loading OR when data is not yet available (prevents flash of content)
+  if (isLoading || !data) {
     return (
       <>
         <div className="page-title-bar">

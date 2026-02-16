@@ -31,6 +31,7 @@ import {
   IconCalendarEvent,
   IconBell,
   IconStar,
+  IconAlertTriangle,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -143,6 +144,17 @@ const allNavItems: NavItem[] = [
       return true; // Will be filtered in render
     }
   },
+  {
+    label: 'Conflict Management',
+    href: '/conflict-management',
+    icon: IconAlertTriangle,
+    showCondition: () => {
+      // Show for school_admin, principal, and academic_coordinator
+      if (typeof window === 'undefined') return false;
+      // This will be checked in the component using useAuth
+      return true; // Will be filtered in render
+    }
+  },
   { label: 'Report', href: '/reports', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
@@ -246,6 +258,10 @@ export function Sidebar({
       if (item.href === '/timetable') {
         return canManageTimetable;
       }
+      // For "Conflict Management", show only if user has admin/coordinator role
+      if (item.href === '/conflict-management') {
+        return canManageTimetable;
+      }
       // For "My Events", show for parents, students, and teachers
       if (item.href === '/my-events') {
         return isParent || isStudent || isTeacher;
@@ -310,6 +326,7 @@ export function Sidebar({
       item.href === '/academic/class-sections' ||
       item.href === '/academic/teacher-mapping' ||
       item.href === '/timetable' ||
+      item.href === '/conflict-management' ||
       item.href === '/parent-associations' ||
       item.href === '/events' ||
       item.href === '/reports' ||

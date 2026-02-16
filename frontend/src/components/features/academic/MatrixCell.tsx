@@ -122,7 +122,13 @@ export function MatrixCell({
 
   const assignedStaffIds = new Set(assignments.map((a) => a.staffId));
   const availableForAssignment = availableStaff.filter((s) => !assignedStaffIds.has(s.id));
-  const staffOptions = availableForAssignment.map((s) => ({
+  // Sort teachers alphabetically by full name
+  const sortedAvailableStaff = availableForAssignment.sort((a, b) => {
+    const nameA = (a.fullName || a.employeeId || 'Unknown').toLowerCase();
+    const nameB = (b.fullName || b.employeeId || 'Unknown').toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+  const staffOptions = sortedAvailableStaff.map((s) => ({
     value: s.id,
     label: s.fullName || s.employeeId || 'Unknown',
   }));

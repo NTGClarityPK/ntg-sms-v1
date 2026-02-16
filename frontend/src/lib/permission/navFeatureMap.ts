@@ -26,6 +26,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/my-schedule': 'timetable_personal',
   '/my-timetable': 'timetable_personal',
   '/timetable': 'timetable_management',
+  '/conflict-management': 'timetable_management',
   '/reports': 'reports',
   '/reports/public': 'reports',
   '/settings': 'settings',

@@ -49,6 +49,7 @@ export function useTeacherAssignments(params?: QueryTeacherAssignmentsParams) {
       return response;
     },
     enabled: !!branchId,
+    staleTime: 2 * 60 * 1000, // 2 minutes - teacher assignments don't change frequently
   });
 }
 

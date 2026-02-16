@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Body,
   Param,
@@ -19,6 +20,7 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { LinkChildDto } from './dto/link-child.dto';
 import { SelectChildDto } from './dto/select-child.dto';
+import { UpdateParentAssociationDto } from './dto/update-parent-association.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @Controller('api/v1/parents')
@@ -117,6 +119,20 @@ export class ParentsController {
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'parent_associations');
     const data = await this.parentsService.linkChild(id, input);
+    return { data };
+  }
+
+  @Put(':id/children/:studentId')
+  @UseGuards(BranchGuard)
+  async updateParentAssociation(
+    @Param('id') id: string,
+    @Param('studentId') studentId: string,
+    @Body() input: UpdateParentAssociationDto,
+    @CurrentBranch() branch: { branchId: string; tenantId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'parent_associations');
+    const data = await this.parentsService.updateParentAssociation(id, studentId, input);
     return { data };
   }
 
