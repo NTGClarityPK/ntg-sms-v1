@@ -1,4 +1,4 @@
-import { IsInt, IsUUID, Min } from 'class-validator';
+import { IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class CreateClassSectionDto {
   @IsUUID()
@@ -7,8 +7,9 @@ export class CreateClassSectionDto {
   @IsUUID()
   sectionId!: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  capacity: number = 30;
+  capacity?: number;
 }
 

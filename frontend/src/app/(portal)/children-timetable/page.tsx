@@ -94,7 +94,7 @@ export default function ChildrenTimetablePage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Children Timetable</Title>
+          <Title order={1}>Child Timetable</Title>
         </Group>
       </div>
 

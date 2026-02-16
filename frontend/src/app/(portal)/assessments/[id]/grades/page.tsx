@@ -44,7 +44,7 @@ export default function AssessmentGradesPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Grades</Title>
+          <Title order={1}>Grade</Title>
         </div>
         <div
           style={{
@@ -69,7 +69,7 @@ export default function AssessmentGradesPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>{canEdit ? `Grade Entry: ${assessment.title}` : `Grades: ${assessment.title}`}</Title>
+          <Title order={1}>{canEdit ? `Grade Entry: ${assessment.title}` : `Grade: ${assessment.title}`}</Title>
           <Button variant="subtle" onClick={() => router.back()}>
             Back
           </Button>

@@ -120,7 +120,7 @@ export default function ReportsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Reports</Title>
+          <Title order={1}>Report</Title>
         </Group>
       </div>
       <div className="page-sub-title-bar" />

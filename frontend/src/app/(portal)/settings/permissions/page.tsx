@@ -21,7 +21,7 @@ export default function PermissionsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Permissions</Title>
+          <Title order={1}>Permission</Title>
         </Group>
       </div>
 

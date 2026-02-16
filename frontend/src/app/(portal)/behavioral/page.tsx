@@ -1,22 +1,33 @@
 'use client';
 
-import { Group, Title, Text, Card, Stack, Button, Skeleton } from '@mantine/core';
-import { IconTable } from '@tabler/icons-react';
-import Link from 'next/link';
+import { useState } from 'react';
+import {
+  Group,
+  Title,
+  Tabs,
+  Stack,
+  Text,
+  Paper,
+  Skeleton,
+} from '@mantine/core';
+import { IconTable, IconListCheck } from '@tabler/icons-react';
 import { usePendingBehavioral } from '@/hooks/useBehavioral';
+import { BehavioralAssessContent } from '@/components/features/behavioral/BehavioralAssessContent';
 
 export default function BehavioralPage() {
+  const [activeTab, setActiveTab] = useState<string | null>('matrix');
   const pendingQuery = usePendingBehavioral();
   const pending = pendingQuery.data ?? [];
-  const isLoading = pendingQuery.isLoading || !pendingQuery.data;
+  const isLoadingPending = pendingQuery.isLoading || !pendingQuery.data;
 
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Behavioral Assessment</Title>
+          <Title order={1}>Behavioural Assessment</Title>
         </Group>
       </div>
+      <div className="page-sub-title-bar" />
       <div
         style={{
           marginTop: '60px',
@@ -26,55 +37,53 @@ export default function BehavioralPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Stack gap="md">
-          <Card withBorder p="lg">
-            <Stack gap="md">
-              <Title order={3}>Assess by class</Title>
-              <Text c="dimmed" size="sm">
-                Open the matrix view to enter star ratings for all students in a class section for a given month.
-              </Text>
-              <Button
-                component={Link}
-                href="/behavioral/assess"
-                leftSection={<IconTable size={18} />}
-              >
-                Open matrix
-              </Button>
-            </Stack>
-          </Card>
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Tab value="matrix" leftSection={<IconTable size={16} />}>
+              Matrix
+            </Tabs.Tab>
+            <Tabs.Tab value="pending" leftSection={<IconListCheck size={16} />}>
+              Pending this month
+            </Tabs.Tab>
+          </Tabs.List>
 
-          <Card withBorder p="lg">
+          <Tabs.Panel value="matrix" pt="md" px="md" pb="md">
+            <BehavioralAssessContent />
+          </Tabs.Panel>
+
+          <Tabs.Panel value="pending" pt="md" px="md" pb="md">
             <Stack gap="md">
-              <Title order={3}>Pending this month</Title>
-              <Text c="dimmed" size="sm">
-                Students in your class sections who have not been assessed yet this month.
-              </Text>
-              {isLoading ? (
-                <Skeleton height={80} radius="sm" />
-              ) : pending.length === 0 ? (
-                <Text size="sm" c="dimmed">
-                  No pending students, or you are not assigned to any class section.
+              <Paper withBorder p="md">
+                <Text size="sm" fw={500} mb="xs">
+                  Students in your class sections who have not been assessed yet this month.
                 </Text>
-              ) : (
-                <Stack gap="xs">
-                  {pending.slice(0, 10).map((s) => (
-                    <Text key={s.id} size="sm">
-                      {s.fullName}
-                      {s.className || s.sectionName
-                        ? ` (${[s.className, s.sectionName].filter(Boolean).join(' ')})`
-                        : ''}
-                    </Text>
-                  ))}
-                  {pending.length > 10 && (
-                    <Text size="sm" c="dimmed">
-                      +{pending.length - 10} more
-                    </Text>
-                  )}
-                </Stack>
-              )}
+                {isLoadingPending ? (
+                  <Skeleton height={80} radius="sm" />
+                ) : pending.length === 0 ? (
+                  <Text size="sm" c="dimmed">
+                    No pending students, or you are not assigned to any class section.
+                  </Text>
+                ) : (
+                  <Stack gap="xs">
+                    {pending.slice(0, 50).map((s) => (
+                      <Text key={s.id} size="sm">
+                        {s.fullName}
+                        {s.className || s.sectionName
+                          ? ` (${[s.className, s.sectionName].filter(Boolean).join(' ')})`
+                          : ''}
+                      </Text>
+                    ))}
+                    {pending.length > 50 && (
+                      <Text size="sm" c="dimmed">
+                        +{pending.length - 50} more
+                      </Text>
+                    )}
+                  </Stack>
+                )}
+              </Paper>
             </Stack>
-          </Card>
-        </Stack>
+          </Tabs.Panel>
+        </Tabs>
       </div>
     </>
   );

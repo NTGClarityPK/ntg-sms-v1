@@ -52,7 +52,7 @@ export default function MyChildrenPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>My Children</Title>
+          <Title order={1}>My Child</Title>
         </Group>
       </div>
 

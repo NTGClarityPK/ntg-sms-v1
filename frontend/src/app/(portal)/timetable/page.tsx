@@ -43,7 +43,7 @@ export default function TimetablePage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Timetable Management</Title>
+          <Title order={1}>Timetable</Title>
         </div>
         <div
           style={{
@@ -67,7 +67,7 @@ export default function TimetablePage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Timetable Management</Title>
+          <Title order={1}>Timetable</Title>
         </div>
         <div
           style={{
@@ -91,7 +91,7 @@ export default function TimetablePage() {
   return (
     <>
       <div className="page-title-bar">
-        <Title order={1}>Timetable Management</Title>
+        <Title order={1}>Timetable</Title>
       </div>
       <div
         style={{

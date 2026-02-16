@@ -28,6 +28,25 @@ export function useCreateAssessmentType() {
   });
 }
 
+export function useUpdateAssessmentType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      id: string;
+      name?: string;
+      nameAr?: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    }) => {
+      const { id, ...body } = payload;
+      return apiClient.patch<AssessmentType>(`/api/v1/assessment-types/${id}`, body);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: assessmentKeys.types });
+    },
+  });
+}
+
 export function useGradeTemplates() {
   return useQuery({
     queryKey: assessmentKeys.templates,

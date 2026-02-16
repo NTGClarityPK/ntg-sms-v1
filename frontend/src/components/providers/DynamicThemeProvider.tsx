@@ -101,6 +101,13 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
     root.style.setProperty('--theme-card-inactive-bg', config.components.statusInactive.cardBackground);
     root.style.setProperty('--theme-card-inactive-border', config.components.statusInactive.cardBorder);
 
+    // Teacher mapping matrix: teacher name badge
+    const matrixBadge = config.components.matrixTeacherBadge;
+    if (matrixBadge) {
+      root.style.setProperty('--theme-matrix-teacher-badge-bg', matrixBadge.backgroundColor);
+      root.style.setProperty('--theme-matrix-teacher-badge-text', matrixBadge.textColor);
+    }
+
     // 2. Apply body styles
     document.body.style.backgroundColor = config.components.page.backgroundColor;
     document.body.style.color = config.colors.text;
@@ -808,6 +815,30 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* Button Outline Variant - Remove border */
       .mantine-Button-root[data-variant="outline"] {
         border: none !important;
+      }
+      
+      /* Teacher mapping matrix: assigned-teacher button (distinct from primary Assign button) */
+      .mantine-Button-root[data-matrix-assigned-teacher],
+      button.mantine-Button-root[data-matrix-assigned-teacher] {
+        background-color: ${config.components.matrixAssignedTeacherButton?.backgroundColor ?? '#0d9488'} !important;
+        color: ${config.components.matrixAssignedTeacherButton?.textColor ?? '#ffffff'} !important;
+      }
+      .mantine-Button-root[data-matrix-assigned-teacher]:hover:not(:disabled):not([data-disabled]),
+      button.mantine-Button-root[data-matrix-assigned-teacher]:hover:not(:disabled):not([data-disabled]) {
+        background-color: ${config.components.matrixAssignedTeacherButton?.hoverColor ?? '#0f766e'} !important;
+        color: ${config.components.matrixAssignedTeacherButton?.textColor ?? '#ffffff'} !important;
+      }
+      
+      /* Teacher mapping matrix: green Assign / + button */
+      .mantine-Button-root[data-matrix-assign-button],
+      button.mantine-Button-root[data-matrix-assign-button] {
+        background-color: ${config.components.matrixAssignButton?.backgroundColor ?? '#16a34a'} !important;
+        color: ${config.components.matrixAssignButton?.textColor ?? '#ffffff'} !important;
+      }
+      .mantine-Button-root[data-matrix-assign-button]:hover:not(:disabled):not([data-disabled]),
+      button.mantine-Button-root[data-matrix-assign-button]:hover:not(:disabled):not([data-disabled]) {
+        background-color: ${config.components.matrixAssignButton?.hoverColor ?? '#15803d'} !important;
+        color: ${config.components.matrixAssignButton?.textColor ?? '#ffffff'} !important;
       }
       
       /* Override inline hover styles */

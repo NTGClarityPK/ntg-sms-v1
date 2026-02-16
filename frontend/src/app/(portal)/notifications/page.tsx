@@ -188,7 +188,7 @@ export default function NotificationsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Notifications</Title>
+          <Title order={1}>Notification</Title>
           {unreadCount > 0 && (
             <Button
               leftSection={<IconChecks size={18} />}

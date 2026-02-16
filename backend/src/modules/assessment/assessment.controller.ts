@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -6,6 +6,7 @@ import { AssessmentService } from './assessment.service';
 import { QueryAssessmentTypesDto } from './dto/query-assessment-types.dto';
 import { AssessmentTypeDto } from './dto/assessment-type.dto';
 import { CreateAssessmentTypeDto } from './dto/create-assessment-type.dto';
+import { UpdateAssessmentTypeDto } from './dto/update-assessment-type.dto';
 import { GradeTemplateDto } from './dto/grade-template.dto';
 import { CreateGradeTemplateDto } from './dto/create-grade-template.dto';
 import { AssignGradeTemplateDto } from './dto/assign-grade-template.dto';
@@ -31,6 +32,16 @@ export class AssessmentController {
   ): Promise<{ data: AssessmentTypeDto }> {
     const created = await this.assessmentService.createAssessmentType(body, branch.branchId, branch.tenantId);
     return { data: created };
+  }
+
+  @Patch('assessment-types/:id')
+  async updateAssessmentType(
+    @Param('id') id: string,
+    @Body() body: UpdateAssessmentTypeDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: AssessmentTypeDto }> {
+    const updated = await this.assessmentService.updateAssessmentType(id, body, branch.branchId);
+    return { data: updated };
   }
 
   @Get('grade-templates')

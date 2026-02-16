@@ -34,7 +34,7 @@ const adminNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/adminportal', icon: IconHome },
   { label: 'Assign Branch', href: '/adminportal/assign-branch', icon: IconBuilding },
   { label: 'Unlock Academic Year', href: '/adminportal/unlock-academic-year', icon: IconLockOpen },
-  { label: 'Payment Models', href: '/adminportal/payment-models', icon: IconCreditCard },
+  { label: 'Payment Model', href: '/adminportal/payment-models', icon: IconCreditCard },
 ];
 
 interface AdminSidebarProps {

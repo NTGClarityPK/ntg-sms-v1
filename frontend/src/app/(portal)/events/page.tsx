@@ -112,7 +112,7 @@ export default function EventsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Events</Title>
+          <Title order={1}>Event</Title>
           <Button
             leftSection={<IconPlus size={16} />}
             onClick={() => router.push('/events/create')}

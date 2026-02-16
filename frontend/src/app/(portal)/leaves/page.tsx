@@ -163,7 +163,7 @@ export default function LeavesPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Leaves</Title>
+          <Title order={1}>Leave</Title>
         </Group>
       </div>
       <div

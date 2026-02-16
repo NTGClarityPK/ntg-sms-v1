@@ -10,7 +10,7 @@ export default function PublicClassCountsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Class Student Counts</Title>
+          <Title order={1}>Class Student Count</Title>
         </Group>
       </div>
       <div

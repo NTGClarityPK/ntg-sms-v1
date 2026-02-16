@@ -7,7 +7,7 @@ export default function PaymentModelsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Payment Models</Title>
+          <Title order={1}>Payment Model</Title>
         </Group>
       </div>
       <div

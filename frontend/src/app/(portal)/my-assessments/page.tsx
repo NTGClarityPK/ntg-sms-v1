@@ -108,7 +108,7 @@ export default function MyAssessmentsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>My Assessments</Title>
+          <Title order={1}>My Assessment</Title>
         </Group>
       </div>
 

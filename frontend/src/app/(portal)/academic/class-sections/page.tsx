@@ -23,17 +23,26 @@ export default function ClassSectionsPage() {
     }
   }, [bulkCreate.isSuccess, bulkCreate.isError]);
 
-  const classes = classesData?.data || [];
-  const sections = sectionsData?.data || [];
+  const classesRaw = classesData?.data || [];
+  const sectionsRaw = sectionsData?.data || [];
   const classSections = data?.data || [];
 
-  // Find all missing combinations
+  // Same order as ClassSectionGrid: by Settings sort order
+  const classes = useMemo(
+    () => [...classesRaw].sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name)),
+    [classesRaw],
+  );
+  const sections = useMemo(
+    () => [...sectionsRaw].sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name)),
+    [sectionsRaw],
+  );
+
+  // Find all missing combinations (class order × section order matches grid)
   const missingCombinations = useMemo(() => {
     const existing = new Set(
       classSections.map((cs) => `${cs.classId}-${cs.sectionId}`)
     );
     const missing: Array<{ classId: string; sectionId: string }> = [];
-    
     classes.forEach((cls) => {
       sections.forEach((sec) => {
         const key = `${cls.id}-${sec.id}`;
@@ -42,7 +51,6 @@ export default function ClassSectionsPage() {
         }
       });
     });
-    
     return missing;
   }, [classes, sections, classSections]);
 
@@ -63,7 +71,7 @@ export default function ClassSectionsPage() {
     }
 
     modals.openConfirmModal({
-      title: 'Create All Class Sections',
+      title: 'Create class-section combinations',
       children: (
         <Text size="sm">
           This will create {missingCombinations.length} class-section combination(s) with default capacity of 30.
@@ -107,7 +115,7 @@ export default function ClassSectionsPage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>Class Sections</Title>
+            <Title order={1}>Class</Title>
           </Group>
         </div>
         <div
@@ -134,7 +142,7 @@ export default function ClassSectionsPage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>Class Sections</Title>
+            <Title order={1}>Class</Title>
           </Group>
         </div>
         <div
@@ -156,7 +164,7 @@ export default function ClassSectionsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Class Sections</Title>
+          <Title order={1}>Class</Title>
           {missingCombinations.length > 0 && (
             <Button
               leftSection={<IconChecklist size={16} />}

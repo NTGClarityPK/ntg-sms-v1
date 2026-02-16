@@ -43,7 +43,7 @@ function lighten(hex: string, percent: number): string {
 /**
  * Darken a color by a percentage
  */
-function darken(hex: string, percent: number): string {
+export function darken(hex: string, percent: number): string {
   const rgb = hexToRgb(hex);
   if (!rgb) return hex;
 
@@ -51,6 +51,20 @@ function darken(hex: string, percent: number): string {
   const g = Math.max(0, Math.round(rgb.g * (1 - percent)));
   const b = Math.max(0, Math.round(rgb.b * (1 - percent)));
 
+  return rgbToHex(r, g, b);
+}
+
+/**
+ * Mix two colors (weight = 0–1, weight of second color)
+ */
+export function mixColors(color1: string, color2: string, weight: number = 0.5): string {
+  const rgb1 = hexToRgb(color1);
+  const rgb2 = hexToRgb(color2);
+  if (!rgb1 || !rgb2) return color1;
+  const w = Math.max(0, Math.min(1, weight));
+  const r = Math.round(rgb1.r * (1 - w) + rgb2.r * w);
+  const g = Math.round(rgb1.g * (1 - w) + rgb2.g * w);
+  const b = Math.round(rgb1.b * (1 - w) + rgb2.b * w);
   return rgbToHex(r, g, b);
 }
 

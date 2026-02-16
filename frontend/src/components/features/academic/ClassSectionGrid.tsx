@@ -18,8 +18,18 @@ export function ClassSectionGrid({ classSections }: ClassSectionGridProps) {
   const { data: academicYearsData } = useAcademicYears();
 
   const activeYear = academicYearsData?.data?.find((y) => y.isActive);
-  const classes = classesData?.data || [];
-  const sections = sectionsData?.data || [];
+  const classesRaw = classesData?.data || [];
+  const sectionsRaw = sectionsData?.data || [];
+
+  // Sort by Settings sort order so grid matches class/section order from Settings
+  const classes = useMemo(
+    () => [...classesRaw].sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name)),
+    [classesRaw],
+  );
+  const sections = useMemo(
+    () => [...sectionsRaw].sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name)),
+    [sectionsRaw],
+  );
 
   // Create a map of class-section combinations
   const classSectionMap = useMemo(() => {

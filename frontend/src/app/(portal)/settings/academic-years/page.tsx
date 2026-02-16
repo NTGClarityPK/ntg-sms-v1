@@ -76,7 +76,7 @@ export default function AcademicYearsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Academic Years</Title>
+          <Title order={1}>Academic Year</Title>
           <Button leftSection={<IconPlus size={16} />} onClick={open}>
             Create
           </Button>

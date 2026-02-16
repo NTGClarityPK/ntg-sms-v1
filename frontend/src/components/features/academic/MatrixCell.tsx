@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Menu, Text, Stack } from '@mantine/core';
-import { IconPlus, IconUser, IconX } from '@tabler/icons-react';
+import { ActionIcon, Badge, Button, Group, Menu, Text, Tooltip } from '@mantine/core';
+import { IconPlus, IconX } from '@tabler/icons-react';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
 import { useStaff } from '@/hooks/useStaff';
 import type { CreateTeacherAssignmentInput } from '@/types/teacher-assignments';
@@ -15,6 +15,79 @@ interface MatrixCellProps {
   onDelete: (id: string) => Promise<void>;
 }
 
+function AssignMenuContent({
+  staffOptions,
+  onAssign,
+  emptyMessage,
+}: {
+  staffOptions: { value: string; label: string }[];
+  onAssign: (staffId: string) => void;
+  emptyMessage: string;
+}) {
+  return staffOptions.length === 0 ? (
+    <Menu.Item disabled>
+      <Text size="sm" c="dimmed">
+        {emptyMessage}
+      </Text>
+    </Menu.Item>
+  ) : (
+    <>
+      {staffOptions.map((option) => (
+        <Menu.Item key={option.value} onClick={() => onAssign(option.value)}>
+          {option.label}
+        </Menu.Item>
+      ))}
+    </>
+  );
+}
+
+function TeacherBadge({
+  assignment,
+  onUnassign,
+}: {
+  assignment: TeacherAssignment;
+  onUnassign: (id: string) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <Group
+      gap={2}
+      wrap="nowrap"
+      align="center"
+      style={{ cursor: 'default' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <Badge
+        size="sm"
+        variant="light"
+        style={{
+          backgroundColor: 'var(--theme-matrix-teacher-badge-bg, var(--mantine-color-blue-1))',
+          color: 'var(--theme-matrix-teacher-badge-text, var(--mantine-color-blue-8))',
+        }}
+      >
+        {assignment.staffName || 'Unknown'}
+      </Badge>
+      <Tooltip label="Remove" withArrow>
+        <ActionIcon
+          size="xs"
+          variant="subtle"
+          color="red"
+          style={{ opacity: hovered ? 1 : 0, transition: 'opacity 0.1s' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUnassign(assignment.id);
+          }}
+          aria-label="Remove teacher"
+        >
+          <IconX size={12} />
+        </ActionIcon>
+      </Tooltip>
+    </Group>
+  );
+}
+
 export function MatrixCell({
   assignments,
   classSectionId,
@@ -23,7 +96,6 @@ export function MatrixCell({
   onDelete,
 }: MatrixCellProps) {
   const [assignMenuOpened, setAssignMenuOpened] = useState(false);
-  const [unassignMenuOpened, setUnassignMenuOpened] = useState<{ [key: string]: boolean }>({});
   const { data: staffData } = useStaff();
 
   const staffResponse = staffData as
@@ -39,108 +111,87 @@ export function MatrixCell({
     | null
     | undefined;
   const staff = staffResponse?.data || [];
-  // Filter to only include active staff with teacher roles (class_teacher or subject_teacher)
   const availableStaff = staff.filter((s) => {
     if (!s.isActive) return false;
-    // Check if staff has teacher roles
     const hasTeacherRole = s.roles?.some(
-      (r: any) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
+      (r: { roleName: string }) =>
+        r.roleName === 'class_teacher' || r.roleName === 'subject_teacher'
     );
     return hasTeacherRole;
   });
 
-  // Get assigned staff IDs to filter them out from the assign menu
   const assignedStaffIds = new Set(assignments.map((a) => a.staffId));
   const availableForAssignment = availableStaff.filter((s) => !assignedStaffIds.has(s.id));
-
   const staffOptions = availableForAssignment.map((s) => ({
     value: s.id,
     label: s.fullName || s.employeeId || 'Unknown',
   }));
 
   const handleAssign = async (staffId: string) => {
-    await onCreate({
-      staffId,
-      classSectionId,
-      subjectId,
-    });
+    await onCreate({ staffId, classSectionId, subjectId });
     setAssignMenuOpened(false);
   };
 
-  const handleUnassign = async (assignmentId: string) => {
-    await onDelete(assignmentId);
-    setUnassignMenuOpened((prev) => ({ ...prev, [assignmentId]: false }));
-  };
+  const assignMenuDropdown = (
+    <Menu.Dropdown>
+      <AssignMenuContent
+        staffOptions={staffOptions}
+        onAssign={handleAssign}
+        emptyMessage={
+          assignments.length > 0
+            ? 'All available teachers are already assigned'
+            : 'No teachers available'
+        }
+      />
+    </Menu.Dropdown>
+  );
 
-  const handleUnassignMenuToggle = (assignmentId: string, opened: boolean) => {
-    setUnassignMenuOpened((prev) => ({ ...prev, [assignmentId]: opened }));
-  };
-
-  return (
-    <Stack gap={4}>
-      {assignments.map((assignment) => (
-        <Menu
-          key={assignment.id}
-          opened={unassignMenuOpened[assignment.id] || false}
-          onChange={(opened) => handleUnassignMenuToggle(assignment.id, opened)}
-        >
-          <Menu.Target>
+  // Empty slot: small green "+" icon only
+  if (assignments.length === 0) {
+    return (
+      <Menu opened={assignMenuOpened} onChange={setAssignMenuOpened}>
+        <Menu.Target>
+          <Tooltip label="Assign Teacher" withArrow>
             <Button
               variant="light"
               size="xs"
-              fullWidth
-              leftSection={<IconUser size={14} />}
+              px={6}
+              data-matrix-assign-button
             >
-              {assignment.staffName || 'Unknown'}
+              <IconPlus size={14} />
             </Button>
-          </Menu.Target>
-          <Menu.Dropdown>
-            <Menu.Item
-              color="red"
-              leftSection={<IconX size={14} />}
-              onClick={() => handleUnassign(assignment.id)}
-            >
-              Unassign
-            </Menu.Item>
-          </Menu.Dropdown>
-        </Menu>
-      ))}
+          </Tooltip>
+        </Menu.Target>
+        {assignMenuDropdown}
+      </Menu>
+    );
+  }
 
-      {/* Dotted "+ Assign" button - always visible to allow adding more teachers */}
+  // Has teacher(s): [Badge1] ... [+][LastBadge] — small green + before the latest teacher
+  const teachersBeforeLast = assignments.slice(0, -1);
+  const lastTeacher = assignments[assignments.length - 1];
+
+  return (
+    <Group gap={4} wrap="nowrap" align="center">
+      {teachersBeforeLast.map((assignment) => (
+        <TeacherBadge key={assignment.id} assignment={assignment} onUnassign={onDelete} />
+      ))}
       <Menu opened={assignMenuOpened} onChange={setAssignMenuOpened}>
         <Menu.Target>
-          <Button
-            variant="subtle"
-            size="xs"
-            fullWidth
-            leftSection={<IconPlus size={14} />}
-            style={{
-              border: '1px dashed',
-              borderColor: 'var(--mantine-color-gray-4)',
-              backgroundColor: 'transparent',
-            }}
-          >
-            Assign
-          </Button>
+          <Tooltip label="Assign Teacher" withArrow>
+            <Button
+              variant="light"
+              size="xs"
+              px={6}
+              data-matrix-assign-button
+            >
+              <IconPlus size={14} />
+            </Button>
+          </Tooltip>
         </Menu.Target>
-        <Menu.Dropdown>
-          {staffOptions.length === 0 ? (
-            <Menu.Item disabled>
-              <Text size="sm" c="dimmed">
-                {assignments.length > 0
-                  ? 'All available teachers are already assigned'
-                  : 'No teachers available'}
-              </Text>
-            </Menu.Item>
-          ) : (
-            staffOptions.map((option) => (
-              <Menu.Item key={option.value} onClick={() => handleAssign(option.value)}>
-                {option.label}
-              </Menu.Item>
-            ))
-          )}
-        </Menu.Dropdown>
+        {assignMenuDropdown}
       </Menu>
-    </Stack>
+      <TeacherBadge assignment={lastTeacher} onUnassign={onDelete} />
+    </Group>
   );
 }

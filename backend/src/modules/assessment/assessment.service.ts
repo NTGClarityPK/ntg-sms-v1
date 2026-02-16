@@ -194,6 +194,40 @@ export class AssessmentService {
     return mapAssessmentType(data as AssessmentTypeRow);
   }
 
+  async updateAssessmentType(
+    id: string,
+    input: { name?: string; nameAr?: string; isActive?: boolean; sortOrder?: number },
+    branchId: string,
+  ): Promise<AssessmentTypeDto> {
+    const supabase = this.supabaseConfig.getClient();
+    const updates: Partial<AssessmentTypeRow> = {};
+    if (input.name !== undefined) updates.name = input.name;
+    if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
+    if (input.isActive !== undefined) updates.is_active = input.isActive;
+    if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
+    if (Object.keys(updates).length === 0) {
+      const { data: existing, error: fetchError } = await supabase
+        .from('assessment_types')
+        .select('*')
+        .eq('id', id)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(fetchError);
+      if (!existing) throw new NotFoundException('Assessment type not found');
+      return mapAssessmentType(existing as AssessmentTypeRow);
+    }
+    const { data, error } = await supabase
+      .from('assessment_types')
+      .update(updates)
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .select('*')
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!data) throw new NotFoundException('Assessment type not found');
+    return mapAssessmentType(data as AssessmentTypeRow);
+  }
+
   async listGradeTemplates(branchId: string): Promise<{ data: GradeTemplateDto[] }> {
     const supabase = this.supabaseConfig.getClient();
     const { data: templates, error: tError } = await supabase

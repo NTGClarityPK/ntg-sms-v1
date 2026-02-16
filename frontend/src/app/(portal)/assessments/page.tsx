@@ -71,7 +71,7 @@ export default function AssessmentsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Assessments</Title>
+          <Title order={1}>Assessment</Title>
           {canEdit && (
             <Button leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
               Create Assessment

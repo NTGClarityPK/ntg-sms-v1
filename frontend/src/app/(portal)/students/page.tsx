@@ -58,7 +58,7 @@ export default function StudentsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <div>
-            <Title order={1}>Student Management</Title>
+            <Title order={1}>Student</Title>
           </div>
           {canEdit && (
             <Button leftSection={<IconPlus size={16} />} onClick={open}>

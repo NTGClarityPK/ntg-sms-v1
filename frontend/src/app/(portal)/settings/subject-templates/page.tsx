@@ -157,7 +157,7 @@ export default function SubjectTemplatesPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Subject Templates</Title>
+          <Title order={1}>Subject Template</Title>
           <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
             New Template
           </Button>

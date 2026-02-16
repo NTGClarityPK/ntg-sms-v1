@@ -109,7 +109,7 @@ export default function UsersPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <div>
-            <Title order={1}>User Management</Title>
+            <Title order={1}>User</Title>
           </div>
           {canEdit && (
             <Button leftSection={<IconPlus size={16} />} onClick={open}>

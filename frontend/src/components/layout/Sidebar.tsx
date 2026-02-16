@@ -50,16 +50,16 @@ const NAV_ICON_SIZE = 22;
 // All navigation items
 const allNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: IconHome },
-  { label: 'Students', href: '/students', icon: IconUsers },
-  { label: 'Users', href: '/users', icon: IconUsers },
-  { label: 'Class Sections', href: '/academic/class-sections', icon: IconSchool },
+  { label: 'Student', href: '/students', icon: IconUsers },
+  { label: 'User', href: '/users', icon: IconUsers },
+  { label: 'Class', href: '/academic/class-sections', icon: IconSchool },
   { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconBook },
-  { label: 'Parent Associations', href: '/parent-associations', icon: IconUsersGroup },
-  { label: 'My Children', href: '/my-children', icon: IconUsersGroup },
-  { label: 'Children Timetable', href: '/children-timetable', icon: IconCalendarClock },
+  { label: 'Parent Association', href: '/parent-associations', icon: IconUsersGroup },
+  { label: 'My Child', href: '/my-children', icon: IconUsersGroup },
+  { label: 'Child Timetable', href: '/children-timetable', icon: IconCalendarClock },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
   {
-    label: 'Assessments',
+    label: 'Assessment',
     href: '/assessments',
     icon: IconFileText,
     showCondition: () => {
@@ -69,7 +69,7 @@ const allNavItems: NavItem[] = [
     },
   },
   {
-    label: 'My Assessments',
+    label: 'My Assessment',
     href: '/my-assessments',
     icon: IconFileText,
     showCondition: () => {
@@ -87,11 +87,11 @@ const allNavItems: NavItem[] = [
       return true; // Filtered in render for assessor roles
     },
   },
-  { label: 'Leaves', href: '/leaves', icon: IconPlaneDeparture },
+  { label: 'Leave', href: '/leaves', icon: IconPlaneDeparture },
   { label: 'Early Departure', href: '/early-departure', icon: IconWalk },
-  { label: 'Notifications', href: '/notifications', icon: IconBell },
+  { label: 'Notification', href: '/notifications', icon: IconBell },
   { 
-    label: 'My Events', 
+    label: 'My Event', 
     href: '/my-events', 
     icon: IconCalendarEvent,
     showCondition: () => {
@@ -101,7 +101,7 @@ const allNavItems: NavItem[] = [
     }
   },
   {
-    label: 'Events',
+    label: 'Event',
     href: '/events',
     icon: IconCalendarEvent,
     showCondition: () => {
@@ -143,7 +143,7 @@ const allNavItems: NavItem[] = [
       return true; // Will be filtered in render
     }
   },
-  { label: 'Reports', href: '/reports', icon: IconChartBar },
+  { label: 'Report', href: '/reports', icon: IconChartBar },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 

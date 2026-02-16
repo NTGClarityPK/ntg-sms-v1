@@ -61,7 +61,7 @@ export default function ParentAssociationsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Parent-Student Associations</Title>
+          <Title order={1}>Parent-Student Association</Title>
           <Button leftSection={<IconPlus size={16} />} onClick={open}>
             Create Association
           </Button>

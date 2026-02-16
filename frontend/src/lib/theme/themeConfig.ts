@@ -5,7 +5,7 @@
  * Change any value here to control the entire application's appearance.
  */
 
-import { generateThemeColors } from '../utils/themeColors';
+import { generateThemeColors, mixColors, darken } from '../utils/themeColors';
 
 export interface ThemeConfig {
   // Color Settings
@@ -155,6 +155,23 @@ export interface ThemeConfig {
     avatar: {
       backgroundColor: string; // Background color of the avatar circle
       textColor: string; // Color of the initials text
+    };
+    /** Teacher mapping matrix: button that shows assigned teacher (distinct from primary Assign button) */
+    matrixAssignedTeacherButton?: {
+      backgroundColor: string;
+      textColor: string;
+      hoverColor: string;
+    };
+    /** Teacher mapping matrix: green Assign / + button (full when empty, icon-only when slot has teachers) */
+    matrixAssignButton?: {
+      backgroundColor: string;
+      textColor: string;
+      hoverColor: string;
+    };
+    /** Teacher mapping matrix: teacher name badge (uses theme primary tint) */
+    matrixTeacherBadge?: {
+      backgroundColor: string;
+      textColor: string;
     };
   };
   
@@ -342,6 +359,26 @@ export function generateThemeConfig(
       avatar: {
         backgroundColor: themeColors.primary,
         textColor: isDark ? themeColors.pureBlack : themeColors.pureWhite,
+      },
+      matrixAssignedTeacherButton: (() => {
+        const bg = mixColors(themeColors.primary, '#4caf50', 0.5);
+        return {
+          backgroundColor: bg,
+          textColor: themeColors.pureWhite,
+          hoverColor: darken(bg, 0.15),
+        };
+      })(),
+      matrixAssignButton: (() => {
+        const bg = '#16a34a'; // Solid green for + Assign button (always green)
+        return {
+          backgroundColor: bg,
+          textColor: themeColors.pureWhite,
+          hoverColor: darken(bg, 0.12),
+        };
+      })(),
+      matrixTeacherBadge: {
+        backgroundColor: themeColors.primaryLightest,
+        textColor: themeColors.primaryDark,
       },
     },
     

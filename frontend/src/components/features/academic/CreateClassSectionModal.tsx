@@ -13,7 +13,7 @@ import { useSections } from '@/hooks/useCoreLookups';
 const createClassSectionSchema = z.object({
   classId: z.string().min(1, 'Class is required'),
   sectionId: z.string().min(1, 'Section is required'),
-  capacity: z.number().min(1, 'Capacity must be at least 1'),
+  capacity: z.number().min(1, 'Capacity must be at least 1').optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -45,7 +45,7 @@ export function CreateClassSectionModal({
     initialValues: {
       classId: '',
       sectionId: '',
-      capacity: 30,
+      capacity: undefined as number | undefined,
       isActive: true,
     },
     validate: zodResolver(createClassSectionSchema),
@@ -65,7 +65,7 @@ export function CreateClassSectionModal({
       form.setValues({
         classId: initialClassId,
         sectionId: initialSectionId,
-        capacity: 30,
+        capacity: undefined,
         isActive: true,
       });
     } else if (!opened) {
@@ -79,7 +79,7 @@ export function CreateClassSectionModal({
       await updateClassSection.mutateAsync({
         id: classSection!.id,
         input: {
-          capacity: values.capacity,
+          ...(values.capacity != null && values.capacity > 0 && { capacity: values.capacity }),
           isActive: values.isActive,
         },
       });
@@ -87,7 +87,7 @@ export function CreateClassSectionModal({
       await createClassSection.mutateAsync({
         classId: values.classId,
         sectionId: values.sectionId,
-        capacity: values.capacity,
+        ...(values.capacity != null && values.capacity > 0 && { capacity: values.capacity }),
       });
     }
     form.reset();
@@ -137,10 +137,9 @@ export function CreateClassSectionModal({
             </>
           )}
           <NumberInput
-            label="Capacity"
-            placeholder="Enter capacity"
+            label="Capacity (optional)"
+            placeholder="Leave empty for default"
             min={1}
-            required
             {...form.getInputProps('capacity')}
           />
           <Switch

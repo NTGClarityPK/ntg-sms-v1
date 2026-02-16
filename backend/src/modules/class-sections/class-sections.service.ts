@@ -261,7 +261,7 @@ export class ClassSectionsService {
         section_id: input.sectionId,
         branch_id: branchId,
         academic_year_id: activeYearId,
-        capacity: input.capacity,
+        capacity: input.capacity ?? 30,
       })
       .select('*')
       .single();
