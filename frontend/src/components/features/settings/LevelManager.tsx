@@ -149,7 +149,7 @@ export function LevelManager() {
               <Table.Tr>
                 <Table.Th>Name</Table.Th>
                 <Table.Th>Classes</Table.Th>
-                <Table.Th width={80}>Actions</Table.Th>
+                <Table.Th style={{ width: 80 }}>Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>

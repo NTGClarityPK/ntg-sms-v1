@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, Skeleton, Stack, Title } from '@mantine/core';
+import { Alert, Button, Group, Skeleton, Stack, Text, Title } from '@mantine/core';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useMemo } from 'react';

@@ -170,9 +170,10 @@ export default function UsersPage() {
             </Chip>
             <Chip.Group
               value={statusFilter === undefined ? '' : statusFilter ? 'active' : 'inactive'}
-              onChange={(value: string | null) => {
-                if (value === 'active') setStatusFilter(true);
-                else if (value === 'inactive') setStatusFilter(false);
+              onChange={(value) => {
+                const val = Array.isArray(value) ? value[0] : value;
+                if (val === 'active') setStatusFilter(true);
+                else if (val === 'inactive') setStatusFilter(false);
                 else setStatusFilter(undefined);
                 handleFilterChange();
               }}

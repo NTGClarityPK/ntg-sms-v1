@@ -268,7 +268,6 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
               leftSection={<IconSearch size={16} />}
               value={teacherSearchQuery}
               onChange={(e) => setTeacherSearchQuery(e.currentTarget.value)}
-              clearable
               style={{ minWidth: 200 }}
             />
           </Group>

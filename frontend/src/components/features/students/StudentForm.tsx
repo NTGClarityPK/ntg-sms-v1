@@ -133,7 +133,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         address: student.address || '',
         dateOfBirth: student.dateOfBirth || '',
         gender: student.gender || undefined,
-        studentId: student.studentId || '',
         classId: student.classId || '',
         sectionId: student.sectionId || '',
         bloodGroup: student.bloodGroup || '',
@@ -222,7 +221,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           {isEdit && (
             <TextInput
               label="Student ID"
-              value={form.values.studentId || student?.studentId || ''}
+              value={student?.studentId || ''}
               readOnly
               styles={{ input: { backgroundColor: 'var(--mantine-color-default-hover)' } }}
             />
@@ -307,8 +306,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
                     <Text fw={500}>Emergency Contacts</Text>
                   </Group>
                   {guardians.length === 0 ? (
-                    <Alert color="yellow" size="sm">
-                      No guardians assigned. Add guardians from Parent Associations page.
+                    <Alert color="yellow">
+                      <Text size="sm">No guardians assigned. Add guardians from Parent Associations page.</Text>
                     </Alert>
                   ) : (
                     <Stack gap="xs">

@@ -47,7 +47,7 @@ export function useBranchById(id: string | null | undefined) {
     queryKey: branchesKeys.byId(id || ''),
     queryFn: async () => {
       if (!id) throw new Error('Branch ID is required');
-      const res = await apiClient.get<{ data: BranchDetails }>(`/api/v1/branches/${id}`);
+      const res = await apiClient.get<BranchDetails>(`/api/v1/branches/${id}`);
       return res;
     },
     enabled: !!id,

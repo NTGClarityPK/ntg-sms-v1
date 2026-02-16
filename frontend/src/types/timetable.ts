@@ -93,6 +93,20 @@ export interface ReplicateDayInput {
   subjectTemplateId?: string;
 }
 
+export interface ReplicateAcrossSectionsInput {
+  sourceClassSectionId: string;
+  targetClassSectionIds: string[];
+  academicYearId?: string;
+  subjectTemplateId?: string;
+}
+
+export interface ReplicateFromSectionInput {
+  targetClassSectionId: string;
+  sourceClassSectionId: string;
+  academicYearId?: string;
+  subjectTemplateId?: string;
+}
+
 export interface TimingTemplateInfo {
   templateId: string;
   templateName: string;

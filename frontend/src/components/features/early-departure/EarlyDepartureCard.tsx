@@ -14,6 +14,7 @@ const statusColorMap: Record<EarlyDepartureRequest['status'], string> = {
   approved: 'green',
   rejected: 'red',
   cancelled: 'gray',
+  excused: 'blue',
 };
 
 export function EarlyDepartureCard({

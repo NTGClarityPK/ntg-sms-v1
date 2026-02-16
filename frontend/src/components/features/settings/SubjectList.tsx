@@ -108,7 +108,7 @@ export function SubjectList() {
               <Table.Tr>
                 <Table.Th>Name</Table.Th>
                 <Table.Th>Code</Table.Th>
-                <Table.Th width={80}>Actions</Table.Th>
+                <Table.Th style={{ width: 80 }}>Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>

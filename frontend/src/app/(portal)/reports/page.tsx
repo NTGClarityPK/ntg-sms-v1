@@ -160,13 +160,13 @@ export default function ReportsPage() {
                     )}
                   </Group>
                   <Chip.Group
-                    className="filter-chip-group"
                     value={periodType === ReportPeriodType.CUSTOM ? 'custom' : periodChip}
                     onChange={(v) => {
-                      if (v === 'custom') {
+                      const value = Array.isArray(v) ? v[0] : v;
+                      if (value === 'custom') {
                         setPeriodType(ReportPeriodType.CUSTOM);
                       } else {
-                        setPeriodChip(v ?? 'year');
+                        setPeriodChip(value ?? 'year');
                         setPeriodType(null);
                         setStartDate(null);
                         setEndDate(null);

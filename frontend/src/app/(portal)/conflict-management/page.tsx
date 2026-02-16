@@ -78,11 +78,11 @@ export default function ConflictManagementPage() {
 
   const conflicts = conflictsData?.data || [];
   const classSections = classSectionsData?.data || [];
-  const staff = staffData?.data || [];
+  const staff = staffData?.data?.data || [];
   const academicYears = academicYearsData?.data || [];
 
   // Set default academic year to active year
-  const effectiveAcademicYearId = selectedAcademicYearId || activeYear?.id || null;
+  const effectiveAcademicYearId = selectedAcademicYearId || activeYear?.data?.id || null;
 
   // Format options for selects
   const classSectionOptions = classSections.map((cs) => ({

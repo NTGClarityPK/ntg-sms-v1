@@ -8,6 +8,8 @@ import type {
   CreateTimetableSlotInput,
   GenerateTimetableInput,
   ReplicateDayInput,
+  ReplicateAcrossSectionsInput,
+  ReplicateFromSectionInput,
   TimingTemplateInfo,
 } from '@/types/timetable';
 import { useAuth } from './useAuth';
@@ -36,9 +38,9 @@ export function useClassTimetable(
       );
       return response;
     },
-    // Only enable query if we have classSectionId, branchId, AND subjectTemplateId
-    // This prevents the query from running before a template is selected
-    enabled: !!classSectionId && !!branchId && !!subjectTemplateId,
+    // Enable query if we have classSectionId and branchId
+    // subjectTemplateId is optional - if not provided, shows all slots regardless of template
+    enabled: !!classSectionId && !!branchId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
@@ -352,6 +354,88 @@ export function useReplicateDay() {
       notifications.show({
         title: 'Error',
         message: message || 'Failed to replicate slots',
+        color: notifyColors.error,
+      });
+    },
+  });
+}
+
+export function useReplicateAcrossSections() {
+  const queryClient = useQueryClient();
+  const notifyColors = useThemeColors();
+
+  return useMutation({
+    mutationFn: async (input: ReplicateAcrossSectionsInput) => {
+      const response = await apiClient.post<{ slotsReplicated: number }>(
+        '/api/v1/timetable/replicate-across-sections',
+        input,
+      );
+      return response.data;
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate timetable queries for all affected sections
+      queryClient.invalidateQueries({
+        queryKey: ['timetable', 'class', variables.sourceClassSectionId],
+      });
+      variables.targetClassSectionIds.forEach((sectionId) => {
+        queryClient.invalidateQueries({
+          queryKey: ['timetable', 'class', sectionId],
+        });
+      });
+      // Invalidate conflicts
+      queryClient.invalidateQueries({ queryKey: ['timetable', 'conflicts'] });
+      notifications.show({
+        title: 'Success',
+        message: `Replicated ${data.slotsReplicated} slots to ${variables.targetClassSectionIds.length} section(s)`,
+        color: notifyColors.success,
+      });
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      notifications.show({
+        title: 'Error',
+        message: message || 'Failed to replicate timetable across sections',
+        color: notifyColors.error,
+      });
+    },
+  });
+}
+
+export function useReplicateFromSection() {
+  const queryClient = useQueryClient();
+  const notifyColors = useThemeColors();
+
+  return useMutation({
+    mutationFn: async (input: ReplicateFromSectionInput) => {
+      const response = await apiClient.post<{ slotsReplicated: number }>(
+        '/api/v1/timetable/replicate-from-section',
+        input,
+      );
+      return response.data;
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate timetable queries for both sections
+      queryClient.invalidateQueries({
+        queryKey: ['timetable', 'class', variables.targetClassSectionId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['timetable', 'class', variables.sourceClassSectionId],
+      });
+      // Invalidate conflicts
+      queryClient.invalidateQueries({ queryKey: ['timetable', 'conflicts'] });
+      notifications.show({
+        title: 'Success',
+        message: `Copied ${data.slotsReplicated} slots from source section`,
+        color: notifyColors.success,
+      });
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      notifications.show({
+        title: 'Error',
+        message: message || 'Failed to copy timetable from section',
         color: notifyColors.error,
       });
     },
