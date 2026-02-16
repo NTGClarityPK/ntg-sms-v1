@@ -127,9 +127,15 @@ export class StudentsService {
     // Don't filter by student_id in DB query when searching - we'll filter by name client-side
     // This allows searching by both student_id and full_name
     // Note: We fetch more records than needed when searching, then filter client-side
-    const searchQuery = query.search;
-    const fetchLimit = searchQuery ? 1000 : limit; // Fetch more when searching to allow client-side filtering
-    const fetchTo = searchQuery ? from + fetchLimit - 1 : to;
+    // Multi-term search: space-delimited words are OR'd (e.g. "Ma Mu" => name contains "Ma" OR "Mu")
+    const searchTerms = (query.search ?? '')
+      .trim()
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const hasSearch = searchTerms.length > 0;
+    const fetchLimit = hasSearch ? 1000 : limit; // Fetch more when searching to allow client-side filtering
+    const fetchTo = hasSearch ? from + fetchLimit - 1 : to;
 
     let dbQueryWithLimit = dbQuery.range(from, fetchTo);
 
@@ -148,9 +154,16 @@ export class StudentsService {
       .select('id, full_name')
       .in('id', userIds);
 
-    if (searchQuery && userIds.length > 0) {
-      // Filter profiles by full_name in database for better performance
-      profilesQuery = profilesQuery.ilike('full_name', `%${searchQuery}%`);
+    if (hasSearch && userIds.length > 0) {
+      // Filter profiles by full_name: one term = single ilike; multiple terms = OR (any term matches)
+      if (searchTerms.length === 1) {
+        profilesQuery = profilesQuery.ilike('full_name', `%${searchTerms[0]}%`);
+      } else {
+        const orFilter = searchTerms
+          .map((t) => `full_name.ilike.%${t}%`)
+          .join(',');
+        profilesQuery = profilesQuery.or(orFilter);
+      }
     }
 
     const { data: profilesData } = userIds.length > 0
@@ -220,7 +233,7 @@ export class StudentsService {
     }>)
       .filter((row) => {
         // Filter by profile match when searching (profiles already filtered in DB)
-        if (searchQuery && !profileMap.has(row.user_id)) {
+        if (hasSearch && !profileMap.has(row.user_id)) {
           return false;
         }
         return true;
@@ -255,24 +268,27 @@ export class StudentsService {
         });
       });
 
-    // Apply search filter on student_id and full_name (case-insensitive)
-    if (searchQuery) {
-      const searchLower = searchQuery.toLowerCase();
-      students = students.filter(
-        (s) =>
-          s.studentId.toLowerCase().includes(searchLower) ||
-          s.fullName?.toLowerCase().includes(searchLower) ||
-          s.email?.toLowerCase().includes(searchLower),
+    // Apply search filter on student_id, full_name, email (case-insensitive)
+    // Multi-term: match if ANY term appears in id, name, or email (OR)
+    if (hasSearch) {
+      const termsLower = searchTerms.map((t) => t.toLowerCase());
+      students = students.filter((s) =>
+        termsLower.some(
+          (term) =>
+            s.studentId.toLowerCase().includes(term) ||
+            s.fullName?.toLowerCase().includes(term) ||
+            (s.email?.toLowerCase().includes(term) ?? false),
+        ),
       );
     }
 
     // Calculate total and pagination
     // When searching, total is the filtered count; otherwise use DB count
-    const total = searchQuery ? students.length : (count ?? 0);
+    const total = hasSearch ? students.length : (count ?? 0);
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     // Apply pagination to filtered results when searching
-    if (searchQuery) {
+    if (hasSearch) {
       students = students.slice(from, from + limit);
     }
 

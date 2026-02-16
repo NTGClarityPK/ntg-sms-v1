@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Group,
   Title,
-  Tabs,
   Stack,
   Paper,
   Text,
@@ -12,6 +11,7 @@ import {
   Button,
   Table,
   Skeleton,
+  Chip,
 } from '@mantine/core';
 import { IconBell, IconChecks } from '@tabler/icons-react';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '@/hooks/useNotifications';
@@ -22,7 +22,7 @@ import type { Notification } from '@/types/notifications';
 export default function NotificationsPage() {
   const router = useRouter();
   const notifyColors = useThemeColors();
-  const [activeTab, setActiveTab] = useState<string | null>('all');
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
 
@@ -31,13 +31,25 @@ export default function NotificationsPage() {
   });
 
   // allNotificationsData is ApiResponse<Notification[]> | null
-  // which is { data: Notification[], meta?: {...} } | null
-  const allNotifications: Notification[] = allNotificationsData 
-    ? (allNotificationsData as unknown as { data: Notification[] }).data 
+  const allNotifications: Notification[] = allNotificationsData
+    ? (allNotificationsData as unknown as { data: Notification[] }).data
     : [];
-  const unreadNotifications = allNotifications.filter((n) => !n.isRead);
-  const readNotifications = allNotifications.filter((n) => n.isRead);
-  const attendanceNotifications = allNotifications.filter((n) => n.type === 'attendance');
+
+  const unreadCount = allNotifications.filter((n) => !n.isRead).length;
+  const readCount = allNotifications.filter((n) => n.isRead).length;
+  const attendanceCount = allNotifications.filter((n) => n.type === 'attendance').length;
+
+  const filteredNotifications = useMemo(() => {
+    if (selectedFilters.length === 0) return allNotifications;
+    return allNotifications.filter((n) =>
+      selectedFilters.some(
+        (f) =>
+          (f === 'unread' && !n.isRead) ||
+          (f === 'read' && n.isRead) ||
+          (f === 'attendance' && n.type === 'attendance'),
+      ),
+    );
+  }, [allNotifications, selectedFilters]);
 
   const getTypeColor = (type: Notification['type']) => {
     switch (type) {
@@ -177,7 +189,7 @@ export default function NotificationsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Notifications</Title>
-          {unreadNotifications.length > 0 && (
+          {unreadCount > 0 && (
             <Button
               leftSection={<IconChecks size={18} />}
               onClick={() => markAllAsRead.mutate()}
@@ -199,38 +211,33 @@ export default function NotificationsPage() {
         }}
       >
         <Paper withBorder p="md">
-          <Tabs value={activeTab} onChange={setActiveTab}>
-            <Tabs.List>
-              <Tabs.Tab value="all">
+          {/* Multiselect filter chips (RMS New Order / Orders screen reference) */}
+          <Paper p="sm" withBorder mb="md">
+            <Group gap="xs" wrap="wrap" className="filter-chip-group">
+              <Chip
+                checked={selectedFilters.length === 0}
+                onChange={() => setSelectedFilters([])}
+                variant="filled"
+              >
                 All ({allNotifications.length})
-              </Tabs.Tab>
-              <Tabs.Tab value="unread">
-                Unread ({unreadNotifications.length})
-              </Tabs.Tab>
-              <Tabs.Tab value="read">
-                Read ({readNotifications.length})
-              </Tabs.Tab>
-              <Tabs.Tab value="attendance">
-                Attendance ({attendanceNotifications.length})
-              </Tabs.Tab>
-            </Tabs.List>
+              </Chip>
+              <Chip.Group multiple value={selectedFilters} onChange={setSelectedFilters}>
+                <Group gap="xs" wrap="wrap">
+                  <Chip value="unread" variant="filled">
+                    Unread ({unreadCount})
+                  </Chip>
+                  <Chip value="read" variant="filled">
+                    Read ({readCount})
+                  </Chip>
+                  <Chip value="attendance" variant="filled">
+                    Attendance ({attendanceCount})
+                  </Chip>
+                </Group>
+              </Chip.Group>
+            </Group>
+          </Paper>
 
-            <Tabs.Panel value="all" pt="md">
-              {renderNotificationsTable(allNotifications, isLoadingAll)}
-            </Tabs.Panel>
-
-            <Tabs.Panel value="unread" pt="md">
-              {renderNotificationsTable(unreadNotifications, isLoadingAll)}
-            </Tabs.Panel>
-
-            <Tabs.Panel value="read" pt="md">
-              {renderNotificationsTable(readNotifications, isLoadingAll)}
-            </Tabs.Panel>
-
-            <Tabs.Panel value="attendance" pt="md">
-              {renderNotificationsTable(attendanceNotifications, isLoadingAll)}
-            </Tabs.Panel>
-          </Tabs>
+          {renderNotificationsTable(filteredNotifications, isLoadingAll)}
         </Paper>
       </div>
     </>
