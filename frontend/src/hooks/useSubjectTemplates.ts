@@ -164,6 +164,19 @@ export function useAssignLevelsToTemplate() {
   });
 }
 
+export function useClassesWithTemplates(branchId: string | null) {
+  return useQuery<string[]>({
+    queryKey: ['subject-templates', 'classes-with-templates', branchId],
+    queryFn: async () => {
+      const response = await apiClient.get<{ data: string[] }>(`/api/v1/subject-templates/classes-with-templates`);
+      const data = response?.data;
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!branchId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
 export function useTemplatesForClass(classId: string | null, branchId: string | null) {
   return useQuery<SubjectTemplateListResponse>({
     queryKey: ['subject-templates', 'class', classId, branchId],

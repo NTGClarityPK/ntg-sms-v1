@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { CreateSubjectTemplateDto } from './dto/create-subject-template.dto';
 import { UpdateSubjectTemplateDto } from './dto/update-subject-template.dto';
 import { SubjectTemplateDto } from './dto/subject-template.dto';
@@ -70,12 +71,16 @@ function mapSubjectTemplate(
 
 @Injectable()
 export class SubjectTemplatesService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async createSubjectTemplate(
     input: CreateSubjectTemplateDto,
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<SubjectTemplateDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -94,6 +99,15 @@ export class SubjectTemplatesService {
     if (!template) throw new BadRequestException('Failed to create subject template');
 
     const templateRow = template as SubjectTemplateRow;
+    this.auditLogService
+      .logCreate(
+        'subject_templates',
+        templateRow.id,
+        userEmail,
+        { ...templateRow } as Record<string, unknown>,
+        { branchId, tenantId },
+      )
+      .catch(() => {});
 
     // Create subject associations if provided
     if (input.subjectIds && input.subjectIds.length > 0) {
@@ -105,6 +119,15 @@ export class SubjectTemplatesService {
 
       const { error: subjectsError } = await supabase.from('subject_template_subjects').insert(subjectsToInsert);
       throwIfDbError(subjectsError);
+      for (const row of subjectsToInsert) {
+        const recordId = `${row.subject_template_id}_${row.subject_id}`;
+        this.auditLogService
+          .logCreate('subject_template_subjects', recordId, userEmail, { ...row } as Record<string, unknown>, {
+            branchId,
+            tenantId,
+          })
+          .catch(() => {});
+      }
     }
 
     // Fetch related data in parallel for response
@@ -134,18 +157,20 @@ export class SubjectTemplatesService {
     id: string,
     input: UpdateSubjectTemplateDto,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<SubjectTemplateDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Verify template exists and belongs to branch
-    const { data: existing, error: checkError } = await supabase
+    // Verify template exists and get full row for audit
+    const { data: oldRow, error: checkError } = await supabase
       .from('subject_templates')
-      .select('id')
+      .select('id, name, description, branch_id, tenant_id, created_at, updated_at')
       .eq('id', id)
       .eq('branch_id', branchId)
-      .maybeSingle();
+      .single();
     throwIfDbError(checkError);
-    if (!existing) throw new NotFoundException('Subject template not found');
+    if (!oldRow) throw new NotFoundException('Subject template not found');
 
     // Update template fields
     const updateData: Partial<SubjectTemplateRow> = {};
@@ -153,11 +178,27 @@ export class SubjectTemplatesService {
     if (input.description !== undefined) updateData.description = input.description ?? null;
 
     if (Object.keys(updateData).length > 0) {
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from('subject_templates')
-        .update(updateData)
-        .eq('id', id);
+        .update({ ...updateData, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('id, name, description, branch_id, tenant_id, created_at, updated_at')
+        .single();
       throwIfDbError(updateError);
+      if (updated) {
+        const changedFields = Object.keys(updateData) as string[];
+        this.auditLogService
+          .logUpdate(
+            'subject_templates',
+            id,
+            userEmail,
+            oldRow as Record<string, unknown>,
+            updated as Record<string, unknown>,
+            changedFields,
+            { branchId, tenantId },
+          )
+          .catch(() => {});
+      }
     }
 
     // Update subjects if provided (delete old + insert new)
@@ -212,18 +253,23 @@ export class SubjectTemplatesService {
     return mapSubjectTemplate(templateRow, subjectIds, assignedClassIds, assignedLevelIds);
   }
 
-  async deleteSubjectTemplate(id: string, branchId: string): Promise<{ data: { id: string } }> {
+  async deleteSubjectTemplate(
+    id: string,
+    branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
+  ): Promise<{ data: { id: string } }> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Verify template exists and belongs to branch
-    const { data: existing, error: checkError } = await supabase
+    // Verify template exists and get full row for audit
+    const { data: oldRow, error: checkError } = await supabase
       .from('subject_templates')
-      .select('id')
+      .select('id, name, description, branch_id, tenant_id, created_at, updated_at')
       .eq('id', id)
       .eq('branch_id', branchId)
-      .maybeSingle();
+      .single();
     throwIfDbError(checkError);
-    if (!existing) throw new NotFoundException('Subject template not found');
+    if (!oldRow) throw new NotFoundException('Subject template not found');
 
     // Check if template is in use (students or timetable slots) using aggregation
     const [studentsCount, slotsCount] = await Promise.all([
@@ -247,6 +293,13 @@ export class SubjectTemplatesService {
     // Delete template (cascade will handle related records)
     const { error: deleteError } = await supabase.from('subject_templates').delete().eq('id', id);
     throwIfDbError(deleteError);
+
+    this.auditLogService
+      .logDelete('subject_templates', id, userEmail, oldRow as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
 
     return { data: { id } };
   }
@@ -375,7 +428,13 @@ export class SubjectTemplatesService {
     return mapSubjectTemplate(templateRow, subjectIds, assignedClassIds, assignedLevelIds);
   }
 
-  async assignClassesToTemplate(templateId: string, classIds: string[], branchId: string): Promise<{ data: string[] }> {
+  async assignClassesToTemplate(
+    templateId: string,
+    classIds: string[],
+    branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
+  ): Promise<{ data: string[] }> {
     const supabase = this.supabaseConfig.getClient();
 
     // Verify template exists
@@ -405,14 +464,34 @@ export class SubjectTemplatesService {
       }
     }
 
+    // Fetch existing assignments for audit before delete
+    const { data: oldAssignments } = await supabase
+      .from('class_subject_template_assignments')
+      .select('class_id, subject_template_id, branch_id')
+      .eq('subject_template_id', templateId)
+      .eq('branch_id', branchId);
+    const oldRows = (oldAssignments ?? []) as Array<{
+      class_id: string;
+      subject_template_id: string;
+      branch_id: string;
+    }>;
+
     // Delete existing assignments for THIS template only, then insert new ones
-    // This allows multiple templates to be assigned to the same class
     const { error: deleteError } = await supabase
       .from('class_subject_template_assignments')
       .delete()
       .eq('subject_template_id', templateId)
       .eq('branch_id', branchId);
     throwIfDbError(deleteError);
+
+    for (const row of oldRows) {
+      const recordId = `${row.subject_template_id}_${row.class_id}_${row.branch_id}`;
+      this.auditLogService
+        .logDelete('class_subject_template_assignments', recordId, userEmail, {
+          ...row,
+        } as Record<string, unknown>, { branchId, tenantId })
+        .catch(() => {});
+    }
 
     // Insert new assignments if any classes provided
     if (uniqueClassIds.length > 0) {
@@ -424,12 +503,26 @@ export class SubjectTemplatesService {
 
       const { error: insertError } = await supabase.from('class_subject_template_assignments').insert(assignmentsToInsert);
       throwIfDbError(insertError);
+      for (const row of assignmentsToInsert) {
+        const recordId = `${row.subject_template_id}_${row.class_id}_${row.branch_id}`;
+        this.auditLogService
+          .logCreate('class_subject_template_assignments', recordId, userEmail, {
+            ...row,
+          } as Record<string, unknown>, { branchId, tenantId })
+          .catch(() => {});
+      }
     }
 
     return { data: uniqueClassIds };
   }
 
-  async assignLevelsToTemplate(templateId: string, levelIds: string[], branchId: string): Promise<{ data: string[] }> {
+  async assignLevelsToTemplate(
+    templateId: string,
+    levelIds: string[],
+    branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
+  ): Promise<{ data: string[] }> {
     const supabase = this.supabaseConfig.getClient();
 
     // Verify template exists
@@ -459,14 +552,34 @@ export class SubjectTemplatesService {
       }
     }
 
+    // Fetch existing assignments for audit before delete
+    const { data: oldAssignments } = await supabase
+      .from('level_subject_template_assignments')
+      .select('level_id, subject_template_id, branch_id')
+      .eq('subject_template_id', templateId)
+      .eq('branch_id', branchId);
+    const oldRows = (oldAssignments ?? []) as Array<{
+      level_id: string;
+      subject_template_id: string;
+      branch_id: string;
+    }>;
+
     // Delete existing assignments for THIS template only, then insert new ones
-    // This allows multiple templates to be assigned to the same level
     const { error: deleteError } = await supabase
       .from('level_subject_template_assignments')
       .delete()
       .eq('subject_template_id', templateId)
       .eq('branch_id', branchId);
     throwIfDbError(deleteError);
+
+    for (const row of oldRows) {
+      const recordId = `${row.subject_template_id}_${row.level_id}_${row.branch_id}`;
+      this.auditLogService
+        .logDelete('level_subject_template_assignments', recordId, userEmail, {
+          ...row,
+        } as Record<string, unknown>, { branchId, tenantId })
+        .catch(() => {});
+    }
 
     // Insert new assignments if any levels provided
     if (uniqueLevelIds.length > 0) {
@@ -478,9 +591,29 @@ export class SubjectTemplatesService {
 
       const { error: insertError } = await supabase.from('level_subject_template_assignments').insert(assignmentsToInsert);
       throwIfDbError(insertError);
+      for (const row of assignmentsToInsert) {
+        const recordId = `${row.subject_template_id}_${row.level_id}_${row.branch_id}`;
+        this.auditLogService
+          .logCreate('level_subject_template_assignments', recordId, userEmail, {
+            ...row,
+          } as Record<string, unknown>, { branchId, tenantId })
+          .catch(() => {});
+      }
     }
 
     return { data: uniqueLevelIds };
+  }
+
+  async getClassIdsWithTemplates(branchId: string): Promise<{ data: string[] }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('class_subject_template_assignments')
+      .select('class_id')
+      .eq('branch_id', branchId);
+    throwIfDbError(error);
+    const rows = (data as { class_id: string }[]) ?? [];
+    const classIds = Array.from(new Set(rows.map((r) => r.class_id)));
+    return { data: classIds };
   }
 
   async getTemplatesForClass(classId: string, branchId: string): Promise<{ data: SubjectTemplateDto[] }> {
@@ -672,6 +805,8 @@ export class SubjectTemplatesService {
     subjectTemplateId: string,
     academicYearId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<{ data: SubjectTemplateDto }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -729,6 +864,19 @@ export class SubjectTemplatesService {
       .single();
     throwIfDbError(upsertError);
 
+    if (assignment) {
+      const row = assignment as StudentSubjectTemplateAssignmentRow;
+      this.auditLogService
+        .logCreate(
+          'student_subject_template_assignments',
+          row.id,
+          userEmail,
+          { ...row } as Record<string, unknown>,
+          { branchId, tenantId },
+        )
+        .catch(() => {});
+    }
+
     // Return full template
     return { data: await this.getSubjectTemplateById(subjectTemplateId, branchId) };
   }
@@ -761,8 +909,19 @@ export class SubjectTemplatesService {
     studentId: string,
     academicYearId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<{ data: { studentId: string; academicYearId: string } }> {
     const supabase = this.supabaseConfig.getClient();
+
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('student_subject_template_assignments')
+      .select('id, student_id, subject_template_id, academic_year_id, branch_id, created_at, updated_at')
+      .eq('student_id', studentId)
+      .eq('academic_year_id', academicYearId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
 
     const { error: deleteError } = await supabase
       .from('student_subject_template_assignments')
@@ -771,6 +930,18 @@ export class SubjectTemplatesService {
       .eq('academic_year_id', academicYearId)
       .eq('branch_id', branchId);
     throwIfDbError(deleteError);
+
+    if (oldRow) {
+      this.auditLogService
+        .logDelete(
+          'student_subject_template_assignments',
+          (oldRow as { id: string }).id,
+          userEmail,
+          oldRow as Record<string, unknown>,
+          { branchId, tenantId },
+        )
+        .catch(() => {});
+    }
 
     return { data: { studentId, academicYearId } };
   }

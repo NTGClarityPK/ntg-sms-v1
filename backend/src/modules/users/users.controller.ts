@@ -13,7 +13,10 @@ import {
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
-import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
+import {
+  CurrentBranch,
+  CurrentBranchContext,
+} from '../../common/decorators/current-branch.decorator';
 import {
   CurrentUser,
   CurrentUserPayload,
@@ -99,11 +102,16 @@ export class UsersController {
   @Post()
   async createUser(
     @Body() input: CreateUserDto,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'user_management');
-    const data = await this.usersService.createUser(input, branch.branchId);
+    const data = await this.usersService.createUser(
+      input,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data };
   }
 
@@ -111,11 +119,17 @@ export class UsersController {
   async updateUser(
     @Param('id') id: string,
     @Body() input: UpdateUserDto,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'user_management');
-    const data = await this.usersService.updateUser(id, input, branch.branchId);
+    const data = await this.usersService.updateUser(
+      id,
+      input,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data };
   }
 
@@ -123,22 +137,33 @@ export class UsersController {
   async updateUserRoles(
     @Param('id') id: string,
     @Body() input: UpdateUserRolesDto,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'user_management');
-    const data = await this.usersService.updateUserRoles(id, input, branch.branchId);
+    const data = await this.usersService.updateUserRoles(
+      id,
+      input,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data };
   }
 
   @Delete(':id')
   async deleteUser(
     @Param('id') id: string,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'user_management');
-    await this.usersService.deleteUser(id, branch.branchId);
+    await this.usersService.deleteUser(
+      id,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data: { success: true } };
   }
 }

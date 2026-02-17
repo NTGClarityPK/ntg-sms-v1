@@ -143,6 +143,7 @@ export class AssessmentsController {
       id,
       body,
       branch.branchId,
+      user.id,
       user.email,
     );
     return { data: updated };
@@ -158,6 +159,7 @@ export class AssessmentsController {
     const result = await this.assessmentsService.deleteAssessment(
       id,
       branch.branchId,
+      user.email,
     );
     return { data: result };
   }
@@ -326,7 +328,11 @@ export class AssessmentsController {
       ...body,
       assessmentId: id,
     };
-    const attachment = await this.assessmentsService.createAssessmentAttachment(dto, branch.branchId);
+    const attachment = await this.assessmentsService.createAssessmentAttachment(
+      dto,
+      branch.branchId,
+      user.email,
+    );
     return { data: attachment };
   }
 
@@ -340,7 +346,11 @@ export class AssessmentsController {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: { id: string } }> {
     await this.ensureAssessmentEditAccess(user, branch.branchId);
-    const result = await this.assessmentsService.deleteAssessmentAttachment(attachmentId, branch.branchId);
+    const result = await this.assessmentsService.deleteAssessmentAttachment(
+      attachmentId,
+      branch.branchId,
+      user.email,
+    );
     return { data: result };
   }
 

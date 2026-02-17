@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { QueryAssessmentTypesDto } from './dto/query-assessment-types.dto';
 import { AssessmentTypeDto } from './dto/assessment-type.dto';
 import { GradeTemplateDto } from './dto/grade-template.dto';
@@ -139,7 +140,10 @@ function validateRanges(ranges: Array<{ letter: string; minPercentage: number; m
 
 @Injectable()
 export class AssessmentService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async listAssessmentTypes(
     query: QueryAssessmentTypesDto,
@@ -176,6 +180,7 @@ export class AssessmentService {
     input: { name: string; nameAr?: string; isActive?: boolean; sortOrder?: number },
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<AssessmentTypeDto> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
@@ -191,13 +196,22 @@ export class AssessmentService {
       .select('*')
       .single();
     throwIfDbError(error);
-    return mapAssessmentType(data as AssessmentTypeRow);
+    const row = data as AssessmentTypeRow;
+    this.auditLogService
+      .logCreate('assessment_types', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
+    return mapAssessmentType(row);
   }
 
   async updateAssessmentType(
     id: string,
     input: { name?: string; nameAr?: string; isActive?: boolean; sortOrder?: number },
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<AssessmentTypeDto> {
     const supabase = this.supabaseConfig.getClient();
     const updates: Partial<AssessmentTypeRow> = {};
@@ -205,16 +219,16 @@ export class AssessmentService {
     if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('assessment_types')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('Assessment type not found');
     if (Object.keys(updates).length === 0) {
-      const { data: existing, error: fetchError } = await supabase
-        .from('assessment_types')
-        .select('*')
-        .eq('id', id)
-        .eq('branch_id', branchId)
-        .maybeSingle();
-      throwIfDbError(fetchError);
-      if (!existing) throw new NotFoundException('Assessment type not found');
-      return mapAssessmentType(existing as AssessmentTypeRow);
+      return mapAssessmentType(oldRow as AssessmentTypeRow);
     }
     const { data, error } = await supabase
       .from('assessment_types')
@@ -225,6 +239,18 @@ export class AssessmentService {
       .maybeSingle();
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Assessment type not found');
+    const changedFields = Object.keys(updates) as string[];
+    this.auditLogService
+      .logUpdate(
+        'assessment_types',
+        id,
+        userEmail,
+        oldRow as Record<string, unknown>,
+        data as Record<string, unknown>,
+        changedFields,
+        { branchId, tenantId },
+      )
+      .catch(() => {});
     return mapAssessmentType(data as AssessmentTypeRow);
   }
 
@@ -263,6 +289,7 @@ export class AssessmentService {
     input: { name: string; ranges: Array<{ letter: string; minPercentage: number; maxPercentage: number; sortOrder: number }> },
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<GradeTemplateDto> {
     validateRanges(input.ranges);
 
@@ -275,6 +302,12 @@ export class AssessmentService {
     throwIfDbError(tError);
 
     const templateRow = template as GradeTemplateRow;
+    this.auditLogService
+      .logCreate('grade_templates', templateRow.id, userEmail, { ...templateRow } as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
 
     const payload = input.ranges.map((r) => ({
       grade_template_id: templateRow.id,
@@ -286,12 +319,26 @@ export class AssessmentService {
 
     const { data: insertedRanges, error: rError } = await supabase.from('grade_ranges').insert(payload).select('*');
     throwIfDbError(rError);
+    for (const r of (insertedRanges as GradeRangeRow[]) ?? []) {
+      this.auditLogService
+        .logCreate('grade_ranges', r.id, userEmail, { ...r } as Record<string, unknown>, {
+          branchId,
+          tenantId,
+        })
+        .catch(() => {});
+    }
 
     const ranges = ((insertedRanges as GradeRangeRow[]) ?? []).map(mapGradeRange).sort((a, b) => a.sortOrder - b.sortOrder);
     return mapGradeTemplate(templateRow, ranges);
   }
 
-  async updateGradeTemplate(id: string, input: { name?: string; ranges?: Array<{ id?: string; letter: string; minPercentage: number; maxPercentage: number; sortOrder: number }> }): Promise<GradeTemplateDto> {
+  async updateGradeTemplate(
+    id: string,
+    input: { name?: string; ranges?: Array<{ id?: string; letter: string; minPercentage: number; maxPercentage: number; sortOrder: number }> },
+    branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
+  ): Promise<GradeTemplateDto> {
     const supabase = this.supabaseConfig.getClient();
     const { data: existing, error: eError } = await supabase.from('grade_templates').select('*').eq('id', id).single();
     if (eError || !existing) throw new NotFoundException('Grade template not found');
@@ -299,8 +346,26 @@ export class AssessmentService {
     const existingRow = existing as GradeTemplateRow;
 
     if (input.name && input.name.trim() !== existingRow.name) {
-      const { error: uError } = await supabase.from('grade_templates').update({ name: input.name.trim() }).eq('id', id);
+      const { data: updated, error: uError } = await supabase
+        .from('grade_templates')
+        .update({ name: input.name.trim() })
+        .eq('id', id)
+        .select('*')
+        .single();
       throwIfDbError(uError);
+      if (updated) {
+        this.auditLogService
+          .logUpdate(
+            'grade_templates',
+            id,
+            userEmail,
+            existingRow as Record<string, unknown>,
+            updated as Record<string, unknown>,
+            ['name'],
+            { branchId, tenantId },
+          )
+          .catch(() => {});
+      }
     }
 
     if (input.ranges) {
@@ -341,17 +406,20 @@ export class AssessmentService {
     return mapGradeTemplate({ ...existingRow, name: input.name?.trim() ?? existingRow.name }, ((ranges as GradeRangeRow[]) ?? []).map(mapGradeRange));
   }
 
-  async deleteGradeTemplate(id: string): Promise<{ id: string }> {
+  async deleteGradeTemplate(
+    id: string,
+    userEmail: string,
+    branchId?: string,
+    tenantId?: string | null,
+  ): Promise<{ id: string }> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Ensure template exists
-    const { data: existing, error: eError } = await supabase.from('grade_templates').select('id').eq('id', id).maybeSingle();
+    const { data: oldRow, error: eError } = await supabase.from('grade_templates').select('*').eq('id', id).maybeSingle();
     throwIfDbError(eError);
-    if (!existing) {
+    if (!oldRow) {
       throw new NotFoundException('Grade template not found');
     }
 
-    // Prevent deleting templates that are assigned to classes
     const { data: assignments, error: aError } = await supabase
       .from('class_grade_assignments')
       .select('id')
@@ -368,6 +436,13 @@ export class AssessmentService {
 
     const { error: delTemplateError } = await supabase.from('grade_templates').delete().eq('id', id);
     throwIfDbError(delTemplateError);
+
+    this.auditLogService
+      .logDelete('grade_templates', id, userEmail, oldRow as Record<string, unknown>, {
+        branchId: branchId ?? null,
+        tenantId: tenantId ?? null,
+      })
+      .catch(() => {});
 
     return { id };
   }
@@ -501,7 +576,13 @@ export class AssessmentService {
     return { data: { academicYearId, annualQuota: row?.annual_quota ?? 0 } };
   }
 
-  async setLeaveQuota(academicYearId: string, annualQuota: number): Promise<{ data: { academicYearId: string; annualQuota: number } }> {
+  async setLeaveQuota(
+    academicYearId: string,
+    annualQuota: number,
+    userEmail: string,
+    branchId?: string | null,
+    tenantId?: string | null,
+  ): Promise<{ data: { academicYearId: string; annualQuota: number } }> {
     if (annualQuota < 0) throw new BadRequestException('annualQuota must be >= 0');
 
     const supabase = this.supabaseConfig.getClient();
@@ -509,10 +590,36 @@ export class AssessmentService {
     throwIfDbError(yError);
     if (!year) throw new NotFoundException('Academic year not found');
 
-    const { error } = await supabase
+    const { data: oldRow } = await supabase
       .from('leave_settings')
-      .upsert({ academic_year_id: academicYearId, annual_quota: annualQuota }, { onConflict: 'academic_year_id' });
+      .select('*')
+      .eq('academic_year_id', academicYearId)
+      .maybeSingle();
+
+    const { data: newRow, error } = await supabase
+      .from('leave_settings')
+      .upsert(
+        { academic_year_id: academicYearId, annual_quota: annualQuota, updated_at: new Date().toISOString() },
+        { onConflict: 'academic_year_id' },
+      )
+      .select('*')
+      .single();
     throwIfDbError(error);
+
+    if (newRow) {
+      const recordId = (newRow as { id?: string; academic_year_id: string }).id ?? academicYearId;
+      this.auditLogService
+        .logUpdate(
+          'leave_settings',
+          recordId,
+          userEmail,
+          (oldRow ?? {}) as Record<string, unknown>,
+          newRow as Record<string, unknown>,
+          ['annual_quota'],
+          { branchId: branchId ?? undefined, tenantId: tenantId ?? undefined },
+        )
+        .catch(() => {});
+    }
 
     return { data: { academicYearId, annualQuota } };
   }

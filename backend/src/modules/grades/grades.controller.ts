@@ -96,7 +96,7 @@ export class GradesController {
     @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{ data: StudentGradeDto }> {
     await this.ensureAssessmentEditAccess(user, branch.branchId);
-    const created = await this.gradesService.createGrade(dto, user.id, branch.branchId);
+    const created = await this.gradesService.createGrade(dto, user.id, branch.branchId, user.email);
     return { data: created };
   }
 
@@ -124,7 +124,7 @@ export class GradesController {
     @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{ data: StudentGradeDto }> {
     await this.ensureAssessmentEditAccess(user, branch.branchId);
-    const updated = await this.gradesService.updateGrade(id, dto, user.id, branch.branchId);
+    const updated = await this.gradesService.updateGrade(id, dto, user.id, branch.branchId, user.email);
     return { data: updated };
   }
 
@@ -138,7 +138,7 @@ export class GradesController {
     @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{ data: { id: string } }> {
     await this.ensureAssessmentEditAccess(user, branch.branchId);
-    const result = await this.gradesService.deleteGrade(id, branch.branchId);
+    const result = await this.gradesService.deleteGrade(id, branch.branchId, user.email);
     return { data: result };
   }
 

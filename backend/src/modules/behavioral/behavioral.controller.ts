@@ -143,7 +143,7 @@ export class BehavioralController {
     @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{ data: BehavioralAssessmentDto }> {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'behavioral');
-    return this.behavioralService.create(dto, user.id, branch.branchId);
+    return this.behavioralService.create(dto, user.id, branch.branchId, user.email);
   }
 
   /** Update an existing behavioral assessment. */
@@ -155,6 +155,6 @@ export class BehavioralController {
     @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{ data: BehavioralAssessmentDto }> {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'behavioral');
-    return this.behavioralService.update(id, dto, user.id, branch.branchId);
+    return this.behavioralService.update(id, dto, user.id, branch.branchId, user.email);
   }
 }

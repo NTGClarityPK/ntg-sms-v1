@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { ClassSectionDto } from './dto/class-section.dto';
 import { QueryClassSectionsDto } from './dto/query-class-sections.dto';
@@ -44,6 +45,7 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class ClassSectionsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
   ) {}
 
@@ -278,7 +280,11 @@ export class ClassSectionsService {
       .single();
 
     throwIfDbError(error);
-    return this.getClassSectionById((data as ClassSectionRow).id, branchId);
+    const row = data as ClassSectionRow;
+    this.auditLogService
+      .logCreate('class_sections', row.id, userEmail, { ...row } as Record<string, unknown>, { branchId })
+      .catch(() => {});
+    return this.getClassSectionById(row.id, branchId);
   }
 
   async bulkCreateClassSections(
@@ -384,6 +390,12 @@ export class ClassSectionsService {
       throw new BadRequestException('Failed to insert class sections');
     }
 
+    for (const row of insertedRows as ClassSectionRow[]) {
+      this.auditLogService
+        .logCreate('class_sections', row.id, userEmail, { ...row } as Record<string, unknown>, { branchId })
+        .catch(() => {});
+    }
+
     // 6. Batch hydrate: fetch class and section names for all inserted rows
     const insertedClassIds = [...new Set(insertedRows.map((r) => r.class_id))];
     const insertedSectionIds = [...new Set(insertedRows.map((r) => r.section_id))];
@@ -436,8 +448,18 @@ export class ClassSectionsService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
-    // Verify it exists and belongs to branch
-    const existing = await this.getClassSectionById(id, branchId);
+    // Verify it exists and get current row for audit
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('class_sections')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) {
+      throw new NotFoundException('Class section not found');
+    }
+    const existingDto = await this.getClassSectionById(id, branchId);
 
     const updateData: Partial<ClassSectionRow> = {};
     if (input.capacity !== undefined) {
@@ -449,7 +471,7 @@ export class ClassSectionsService {
     updateData.updated_by = username;
 
     if (Object.keys(updateData).length === 1 && updateData.updated_by) {
-      return existing;
+      return existingDto;
     }
 
     const { data, error } = await supabase
@@ -461,14 +483,36 @@ export class ClassSectionsService {
       .single();
 
     throwIfDbError(error);
-    return this.getClassSectionById((data as ClassSectionRow).id, branchId);
+    const newRow = data as ClassSectionRow;
+    const changedFields = Object.keys(updateData).filter((k) => k !== 'updated_by');
+    this.auditLogService
+      .logUpdate(
+        'class_sections',
+        id,
+        userEmail,
+        { ...oldRow } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        changedFields,
+        { branchId },
+      )
+      .catch(() => {});
+    return this.getClassSectionById(newRow.id, branchId);
   }
 
-  async deleteClassSection(id: string, branchId: string): Promise<void> {
-    // Verify it exists and belongs to branch
-    await this.getClassSectionById(id, branchId);
+  async deleteClassSection(id: string, branchId: string, userEmail: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
 
-    // Check if students are enrolled
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('class_sections')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) {
+      throw new NotFoundException('Class section not found');
+    }
+
     const studentCount = await this.countStudentsInClassSection(id);
     if (studentCount > 0) {
       throw new BadRequestException(
@@ -476,7 +520,6 @@ export class ClassSectionsService {
       );
     }
 
-    const supabase = this.supabaseConfig.getClient();
     const { error } = await supabase
       .from('class_sections')
       .delete()
@@ -484,6 +527,9 @@ export class ClassSectionsService {
       .eq('branch_id', branchId);
 
     throwIfDbError(error);
+    this.auditLogService
+      .logDelete('class_sections', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
+      .catch(() => {});
   }
 
   async getStudentsInClassSection(
@@ -668,10 +714,17 @@ export class ClassSectionsService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
-    // Verify class-section exists
-    await this.getClassSectionById(classSectionId, branchId);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('class_sections')
+      .select('*')
+      .eq('id', classSectionId)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) {
+      throw new NotFoundException('Class section not found');
+    }
 
-    // If assigning a teacher, verify staff exists and belongs to branch
     if (staffId) {
       const { data: staff, error: staffError } = await supabase
         .from('staff')
@@ -694,7 +747,19 @@ export class ClassSectionsService {
       .single();
 
     throwIfDbError(error);
-    return this.getClassSectionById((data as ClassSectionRow).id, branchId);
+    const newRow = data as ClassSectionRow;
+    this.auditLogService
+      .logUpdate(
+        'class_sections',
+        classSectionId,
+        userEmail,
+        { ...oldRow } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        ['class_teacher_id', 'updated_by'],
+        { branchId },
+      )
+      .catch(() => {});
+    return this.getClassSectionById(newRow.id, branchId);
   }
 }
 

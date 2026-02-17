@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ScheduleService } from '../schedule/schedule.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
@@ -75,6 +76,7 @@ function timesOverlap(start1: string, end1: string, start2: string, end2: string
 export class TimetableService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly scheduleService: ScheduleService,
     private readonly teacherAssignmentsService: TeacherAssignmentsService,
@@ -364,6 +366,8 @@ export class TimetableService {
   async createOrUpdateSlot(
     input: CreateTimetableSlotDto,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<TimetableSlotDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -471,7 +475,16 @@ export class TimetableService {
     let row: TimetableSlotRow;
 
     if (input.id) {
-      // Update existing slot by ID
+      // Update existing slot by ID – fetch old row for audit
+      const { data: oldRow, error: fetchErr } = await supabase
+        .from('timetable_slots')
+        .select('*')
+        .eq('id', input.id)
+        .eq('branch_id', branchId)
+        .single();
+      throwIfDbError(fetchErr);
+      if (!oldRow) throw new NotFoundException('Timetable slot not found');
+
       const { data, error } = await supabase
         .from('timetable_slots')
         .update(updateData)
@@ -484,19 +497,37 @@ export class TimetableService {
         throw new NotFoundException('Timetable slot not found');
       }
       row = data as TimetableSlotRow;
+      const changedFields = Object.keys(updateData).filter(
+        (k) => (oldRow as Record<string, unknown>)[k] !== (row as Record<string, unknown>)[k],
+      );
+      this.auditLogService
+        .logUpdate(
+          'timetable_slots',
+          row.id,
+          userEmail,
+          oldRow as Record<string, unknown>,
+          row as Record<string, unknown>,
+          changedFields,
+          { branchId, tenantId },
+        )
+        .catch(() => {});
     } else {
       // Upsert using unique constraint (with subject_template_id)
       const { data, error } = await supabase
         .from('timetable_slots')
         .upsert(updateData, {
-          // Use the unique constraint that includes subject_template_id
-          // This matches: (class_section_id, day_of_week, start_time, end_time, academic_year_id, subject_template_id)
           onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
         })
         .select('*')
         .single();
       throwIfDbError(error);
       row = data as TimetableSlotRow;
+      this.auditLogService
+        .logCreate('timetable_slots', row.id, userEmail, { ...row } as Record<string, unknown>, {
+          branchId,
+          tenantId,
+        })
+        .catch(() => {});
     }
     
     // Automatically renumber periods based on chronological order
@@ -604,29 +635,22 @@ export class TimetableService {
     }
   }
 
-  async deleteSlot(id: string, branchId: string): Promise<{ success: boolean }> {
+  async deleteSlot(
+    id: string,
+    branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
+  ): Promise<{ success: boolean }> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Verify slot belongs to branch
-    const { data: slot, error: slotError } = await supabase
-      .from('timetable_slots')
-      .select('id')
-      .eq('id', id)
-      .eq('branch_id', branchId)
-      .maybeSingle();
-    throwIfDbError(slotError);
-    if (!slot) {
-      throw new NotFoundException('Timetable slot not found');
-    }
-
-    // Get slot info before deletion for renumbering
+    // Get full slot row for audit and renumbering
     const { data: slotToDelete, error: getError } = await supabase
       .from('timetable_slots')
-      .select('class_section_id, academic_year_id, subject_template_id')
+      .select('*')
       .eq('id', id)
+      .eq('branch_id', branchId)
       .single();
     throwIfDbError(getError);
-    
     if (!slotToDelete) {
       throw new NotFoundException('Timetable slot not found');
     }
@@ -634,15 +658,22 @@ export class TimetableService {
     const { error } = await supabase.from('timetable_slots').delete().eq('id', id);
     throwIfDbError(error);
 
-    // Automatically renumber periods after deletion
-    if (slotToDelete) {
-      await this.renumberPeriodsForClassSection(
-        slotToDelete.class_section_id,
-        branchId,
-        slotToDelete.academic_year_id,
-        slotToDelete.subject_template_id,
-      );
-    }
+    this.auditLogService
+      .logDelete(
+        'timetable_slots',
+        id,
+        userEmail,
+        slotToDelete as Record<string, unknown>,
+        { branchId, tenantId },
+      )
+      .catch(() => {});
+
+    await this.renumberPeriodsForClassSection(
+      slotToDelete.class_section_id,
+      branchId,
+      slotToDelete.academic_year_id,
+      slotToDelete.subject_template_id,
+    );
 
     return { success: true };
   }
@@ -655,6 +686,8 @@ export class TimetableService {
   async replicateDay(
     input: ReplicateDayDto,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<{ slotsReplicated: number }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -733,12 +766,26 @@ export class TimetableService {
     }
 
     // Upsert slots (will replace existing ones due to unique constraint)
-    const { error: insertError } = await supabase
+    const { data: insertedRows, error: insertError } = await supabase
       .from('timetable_slots')
       .upsert(slotsToInsert, {
         onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
-      });
+      })
+      .select('*');
     throwIfDbError(insertError);
+    if (insertedRows) {
+      for (const row of insertedRows) {
+        this.auditLogService
+          .logCreate(
+            'timetable_slots',
+            (row as TimetableSlotRow).id,
+            userEmail,
+            row as Record<string, unknown>,
+            { branchId, tenantId },
+          )
+          .catch(() => {});
+      }
+    }
 
     // Renumber periods for all affected days
     const allAffectedDays = [...new Set([input.sourceDayOfWeek, ...input.targetDaysOfWeek])];
@@ -762,6 +809,8 @@ export class TimetableService {
   async replicateAcrossSections(
     input: ReplicateAcrossSectionsDto,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<{ slotsReplicated: number }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -843,12 +892,26 @@ export class TimetableService {
     }
 
     // Upsert slots (will replace existing ones due to unique constraint)
-    const { error: insertError } = await supabase
+    const { data: insertedRows, error: insertError } = await supabase
       .from('timetable_slots')
       .upsert(slotsToInsert, {
         onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
-      });
+      })
+      .select('*');
     throwIfDbError(insertError);
+    if (insertedRows) {
+      for (const row of insertedRows) {
+        this.auditLogService
+          .logCreate(
+            'timetable_slots',
+            (row as TimetableSlotRow).id,
+            userEmail,
+            row as Record<string, unknown>,
+            { branchId, tenantId },
+          )
+          .catch(() => {});
+      }
+    }
 
     // Renumber periods for all affected class sections
     const allAffectedSections = [
@@ -875,6 +938,8 @@ export class TimetableService {
   async replicateFromSection(
     input: ReplicateFromSectionDto,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<{ slotsReplicated: number }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -950,12 +1015,26 @@ export class TimetableService {
     }
 
     // Upsert slots (will replace existing ones due to unique constraint)
-    const { error: insertError } = await supabase
+    const { data: insertedRows, error: insertError } = await supabase
       .from('timetable_slots')
       .upsert(slotsToInsert, {
         onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
-      });
+      })
+      .select('*');
     throwIfDbError(insertError);
+    if (insertedRows) {
+      for (const row of insertedRows) {
+        this.auditLogService
+          .logCreate(
+            'timetable_slots',
+            (row as TimetableSlotRow).id,
+            userEmail,
+            row as Record<string, unknown>,
+            { branchId, tenantId },
+          )
+          .catch(() => {});
+      }
+    }
 
     // Renumber periods for both affected class sections
     await this.renumberPeriodsForClassSection(
@@ -1073,6 +1152,8 @@ export class TimetableService {
   async generateFromTimingTemplate(
     classSectionId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
     academicYearId?: string,
     subjectTemplateId?: string,
   ): Promise<{ slotsCreated: number }> {
@@ -1233,17 +1314,27 @@ export class TimetableService {
     }
 
     // Upsert slots (will replace existing ones due to unique constraint)
-    // The unique constraint includes: (class_section_id, day_of_week, start_time, end_time, academic_year_id, subject_template_id)
-    // This allows multiple slots at the same time for different templates
-    const { error: insertError } = await supabase
+    const { data: insertedRows, error: insertError } = await supabase
       .from('timetable_slots')
       .upsert(slotsToInsert, {
         onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
-      });
+      })
+      .select('*');
     throwIfDbError(insertError);
+    if (insertedRows) {
+      for (const row of insertedRows) {
+        this.auditLogService
+          .logCreate(
+            'timetable_slots',
+            (row as TimetableSlotRow).id,
+            userEmail,
+            row as Record<string, unknown>,
+            { branchId, tenantId },
+          )
+          .catch(() => {});
+      }
+    }
 
-    // Automatically renumber periods based on chronological order
-    // This ensures all slots (including existing ones) are properly numbered
     await this.renumberPeriodsForClassSection(
       classSectionId,
       branchId,

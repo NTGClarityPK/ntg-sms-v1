@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { AcademicYearDto } from './dto/academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
@@ -37,7 +38,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class AcademicYearsService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async list(
     query: QueryAcademicYearsDto,
@@ -149,7 +153,13 @@ export class AcademicYearsService {
       .single();
 
     throwIfDbError(error);
-    return mapAcademicYear(data as AcademicYearRow);
+    const row = data as AcademicYearRow;
+    this.auditLogService
+      .logCreate('academic_years', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        tenantId,
+      })
+      .catch(() => {});
+    return mapAcademicYear(row);
   }
 
   async activate(id: string, tenantId: string | null, userEmail: string): Promise<AcademicYearDto> {
@@ -183,7 +193,19 @@ export class AcademicYearsService {
       .single();
 
     throwIfDbError(error);
-    return mapAcademicYear(data as AcademicYearRow);
+    const newRow = data as AcademicYearRow;
+    this.auditLogService
+      .logUpdate(
+        'academic_years',
+        id,
+        userEmail,
+        { ...existing } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        ['is_active', 'updated_by'],
+        { tenantId },
+      )
+      .catch(() => {});
+    return mapAcademicYear(newRow);
   }
 
   async lock(id: string, tenantId: string | null, userEmail: string): Promise<AcademicYearDto> {
@@ -207,7 +229,19 @@ export class AcademicYearsService {
       .single();
 
     throwIfDbError(error);
-    return mapAcademicYear(data as AcademicYearRow);
+    const newRow = data as AcademicYearRow;
+    this.auditLogService
+      .logUpdate(
+        'academic_years',
+        id,
+        userEmail,
+        { ...existing } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        ['is_locked', 'updated_by'],
+        { tenantId },
+      )
+      .catch(() => {});
+    return mapAcademicYear(newRow);
   }
 
   async unlock(id: string, tenantId: string | null, userEmail: string): Promise<AcademicYearDto> {
@@ -234,7 +268,19 @@ export class AcademicYearsService {
       .single();
 
     throwIfDbError(error);
-    return mapAcademicYear(data as AcademicYearRow);
+    const newRow = data as AcademicYearRow;
+    this.auditLogService
+      .logUpdate(
+        'academic_years',
+        id,
+        userEmail,
+        { ...existing } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        ['is_locked', 'updated_by'],
+        { tenantId },
+      )
+      .catch(() => {});
+    return mapAcademicYear(newRow);
   }
 }
 

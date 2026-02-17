@@ -41,17 +41,22 @@ export class TenantsController {
   async updateMe(
     @CurrentBranch() branch: CurrentBranchContext,
     @Body() body: UpdateTenantDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: TenantDto }> {
-    const updated = await this.tenantsService.updateMe(branch.tenantId, {
-      name: body.name,
-      domain: body.domain,
-      email: body.email,
-      phone: body.phone,
-      timezone: body.timezone,
-      fiscalYearStart: body.fiscalYearStart,
-      vatNumber: body.vatNumber,
-      primaryColor: body.primaryColor,
-    });
+    const updated = await this.tenantsService.updateMe(
+      branch.tenantId,
+      {
+        name: body.name,
+        domain: body.domain,
+        email: body.email,
+        phone: body.phone,
+        timezone: body.timezone,
+        fiscalYearStart: body.fiscalYearStart,
+        vatNumber: body.vatNumber,
+        primaryColor: body.primaryColor,
+      },
+      user.email,
+    );
     return { data: updated.data };
   }
 
@@ -59,6 +64,7 @@ export class TenantsController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadLogo(
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({
@@ -73,7 +79,7 @@ export class TenantsController {
     )
     file: UploadedLogoFile,
   ): Promise<{ data: TenantDto }> {
-    return this.tenantsService.uploadLogo(branch.tenantId, file);
+    return this.tenantsService.uploadLogo(branch.tenantId, file, user.email);
   }
 
   @Get('all')

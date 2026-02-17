@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import {
@@ -52,6 +53,7 @@ function firstDayOfMonth(date: Date): string {
 export class BehavioralService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
   ) {}
 
@@ -300,6 +302,7 @@ export class BehavioralService {
     dto: CreateBehavioralAssessmentDto,
     userId: string,
     branchId: string,
+    userEmail: string,
   ): Promise<{ data: BehavioralAssessmentDto }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -347,6 +350,15 @@ export class BehavioralService {
       .single();
     throwIfDbError(insErr);
     const row = inserted as BehavioralAssessmentRow;
+    this.auditLogService
+      .logCreate(
+        'behavioral_assessments',
+        row.id,
+        userEmail,
+        { ...row } as Record<string, unknown>,
+        { branchId },
+      )
+      .catch(() => {});
 
     const scoreInserts = dto.scores.map((s) => ({
       behavioral_assessment_id: row.id,
@@ -393,6 +405,7 @@ export class BehavioralService {
     dto: UpdateBehavioralAssessmentDto,
     userId: string,
     branchId: string,
+    userEmail: string,
   ): Promise<{ data: BehavioralAssessmentDto }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -441,6 +454,17 @@ export class BehavioralService {
       .single();
     throwIfDbError(updateErr);
     const updatedRow = updated as BehavioralAssessmentRow;
+    this.auditLogService
+      .logUpdate(
+        'behavioral_assessments',
+        id,
+        userEmail,
+        { ...row } as Record<string, unknown>,
+        { ...updatedRow } as Record<string, unknown>,
+        ['updated_at'],
+        { branchId },
+      )
+      .catch(() => {});
 
     const { data: scoreRows } = await supabase
       .from('behavioral_scores')

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { TenantDto } from './dto/tenant.dto';
 import { TenantStatisticsDto, TenantAdminInfo } from './dto/tenant-statistics.dto';
 
@@ -53,7 +54,10 @@ type UploadedLogoFile = {
 
 @Injectable()
 export class TenantsService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   private getThemeSettingKey(tenantId: string): string {
     return `tenant_theme_primary_color:${tenantId}`;
@@ -101,6 +105,7 @@ export class TenantsService {
       vatNumber?: string;
       primaryColor?: string;
     },
+    userEmail: string,
   ): Promise<{ data: TenantDto }> {
     if (!tenantId) throw new BadRequestException('Tenant not resolved from branch');
     const hasTenantUpdates =
@@ -120,6 +125,12 @@ export class TenantsService {
     let tenantData: TenantRow | null = null;
 
     if (hasTenantUpdates) {
+      const { data: oldRow } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', tenantId)
+        .single();
+
       const updateData: Partial<TenantRow> = {};
       if (updates.name !== undefined) updateData.name = updates.name;
       if (updates.domain !== undefined) updateData.domain = updates.domain || null;
@@ -137,6 +148,20 @@ export class TenantsService {
 
       throwIfDbError(error);
       tenantData = data as TenantRow;
+      if (oldRow && data) {
+        const changedFields = Object.keys(updateData) as string[];
+        this.auditLogService
+          .logUpdate(
+            'tenants',
+            tenantId,
+            userEmail,
+            oldRow as Record<string, unknown>,
+            data as Record<string, unknown>,
+            changedFields,
+            { tenantId },
+          )
+          .catch(() => {});
+      }
     } else {
       const { data, error } = await supabase
         .from('tenants')
@@ -175,11 +200,21 @@ export class TenantsService {
     return { data: mapTenant(tenantData, primaryColor) };
   }
 
-  async uploadLogo(tenantId: string | null, file: UploadedLogoFile): Promise<{ data: TenantDto }> {
+  async uploadLogo(
+    tenantId: string | null,
+    file: UploadedLogoFile,
+    userEmail: string,
+  ): Promise<{ data: TenantDto }> {
     if (!tenantId) throw new BadRequestException('Tenant not resolved from branch');
     if (!file) throw new BadRequestException('Logo file is required');
 
     const supabase = this.supabaseConfig.getClient();
+    const { data: oldRow } = await supabase
+      .from('tenants')
+      .select('*')
+      .eq('id', tenantId)
+      .single();
+
     const extension = (file.originalname.split('.').pop() || 'png').toLowerCase();
     const fileName = `${tenantId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
 
@@ -206,6 +241,19 @@ export class TenantsService {
       .single();
 
     throwIfDbError(error);
+    if (oldRow && data) {
+      this.auditLogService
+        .logUpdate(
+          'tenants',
+          tenantId,
+          userEmail,
+          oldRow as Record<string, unknown>,
+          data as Record<string, unknown>,
+          ['logo_url'],
+          { tenantId },
+        )
+        .catch(() => {});
+    }
     const themeSettingKey = this.getThemeSettingKey(tenantId);
     const { data: themeSetting, error: themeError } = await supabase
       .from('system_settings')

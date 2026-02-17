@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } fro
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { ScheduleService } from './schedule.service';
 import { UpdateSchoolDaysDto } from './dto/update-school-days.dto';
 import { QueryTimingTemplatesDto } from './dto/query-timing-templates.dto';
@@ -42,8 +43,14 @@ export class ScheduleController {
   async createTimingTemplate(
     @Body() body: CreateTimingTemplateDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: TimingTemplateDto }> {
-    const created = await this.scheduleService.createTimingTemplate(body, branch.branchId, branch.tenantId);
+    const created = await this.scheduleService.createTimingTemplate(
+      body,
+      branch.branchId,
+      branch.tenantId,
+      user.email,
+    );
     return { data: created };
   }
 
@@ -67,20 +74,41 @@ export class ScheduleController {
   async createHoliday(
     @Body() body: CreatePublicHolidayDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: PublicHolidayDto }> {
-    const created = await this.scheduleService.createPublicHoliday(body, branch.branchId, branch.tenantId);
+    const created = await this.scheduleService.createPublicHoliday(
+      body,
+      branch.branchId,
+      branch.tenantId,
+      user.email,
+    );
     return { data: created };
   }
 
   @Put('public-holidays/:id')
-  async updateHoliday(@Param('id') id: string, @Body() body: UpdatePublicHolidayDto): Promise<{ data: PublicHolidayDto }> {
-    const updated = await this.scheduleService.updatePublicHoliday(id, body);
+  async updateHoliday(
+    @Param('id') id: string,
+    @Body() body: UpdatePublicHolidayDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: PublicHolidayDto }> {
+    const updated = await this.scheduleService.updatePublicHoliday(
+      id,
+      body,
+      user.email,
+      branch.branchId,
+      branch.tenantId,
+    );
     return { data: updated };
   }
 
   @Delete('public-holidays/:id')
-  async deleteHoliday(@Param('id') id: string): Promise<{ data: { id: string } }> {
-    return this.scheduleService.deletePublicHoliday(id);
+  async deleteHoliday(
+    @Param('id') id: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: { id: string } }> {
+    return this.scheduleService.deletePublicHoliday(id, user.email, branch.branchId, branch.tenantId);
   }
 
   @Get('vacations')
@@ -89,20 +117,30 @@ export class ScheduleController {
   }
 
   @Post('vacations')
-  async createVacation(@Body() body: CreateVacationDto): Promise<{ data: VacationDto }> {
-    const created = await this.scheduleService.createVacation(body);
+  async createVacation(
+    @Body() body: CreateVacationDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: VacationDto }> {
+    const created = await this.scheduleService.createVacation(body, user.email);
     return { data: created };
   }
 
   @Put('vacations/:id')
-  async updateVacation(@Param('id') id: string, @Body() body: UpdateVacationDto): Promise<{ data: VacationDto }> {
-    const updated = await this.scheduleService.updateVacation(id, body);
+  async updateVacation(
+    @Param('id') id: string,
+    @Body() body: UpdateVacationDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: VacationDto }> {
+    const updated = await this.scheduleService.updateVacation(id, body, user.email);
     return { data: updated };
   }
 
   @Delete('vacations/:id')
-  async deleteVacation(@Param('id') id: string): Promise<{ data: { id: string } }> {
-    return this.scheduleService.deleteVacation(id);
+  async deleteVacation(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: { id: string } }> {
+    return this.scheduleService.deleteVacation(id, user.email);
   }
 }
 

@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { StaffDto } from './dto/staff.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
@@ -40,7 +41,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class StaffService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async listStaff(query: QueryStaffDto, branchId: string): Promise<{
     data: StaffDto[];
@@ -454,7 +458,14 @@ export class StaffService {
         throw new BadRequestException('Failed to create staff record');
       }
 
-      return this.getStaffById((staff as StaffRow).id, branchId);
+      const staffRow = staff as StaffRow;
+      this.auditLogService
+        .logCreate('staff', staffRow.id, userEmail, { ...staffRow } as Record<string, unknown>, {
+          branchId,
+        })
+        .catch(() => {});
+
+      return this.getStaffById(staffRow.id, branchId);
     } catch (error) {
       // Rollback: delete auth user if staff creation fails
       await supabase.auth.admin.deleteUser(user.id);
@@ -466,8 +477,16 @@ export class StaffService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
-    // Verify staff exists in branch
-    await this.getStaffById(id, branchId);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('staff')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) {
+      throw new NotFoundException('Staff not found');
+    }
 
     // Update profile if needed
     if (
@@ -501,20 +520,37 @@ export class StaffService {
       }
     }
 
-    // Update staff record
-    const { error } = await supabase
+    const staffUpdates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+      updated_by: username,
+    };
+    if (input.employeeId !== undefined) staffUpdates.employee_id = input.employeeId;
+    if (input.department !== undefined) staffUpdates.department = input.department;
+    if (input.joinDate !== undefined) staffUpdates.join_date = input.joinDate;
+    if (input.isActive !== undefined) staffUpdates.is_active = input.isActive;
+
+    const { data: newRow, error } = await supabase
       .from('staff')
-      .update({
-        employee_id: input.employeeId,
-        department: input.department,
-        join_date: input.joinDate,
-        is_active: input.isActive,
-        updated_at: new Date().toISOString(),
-        updated_by: username,
-      })
-      .eq('id', id);
+      .update(staffUpdates)
+      .eq('id', id)
+      .select('*')
+      .single();
 
     throwIfDbError(error);
+    if (newRow) {
+      const changedFields = Object.keys(staffUpdates).filter((k) => k !== 'updated_at');
+      this.auditLogService
+        .logUpdate(
+          'staff',
+          id,
+          userEmail,
+          { ...oldRow } as Record<string, unknown>,
+          { ...newRow } as Record<string, unknown>,
+          changedFields,
+          { branchId },
+        )
+        .catch(() => {});
+    }
 
     return this.getStaffById(id, branchId);
   }
@@ -528,11 +564,18 @@ export class StaffService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
-    const staff = await this.getStaffById(id, branchId);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('staff')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) {
+      throw new NotFoundException('Staff not found');
+    }
 
-    // Check for assignments (will be implemented in Prompt 4)
-    // For now, just deactivate
-    const { error } = await supabase
+    const { data: newRow, error } = await supabase
       .from('staff')
       .update({
         is_active: false,
@@ -541,11 +584,24 @@ export class StaffService {
         updated_at: new Date().toISOString(),
         updated_by: username,
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select('*')
+      .single();
 
     throwIfDbError(error);
-
-    // TODO: Handle replacement logic when teacher_assignments table exists (Prompt 4)
+    if (newRow) {
+      this.auditLogService
+        .logUpdate(
+          'staff',
+          id,
+          userEmail,
+          { ...oldRow } as Record<string, unknown>,
+          { ...newRow } as Record<string, unknown>,
+          ['is_active', 'deactivated_at', 'deactivation_reason', 'updated_at', 'updated_by'],
+          { branchId },
+        )
+        .catch(() => {});
+    }
 
     return this.getStaffById(id, branchId);
   }

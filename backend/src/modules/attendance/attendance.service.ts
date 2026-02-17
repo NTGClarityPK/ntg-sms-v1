@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { AttendanceDto } from './dto/attendance.dto';
 import { QueryAttendanceDto } from './dto/query-attendance.dto';
@@ -43,6 +44,7 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class AttendanceService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly notificationsService: NotificationsService,
     private readonly leaveRequestsService: LeaveRequestsService,
@@ -782,6 +784,20 @@ export class AttendanceService {
       return [];
     }
 
+    for (const row of upsertedRows) {
+      this.auditLogService
+        .logUpdate(
+          'attendance',
+          row.id,
+          userEmail,
+          {},
+          { ...row } as Record<string, unknown>,
+          ['status', 'entry_time', 'exit_time', 'notes', 'marked_by', 'updated_by', 'updated_at'],
+          { branchId },
+        )
+        .catch(() => {});
+    }
+
     const classSection = classSectionData as { class_id: string; section_id: string };
 
     const { data: classRows, error: classError } = await supabase
@@ -911,10 +927,9 @@ export class AttendanceService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
-    // Verify attendance exists and belongs to branch
     const { data: existing, error: fetchError } = await supabase
       .from('attendance')
-      .select('id, student_id, class_section_id, date, status, entry_time, exit_time, notes, marked_by, branch_id, academic_year_id, created_at, updated_at')
+      .select('*')
       .eq('id', id)
       .eq('branch_id', branchId)
       .single();
@@ -957,6 +972,18 @@ export class AttendanceService {
 
     const updatedRow = updated as AttendanceRow;
     const existingRow = existing as AttendanceRow;
+    const changedFields = Object.keys(updateData).filter((k) => k !== 'updated_at');
+    this.auditLogService
+      .logUpdate(
+        'attendance',
+        id,
+        userEmail,
+        { ...existingRow } as Record<string, unknown>,
+        { ...updatedRow } as Record<string, unknown>,
+        changedFields,
+        { branchId },
+      )
+      .catch(() => {});
 
     // Create unrequested leave request if status changed to absent
     if (input.status === 'absent' && existingRow.status !== 'absent') {

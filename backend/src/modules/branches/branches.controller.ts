@@ -54,8 +54,11 @@ export class BranchesController {
   }
 
   @Post()
-  async create(@Body() body: CreateBranchDto): Promise<{ data: BranchDto }> {
-    const created = await this.branchesService.create(body);
+  async create(
+    @Body() body: CreateBranchDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: BranchDto }> {
+    const created = await this.branchesService.create(body, user.email);
     return { data: created };
   }
 
@@ -63,8 +66,9 @@ export class BranchesController {
   async update(
     @Param('id') id: string,
     @Body() body: UpdateBranchDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: BranchDto }> {
-    const updated = await this.branchesService.update(id, body);
+    const updated = await this.branchesService.update(id, body, user.email);
     return { data: updated };
   }
 
@@ -82,7 +86,7 @@ export class BranchesController {
       throw new ForbiddenException('This endpoint is only accessible to super admins, developers and owners');
     }
 
-    const created = await this.branchesService.assignBranchToTenant(body);
+    const created = await this.branchesService.assignBranchToTenant(body, user.email);
     return { data: created };
   }
 

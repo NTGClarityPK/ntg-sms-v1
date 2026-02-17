@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { ParentStudentDto } from './dto/parent-student.dto';
 import { LinkChildDto } from './dto/link-child.dto';
@@ -31,7 +32,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class ParentsService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   private async hydrateAssociations(
     rows: ParentStudentRow[],
@@ -165,7 +169,13 @@ export class ParentsService {
     return this.hydrateAssociations((data || []) as unknown as ParentStudentRow[]);
   }
 
-  async linkChild(parentUserId: string, input: LinkChildDto): Promise<ParentStudentDto> {
+  async linkChild(
+    parentUserId: string,
+    input: LinkChildDto,
+    userEmail: string,
+    branchId?: string,
+    tenantId?: string | null,
+  ): Promise<ParentStudentDto> {
     const supabase = this.supabaseConfig.getClient();
 
     // Verify student exists
@@ -253,6 +263,12 @@ export class ParentsService {
     }
 
     const row = data as ParentStudentRow;
+    this.auditLogService
+      .logCreate('parent_students', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        branchId: branchId ?? null,
+        tenantId: tenantId ?? null,
+      })
+      .catch(() => {});
     const children = await this.getChildren(parentUserId);
     return children.find((c) => c.id === row.id)!;
   }
@@ -261,6 +277,9 @@ export class ParentsService {
     parentUserId: string,
     studentId: string,
     input: UpdateParentAssociationDto,
+    userEmail: string,
+    branchId?: string,
+    tenantId?: string | null,
   ): Promise<ParentStudentDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -285,6 +304,7 @@ export class ParentsService {
 
     // Update if there are changes
     if (Object.keys(updateData).length > 0) {
+      const oldRow = existing as Record<string, unknown>;
       const { data, error } = await supabase
         .from('parent_students')
         .update(updateData)
@@ -298,6 +318,19 @@ export class ParentsService {
         throw new BadRequestException('Failed to update association');
       }
 
+      const newRow = data as Record<string, unknown>;
+      const changedFields = Object.keys(updateData) as string[];
+      this.auditLogService
+        .logUpdate(
+          'parent_students',
+          (existing as { id: string }).id,
+          userEmail,
+          oldRow,
+          newRow,
+          changedFields,
+          { branchId: branchId ?? null, tenantId: tenantId ?? null },
+        )
+        .catch(() => {});
       const hydrated = await this.hydrateAssociations([data as unknown as ParentStudentRow]);
       return hydrated[0]!;
     }
@@ -307,16 +340,23 @@ export class ParentsService {
     return hydrated[0]!;
   }
 
-  async unlinkChild(parentUserId: string, studentId: string): Promise<void> {
+  async unlinkChild(
+    parentUserId: string,
+    studentId: string,
+    userEmail: string,
+    branchId?: string,
+    tenantId?: string | null,
+  ): Promise<void> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Get the guardian being removed to check priority
-    const { data: guardianToRemove } = await supabase
+    // Get full row for audit and priority check
+    const { data: oldRow, error: fetchError } = await supabase
       .from('parent_students')
-      .select('priority')
+      .select('*')
       .eq('parent_user_id', parentUserId)
       .eq('student_id', studentId)
       .maybeSingle();
+    throwIfDbError(fetchError);
 
     const { error } = await supabase
       .from('parent_students')
@@ -326,8 +366,19 @@ export class ParentsService {
 
     throwIfDbError(error);
 
-    // If we removed priority 1, promote priority 2 to 1
-    if (guardianToRemove && guardianToRemove.priority === 1) {
+    if (oldRow) {
+      this.auditLogService
+        .logDelete(
+          'parent_students',
+          (oldRow as { id: string }).id,
+          userEmail,
+          oldRow as Record<string, unknown>,
+          { branchId: branchId ?? null, tenantId: tenantId ?? null },
+        )
+        .catch(() => {});
+    }
+
+    if (oldRow && (oldRow as { priority: number }).priority === 1) {
       await supabase
         .from('parent_students')
         .update({ priority: 1 })

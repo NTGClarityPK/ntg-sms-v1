@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ScheduleService } from '../schedule/schedule.service';
@@ -86,6 +87,7 @@ function countActiveSchoolDaysInRangeExcluding(
 export class LeaveRequestsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly notificationsService: NotificationsService,
     private readonly scheduleService: ScheduleService,
@@ -180,6 +182,8 @@ export class LeaveRequestsService {
     input: CreateLeaveRequestDto,
     userId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<LeaveRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -241,6 +245,16 @@ export class LeaveRequestsService {
     }
 
     const row = data as LeaveRequestRow;
+
+    this.auditLogService
+      .logCreate(
+        'leave_requests',
+        row.id,
+        userEmail,
+        { ...row } as Record<string, unknown>,
+        { branchId, tenantId: tenantId ?? null },
+      )
+      .catch(() => {});
 
     // Notify school admin, admin assistant, and class teacher (best-effort)
     try {
@@ -573,6 +587,8 @@ export class LeaveRequestsService {
     input: UpdateLeaveStatusDto,
     reviewerUserId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
     isParent: boolean = false,
   ): Promise<LeaveRequestDto> {
     const supabase = this.supabaseConfig.getClient();
@@ -627,6 +643,18 @@ export class LeaveRequestsService {
 
     const updatedRow = data as LeaveRequestRow;
 
+    this.auditLogService
+      .logUpdate(
+        'leave_requests',
+        id,
+        userEmail,
+        { ...existingRow } as Record<string, unknown>,
+        { ...updatedRow } as Record<string, unknown>,
+        ['status', 'review_notes', 'reviewed_by', 'reviewed_at', 'updated_at'],
+        { branchId, tenantId: tenantId ?? null },
+      )
+      .catch(() => {});
+
     // Best-effort notification to parent who requested
     try {
       const { data: studentData } = await this.supabaseConfig
@@ -667,6 +695,8 @@ export class LeaveRequestsService {
     id: string,
     userId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<LeaveRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -709,7 +739,20 @@ export class LeaveRequestsService {
       throw new BadRequestException('Failed to cancel leave request');
     }
 
-    return this.mapRowToDto(data as LeaveRequestRow);
+    const updatedRow = data as LeaveRequestRow;
+    this.auditLogService
+      .logUpdate(
+        'leave_requests',
+        id,
+        userEmail,
+        { ...existingRow } as Record<string, unknown>,
+        { ...updatedRow } as Record<string, unknown>,
+        ['status', 'updated_at'],
+        { branchId, tenantId: tenantId ?? null },
+      )
+      .catch(() => {});
+
+    return this.mapRowToDto(updatedRow);
   }
 
   /**

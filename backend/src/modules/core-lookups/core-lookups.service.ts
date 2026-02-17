@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { QuerySubjectsDto } from './dto/query-subjects.dto';
 import { SubjectDto } from './dto/subject.dto';
@@ -132,7 +133,10 @@ function mapLevel(row: LevelRow, classes: ClassDto[]): LevelDto {
 
 @Injectable()
 export class CoreLookupsService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async listSubjects(query: QuerySubjectsDto, branchId: string): Promise<{ data: SubjectDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
@@ -209,7 +213,14 @@ export class CoreLookupsService {
       .select('*')
       .single();
     throwIfDbError(error);
-    return mapSubject(data as SubjectRow);
+    const row = data as SubjectRow;
+    this.auditLogService
+      .logCreate('subjects', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
+    return mapSubject(row);
   }
 
   async updateSubject(
@@ -220,6 +231,14 @@ export class CoreLookupsService {
   ): Promise<SubjectDto> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('subjects')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('Subject not found');
     const updates: Partial<SubjectRow> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
@@ -228,15 +247,7 @@ export class CoreLookupsService {
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
     updates.updated_by = username;
     if (Object.keys(updates).length === 1 && updates.updated_by) {
-      const { data: existing, error: fetchError } = await supabase
-        .from('subjects')
-        .select('*')
-        .eq('id', id)
-        .eq('branch_id', branchId)
-        .maybeSingle();
-      throwIfDbError(fetchError);
-      if (!existing) throw new NotFoundException('Subject not found');
-      return mapSubject(existing as SubjectRow);
+      return mapSubject(oldRow as SubjectRow);
     }
     const { data, error } = await supabase
       .from('subjects')
@@ -247,7 +258,19 @@ export class CoreLookupsService {
       .maybeSingle();
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Subject not found');
-    return mapSubject(data as SubjectRow);
+    const newRow = data as SubjectRow;
+    this.auditLogService
+      .logUpdate(
+        'subjects',
+        id,
+        userEmail,
+        { ...oldRow } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        Object.keys(updates).filter((k) => k !== 'updated_by'),
+        { branchId },
+      )
+      .catch(() => {});
+    return mapSubject(newRow);
   }
 
   async listClasses(query: QueryClassesDto, branchId: string): Promise<{ data: ClassDto[]; meta: Meta }> {
@@ -356,7 +379,14 @@ export class CoreLookupsService {
       .select('*')
       .single();
     throwIfDbError(error);
-    return mapClass(data as ClassRow);
+    const row = data as ClassRow;
+    this.auditLogService
+      .logCreate('classes', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
+    return mapClass(row);
   }
 
   async updateClass(
@@ -367,6 +397,14 @@ export class CoreLookupsService {
   ): Promise<ClassDto> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('classes')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('Class not found');
     const updates: Partial<ClassRow> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.displayName !== undefined) updates.display_name = input.displayName;
@@ -374,15 +412,7 @@ export class CoreLookupsService {
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     updates.updated_by = username;
     if (Object.keys(updates).length === 1 && updates.updated_by) {
-      const { data: existing, error: fetchError } = await supabase
-        .from('classes')
-        .select('*')
-        .eq('id', id)
-        .eq('branch_id', branchId)
-        .maybeSingle();
-      throwIfDbError(fetchError);
-      if (!existing) throw new NotFoundException('Class not found');
-      return mapClass(existing as ClassRow);
+      return mapClass(oldRow as ClassRow);
     }
     const { data, error } = await supabase
       .from('classes')
@@ -393,7 +423,19 @@ export class CoreLookupsService {
       .maybeSingle();
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Class not found');
-    return mapClass(data as ClassRow);
+    const newRow = data as ClassRow;
+    this.auditLogService
+      .logUpdate(
+        'classes',
+        id,
+        userEmail,
+        { ...oldRow } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        Object.keys(updates).filter((k) => k !== 'updated_by'),
+        { branchId },
+      )
+      .catch(() => {});
+    return mapClass(newRow);
   }
 
   async listSections(query: QuerySectionsDto, branchId: string): Promise<{ data: SectionDto[]; meta: Meta }> {
@@ -453,7 +495,14 @@ export class CoreLookupsService {
       .select('*')
       .single();
     throwIfDbError(error);
-    return mapSection(data as SectionRow);
+    const row = data as SectionRow;
+    this.auditLogService
+      .logCreate('sections', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
+    return mapSection(row);
   }
 
   async updateSection(
@@ -464,21 +513,21 @@ export class CoreLookupsService {
   ): Promise<SectionDto> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('sections')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('Section not found');
     const updates: Partial<SectionRow> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
     updates.updated_by = username;
     if (Object.keys(updates).length === 1 && updates.updated_by) {
-      const { data: existing, error: fetchError } = await supabase
-        .from('sections')
-        .select('*')
-        .eq('id', id)
-        .eq('branch_id', branchId)
-        .maybeSingle();
-      throwIfDbError(fetchError);
-      if (!existing) throw new NotFoundException('Section not found');
-      return mapSection(existing as SectionRow);
+      return mapSection(oldRow as SectionRow);
     }
     const { data, error } = await supabase
       .from('sections')
@@ -489,7 +538,19 @@ export class CoreLookupsService {
       .maybeSingle();
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Section not found');
-    return mapSection(data as SectionRow);
+    const newRow = data as SectionRow;
+    this.auditLogService
+      .logUpdate(
+        'sections',
+        id,
+        userEmail,
+        { ...oldRow } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        Object.keys(updates).filter((k) => k !== 'updated_by'),
+        { branchId },
+      )
+      .catch(() => {});
+    return mapSection(newRow);
   }
 
   async listLevels(query: QueryLevelsDto, branchId: string): Promise<{ data: LevelDto[]; meta: Meta }> {
@@ -639,6 +700,12 @@ export class CoreLookupsService {
     throwIfDbError(error);
 
     const levelRow = level as LevelRow;
+    this.auditLogService
+      .logCreate('levels', levelRow.id, userEmail, { ...levelRow } as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
 
     if (input.classIds && input.classIds.length > 0) {
       const payload = input.classIds.map((classId) => ({
@@ -699,12 +766,27 @@ export class CoreLookupsService {
     updates.updated_by = username;
 
     if (Object.keys(updates).length > 0) {
-      const { error: updateError } = await supabase
+      const { data: newLevel, error: updateError } = await supabase
         .from('levels')
         .update(updates)
         .eq('id', id)
-        .eq('branch_id', branchId);
+        .eq('branch_id', branchId)
+        .select('*')
+        .single();
       throwIfDbError(updateError);
+      if (newLevel) {
+        this.auditLogService
+          .logUpdate(
+            'levels',
+            id,
+            userEmail,
+            { ...existingLevel } as Record<string, unknown>,
+            { ...newLevel } as Record<string, unknown>,
+            Object.keys(updates).filter((k) => k !== 'updated_by'),
+            { branchId },
+          )
+          .catch(() => {});
+      }
     }
 
     if (input.classIds !== undefined) {

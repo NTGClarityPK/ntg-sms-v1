@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ClassSectionsService } from '../class-sections/class-sections.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -119,6 +120,7 @@ function mapEventConsent(row: EventConsentRow): EventConsentDto {
 export class EventsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly classSectionsService: ClassSectionsService,
     private readonly notificationsService: NotificationsService,
@@ -325,6 +327,7 @@ export class EventsService {
     input: CreateEventDto,
     branchId: string,
     userId: string,
+    userEmail: string,
   ): Promise<EventDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -391,6 +394,16 @@ export class EventsService {
       throw new BadRequestException('Failed to create event');
     }
 
+    this.auditLogService
+      .logCreate(
+        'events',
+        (eventData as EventRow).id,
+        userEmail,
+        { ...eventData } as Record<string, unknown>,
+        { branchId },
+      )
+      .catch(() => {});
+
     const event = mapEvent(eventData as EventRow);
 
     // Create participants
@@ -446,6 +459,7 @@ export class EventsService {
     id: string,
     input: UpdateEventDto,
     branchId: string,
+    userEmail: string,
   ): Promise<EventDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -495,6 +509,20 @@ export class EventsService {
     if (!data) {
       throw new BadRequestException('Failed to update event');
     }
+
+    const newRow = data as EventRow;
+    const changedFields = Object.keys(payload);
+    this.auditLogService
+      .logUpdate(
+        'events',
+        id,
+        userEmail,
+        { ...existing } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        changedFields,
+        { branchId },
+      )
+      .catch(() => {});
 
     // Update participants if provided
     if (input.classSectionIds !== undefined || input.studentIds !== undefined) {
@@ -548,25 +576,28 @@ export class EventsService {
     // Send update notifications
     await this.notifyEventUpdated(id, branchId);
 
-    return mapEvent(data as EventRow);
+    return mapEvent(newRow);
   }
 
-  async deleteEvent(id: string, branchId: string): Promise<{ id: string }> {
+  async deleteEvent(
+    id: string,
+    branchId: string,
+    userEmail: string,
+  ): Promise<{ id: string }> {
     const supabase = this.supabaseConfig.getClient();
 
-    const { data: existing, error: existingError } = await supabase
+    const { data: oldRow, error: existingError } = await supabase
       .from('events')
-      .select('id')
+      .select('*')
       .eq('id', id)
       .eq('branch_id', branchId)
       .maybeSingle();
 
     throwIfDbError(existingError);
-    if (!existing) {
+    if (!oldRow) {
       throw new NotFoundException('Event not found');
     }
 
-    // Delete event (cascade will delete participants and consents)
     const { error } = await supabase
       .from('events')
       .delete()
@@ -575,6 +606,9 @@ export class EventsService {
 
     throwIfDbError(error);
 
+    this.auditLogService
+      .logDelete('events', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
+      .catch(() => {});
     return { id };
   }
 

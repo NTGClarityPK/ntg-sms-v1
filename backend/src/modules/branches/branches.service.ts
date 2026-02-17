@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { BranchDto } from './dto/branch.dto';
 import { QueryBranchesDto } from './dto/query-branches.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
@@ -48,7 +49,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class BranchesService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async list(query: QueryBranchesDto): Promise<{
     data: BranchDto[];
@@ -98,7 +102,7 @@ export class BranchesService {
     return mapBranch(data as BranchRow);
   }
 
-  async create(input: CreateBranchDto): Promise<BranchDto> {
+  async create(input: CreateBranchDto, userEmail: string): Promise<BranchDto> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('branches')
@@ -116,10 +120,21 @@ export class BranchesService {
       .single();
 
     throwIfDbError(error);
-    return mapBranch(data as BranchRow);
+    const row = data as BranchRow;
+    this.auditLogService
+      .logCreate('branches', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        branchId: row.id,
+        tenantId: row.tenant_id,
+      })
+      .catch(() => {});
+    return mapBranch(row);
   }
 
-  async update(id: string, input: UpdateBranchDto): Promise<BranchDto> {
+  async update(
+    id: string,
+    input: UpdateBranchDto,
+    userEmail: string,
+  ): Promise<BranchDto> {
     const supabase = this.supabaseConfig.getClient();
 
     const { data: existing, error: existingError } = await supabase
@@ -149,7 +164,22 @@ export class BranchesService {
       .single();
 
     throwIfDbError(error);
-    return mapBranch(data as BranchRow);
+    const newRow = data as BranchRow;
+    const changedFields = Object.keys(input).filter(
+      (k) => (existing as Record<string, unknown>)[k] !== (newRow as Record<string, unknown>)[k],
+    ) as string[];
+    this.auditLogService
+      .logUpdate(
+        'branches',
+        id,
+        userEmail,
+        existing as Record<string, unknown>,
+        newRow as Record<string, unknown>,
+        changedFields.length ? changedFields : [],
+        { branchId: id, tenantId: (existing as BranchRow).tenant_id },
+      )
+      .catch(() => {});
+    return mapBranch(newRow);
   }
 
   async getStorage(id: string): Promise<{
@@ -234,7 +264,7 @@ export class BranchesService {
     };
   }
 
-  async assignBranchToTenant(input: AssignBranchToTenantDto): Promise<BranchDto> {
+  async assignBranchToTenant(input: AssignBranchToTenantDto, userEmail: string): Promise<BranchDto> {
     const supabase = this.supabaseConfig.getClient();
 
     // Verify tenant exists
@@ -268,6 +298,15 @@ export class BranchesService {
 
     throwIfDbError(branchError);
     const newBranch = mapBranch(branch as BranchRow);
+    this.auditLogService
+      .logCreate(
+        'branches',
+        newBranch.id,
+        userEmail,
+        { ...(branch as BranchRow) } as Record<string, unknown>,
+        { branchId: newBranch.id, tenantId: input.tenantId },
+      )
+      .catch(() => {});
 
     // Find all school_admin users for this tenant (from existing branches)
     const { data: existingBranches, error: branchesError } = await supabase

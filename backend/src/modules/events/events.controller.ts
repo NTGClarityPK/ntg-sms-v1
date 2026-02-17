@@ -146,6 +146,7 @@ export class EventsController {
       body,
       branch.branchId,
       user.id,
+      user.email,
     );
     return { data: created };
   }
@@ -191,6 +192,7 @@ export class EventsController {
       id,
       body,
       branch.branchId,
+      user.email,
     );
     return { data: updated };
   }
@@ -202,7 +204,7 @@ export class EventsController {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: { id: string } }> {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'events_management');
-    const result = await this.eventsService.deleteEvent(id, branch.branchId);
+    const result = await this.eventsService.deleteEvent(id, branch.branchId, user.email);
     return { data: result };
   }
 

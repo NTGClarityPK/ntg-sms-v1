@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuard
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { AssessmentService } from './assessment.service';
 import { QueryAssessmentTypesDto } from './dto/query-assessment-types.dto';
 import { AssessmentTypeDto } from './dto/assessment-type.dto';
@@ -29,8 +30,14 @@ export class AssessmentController {
   async createAssessmentType(
     @Body() body: CreateAssessmentTypeDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AssessmentTypeDto }> {
-    const created = await this.assessmentService.createAssessmentType(body, branch.branchId, branch.tenantId);
+    const created = await this.assessmentService.createAssessmentType(
+      body,
+      branch.branchId,
+      branch.tenantId,
+      user.email,
+    );
     return { data: created };
   }
 
@@ -39,8 +46,15 @@ export class AssessmentController {
     @Param('id') id: string,
     @Body() body: UpdateAssessmentTypeDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AssessmentTypeDto }> {
-    const updated = await this.assessmentService.updateAssessmentType(id, body, branch.branchId);
+    const updated = await this.assessmentService.updateAssessmentType(
+      id,
+      body,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data: updated };
   }
 
@@ -53,6 +67,7 @@ export class AssessmentController {
   async createGradeTemplate(
     @Body() body: CreateGradeTemplateDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: GradeTemplateDto }> {
     const ranges = body.ranges.map((r, idx) => ({
       letter: r.letter,
@@ -64,6 +79,7 @@ export class AssessmentController {
       { name: body.name, ranges },
       branch.branchId,
       branch.tenantId,
+      user.email,
     );
     return { data: created };
   }
@@ -72,6 +88,8 @@ export class AssessmentController {
   async updateGradeTemplate(
     @Param('id') id: string,
     @Body() body: Partial<CreateGradeTemplateDto>,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: GradeTemplateDto }> {
     const ranges = body.ranges
       ? body.ranges.map((r, idx) => ({
@@ -81,13 +99,28 @@ export class AssessmentController {
           sortOrder: r.sortOrder ?? idx,
         }))
       : undefined;
-    const updated = await this.assessmentService.updateGradeTemplate(id, { name: body.name, ranges });
+    const updated = await this.assessmentService.updateGradeTemplate(
+      id,
+      { name: body.name, ranges },
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data: updated };
   }
 
   @Delete('grade-templates/:id')
-  async deleteGradeTemplate(@Param('id') id: string): Promise<{ data: { id: string } }> {
-    const result = await this.assessmentService.deleteGradeTemplate(id);
+  async deleteGradeTemplate(
+    @Param('id') id: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: { id: string } }> {
+    const result = await this.assessmentService.deleteGradeTemplate(
+      id,
+      user.email,
+      branch.branchId,
+      branch.tenantId,
+    );
     return { data: result };
   }
 
@@ -132,8 +165,16 @@ export class AssessmentController {
   @Put('settings/leave-quota')
   async setLeaveQuota(
     @Body() body: { academicYearId: string; annualQuota: number },
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: { academicYearId: string; annualQuota: number } }> {
-    return this.assessmentService.setLeaveQuota(body.academicYearId, body.annualQuota);
+    return this.assessmentService.setLeaveQuota(
+      body.academicYearId,
+      body.annualQuota,
+      user.email,
+      branch.branchId,
+      branch.tenantId,
+    );
   }
 }
 

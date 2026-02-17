@@ -104,13 +104,15 @@ export class LeaveRequestsController {
   async createLeaveRequest(
     @Body() input: CreateLeaveRequestDto,
     @CurrentUser() user: CurrentUserPayload,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: { branchId: string; tenantId: string | null },
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'leaves');
     const data = await this.leaveRequestsService.createLeaveRequest(
       input,
       user.id,
       branch.branchId,
+      user.email,
+      branch.tenantId,
     );
     return { data };
   }
@@ -120,7 +122,7 @@ export class LeaveRequestsController {
     @Param('id') id: string,
     @Body() input: UpdateLeaveStatusDto,
     @CurrentUser() user: CurrentUserPayload,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: { branchId: string; tenantId: string | null },
   ) {
     const isParent = user.roles?.includes('parent');
     // Parents can approve if they have canApprove permission (checked in service)
@@ -133,6 +135,8 @@ export class LeaveRequestsController {
       { ...input, status: 'approved' },
       user.id,
       branch.branchId,
+      user.email,
+      branch.tenantId,
       isParent,
     );
     return { data };
@@ -143,7 +147,7 @@ export class LeaveRequestsController {
     @Param('id') id: string,
     @Body() input: UpdateLeaveStatusDto,
     @CurrentUser() user: CurrentUserPayload,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: { branchId: string; tenantId: string | null },
   ) {
     const isParent = user.roles?.includes('parent');
     // Parents can reject if they have canApprove permission (checked in service)
@@ -156,6 +160,8 @@ export class LeaveRequestsController {
       { ...input, status: 'rejected' },
       user.id,
       branch.branchId,
+      user.email,
+      branch.tenantId,
       isParent,
     );
     return { data };
@@ -165,13 +171,15 @@ export class LeaveRequestsController {
   async cancelLeaveRequest(
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: { branchId: string; tenantId: string | null },
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'leaves');
     const data = await this.leaveRequestsService.cancelLeaveRequest(
       id,
       user.id,
       branch.branchId,
+      user.email,
+      branch.tenantId,
     );
     return { data };
   }

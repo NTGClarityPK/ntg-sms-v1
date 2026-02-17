@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { StudentDto } from './dto/student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
@@ -39,6 +40,7 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class StudentsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
   ) {}
 
@@ -587,6 +589,11 @@ export class StudentsService {
       }
 
       const studentRow = student as StudentRow;
+      this.auditLogService
+        .logCreate('students', studentRow.id, userEmail, { ...studentRow } as Record<string, unknown>, {
+          branchId,
+        })
+        .catch(() => {});
 
       // Create subject template assignment if provided
       if (input.subjectTemplateId) {
@@ -625,8 +632,16 @@ export class StudentsService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
-    // Verify student exists in branch
-    await this.getStudentById(id, branchId);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('students')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) {
+      throw new NotFoundException('Student not found');
+    }
 
     // Update profile if fullName provided
     if (input.fullName || input.phone || input.address || input.dateOfBirth || input.gender) {
@@ -688,9 +703,32 @@ export class StudentsService {
       updatePayload.academic_year_id = input.academicYearId ?? null;
     }
 
-    const { error } = await supabase.from('students').update(updatePayload).eq('id', id);
+    const filteredPayload = Object.fromEntries(
+      Object.entries(updatePayload).filter(([, v]) => v !== undefined),
+    ) as Record<string, unknown>;
+    const { data: newRow, error } = await supabase
+      .from('students')
+      .update(filteredPayload)
+      .eq('id', id)
+      .select('*')
+      .single();
 
     throwIfDbError(error);
+
+    if (newRow) {
+      const changedFields = Object.keys(filteredPayload).filter((k) => k !== 'updated_at');
+      this.auditLogService
+        .logUpdate(
+          'students',
+          id,
+          userEmail,
+          { ...oldRow } as Record<string, unknown>,
+          { ...newRow } as Record<string, unknown>,
+          changedFields,
+          { branchId },
+        )
+        .catch(() => {});
+    }
 
     // Determine academic year to use for template assignment
     // Priority: input.academicYearId > existing student.academic_year_id

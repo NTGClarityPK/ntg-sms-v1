@@ -118,7 +118,13 @@ export class ParentsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'parent_associations');
-    const data = await this.parentsService.linkChild(id, input);
+    const data = await this.parentsService.linkChild(
+      id,
+      input,
+      user.email,
+      branch.branchId,
+      branch.tenantId,
+    );
     return { data };
   }
 
@@ -132,7 +138,14 @@ export class ParentsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'parent_associations');
-    const data = await this.parentsService.updateParentAssociation(id, studentId, input);
+    const data = await this.parentsService.updateParentAssociation(
+      id,
+      studentId,
+      input,
+      user.email,
+      branch.branchId,
+      branch.tenantId,
+    );
     return { data };
   }
 
@@ -145,7 +158,13 @@ export class ParentsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'parent_associations');
-    await this.parentsService.unlinkChild(id, studentId);
+    await this.parentsService.unlinkChild(
+      id,
+      studentId,
+      user.email,
+      branch.branchId,
+      branch.tenantId,
+    );
     return { data: { success: true } };
   }
 

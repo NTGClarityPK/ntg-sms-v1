@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ClassSectionsService } from '../class-sections/class-sections.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
@@ -109,6 +110,7 @@ function mapStudentStatusRow(
 export class AssessmentsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly classSectionsService: ClassSectionsService,
     private readonly teacherAssignmentsService: TeacherAssignmentsService,
@@ -205,7 +207,6 @@ export class AssessmentsService {
     userEmail: string,
   ): Promise<AssessmentDto> {
     const supabase = this.supabaseConfig.getClient();
-    const username = extractUsernameFromEmail(userEmail);
 
     // Determine which mode we're using
     let classSectionIdsToCreate: string[] = [];
@@ -327,15 +328,15 @@ export class AssessmentsService {
       throw new BadRequestException('Subject not found');
     }
 
-    // Create assessments for each class-section
+    // Create assessments for each class-section (created_by/updated_by are user UUIDs)
     const assessmentsToInsert = classSectionIdsToCreate.map((classSectionId) => ({
       title: input.title,
       description: input.description ?? null,
       assessment_type_id: input.assessmentTypeId,
       subject_id: input.subjectId,
       class_section_id: classSectionId,
-      created_by: username,
-      updated_by: username,
+      created_by: createdByUserId,
+      updated_by: createdByUserId,
       total_marks: input.totalMarks,
       due_date: input.dueDate ?? null,
       publish_date: input.publishDate ?? null,
@@ -357,7 +358,15 @@ export class AssessmentsService {
       throw new BadRequestException('Failed to create assessments');
     }
 
-    // Return the first created assessment
+    for (const row of data as AssessmentRow[]) {
+      this.auditLogService
+        .logCreate('assessments', row.id, userEmail, { ...row } as Record<string, unknown>, {
+          branchId,
+          tenantId,
+        })
+        .catch(() => {});
+    }
+
     return mapAssessment(data[0] as AssessmentRow);
   }
 
@@ -365,10 +374,10 @@ export class AssessmentsService {
     id: string,
     input: UpdateAssessmentDto,
     branchId: string,
+    updatedByUserId: string,
     userEmail: string,
   ): Promise<AssessmentDto> {
     const supabase = this.supabaseConfig.getClient();
-    const username = extractUsernameFromEmail(userEmail);
 
     const { data: existing, error: existingError } = await supabase
       .from('assessments')
@@ -399,7 +408,7 @@ export class AssessmentsService {
       payload.is_published = input.isPublished;
     if (input.allowLateSubmission !== undefined)
       payload.allow_late_submission = input.allowLateSubmission;
-    payload.updated_by = username;
+    payload.updated_by = updatedByUserId;
 
     const { data, error } = await supabase
       .from('assessments')
@@ -412,24 +421,40 @@ export class AssessmentsService {
       .single();
     throwIfDbError(error);
 
-    return mapAssessment(data as AssessmentRow);
+    const newRow = data as AssessmentRow;
+    const changedFields = Object.keys(payload).filter((k) => k !== 'updated_by');
+    this.auditLogService
+      .logUpdate(
+        'assessments',
+        id,
+        userEmail,
+        { ...existing } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        changedFields,
+        { branchId },
+      )
+      .catch(() => {});
+    return mapAssessment(newRow);
   }
 
-  async deleteAssessment(id: string, branchId: string): Promise<{ id: string }> {
+  async deleteAssessment(
+    id: string,
+    branchId: string,
+    userEmail: string,
+  ): Promise<{ id: string }> {
     const supabase = this.supabaseConfig.getClient();
 
-    const { data: existing, error: existingError } = await supabase
+    const { data: oldRow, error: existingError } = await supabase
       .from('assessments')
-      .select('id')
+      .select('*')
       .eq('id', id)
       .eq('branch_id', branchId)
       .maybeSingle();
     throwIfDbError(existingError);
-    if (!existing) {
+    if (!oldRow) {
       throw new NotFoundException('Assessment not found');
     }
 
-    // Prevent deletion if grades exist
     const { count, error: gradesError } = await supabase
       .from('student_grades')
       .select('id', { head: true, count: 'exact' })
@@ -448,6 +473,11 @@ export class AssessmentsService {
       .eq('branch_id', branchId);
     throwIfDbError(error);
 
+    this.auditLogService
+      .logDelete('assessments', id, userEmail, { ...oldRow } as Record<string, unknown>, {
+        branchId,
+      })
+      .catch(() => {});
     return { id };
   }
 
@@ -1335,10 +1365,10 @@ export class AssessmentsService {
   async createAssessmentAttachment(
     dto: CreateAssessmentAttachmentDto,
     branchId: string,
+    userEmail: string,
   ): Promise<AssessmentAttachmentDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Verify assessment exists and belongs to branch
     const { data: assessment, error: assessmentError } = await supabase
       .from('assessments')
       .select('id')
@@ -1356,7 +1386,7 @@ export class AssessmentsService {
         assessment_id: dto.assessmentId,
         file_name: dto.fileName,
         file_url: dto.fileUrl,
-        file_size_bytes: null, // Can be added if needed
+        file_size_bytes: null,
         mime_type: dto.mimeType ?? null,
       })
       .select('id, assessment_id, file_name, file_url, file_size_bytes, mime_type, created_at')
@@ -1366,6 +1396,16 @@ export class AssessmentsService {
     if (!attachment) {
       throw new BadRequestException('Failed to create attachment');
     }
+
+    this.auditLogService
+      .logCreate(
+        'assessment_attachments',
+        attachment.id,
+        userEmail,
+        { ...attachment } as Record<string, unknown>,
+        { branchId },
+      )
+      .catch(() => {});
 
     return new AssessmentAttachmentDto({
       id: attachment.id,
@@ -1381,25 +1421,27 @@ export class AssessmentsService {
   /**
    * Delete an attachment
    */
-  async deleteAssessmentAttachment(attachmentId: string, branchId: string): Promise<{ id: string }> {
+  async deleteAssessmentAttachment(
+    attachmentId: string,
+    branchId: string,
+    userEmail: string,
+  ): Promise<{ id: string }> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Verify attachment exists and belongs to an assessment in this branch
-    const { data: attachment, error: attachmentError } = await supabase
+    const { data: oldRow, error: attachmentError } = await supabase
       .from('assessment_attachments')
-      .select('id, assessment_id')
+      .select('*')
       .eq('id', attachmentId)
       .maybeSingle();
     throwIfDbError(attachmentError);
-    if (!attachment) {
+    if (!oldRow) {
       throw new NotFoundException('Attachment not found');
     }
 
-    // Verify the assessment belongs to this branch
     const { data: assessment, error: assessmentError } = await supabase
       .from('assessments')
       .select('id')
-      .eq('id', attachment.assessment_id)
+      .eq('id', oldRow.assessment_id)
       .eq('branch_id', branchId)
       .maybeSingle();
     throwIfDbError(assessmentError);
@@ -1414,6 +1456,15 @@ export class AssessmentsService {
 
     throwIfDbError(error);
 
+    this.auditLogService
+      .logDelete(
+        'assessment_attachments',
+        attachmentId,
+        userEmail,
+        { ...oldRow } as Record<string, unknown>,
+        { branchId },
+      )
+      .catch(() => {});
     return { id: attachmentId };
   }
 }

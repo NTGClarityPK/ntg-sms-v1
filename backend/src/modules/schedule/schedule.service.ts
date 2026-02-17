@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { QueryTimingTemplatesDto } from './dto/query-timing-templates.dto';
 import { TimingTemplateDto } from './dto/timing-template.dto';
 import { PublicHolidayDto } from './dto/public-holiday.dto';
@@ -122,7 +123,10 @@ function mapVacation(row: VacationRow): VacationDto {
 
 @Injectable()
 export class ScheduleService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async getSchoolDays(): Promise<{ data: number[] }> {
     const supabase = this.supabaseConfig.getClient();
@@ -256,6 +260,7 @@ export class ScheduleService {
     },
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<TimingTemplateDto> {
     if (input.startTime >= input.endTime) {
       throw new BadRequestException('startTime must be before endTime');
@@ -277,6 +282,12 @@ export class ScheduleService {
     throwIfDbError(error);
 
     const template = data as TimingTemplateRow;
+    this.auditLogService
+      .logCreate('timing_templates', template.id, userEmail, { ...template } as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
     const createdSlots: TimingSlotDto[] = [];
 
     // Create slots if provided
@@ -366,6 +377,7 @@ export class ScheduleService {
     },
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<PublicHolidayDto> {
     if (input.startDate > input.endDate) {
       throw new BadRequestException('startDate must be on or before endDate');
@@ -399,10 +411,23 @@ export class ScheduleService {
       .single();
     throwIfDbError(error);
 
-    return mapPublicHoliday(data as PublicHolidayRow);
+    const row = data as PublicHolidayRow;
+    this.auditLogService
+      .logCreate('public_holidays', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        branchId,
+        tenantId,
+      })
+      .catch(() => {});
+    return mapPublicHoliday(row);
   }
 
-  async updatePublicHoliday(id: string, input: { name?: string; nameAr?: string; startDate?: string; endDate?: string }): Promise<PublicHolidayDto> {
+  async updatePublicHoliday(
+    id: string,
+    input: { name?: string; nameAr?: string; startDate?: string; endDate?: string },
+    userEmail: string,
+    branchId?: string,
+    tenantId?: string | null,
+  ): Promise<PublicHolidayDto> {
     const supabase = this.supabaseConfig.getClient();
 
     const { data: existing, error: existingError } = await supabase
@@ -446,13 +471,43 @@ export class ScheduleService {
       .single();
     throwIfDbError(error);
 
-    return mapPublicHoliday(data as PublicHolidayRow);
+    const newRow = data as PublicHolidayRow;
+    const changedFields = Object.keys(input) as string[];
+    this.auditLogService
+      .logUpdate(
+        'public_holidays',
+        id,
+        userEmail,
+        current as Record<string, unknown>,
+        newRow as Record<string, unknown>,
+        changedFields.length ? changedFields : [],
+        { branchId: branchId ?? ((current as Record<string, unknown>).branch_id as string), tenantId },
+      )
+      .catch(() => {});
+    return mapPublicHoliday(newRow);
   }
 
-  async deletePublicHoliday(id: string): Promise<{ data: { id: string } }> {
+  async deletePublicHoliday(
+    id: string,
+    userEmail: string,
+    branchId?: string,
+    tenantId?: string | null,
+  ): Promise<{ data: { id: string } }> {
     const supabase = this.supabaseConfig.getClient();
+    const { data: oldRow } = await supabase.from('public_holidays').select('*').eq('id', id).single();
     const { error } = await supabase.from('public_holidays').delete().eq('id', id);
     throwIfDbError(error);
+    if (oldRow) {
+      this.auditLogService
+        .logDelete(
+          'public_holidays',
+          id,
+          userEmail,
+          oldRow as Record<string, unknown>,
+          { branchId: branchId ?? ((oldRow as Record<string, unknown>).branch_id as string), tenantId },
+        )
+        .catch(() => {});
+    }
     return { data: { id } };
   }
 
@@ -469,13 +524,16 @@ export class ScheduleService {
     return { data: ((data as VacationRow[]) ?? []).map(mapVacation) };
   }
 
-  async createVacation(input: {
-    name: string;
-    nameAr?: string;
-    startDate: string;
-    endDate: string;
-    academicYearId: string;
-  }): Promise<VacationDto> {
+  async createVacation(
+    input: {
+      name: string;
+      nameAr?: string;
+      startDate: string;
+      endDate: string;
+      academicYearId: string;
+    },
+    userEmail: string,
+  ): Promise<VacationDto> {
     if (input.startDate > input.endDate) {
       throw new BadRequestException('startDate must be on or before endDate');
     }
@@ -506,10 +564,18 @@ export class ScheduleService {
       .single();
     throwIfDbError(error);
 
-    return mapVacation(data as VacationRow);
+    const row = data as VacationRow;
+    this.auditLogService
+      .logCreate('vacations', row.id, userEmail, { ...row } as Record<string, unknown>, {})
+      .catch(() => {});
+    return mapVacation(row);
   }
 
-  async updateVacation(id: string, input: { name?: string; nameAr?: string; startDate?: string; endDate?: string }): Promise<VacationDto> {
+  async updateVacation(
+    id: string,
+    input: { name?: string; nameAr?: string; startDate?: string; endDate?: string },
+    userEmail: string,
+  ): Promise<VacationDto> {
     const supabase = this.supabaseConfig.getClient();
 
     const { data: existing, error: existingError } = await supabase
@@ -553,13 +619,32 @@ export class ScheduleService {
       .single();
     throwIfDbError(error);
 
-    return mapVacation(data as VacationRow);
+    const newRow = data as VacationRow;
+    const changedFields = Object.keys(input) as string[];
+    this.auditLogService
+      .logUpdate(
+        'vacations',
+        id,
+        userEmail,
+        current as Record<string, unknown>,
+        newRow as Record<string, unknown>,
+        changedFields.length ? changedFields : [],
+        {},
+      )
+      .catch(() => {});
+    return mapVacation(newRow);
   }
 
-  async deleteVacation(id: string): Promise<{ data: { id: string } }> {
+  async deleteVacation(id: string, userEmail: string): Promise<{ data: { id: string } }> {
     const supabase = this.supabaseConfig.getClient();
+    const { data: oldRow } = await supabase.from('vacations').select('*').eq('id', id).single();
     const { error } = await supabase.from('vacations').delete().eq('id', id);
     throwIfDbError(error);
+    if (oldRow) {
+      this.auditLogService
+        .logDelete('vacations', id, userEmail, oldRow as Record<string, unknown>, {})
+        .catch(() => {});
+    }
     return { data: { id } };
   }
 }

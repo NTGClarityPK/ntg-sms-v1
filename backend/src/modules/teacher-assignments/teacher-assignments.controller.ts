@@ -107,6 +107,7 @@ export class TeacherAssignmentsController {
     const data = await this.teacherAssignmentsService.createTeacherAssignment(
       input,
       branch.branchId,
+      user.email,
     );
     return { data };
   }
@@ -123,6 +124,7 @@ export class TeacherAssignmentsController {
       id,
       input,
       branch.branchId,
+      user.email,
     );
     return { data };
   }
@@ -134,7 +136,11 @@ export class TeacherAssignmentsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'teacher_mapping');
-    await this.teacherAssignmentsService.deleteTeacherAssignment(id, branch.branchId);
+    await this.teacherAssignmentsService.deleteTeacherAssignment(
+      id,
+      branch.branchId,
+      user.email,
+    );
     return { message: 'Teacher assignment deleted successfully' };
   }
 

@@ -6,7 +6,7 @@
  */
 
 import { useForm, zodResolver } from '@mantine/form';
-import { Button, Stack, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton, Divider, MultiSelect, Checkbox } from '@mantine/core';
+import { Alert, Button, Stack, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton, Divider, MultiSelect, Checkbox } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconCalendar } from '@tabler/icons-react';
@@ -15,7 +15,7 @@ import type { Assessment, CreateAssessmentInput, UpdateAssessmentInput } from '@
 import { useAssessmentTypes } from '@/hooks/useAssessmentSettings';
 import { useSubjects, useClasses } from '@/hooks/useCoreLookups';
 import { useClassSections } from '@/hooks/useClassSections';
-import { useTemplatesForClass } from '@/hooks/useSubjectTemplates';
+import { useTemplatesForClass, useClassesWithTemplates } from '@/hooks/useSubjectTemplates';
 import { useMyStaff } from '@/hooks/useStaff';
 import { useAssignmentsByTeacher } from '@/hooks/useTeacherAssignments';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
@@ -26,15 +26,17 @@ import { FileUploadForCreate } from './FileUploadForCreate';
 
 type CreationMode = 'single' | 'class-template' | 'class-sections';
 
+// Optional UUID fields accept '' so validation doesn't fail before refine when user hasn't selected yet
+const optionalUuid = () => z.union([z.string().uuid(), z.literal('')]).optional();
 const createAssessmentSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
-  assessmentTypeId: z.string().uuid('Invalid assessment type'),
-  subjectId: z.string().uuid('Invalid subject'),
+  assessmentTypeId: z.string().min(1, 'Select assessment type').pipe(z.string().uuid('Invalid assessment type')),
+  subjectId: z.string().min(1, 'Select subject').pipe(z.string().uuid('Invalid subject')),
   mode: z.enum(['single', 'class-template', 'class-sections']),
-  classSectionId: z.string().uuid('Invalid class section').optional(),
-  classId: z.string().uuid('Invalid class').optional(),
-  subjectTemplateId: z.string().uuid('Invalid subject template').optional(),
+  classSectionId: optionalUuid(),
+  classId: optionalUuid(),
+  subjectTemplateId: optionalUuid(),
   classSectionIds: z.array(z.string().uuid('Invalid class section')).optional(),
   totalMarks: z.number().min(0.01, 'Total marks must be greater than 0'),
   dueDate: z.date().nullable().optional(),
@@ -50,8 +52,18 @@ const createAssessmentSchema = z.object({
     return !!data.classId && !!data.classSectionIds && data.classSectionIds.length > 0;
   }
   return false;
-}, {
-  message: 'Please fill all required fields for the selected mode',
+}, (data) => {
+  const msg = 'Please fill all required fields for the selected mode';
+  if (data.mode === 'single') return { message: msg, path: ['classSectionId'] };
+  if (data.mode === 'class-template') {
+    if (!data.classId) return { message: msg, path: ['classId'] };
+    return { message: msg, path: ['subjectTemplateId'] };
+  }
+  if (data.mode === 'class-sections') {
+    if (!data.classId) return { message: msg, path: ['classId'] };
+    return { message: msg, path: ['classSectionIds'] };
+  }
+  return { message: msg, path: ['classId'] };
 });
 
 const updateAssessmentSchema = z.object({
@@ -186,6 +198,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     isActive: true,
     limit: 100,
   });
+  const { data: classIdsWithTemplatesData } = useClassesWithTemplates(branchId || null);
 
   const handleSubmit = (values: CreateFormValues | UpdateFormValues) => {
     if (isEditMode) {
@@ -218,13 +231,14 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
       };
 
       if (createValues.mode === 'single') {
-        payload.classSectionId = createValues.classSectionId;
+        payload.classSectionId = createValues.classSectionId || undefined;
       } else if (createValues.mode === 'class-template') {
-        payload.classId = createValues.classId;
-        payload.subjectTemplateId = createValues.subjectTemplateId;
+        payload.classId = createValues.classId || undefined;
+        payload.subjectTemplateId = createValues.subjectTemplateId || undefined;
       } else if (createValues.mode === 'class-sections') {
-        payload.classId = createValues.classId;
-        payload.classSectionIds = createValues.classSectionIds;
+        payload.classId = createValues.classId || undefined;
+        payload.classSectionIds =
+          createValues.classSectionIds?.length ? createValues.classSectionIds : undefined;
       }
 
       onSubmit(payload);
@@ -286,6 +300,16 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     return list.sort((a, b) => a.label.localeCompare(b.label));
   }, [classesData, classSectionsData, isTeacherWithAssignments, allowedClassSectionIds]);
 
+  // For "Class + Subject Template (All Sections)" only show classes that have at least one subject template assigned
+  const classIdsWithTemplatesSet = useMemo(
+    () => new Set(classIdsWithTemplatesData ?? []),
+    [classIdsWithTemplatesData],
+  );
+  const classesForTemplateMode = useMemo(
+    () => classes.filter((c) => classIdsWithTemplatesSet.has(c.value)),
+    [classes, classIdsWithTemplatesSet],
+  );
+
   const classSections = useMemo(() => {
     let list = (classSectionsData?.data || [])
       .map((cs) => ({
@@ -325,19 +349,21 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     return [];
   }, [classSectionsForClassData, form.values, isEditMode, isTeacherWithAssignments, allowedClassSectionIds]);
 
-  const dataLoading =
-    assessmentTypesLoading ||
-    subjectsLoading ||
-    classesLoading ||
-    classSectionsLoading ||
-    templatesLoading ||
-    classSectionsForClassLoading;
-
-  // Reset dependent fields when mode or class changes
+  // Reset dependent fields when mode or class changes (used below for conditional UI and loading)
   const currentMode = isEditMode ? undefined : (form.values as CreateFormValues).mode;
   const currentClassId = isEditMode ? undefined : (form.values as CreateFormValues).classId;
 
-  if (dataLoading) {
+  // Only block entire form on initial lookup data; dependent data (templates/sections for selected class) must not replace the form
+  const initialDataLoading =
+    assessmentTypesLoading ||
+    subjectsLoading ||
+    classesLoading ||
+    classSectionsLoading;
+  const dependentDataLoading =
+    (currentMode === 'class-template' && !!currentClassId && templatesLoading) ||
+    (currentMode === 'class-sections' && !!currentClassId && classSectionsForClassLoading);
+
+  if (initialDataLoading) {
     return (
       <Stack gap="md">
         <Skeleton height={40} />
@@ -356,13 +382,34 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     return createForm.getInputProps(field as keyof CreateFormValues);
   };
 
+  const createFormErrors = !isEditMode ? (createForm.errors as Record<string, string>) : {};
+  const hasCreateErrors = Object.keys(createFormErrors).length > 0;
+  const firstCreateError =
+    createFormErrors.title ||
+    createFormErrors.assessmentTypeId ||
+    createFormErrors.subjectId ||
+    createFormErrors.classSectionId ||
+    createFormErrors.classId ||
+    createFormErrors.subjectTemplateId ||
+    createFormErrors.classSectionIds ||
+    createFormErrors._root ||
+    'Please complete all required fields above.';
+
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)} onKeyDown={(e) => {
-      if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
-        e.preventDefault();
-      }
-    }}>
+    <form
+      onSubmit={form.onSubmit(handleSubmit)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+          e.preventDefault();
+        }
+      }}
+    >
       <Stack gap="md">
+        {hasCreateErrors && (
+          <Alert variant="light" color="red" title="Cannot create yet">
+            {firstCreateError}
+          </Alert>
+        )}
         <TextInput label="Title" placeholder="Enter assessment title" required {...getInputProps('title')} />
 
         <Textarea
@@ -465,9 +512,10 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
                 <Select
                   label="Class"
                   placeholder="Select class"
-                  data={classes}
+                  data={classesForTemplateMode}
                   required
                   searchable
+                  error={createForm.errors.classId}
                   value={createForm.values.classId || null}
                   onChange={(value) => {
                     if (value !== createForm.values.classId) {
@@ -479,11 +527,12 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
                 />
                 <Select
                   label="Subject Template"
-                  placeholder="Select subject template"
+                  placeholder={dependentDataLoading && currentMode === 'class-template' ? 'Loading…' : 'Select subject template'}
                   data={subjectTemplates}
                   required
                   searchable
-                  disabled={!currentClassId}
+                  disabled={!currentClassId || (currentMode === 'class-template' && !!currentClassId && templatesLoading)}
+                  error={createForm.errors.subjectTemplateId}
                   value={createForm.values.subjectTemplateId || null}
                   onChange={(value) => {
                     if (value !== createForm.values.subjectTemplateId) {
@@ -511,6 +560,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
                   data={classes}
                   required
                   searchable
+                  error={createForm.errors.classId}
                   value={createForm.values.classId || null}
                   onChange={(value) => {
                     if (value !== createForm.values.classId) {
@@ -521,11 +571,12 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
                 />
                 <MultiSelect
                   label="Class Sections"
-                  placeholder="Select sections"
+                  placeholder={dependentDataLoading && currentMode === 'class-sections' ? 'Loading…' : 'Select sections'}
                   data={sectionsForClass}
                   required
                   searchable
-                  disabled={!currentClassId}
+                  disabled={!currentClassId || (currentMode === 'class-sections' && !!currentClassId && classSectionsForClassLoading)}
+                  error={createForm.errors.classSectionIds}
                   value={createForm.values.classSectionIds || []}
                   onChange={(value) => {
                     createForm.setFieldValue('classSectionIds', value);
@@ -580,7 +631,12 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
         {assessment?.id ? (
           <FileUpload assessmentId={assessment.id} />
         ) : (
-          <FileUploadForCreate files={filesToUpload} onFilesChange={onFilesChange || (() => {})} />
+          <>
+            <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>
+              Optional: Assignment materials
+            </div>
+            <FileUploadForCreate files={filesToUpload} onFilesChange={onFilesChange || (() => {})} />
+          </>
         )}
 
         <Group justify="flex-end" mt="md">

@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } fro
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { SubjectTemplatesService } from './subject-templates.service';
 import { CreateSubjectTemplateDto } from './dto/create-subject-template.dto';
 import { UpdateSubjectTemplateDto } from './dto/update-subject-template.dto';
@@ -20,11 +21,13 @@ export class SubjectTemplatesController {
   async create(
     @Body() body: CreateSubjectTemplateDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: SubjectTemplateDto }> {
     const created = await this.subjectTemplatesService.createSubjectTemplate(
       body,
       branch.branchId,
       branch.tenantId,
+      user.email,
     );
     return { data: created };
   }
@@ -35,6 +38,13 @@ export class SubjectTemplatesController {
     @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{ data: SubjectTemplateDto[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
     return this.subjectTemplatesService.listSubjectTemplates(query, branch.branchId);
+  }
+
+  @Get('classes-with-templates')
+  async getClassIdsWithTemplates(
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: string[] }> {
+    return this.subjectTemplatesService.getClassIdsWithTemplates(branch.branchId);
   }
 
   @Get('class/:classId')
@@ -58,12 +68,15 @@ export class SubjectTemplatesController {
     @Param('studentId') studentId: string,
     @Body() body: AssignStudentToTemplateDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: SubjectTemplateDto }> {
     return this.subjectTemplatesService.assignStudentToTemplate(
       studentId,
       body.subjectTemplateId,
       body.academicYearId,
       branch.branchId,
+      user.email,
+      branch.tenantId,
     );
   }
 
@@ -85,12 +98,19 @@ export class SubjectTemplatesController {
     @Param('studentId') studentId: string,
     @Query('academicYearId') academicYearId: string | undefined,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: { studentId: string; academicYearId: string } }> {
     // TODO: Get active academic year if not provided
     if (!academicYearId) {
       throw new Error('academicYearId is required');
     }
-    return this.subjectTemplatesService.removeStudentTemplate(studentId, academicYearId, branch.branchId);
+    return this.subjectTemplatesService.removeStudentTemplate(
+      studentId,
+      academicYearId,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
   }
 
   @Get(':id')
@@ -107,8 +127,15 @@ export class SubjectTemplatesController {
     @Param('id') id: string,
     @Body() body: UpdateSubjectTemplateDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: SubjectTemplateDto }> {
-    const updated = await this.subjectTemplatesService.updateSubjectTemplate(id, body, branch.branchId);
+    const updated = await this.subjectTemplatesService.updateSubjectTemplate(
+      id,
+      body,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data: updated };
   }
 
@@ -116,8 +143,14 @@ export class SubjectTemplatesController {
   async delete(
     @Param('id') id: string,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: { id: string } }> {
-    return this.subjectTemplatesService.deleteSubjectTemplate(id, branch.branchId);
+    return this.subjectTemplatesService.deleteSubjectTemplate(
+      id,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
   }
 
   @Post(':id/assign-classes')
@@ -125,8 +158,15 @@ export class SubjectTemplatesController {
     @Param('id') id: string,
     @Body() body: AssignClassesToTemplateDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: string[] }> {
-    return this.subjectTemplatesService.assignClassesToTemplate(id, body.classIds, branch.branchId);
+    return this.subjectTemplatesService.assignClassesToTemplate(
+      id,
+      body.classIds,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
   }
 
   @Post(':id/assign-levels')
@@ -134,8 +174,15 @@ export class SubjectTemplatesController {
     @Param('id') id: string,
     @Body() body: AssignLevelsToTemplateDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: string[] }> {
-    return this.subjectTemplatesService.assignLevelsToTemplate(id, body.levelIds, branch.branchId);
+    return this.subjectTemplatesService.assignLevelsToTemplate(
+      id,
+      body.levelIds,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
   }
 }
 

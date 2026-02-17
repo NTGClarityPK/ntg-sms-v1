@@ -11,7 +11,10 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
-import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
+import {
+  CurrentBranch,
+  CurrentBranchContext,
+} from '../../common/decorators/current-branch.decorator';
 import {
   CurrentUser,
   type CurrentUserPayload,
@@ -199,35 +202,47 @@ export class TimetableController {
   @Post('slots')
   async createOrUpdateSlot(
     @Body() input: CreateTimetableSlotDto,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
-    const data = await this.timetableService.createOrUpdateSlot(input, branch.branchId);
+    const data = await this.timetableService.createOrUpdateSlot(
+      input,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data };
   }
 
   @Delete('slots/:id')
   async deleteSlot(
     @Param('id') id: string,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
-    const data = await this.timetableService.deleteSlot(id, branch.branchId);
+    const data = await this.timetableService.deleteSlot(
+      id,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data };
   }
 
   @Post('generate')
   async generateTimetable(
     @Body() input: GenerateTimetableDto,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
     const data = await this.timetableService.generateFromTimingTemplate(
       input.classSectionId,
       branch.branchId,
+      user.email,
+      branch.tenantId,
       input.academicYearId,
       input.subjectTemplateId,
     );
@@ -237,33 +252,48 @@ export class TimetableController {
   @Post('replicate-day')
   async replicateDay(
     @Body() input: ReplicateDayDto,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
-    const data = await this.timetableService.replicateDay(input, branch.branchId);
+    const data = await this.timetableService.replicateDay(
+      input,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data };
   }
 
   @Post('replicate-across-sections')
   async replicateAcrossSections(
     @Body() input: ReplicateAcrossSectionsDto,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
-    const data = await this.timetableService.replicateAcrossSections(input, branch.branchId);
+    const data = await this.timetableService.replicateAcrossSections(
+      input,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data };
   }
 
   @Post('replicate-from-section')
   async replicateFromSection(
     @Body() input: ReplicateFromSectionDto,
-    @CurrentBranch() branch: { branchId: string },
+    @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
-    const data = await this.timetableService.replicateFromSection(input, branch.branchId);
+    const data = await this.timetableService.replicateFromSection(
+      input,
+      branch.branchId,
+      user.email,
+      branch.tenantId,
+    );
     return { data };
   }
 }

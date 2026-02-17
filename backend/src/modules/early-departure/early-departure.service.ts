@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TimetableService } from '../timetable/timetable.service';
@@ -47,6 +48,7 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class EarlyDepartureService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly notificationsService: NotificationsService,
     private readonly timetableService: TimetableService,
@@ -239,6 +241,8 @@ export class EarlyDepartureService {
     input: CreateEarlyDepartureRequestDto,
     userId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<EarlyDepartureRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -292,6 +296,15 @@ export class EarlyDepartureService {
     }
 
     const row = data as EarlyDepartureRow;
+    this.auditLogService
+      .logCreate(
+        'early_departure_requests',
+        row.id,
+        userEmail,
+        { ...row } as Record<string, unknown>,
+        { branchId, tenantId: tenantId ?? null },
+      )
+      .catch(() => {});
 
     // Notify school admin, admin assistant, and class teacher (best-effort)
     try {
@@ -327,6 +340,8 @@ export class EarlyDepartureService {
     input: CreateEarlyDepartureRequestDto,
     authorizedByUserId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<EarlyDepartureRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -377,6 +392,15 @@ export class EarlyDepartureService {
     }
 
     const row = data as EarlyDepartureRow;
+    this.auditLogService
+      .logCreate(
+        'early_departure_requests',
+        row.id,
+        userEmail,
+        { ...row } as Record<string, unknown>,
+        { branchId, tenantId: tenantId ?? null },
+      )
+      .catch(() => {});
 
     // Notify parent(s) with critical notification
     try {
@@ -562,6 +586,8 @@ export class EarlyDepartureService {
     input: UpdateEarlyDepartureStatusDto,
     reviewerUserId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
     isParent: boolean = false,
   ): Promise<EarlyDepartureRequestDto> {
     const supabase = this.supabaseConfig.getClient();
@@ -617,9 +643,17 @@ export class EarlyDepartureService {
     }
 
     const updatedRow = data as EarlyDepartureRow;
-
-    // Map with conflict detection
-    const result = await this.mapRowToDtoWithConflict(updatedRow, branchId);
+    this.auditLogService
+      .logUpdate(
+        'early_departure_requests',
+        id,
+        userEmail,
+        { ...existingRow } as Record<string, unknown>,
+        { ...updatedRow } as Record<string, unknown>,
+        ['status', 'review_notes', 'reviewed_by', 'reviewed_at', 'updated_at'],
+        { branchId, tenantId: tenantId ?? null },
+      )
+      .catch(() => {});
 
     // Best-effort notification to parent who requested
     try {
@@ -661,6 +695,8 @@ export class EarlyDepartureService {
     id: string,
     userId: string,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<EarlyDepartureRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -704,6 +740,17 @@ export class EarlyDepartureService {
     }
 
     const updatedRow = data as EarlyDepartureRow;
+    this.auditLogService
+      .logUpdate(
+        'early_departure_requests',
+        id,
+        userEmail,
+        { ...existingRow } as Record<string, unknown>,
+        { ...updatedRow } as Record<string, unknown>,
+        ['status', 'updated_at'],
+        { branchId, tenantId: tenantId ?? null },
+      )
+      .catch(() => {});
     return await this.mapRowToDtoWithConflict(updatedRow, branchId);
   }
 

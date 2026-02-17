@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { TeacherAssignmentDto } from './dto/teacher-assignment.dto';
 import { QueryTeacherAssignmentsDto } from './dto/query-teacher-assignments.dto';
@@ -45,6 +46,7 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class TeacherAssignmentsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
   ) {}
 
@@ -199,6 +201,7 @@ export class TeacherAssignmentsService {
   async createTeacherAssignment(
     input: CreateTeacherAssignmentDto,
     branchId: string,
+    userEmail: string,
     academicYearId?: string,
   ): Promise<TeacherAssignmentDto> {
     const supabase = this.supabaseConfig.getClient();
@@ -276,20 +279,34 @@ export class TeacherAssignmentsService {
       .single();
 
     throwIfDbError(error);
-    return this.getTeacherAssignmentById((data as TeacherAssignmentRow).id, branchId);
+    const row = data as TeacherAssignmentRow;
+    this.auditLogService
+      .logCreate('teacher_assignments', row.id, userEmail, { ...row } as Record<string, unknown>, {
+        branchId,
+      })
+      .catch(() => {});
+    return this.getTeacherAssignmentById(row.id, branchId);
   }
 
   async updateTeacherAssignment(
     id: string,
     input: UpdateTeacherAssignmentDto,
     branchId: string,
+    userEmail: string,
   ): Promise<TeacherAssignmentDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Verify it exists and belongs to branch
-    const existing = await this.getTeacherAssignmentById(id, branchId);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('teacher_assignments')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) {
+      throw new NotFoundException('Teacher assignment not found');
+    }
 
-    // Validate new staff belongs to branch
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
       .select('id')
@@ -310,14 +327,38 @@ export class TeacherAssignmentsService {
       .single();
 
     throwIfDbError(error);
-    return this.getTeacherAssignmentById((data as TeacherAssignmentRow).id, branchId);
+    const newRow = data as TeacherAssignmentRow;
+    this.auditLogService
+      .logUpdate(
+        'teacher_assignments',
+        id,
+        userEmail,
+        { ...oldRow } as Record<string, unknown>,
+        { ...newRow } as Record<string, unknown>,
+        ['staff_id'],
+        { branchId },
+      )
+      .catch(() => {});
+    return this.getTeacherAssignmentById(newRow.id, branchId);
   }
 
-  async deleteTeacherAssignment(id: string, branchId: string): Promise<void> {
-    // Verify it exists and belongs to branch
-    await this.getTeacherAssignmentById(id, branchId);
-
+  async deleteTeacherAssignment(
+    id: string,
+    branchId: string,
+    userEmail: string,
+  ): Promise<void> {
     const supabase = this.supabaseConfig.getClient();
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('teacher_assignments')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) {
+      throw new NotFoundException('Teacher assignment not found');
+    }
+
     const { error } = await supabase
       .from('teacher_assignments')
       .delete()
@@ -325,6 +366,15 @@ export class TeacherAssignmentsService {
       .eq('branch_id', branchId);
 
     throwIfDbError(error);
+    this.auditLogService
+      .logDelete(
+        'teacher_assignments',
+        id,
+        userEmail,
+        { ...oldRow } as Record<string, unknown>,
+        { branchId },
+      )
+      .catch(() => {});
   }
 
   async getAssignmentsByTeacher(

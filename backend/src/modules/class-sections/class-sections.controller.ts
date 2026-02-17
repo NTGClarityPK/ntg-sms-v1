@@ -135,7 +135,7 @@ export class ClassSectionsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'class_sections');
-    await this.classSectionsService.deleteClassSection(id, branch.branchId);
+    await this.classSectionsService.deleteClassSection(id, branch.branchId, user.email);
     return { message: 'Class section deleted successfully' };
   }
 

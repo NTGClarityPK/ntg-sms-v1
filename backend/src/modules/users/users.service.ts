@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { UserDto } from './dto/user.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
@@ -45,7 +46,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   /**
    * Ensure a basic staff record exists for a user in a given branch.
@@ -363,7 +367,12 @@ export class UsersService {
     });
   }
 
-  async createUser(input: CreateUserDto, branchId: string): Promise<UserDto> {
+  async createUser(
+    input: CreateUserDto,
+    branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
+  ): Promise<UserDto> {
     const supabase = this.supabaseConfig.getClient();
 
     // Create auth user
@@ -409,6 +418,16 @@ export class UsersService {
         throw new BadRequestException('Failed to create profile');
       }
 
+      this.auditLogService
+        .logCreate(
+          'profiles',
+          (profile as { id: string }).id,
+          userEmail,
+          { ...(profile as Record<string, unknown>) },
+          { branchId, tenantId },
+        )
+        .catch(() => {});
+
       // Assign to branch
       const { error: branchError } = await supabase.from('user_branches').insert({
         user_id: user.id,
@@ -432,6 +451,16 @@ export class UsersService {
 
         if (rolesError) {
           throw new BadRequestException(rolesError.message);
+        }
+
+        for (const row of roleAssignments) {
+          const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
+          this.auditLogService
+            .logCreate('user_roles', recordId, userEmail, { ...row } as Record<string, unknown>, {
+              branchId,
+              tenantId,
+            })
+            .catch(() => {});
         }
 
         // If any of the assigned roles are staff roles, ensure a staff record exists
@@ -460,13 +489,25 @@ export class UsersService {
     }
   }
 
-  async updateUser(id: string, input: UpdateUserDto, branchId: string): Promise<UserDto> {
+  async updateUser(
+    id: string,
+    input: UpdateUserDto,
+    branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
+  ): Promise<UserDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Verify user exists in branch
-    await this.getUserById(id, branchId);
+    // Verify user exists in branch and get current profile for audit
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', id)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('User not found');
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('profiles')
       .update({
         full_name: input.fullName,
@@ -478,9 +519,29 @@ export class UsersService {
         is_active: input.isActive,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select('*')
+      .single();
 
     throwIfDbError(error);
+    if (!updated) throw new BadRequestException('Update failed');
+
+    const oldProfile = oldRow as Record<string, unknown>;
+    const newProfile = updated as Record<string, unknown>;
+    const changedFields = Object.keys(input).filter(
+      (k) => oldProfile[k] !== newProfile[k],
+    ) as string[];
+    this.auditLogService
+      .logUpdate(
+        'profiles',
+        id,
+        userEmail,
+        oldProfile,
+        newProfile,
+        changedFields.length ? changedFields : [],
+        { branchId, tenantId },
+      )
+      .catch(() => {});
 
     return this.getUserById(id, branchId);
   }
@@ -489,11 +550,22 @@ export class UsersService {
     id: string,
     input: UpdateUserRolesDto,
     branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
   ): Promise<UserDto> {
     const supabase = this.supabaseConfig.getClient();
 
     // Verify user exists in branch
     await this.getUserById(id, branchId);
+
+    // Fetch existing roles for audit before delete
+    const { data: oldRoles, error: fetchError } = await supabase
+      .from('user_roles')
+      .select('user_id, role_id, branch_id')
+      .eq('user_id', id)
+      .eq('branch_id', branchId);
+    throwIfDbError(fetchError);
+    const oldRows = (oldRoles || []) as Array<{ user_id: string; role_id: string; branch_id: string }>;
 
     // Delete existing roles for this branch
     const { error: deleteError } = await supabase
@@ -503,6 +575,16 @@ export class UsersService {
       .eq('branch_id', branchId);
 
     throwIfDbError(deleteError);
+
+    for (const row of oldRows) {
+      const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
+      this.auditLogService
+        .logDelete('user_roles', recordId, userEmail, { ...row } as Record<string, unknown>, {
+          branchId,
+          tenantId,
+        })
+        .catch(() => {});
+    }
 
     // Insert new roles
     if (input.roleIds.length > 0) {
@@ -515,6 +597,16 @@ export class UsersService {
       const { error: insertError } = await supabase.from('user_roles').insert(roleAssignments);
 
       throwIfDbError(insertError);
+
+      for (const row of roleAssignments) {
+        const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
+        this.auditLogService
+          .logCreate('user_roles', recordId, userEmail, { ...row } as Record<string, unknown>, {
+            branchId,
+            tenantId,
+          })
+          .catch(() => {});
+      }
 
       // If any of the new roles are staff roles, ensure a staff record exists
       const { data: rolesData, error: rolesLookupError } = await supabase
@@ -537,22 +629,47 @@ export class UsersService {
     return this.getUserById(id, branchId);
   }
 
-  async deleteUser(id: string, branchId: string): Promise<void> {
+  async deleteUser(
+    id: string,
+    branchId: string,
+    userEmail: string,
+    tenantId?: string | null,
+  ): Promise<void> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Verify user exists in branch
-    await this.getUserById(id, branchId);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', id)
+      .single();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('User not found');
 
     // Soft delete: set is_active = false
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('profiles')
       .update({
         is_active: false,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select('*')
+      .single();
 
     throwIfDbError(error);
+    if (!updated) throw new BadRequestException('Update failed');
+
+    this.auditLogService
+      .logUpdate(
+        'profiles',
+        id,
+        userEmail,
+        oldRow as Record<string, unknown>,
+        updated as Record<string, unknown>,
+        ['is_active', 'updated_at'],
+        { branchId, tenantId },
+      )
+      .catch(() => {});
   }
 }
 
