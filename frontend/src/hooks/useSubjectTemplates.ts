@@ -164,7 +164,10 @@ export function useAssignLevelsToTemplate() {
   });
 }
 
-export function useClassesWithTemplates(branchId: string | null) {
+export function useClassesWithTemplates(
+  branchId: string | null,
+  options?: { enabled?: boolean },
+) {
   return useQuery<string[]>({
     queryKey: ['subject-templates', 'classes-with-templates', branchId],
     queryFn: async () => {
@@ -172,7 +175,7 @@ export function useClassesWithTemplates(branchId: string | null) {
       const data = response?.data;
       return Array.isArray(data) ? data : [];
     },
-    enabled: !!branchId,
+    enabled: !!branchId && (options?.enabled !== false),
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -191,25 +194,12 @@ export function useTemplatesForClass(classId: string | null, branchId: string | 
       // response.data = SubjectTemplateDto[] (the array)
       const response = await apiClient.get<SubjectTemplate[]>(`/api/v1/subject-templates/class/${classId}`);
       
-      // Debug logging
-      if (typeof window !== 'undefined') {
-        console.log('[useTemplatesForClass] classId:', classId);
-        console.log('[useTemplatesForClass] branchId:', branchId);
-        console.log('[useTemplatesForClass] Raw response:', response);
-        console.log('[useTemplatesForClass] response.data:', response.data);
-        console.log('[useTemplatesForClass] Is array?', Array.isArray(response.data));
-      }
-      
       // response is { data: SubjectTemplateDto[] }
       // response.data is SubjectTemplateDto[] (the array)
       if (Array.isArray(response.data)) {
         return { data: response.data as SubjectTemplate[] };
       }
       
-      // Fallback: return empty
-      if (typeof window !== 'undefined') {
-        console.warn('[useTemplatesForClass] Unexpected response shape. Expected array but got:', typeof response.data, response.data);
-      }
       return { data: [] };
     },
     enabled: !!classId && !!branchId,

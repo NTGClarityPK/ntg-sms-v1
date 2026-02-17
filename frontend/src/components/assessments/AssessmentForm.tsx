@@ -193,12 +193,17 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     selectedClassId || null,
     branchId || null,
   );
+  const currentMode = isEditMode ? undefined : (form.values as CreateFormValues).mode;
+  const currentClassId = isEditMode ? undefined : (form.values as CreateFormValues).classId;
   const { data: classSectionsForClassData, isLoading: classSectionsForClassLoading } = useClassSections({
     classId: selectedClassId,
     isActive: true,
     limit: 100,
+    enabled: currentMode === 'class-sections' && !!selectedClassId,
   });
-  const { data: classIdsWithTemplatesData } = useClassesWithTemplates(branchId || null);
+  const { data: classIdsWithTemplatesData } = useClassesWithTemplates(branchId || null, {
+    enabled: currentMode === 'class-template',
+  });
 
   const handleSubmit = (values: CreateFormValues | UpdateFormValues) => {
     if (isEditMode) {
@@ -348,10 +353,6 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
     }
     return [];
   }, [classSectionsForClassData, form.values, isEditMode, isTeacherWithAssignments, allowedClassSectionIds]);
-
-  // Reset dependent fields when mode or class changes (used below for conditional UI and loading)
-  const currentMode = isEditMode ? undefined : (form.values as CreateFormValues).mode;
-  const currentClassId = isEditMode ? undefined : (form.values as CreateFormValues).classId;
 
   // Only block entire form on initial lookup data; dependent data (templates/sections for selected class) must not replace the form
   const initialDataLoading =

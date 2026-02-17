@@ -14,6 +14,7 @@ export function useAssessmentTypes() {
     queryKey: assessmentKeys.types,
     queryFn: async () =>
       apiClient.get<AssessmentType[]>('/api/v1/assessment-types', { params: { page: 1, limit: 100 } }),
+    staleTime: 5 * 60 * 1000, // 5 minutes - types rarely change
   });
 }
 

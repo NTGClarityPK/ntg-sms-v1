@@ -27,6 +27,8 @@ interface QueryClassSectionsParams {
   classTeacherId?: string;
   /** When true, backend skips student counts and teacher names (faster for dropdowns) */
   minimal?: boolean;
+  /** When false, query does not run (e.g. defer until mode/selection is set) */
+  enabled?: boolean;
 }
 
 export function useClassSections(params?: QueryClassSectionsParams) {
@@ -57,7 +59,7 @@ export function useClassSections(params?: QueryClassSectionsParams) {
       );
       return response;
     },
-    enabled: !!branchId,
+    enabled: !!branchId && (params?.enabled !== false),
     staleTime: 2 * 60 * 1000,  // 2 minutes - class sections rarely change mid-session
   });
 }
