@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { flushSync } from 'react-dom';
 import { apiClient } from '@/lib/api-client';
 import type {
   Conversation,
@@ -10,6 +11,7 @@ import type {
 import { useAuth } from '@/hooks/useAuth';
 import { notifications } from '@mantine/notifications';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import type { QueryKey } from '@tanstack/react-query';
 
 interface QueryConversationsParams {
   page?: number;
@@ -90,6 +92,7 @@ export function useConversationMessages(
 export function useSendMessage(conversationId: string | null) {
   const queryClient = useQueryClient();
   const notifyColors = useThemeColors();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (input: CreateMessageInput) => {
@@ -100,11 +103,100 @@ export function useSendMessage(conversationId: string | null) {
       );
       return (response as { data?: Message })?.data;
     },
-    onSuccess: (_, __, context) => {
-      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversationId] });
+    onMutate: async (input) => {
+      if (!conversationId || !user?.id) return;
+
+      // Snapshot previous value for rollback (synchronous)
+      const previousData = queryClient.getQueriesData({
+        queryKey: ['conversation-messages', conversationId],
+      });
+
+      // Optimistically add message to cache IMMEDIATELY (synchronous)
+      const optimisticMessage: Message = {
+        id: `temp-${Date.now()}`,
+        conversationId,
+        senderId: user.id,
+        messageType: input.messageType ?? 'other',
+        subject: input.subject ?? '',
+        body: input.body ?? '',
+        createdAt: new Date().toISOString(),
+        isRead: true,
+        senderName: user.fullName,
+      };
+
+      // Update ALL matching queries IMMEDIATELY (synchronous)
+      // Use flushSync to ensure React processes the update synchronously and triggers immediate re-render
+      flushSync(() => {
+        queryClient.setQueriesData(
+          {
+            predicate: (query) => {
+              const key = query.queryKey;
+              return (
+                Array.isArray(key) &&
+                key.length >= 2 &&
+                key[0] === 'conversation-messages' &&
+                key[1] === conversationId
+              );
+            },
+          },
+          (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
+            if (!prev) {
+              return { data: [optimisticMessage], meta: undefined };
+            }
+            const list = prev.data ?? [];
+            // Create new array reference to ensure React Query detects the change
+            return { ...prev, data: [...list, optimisticMessage] };
+          },
+        );
+      });
+
+      // Cancel outgoing refetches AFTER optimistic update (non-blocking)
+      queryClient.cancelQueries({ queryKey: ['conversation-messages', conversationId] }).catch(() => {});
+
+      return { previousData };
+    },
+    onSuccess: (data, variables, context) => {
+      if (!conversationId || !data) return;
+
+      // Replace optimistic message with real one from server
+      queryClient.setQueriesData(
+        {
+          predicate: (query) => {
+            const key = query.queryKey;
+            return (
+              Array.isArray(key) &&
+              key.length >= 2 &&
+              key[0] === 'conversation-messages' &&
+              key[1] === conversationId
+            );
+          },
+        },
+        (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
+          if (!prev) return { data: [data], meta: undefined };
+          const list = prev.data ?? [];
+          
+          // Check if real message already exists (from Realtime)
+          if (list.some((m) => m.id === data.id)) {
+            // Already added by Realtime, just remove any temp messages
+            const filtered = list.filter((m) => !m.id.startsWith('temp-'));
+            return { ...prev, data: filtered };
+          }
+          
+          // Replace optimistic message(s) with real one
+          const filtered = list.filter((m) => !m.id.startsWith('temp-'));
+          return { ...prev, data: [...filtered, data] };
+        },
+      );
+
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
-    onError: (error: unknown) => {
+    onError: (error, variables, context) => {
+      // Rollback optimistic update on error
+      if (context?.previousData) {
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
       const message = error instanceof Error ? error.message : 'Failed to send message';
       notifications.show({ title: 'Error', message, color: notifyColors.error });
     },
@@ -131,6 +223,22 @@ export function useMarkMessageRead() {
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to mark as read';
       notifications.show({ title: 'Error', message, color: notifyColors.error });
+    },
+  });
+}
+
+/** Mark all messages in a conversation as read for the current user (e.g. when viewing the thread). */
+export function useMarkConversationRead(conversationId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!conversationId) return;
+      await apiClient.put(`/api/v1/conversations/${conversationId}/read`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
 }

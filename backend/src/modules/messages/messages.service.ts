@@ -576,8 +576,8 @@ export class MessagesService {
       .insert({
         conversation_id: conversationId,
         sender_id: userId,
-        message_type: dto.messageType,
-        subject: dto.subject,
+        message_type: dto.messageType ?? 'other',
+        subject: dto.subject ?? '',
         body: dto.body ?? '',
       })
       .select('id, conversation_id, sender_id, message_type, subject, body, created_at')
@@ -598,12 +598,13 @@ export class MessagesService {
     }
 
     try {
+      const notificationBody = (dto.body ?? '').trim().slice(0, 80) || 'You have a new message';
       for (const recipientId of recipientIds) {
         await this.notificationsService.createNotification({
           userId: recipientId,
           type: 'message',
           title: 'New message',
-          body: dto.subject || 'You have a new message',
+          body: notificationBody,
           data: { conversationId, messageId: msgRow.id },
         });
       }
@@ -679,5 +680,36 @@ export class MessagesService {
       isRead: true,
       senderName,
     });
+  }
+
+  /** Mark all messages in a conversation as read for the current user (e.g. when viewing the thread). */
+  async markConversationRead(conversationId: string, userId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: partRows, error: partError } = await supabase
+      .from('conversation_participants')
+      .select('user_id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+    throwIfDbError(partError);
+    if (!partRows || partRows.length === 0) {
+      throw new ForbiddenException('You are not a participant in this conversation');
+    }
+
+    const { data: messageRows, error: msgError } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', conversationId);
+    throwIfDbError(msgError);
+    const messageIds = (messageRows || []).map((m: { id: string }) => m.id);
+    if (messageIds.length === 0) return;
+
+    const now = new Date().toISOString();
+    await supabase
+      .from('message_reads')
+      .update({ read_at: now })
+      .eq('user_id', userId)
+      .in('message_id', messageIds)
+      .is('read_at', null);
   }
 }

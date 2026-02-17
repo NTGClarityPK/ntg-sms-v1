@@ -49,9 +49,9 @@ export interface Message {
 }
 
 export interface CreateMessageInput {
-  messageType: MessageType;
-  subject: string;
-  body?: string;
+  body: string;
+  messageType?: MessageType;
+  subject?: string;
 }
 
 export interface CreateConversationInput {

@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -63,6 +64,15 @@ export class ConversationsController {
       branch.branchId,
     );
     return { data };
+  }
+
+  @Put(':id/read')
+  async markConversationAsRead(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.messagesService.markConversationRead(id, user.id);
+    return { data: null };
   }
 
   @Get(':id/messages')

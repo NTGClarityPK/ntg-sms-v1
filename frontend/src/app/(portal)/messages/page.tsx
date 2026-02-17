@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Title,
@@ -12,44 +13,23 @@ import {
   Button,
   Skeleton,
   ScrollArea,
-  TextInput,
   Textarea,
   Select,
-  Divider,
   Modal,
   SimpleGrid,
   useMantineTheme,
+  ActionIcon,
 } from '@mantine/core';
 import { useSearchParams } from 'next/navigation';
-import { IconMessage, IconPlus } from '@tabler/icons-react';
-import { useConversations, useConversation, useConversationMessages, useSendMessage, useMarkMessageRead, useCreateConversation } from '@/hooks/api/useMessages';
+import { IconMessage, IconPlus, IconSend } from '@tabler/icons-react';
+import { useConversations, useConversation, useConversationMessages, useSendMessage, useMarkConversationRead, useCreateConversation } from '@/hooks/api/useMessages';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useUsers } from '@/hooks/useUsers';
 import { useSystemSetting } from '@/hooks/useSystemSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { supabase } from '@/lib/supabase/client';
 import type { MessageType, ConversationListItem, Message } from '@/types/messages';
-
-const MESSAGE_TYPES: { value: MessageType; label: string }[] = [
-  { value: 'event', label: 'Event' },
-  { value: 'meeting', label: 'Meeting' },
-  { value: 'grade', label: 'Grade' },
-  { value: 'other', label: 'Other' },
-];
-
-function getMessageTypeColor(type: MessageType, colors: ReturnType<typeof useThemeColors>) {
-  switch (type) {
-    case 'event':
-      return colors.primary;
-    case 'meeting':
-      return colors.info;
-    case 'grade':
-      return colors.success;
-    case 'other':
-    default:
-      return colors.primary;
-  }
-}
 
 export default function MessagesPage() {
   const searchParams = useSearchParams();
@@ -58,10 +38,9 @@ export default function MessagesPage() {
   const { user } = useAuth();
   const conversationIdFromUrl = searchParams.get('conversation');
   const [selectedId, setSelectedId] = useState<string | null>(conversationIdFromUrl);
-  const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [messageType, setMessageType] = useState<MessageType>('other');
   const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [newType, setNewType] = useState<'one_to_one' | 'broadcast'>('one_to_one');
   const [newRecipientUserId, setNewRecipientUserId] = useState<string | null>(null);
   const [newClassSectionId, setNewClassSectionId] = useState<string | null>(null);
@@ -70,6 +49,10 @@ export default function MessagesPage() {
     if (conversationIdFromUrl) setSelectedId(conversationIdFromUrl);
   }, [conversationIdFromUrl]);
 
+  const queryClient = useQueryClient();
+  // Use useMemo to ensure stable reference for query key
+  const messagesParams = useMemo(() => ({ page: 1, limit: 50 }), []);
+
   const { data: conversationsResponse, isLoading: loadingList } = useConversations({ limit: 50 });
   const conversations: ConversationListItem[] = conversationsResponse?.data ?? [];
   const meta = (conversationsResponse as { meta?: { total: number } })?.meta;
@@ -77,12 +60,212 @@ export default function MessagesPage() {
   const { data: conversation, isLoading: loadingConv } = useConversation(selectedId);
   const { data: messagesResponse, isLoading: loadingMessages } = useConversationMessages(
     selectedId,
-    { page: 1, limit: 50 },
+    messagesParams,
   );
   const messages: Message[] = messagesResponse?.data ?? [];
   const sendMessage = useSendMessage(selectedId);
-  const markRead = useMarkMessageRead();
+  const markConversationRead = useMarkConversationRead(selectedId);
   const createConversation = useCreateConversation();
+
+  // Auto-mark conversation as read when user is viewing it
+  useEffect(() => {
+    if (!selectedId || !user?.id) return;
+    markConversationRead.mutate();
+  }, [selectedId, user?.id]);
+
+  // Realtime: new messages and read-status updates
+  useEffect(() => {
+    if (!selectedId || !user?.id) return;
+
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let testChannel: ReturnType<typeof supabase.channel> | null = null;
+    let authListener: ReturnType<typeof supabase.auth.onAuthStateChange> | null = null;
+
+    const setupSubscription = async () => {
+      // Ensure we have a session and set auth for Realtime
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        console.error('[Realtime] ❌ No session available:', sessionError);
+        return;
+      }
+
+      console.log('[Realtime] Session found, user:', session.user?.id);
+
+      // CRITICAL: Set auth for Realtime BEFORE creating channels
+      // This ensures RLS policies are evaluated with the correct user context
+      try {
+        await supabase.realtime.setAuth(session.access_token);
+        console.log('[Realtime] ✅ Auth set for Realtime');
+      } catch (authError) {
+        console.error('[Realtime] ❌ Failed to set auth:', authError);
+        return;
+      }
+      
+      if (cancelled) return;
+
+      console.log('[Realtime] Setting up subscription for conversation:', selectedId);
+
+      // Listen for auth state changes and update Realtime auth
+      authListener = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        if (newSession?.access_token) {
+          console.log('[Realtime] Auth state changed, updating Realtime auth:', event);
+          await supabase.realtime.setAuth(newSession.access_token);
+        }
+      });
+
+      const channelName = `messages-${selectedId}`;
+      
+      // Test channel: Subscribe to ALL messages (no filter) to verify events are received
+      testChannel = supabase
+        .channel(`test-all-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+          },
+          (payload) => {
+            console.log('[Realtime] 🔍 TEST: Received ANY message INSERT:', payload);
+            console.log('[Realtime] 🔍 TEST: Conversation ID:', payload.new?.conversation_id);
+            console.log('[Realtime] 🔍 TEST: Full payload:', JSON.stringify(payload, null, 2));
+          },
+        )
+        .subscribe((status, err) => {
+          console.log('[Realtime] 🔍 TEST channel status:', status, err ? `Error: ${err.message}` : '');
+        });
+
+      // Actual filtered subscription
+      channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${selectedId}`,
+          },
+          (payload) => {
+            console.log('[Realtime] ✅ postgres_changes INSERT event received:', payload);
+            console.log('[Realtime] ✅ Full payload:', JSON.stringify(payload, null, 2));
+
+            const row = payload.new as Record<string, unknown>;
+            const conversationId = row.conversation_id as string;
+            const newMessage: Message = {
+              id: row.id as string,
+              conversationId,
+              senderId: row.sender_id as string,
+              messageType: (row.message_type as MessageType) ?? 'other',
+              subject: (row.subject as string) ?? '',
+              body: (row.body as string) ?? '',
+              createdAt: (row.created_at as string) ?? new Date().toISOString(),
+              isRead: false,
+              senderName: undefined,
+            };
+
+            console.log('[Realtime] ✅ Processing new message:', newMessage.body);
+
+            // Update all conversation-messages queries for this conversationId
+            queryClient.setQueriesData(
+              {
+                predicate: (query) => {
+                  const key = query.queryKey;
+                  return (
+                    Array.isArray(key) &&
+                    key.length >= 2 &&
+                    key[0] === 'conversation-messages' &&
+                    key[1] === conversationId
+                  );
+                },
+              },
+              (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
+                if (!prev) {
+                  console.log('[Realtime] No cache found, creating new entry');
+                  return { data: [newMessage], meta: undefined };
+                }
+                const list = prev.data ?? [];
+                
+                // Check if message already exists (by ID)
+                if (list.some((m) => m.id === newMessage.id)) {
+                  console.log('[Realtime] Message already in cache, skipping');
+                  return prev;
+                }
+                
+                // Replace optimistic message (temp-*) if it matches this real message
+                // Match by: same sender, same body, within 5 seconds
+                const now = Date.now();
+                const updatedList = list.map((m) => {
+                  if (
+                    m.id.startsWith('temp-') &&
+                    m.senderId === newMessage.senderId &&
+                    m.body === newMessage.body &&
+                    Math.abs(now - new Date(m.createdAt).getTime()) < 5000
+                  ) {
+                    console.log('[Realtime] Replacing optimistic message with real one');
+                    return newMessage;
+                  }
+                  return m;
+                });
+                
+                // If no optimistic message was replaced, append the new message
+                const wasReplaced = updatedList.some((m) => m.id === newMessage.id);
+                const finalList = wasReplaced ? updatedList : [...updatedList, newMessage];
+                
+                const updated = { ...prev, data: finalList };
+                console.log('[Realtime] ✅ Updated cache, message count:', updated.data?.length);
+                return updated;
+              },
+            );
+            
+            // Invalidate to trigger re-render
+            queryClient.invalidateQueries({
+              queryKey: ['conversation-messages', conversationId],
+            });
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'message_reads',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('[Realtime] message_reads UPDATE event received:', payload);
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          },
+        )
+        .subscribe((status, err) => {
+          console.log('[Realtime] Subscription status:', status, err ? `Error: ${err?.message}` : '');
+          if (status === 'SUBSCRIBED') {
+            console.log('[Realtime] ✅ Successfully subscribed to conversation:', selectedId);
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.error('[Realtime] ❌ Subscription failed:', status, err);
+          }
+        });
+    };
+
+    setupSubscription();
+
+    return () => {
+      cancelled = true;
+      if (authListener) {
+        authListener.data.subscription.unsubscribe();
+      }
+      if (channel) {
+        console.log('[Realtime] Cleaning up subscription for conversation:', selectedId);
+        supabase.removeChannel(channel);
+      }
+      if (testChannel) {
+        console.log('[Realtime] Cleaning up test channel');
+        supabase.removeChannel(testChannel);
+      }
+    };
+  }, [selectedId, user?.id, queryClient]);
 
   const { data: commSetting } = useSystemSetting<{ teacher_student?: string; teacher_parent?: string }>('communication_direction');
   const teacherStudentBoth = (commSetting?.data?.value?.teacher_student ?? 'both') === 'both';
@@ -103,21 +286,22 @@ export default function MessagesPage() {
   const usersList = (usersResponse as { data?: Array<{ id: string; email?: string; fullName?: string }> })?.data ?? [];
 
   const handleSend = useCallback(() => {
-    if (!selectedId || !subject.trim()) return;
+    const trimmed = body.trim();
+    if (!selectedId || !trimmed) return;
+    
+    // Clear input immediately for instant feedback
+    setBody('');
+    
     sendMessage.mutate(
-      { messageType, subject: subject.trim(), body: body.trim() || undefined },
+      { body: trimmed },
       {
-        onSuccess: () => {
-          setSubject('');
-          setBody('');
+        onError: () => {
+          // Restore input on error
+          setBody(trimmed);
         },
       },
     );
-  }, [selectedId, subject, body, messageType, sendMessage]);
-
-  const handleMarkAllRead = useCallback(() => {
-    messages.filter((m) => !m.isRead).forEach((m) => markRead.mutate(m.id));
-  }, [messages, markRead]);
+  }, [selectedId, body, sendMessage]);
 
   const handleCreateConversation = useCallback(() => {
     if (newType === 'one_to_one' && newRecipientUserId) {
@@ -156,6 +340,18 @@ export default function MessagesPage() {
       ? `${conversation.className ?? ''} ${conversation.sectionName ?? ''}`.trim()
       : conversation.participants?.map((p) => p.fullName).filter(Boolean).join(', ') || 'Conversation'
     : '';
+
+  const isOwnMessage = (m: Message) => m.senderId === user?.id;
+
+  // Scroll to bottom when messages change (including new Realtime messages)
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Small delay to ensure DOM has updated
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [messages.length, messages.map((m) => m.id).join(',')]);
 
   return (
     <>
@@ -246,108 +442,96 @@ export default function MessagesPage() {
                     {loadingConv ? (
                       <Skeleton height={24} width="60%" />
                     ) : (
-                      <Group justify="space-between">
-                        <Text fw={600}>{conversationTitle}</Text>
-                        {messages.some((m) => !m.isRead) && (
-                          <Button variant="subtle" size="xs" onClick={handleMarkAllRead}>
-                            Mark all read
-                          </Button>
-                        )}
-                      </Group>
+                      <Text fw={600}>{conversationTitle}</Text>
                     )}
                   </Box>
-                  <ScrollArea flex={1} type="auto" viewportProps={{ style: { maxHeight: 280 } }}>
-                    <Stack p="md" gap="md">
+                  <ScrollArea flex={1} type="auto" viewportProps={{ style: { maxHeight: 320 } }}>
+                    <Stack p="md" gap="xs">
                       {loadingMessages ? (
                         <Skeleton height={120} />
                       ) : messages.length === 0 ? (
-                        <Text size="sm" c="dimmed">
-                          No messages yet. Send the first message.
+                        <Text size="sm" c="dimmed" ta="center" py="xl">
+                          No messages yet. Say hello.
                         </Text>
                       ) : (
-                        [...messages].reverse().map((m) => (
-                          <Paper key={m.id} p="sm" withBorder shadow="xs" radius="md">
-                            <Group justify="space-between" mb={4}>
-                              <Group gap="xs">
-                                <Badge
-                                  size="sm"
-                                  variant="light"
-                                  color={getMessageTypeColor(m.messageType, colors)}
-                                >
-                                  {m.messageType}
-                                </Badge>
-                                <Text size="sm" fw={500}>
-                                  {m.senderName ?? 'Unknown'}
-                                </Text>
-                              </Group>
-                              <Group gap="xs">
-                                <Text size="xs" c="dimmed">
-                                  {new Date(m.createdAt).toLocaleString()}
-                                </Text>
-                                {!m.isRead && (
-                                  <Badge size="xs" variant="dot">
-                                    Unread
-                                  </Badge>
-                                )}
-                              </Group>
-                            </Group>
-                            {m.subject && (
-                              <Text size="sm" fw={500} mb={4}>
-                                {m.subject}
-                              </Text>
-                            )}
-                            <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap' }}>
-                              {m.body || '-'}
-                            </Text>
-                            {!m.isRead && m.senderId !== user?.id && (
-                              <Button
-                                size="xs"
-                                variant="subtle"
-                                mt="xs"
-                                onClick={() => markRead.mutate(m.id)}
+                        [...messages].reverse().map((m) => {
+                          const own = isOwnMessage(m);
+                          return (
+                            <Box
+                              key={m.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: own ? 'flex-end' : 'flex-start',
+                                alignSelf: own ? 'flex-end' : 'flex-start',
+                                maxWidth: '85%',
+                              }}
+                            >
+                              <Paper
+                                p="xs"
+                                px="sm"
+                                radius="lg"
+                                withBorder={!own}
+                                style={{
+                                  backgroundColor: own ? theme.colors.blue[6] : undefined,
+                                  borderBottomRightRadius: own ? 4 : theme.radius.lg,
+                                  borderBottomLeftRadius: own ? theme.radius.lg : 4,
+                                }}
                               >
-                                Mark as read
-                              </Button>
-                            )}
-                          </Paper>
-                        ))
+                                {!own && (
+                                  <Text size="xs" fw={500} c={own ? 'white' : 'dimmed'} mb={2}>
+                                    {m.senderName ?? 'Unknown'}
+                                  </Text>
+                                )}
+                                <Text
+                                  size="sm"
+                                  c={own ? 'white' : undefined}
+                                  style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                >
+                                  {m.body || '-'}
+                                </Text>
+                                <Text size="xs" c={own ? 'white' : 'dimmed'} style={{ opacity: 0.85 }} mt={4}>
+                                  {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                              </Paper>
+                            </Box>
+                          );
+                        })
                       )}
+                      <div ref={messagesEndRef} />
                     </Stack>
                   </ScrollArea>
                   {canReply && (
-                    <>
-                      <Divider />
-                      <Box p="md">
-                        <Stack gap="sm">
-                          <Select
-                            label="Type"
-                            data={MESSAGE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-                            value={messageType}
-                            onChange={(v) => v && setMessageType(v as MessageType)}
-                          />
-                          <TextInput
-                            label="Subject"
-                            placeholder="Subject"
-                            value={subject}
-                            onChange={(e) => setSubject(e.target.value)}
-                          />
-                          <Textarea
-                            label="Message"
-                            placeholder="Write your message..."
-                            value={body}
-                            onChange={(e) => setBody(e.target.value)}
-                            minRows={2}
-                          />
-                          <Button
-                            onClick={handleSend}
-                            loading={sendMessage.isPending}
-                            disabled={!subject.trim()}
-                          >
-                            Send
-                          </Button>
-                        </Stack>
-                      </Box>
-                    </>
+                    <Box p="sm" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
+                      <Group gap="sm" align="flex-end" wrap="nowrap">
+                        <Textarea
+                          placeholder="Type a message..."
+                          value={body}
+                          onChange={(e) => setBody(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSend();
+                            }
+                          }}
+                          minRows={1}
+                          maxRows={4}
+                          autosize
+                          style={{ flex: 1 }}
+                          styles={{ input: { borderTopRightRadius: 0, borderBottomRightRadius: 0 } }}
+                        />
+                        <ActionIcon
+                          size="lg"
+                          variant="filled"
+                          color="blue"
+                          onClick={handleSend}
+                          loading={sendMessage.isPending}
+                          disabled={!body.trim()}
+                          style={{ height: 36, width: 36 }}
+                        >
+                          <IconSend size={18} />
+                        </ActionIcon>
+                      </Group>
+                    </Box>
                   )}
                 </Stack>
               )}
