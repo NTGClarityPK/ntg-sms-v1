@@ -30,6 +30,7 @@ import {
   IconFileText,
   IconCalendarEvent,
   IconBell,
+  IconMessage,
   IconStar,
   IconAlertTriangle,
   type IconProps,
@@ -91,6 +92,7 @@ const allNavItems: NavItem[] = [
   { label: 'Leave', href: '/leaves', icon: IconPlaneDeparture },
   { label: 'Early Departure', href: '/early-departure', icon: IconWalk },
   { label: 'Notification', href: '/notifications', icon: IconBell },
+  { label: 'Messages', href: '/messages', icon: IconMessage },
   { 
     label: 'My Event', 
     href: '/my-events', 
@@ -314,11 +316,13 @@ export function Sidebar({
       item.href === '/behavioral' ||
       item.href === '/leaves' ||
       item.href === '/early-departure' ||
+      item.href === '/notifications' ||
+      item.href === '/messages' ||
       item.href === '/my-schedule' ||
       item.href === '/my-timetable' ||
-      item.href === '/my-events'
-      || item.href === '/my-children'
-      || item.href === '/children-timetable'
+      item.href === '/my-events' ||
+      item.href === '/my-children' ||
+      item.href === '/children-timetable'
   );
   const managementItems = navItems.filter(
     (item) =>

@@ -61,11 +61,11 @@ export function useAuditLogs(params: QueryAuditLogsParams = {}) {
 
       // Backend returns { data: AuditLogDto[], meta: {...} }
       // ResponseInterceptor passes it through as-is
-      // apiClient.get returns response.data which is { data: AuditLogDto[], meta: {...} }
-      const response = await apiClient.get<AuditLogsResponse>(
+      const response = await apiClient.get<AuditLog[]>(
         `/api/v1/audit-logs?${searchParams.toString()}`,
       );
-      return response;
+      // Ensure query data is typed as { data, meta } for consistent access in components
+      return response as unknown as AuditLogsResponse;
     },
     staleTime: 30 * 1000, // 30 seconds - audit logs should be relatively fresh
   });

@@ -6,6 +6,7 @@ import { SystemSettingsService } from './system-settings.service';
 @Module({
   controllers: [SystemSettingsController],
   providers: [SystemSettingsService, SupabaseConfig],
+  exports: [SystemSettingsService],
 })
 export class SystemSettingsModule {}
 

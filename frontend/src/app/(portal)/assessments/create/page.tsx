@@ -31,7 +31,9 @@ export default function CreateAssessmentPage() {
     createAssessment.mutate(values as CreateAssessmentInput, {
       onSuccess: async (response) => {
         // Hook returns response.data from API; API is { data: Assessment }
-        const assessment = (response as { data?: Assessment })?.data ?? (response as Assessment);
+        const assessment =
+          (response as unknown as { data?: Assessment })?.data ??
+          (response as unknown as Assessment);
         const assessmentId = assessment?.id;
         if (!assessmentId) {
           console.error('[CreateAssessmentPage] Missing assessmentId in create response:', response);

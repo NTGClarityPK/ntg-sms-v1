@@ -57,6 +57,9 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
       notification.data
     ) {
       router.push('/early-departure');
+    } else if (notification.type === 'message' && notification.data) {
+      const conversationId = notification.data.conversationId as string | undefined;
+      if (conversationId) router.push(`/messages?conversation=${conversationId}`);
     }
 
     onClose();
@@ -78,6 +81,8 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
       case 'event_created':
       case 'event_updated':
         return notifyColors.primary;
+      case 'message':
+        return notifyColors.info;
       default:
         return notifyColors.primary;
     }

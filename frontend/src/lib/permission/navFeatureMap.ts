@@ -20,6 +20,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/leaves': 'leaves',
   '/early-departure': 'early_departure',
   '/notifications': 'communication',
+  '/messages': 'communication',
   // Split personal vs management features
   '/my-events': 'events_personal',
   '/events': 'events_management',

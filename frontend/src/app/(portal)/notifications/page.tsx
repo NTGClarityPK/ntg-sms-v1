@@ -67,6 +67,8 @@ export default function NotificationsPage() {
       case 'event_created':
       case 'event_updated':
         return notifyColors.primary;
+      case 'message':
+        return notifyColors.info;
       default:
         return notifyColors.primary;
     }
@@ -85,6 +87,9 @@ export default function NotificationsPage() {
       router.push('/leaves');
     } else if (notification.type === 'grade' && notification.data) {
       router.push('/grades');
+    } else if (notification.type === 'message' && notification.data) {
+      const conversationId = notification.data.conversationId as string | undefined;
+      if (conversationId) router.push(`/messages?conversation=${conversationId}`);
     }
   };
 
