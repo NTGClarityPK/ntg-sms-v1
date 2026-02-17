@@ -112,7 +112,7 @@ export class StudentsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'students');
-    const data = await this.studentsService.createStudent(input, branch.branchId);
+    const data = await this.studentsService.createStudent(input, branch.branchId, user.email);
     return { data };
   }
 
@@ -123,7 +123,7 @@ export class StudentsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'students');
-    const data = await this.studentsService.bulkImport(input.students, branch.branchId);
+    const data = await this.studentsService.bulkImport(input.students, branch.branchId, user.email);
     return { data };
   }
 
@@ -135,7 +135,7 @@ export class StudentsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'students');
-    const data = await this.studentsService.updateStudent(id, input, branch.branchId);
+    const data = await this.studentsService.updateStudent(id, input, branch.branchId, user.email);
     return { data };
   }
 }

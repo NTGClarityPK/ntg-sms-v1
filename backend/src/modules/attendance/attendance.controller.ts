@@ -136,6 +136,7 @@ export class AttendanceController {
       branch.branchId,
       academicYearId || activeYear.id,
       user.id,
+      user.email,
     );
     return { data };
   }
@@ -153,6 +154,7 @@ export class AttendanceController {
       input,
       branch.branchId,
       user.id,
+      user.email,
     );
     return { data };
   }

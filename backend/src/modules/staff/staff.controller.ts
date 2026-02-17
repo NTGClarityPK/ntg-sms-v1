@@ -129,7 +129,7 @@ export class StaffController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'staff');
-    const data = await this.staffService.createStaff(input, branch.branchId);
+    const data = await this.staffService.createStaff(input, branch.branchId, user.email);
     return { data };
   }
 
@@ -141,7 +141,7 @@ export class StaffController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'staff');
-    const data = await this.staffService.updateStaff(id, input, branch.branchId);
+    const data = await this.staffService.updateStaff(id, input, branch.branchId, user.email);
     return { data };
   }
 
@@ -153,7 +153,7 @@ export class StaffController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'staff');
-    const data = await this.staffService.deactivateStaff(id, input, branch.branchId);
+    const data = await this.staffService.deactivateStaff(id, input, branch.branchId, user.email);
     return { data };
   }
 }

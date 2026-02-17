@@ -109,7 +109,19 @@ export function ClassTimetableContent({
     minimal: true,
   });
   const allClassSections = allClassSectionsData?.data ?? [];
-  const otherSections = allClassSections.filter((cs) => cs.id !== classSectionId);
+  const otherSections = allClassSections
+    .filter((cs) => cs.id !== classSectionId)
+    .sort((a, b) => {
+      // Sort by class sort order first, then by section sort order
+      const classOrderA = a.classSortOrder ?? 999;
+      const classOrderB = b.classSortOrder ?? 999;
+      if (classOrderA !== classOrderB) {
+        return classOrderA - classOrderB;
+      }
+      const sectionOrderA = a.sectionSortOrder ?? 999;
+      const sectionOrderB = b.sectionSortOrder ?? 999;
+      return sectionOrderA - sectionOrderB;
+    });
 
   // Fetch all active class sections for copying from other sections
   const { data: allActiveSectionsData } = useClassSections({
@@ -135,12 +147,24 @@ export function ClassTimetableContent({
     })),
   });
 
-  // Filter sections that have at least one slot
+  // Filter sections that have at least one slot and sort by class/section sort order
   const availableSourceSections = useMemo(() => {
-    return candidateSourceSections.filter((cs, index) => {
-      const queryResult = sourceTimetableQueries[index];
-      return queryResult?.data?.data?.slots && queryResult.data.data.slots.length > 0;
-    });
+    return candidateSourceSections
+      .filter((cs, index) => {
+        const queryResult = sourceTimetableQueries[index];
+        return queryResult?.data?.data?.slots && queryResult.data.data.slots.length > 0;
+      })
+      .sort((a, b) => {
+        // Sort by class sort order first, then by section sort order
+        const classOrderA = a.classSortOrder ?? 999;
+        const classOrderB = b.classSortOrder ?? 999;
+        if (classOrderA !== classOrderB) {
+          return classOrderA - classOrderB;
+        }
+        const sectionOrderA = a.sectionSortOrder ?? 999;
+        const sectionOrderB = b.sectionSortOrder ?? 999;
+        return sectionOrderA - sectionOrderB;
+      });
   }, [candidateSourceSections, sourceTimetableQueries]);
 
   // Get the selected source section to fetch its class templates

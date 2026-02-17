@@ -12,6 +12,7 @@ import { CreateClassSectionDto } from './dto/create-class-section.dto';
 import { BulkCreateClassSectionDto } from './dto/bulk-create-class-section.dto';
 import { UpdateClassSectionDto } from './dto/update-class-section.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
+import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 
 type ClassSectionRow = {
   id: string;
@@ -24,6 +25,8 @@ type ClassSectionRow = {
   created_at: string;
   updated_at: string;
   class_teacher_id?: string | null;
+  created_by: string | null;
+  updated_by: string | null;
 };
 
 type ClassSectionWithRelations = ClassSectionRow & {
@@ -207,9 +210,11 @@ export class ClassSectionsService {
   async createClassSection(
     input: CreateClassSectionDto,
     branchId: string,
+    userEmail: string,
     academicYearId?: string,
   ): Promise<ClassSectionDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
@@ -266,6 +271,8 @@ export class ClassSectionsService {
         branch_id: branchId,
         academic_year_id: activeYearId,
         capacity: input.capacity ?? 30,
+        created_by: username,
+        updated_by: username,
       })
       .select('*')
       .single();
@@ -277,9 +284,11 @@ export class ClassSectionsService {
   async bulkCreateClassSections(
     input: BulkCreateClassSectionDto,
     branchId: string,
+    userEmail: string,
     academicYearId?: string,
   ): Promise<{ data: ClassSectionDto[] }> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // 1. Get academic year ONCE
     let activeYearId = academicYearId;
@@ -324,6 +333,8 @@ export class ClassSectionsService {
       branch_id: string;
       academic_year_id: string;
       capacity: number;
+      created_by: string;
+      updated_by: string;
     }> = [];
 
     for (const cs of input.classSections) {
@@ -348,6 +359,8 @@ export class ClassSectionsService {
         branch_id: branchId,
         academic_year_id: activeYearId,
         capacity: cs.capacity ?? 30,
+        created_by: username,
+        updated_by: username,
       });
     }
 
@@ -418,8 +431,10 @@ export class ClassSectionsService {
     id: string,
     input: UpdateClassSectionDto,
     branchId: string,
+    userEmail: string,
   ): Promise<ClassSectionDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Verify it exists and belongs to branch
     const existing = await this.getClassSectionById(id, branchId);
@@ -431,8 +446,9 @@ export class ClassSectionsService {
     if (input.isActive !== undefined) {
       updateData.is_active = input.isActive;
     }
+    updateData.updated_by = username;
 
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(updateData).length === 1 && updateData.updated_by) {
       return existing;
     }
 
@@ -647,8 +663,10 @@ export class ClassSectionsService {
     classSectionId: string,
     staffId: string | null,
     branchId: string,
+    userEmail: string,
   ): Promise<ClassSectionDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Verify class-section exists
     await this.getClassSectionById(classSectionId, branchId);
@@ -669,7 +687,7 @@ export class ClassSectionsService {
 
     const { data, error } = await supabase
       .from('class_sections')
-      .update({ class_teacher_id: staffId })
+      .update({ class_teacher_id: staffId, updated_by: username })
       .eq('id', classSectionId)
       .eq('branch_id', branchId)
       .select('*')

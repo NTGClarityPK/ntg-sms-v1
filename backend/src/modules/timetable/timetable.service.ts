@@ -16,6 +16,8 @@ import { TeacherTimetableDto, FreePeriod } from './dto/teacher-timetable.dto';
 import { ConflictDto, ConflictType, ConflictingSlot } from './dto/conflict.dto';
 import { TimingTemplateInfoDto } from './dto/timing-template-info.dto';
 import { ReplicateDayDto } from './dto/replicate-day.dto';
+import { ReplicateAcrossSectionsDto } from './dto/replicate-across-sections.dto';
+import { ReplicateFromSectionDto } from './dto/replicate-from-section.dto';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -748,6 +750,226 @@ export class TimetableService {
         input.subjectTemplateId,
       );
     }
+
+    return { slotsReplicated: slotsToInsert.length };
+  }
+
+  /**
+   * Replicates all timetable slots from a source class section to one or more target class sections.
+   * Only replicates slots that match the subject_template_id if provided.
+   * Existing slots in target sections with the same day, time range, and template will be replaced.
+   */
+  async replicateAcrossSections(
+    input: ReplicateAcrossSectionsDto,
+    branchId: string,
+  ): Promise<{ slotsReplicated: number }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Validate source is not in targets
+    if (input.targetClassSectionIds.includes(input.sourceClassSectionId)) {
+      throw new BadRequestException('Source class section cannot be in target sections');
+    }
+
+    if (input.targetClassSectionIds.length === 0) {
+      throw new BadRequestException('At least one target class section must be specified');
+    }
+
+    // Get active academic year if not provided
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      throw new BadRequestException('No active academic year found');
+    }
+    const activeYearId = input.academicYearId ?? activeYear.id;
+
+    // Fetch all slots from source class section
+    let sourceSlotsQuery = supabase
+      .from('timetable_slots')
+      .select('*')
+      .eq('class_section_id', input.sourceClassSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYearId);
+
+    // Filter by subject_template_id if provided
+    if (input.subjectTemplateId) {
+      sourceSlotsQuery = sourceSlotsQuery.eq('subject_template_id', input.subjectTemplateId);
+    } else {
+      sourceSlotsQuery = sourceSlotsQuery.is('subject_template_id', null);
+    }
+
+    const { data: sourceSlots, error: sourceError } = await sourceSlotsQuery;
+    throwIfDbError(sourceError);
+
+    if (!sourceSlots || sourceSlots.length === 0) {
+      return { slotsReplicated: 0 };
+    }
+
+    // Prepare slots to insert for each target class section
+    const slotsToInsert: Array<{
+      class_section_id: string;
+      day_of_week: number;
+      period_number: number | null;
+      start_time: string;
+      end_time: string;
+      subject_id: string | null;
+      staff_id: string | null;
+      room: string | null;
+      slot_type: 'class' | 'assembly' | 'break' | 'free';
+      branch_id: string;
+      academic_year_id: string;
+      subject_template_id: string | null;
+    }> = [];
+
+    for (const targetClassSectionId of input.targetClassSectionIds) {
+      for (const sourceSlot of sourceSlots) {
+        slotsToInsert.push({
+          class_section_id: targetClassSectionId,
+          day_of_week: sourceSlot.day_of_week,
+          period_number: sourceSlot.period_number,
+          start_time: sourceSlot.start_time,
+          end_time: sourceSlot.end_time,
+          subject_id: sourceSlot.subject_id,
+          staff_id: sourceSlot.staff_id,
+          room: sourceSlot.room,
+          slot_type: sourceSlot.slot_type,
+          branch_id: branchId,
+          academic_year_id: activeYearId,
+          subject_template_id: sourceSlot.subject_template_id,
+        });
+      }
+    }
+
+    if (slotsToInsert.length === 0) {
+      return { slotsReplicated: 0 };
+    }
+
+    // Upsert slots (will replace existing ones due to unique constraint)
+    const { error: insertError } = await supabase
+      .from('timetable_slots')
+      .upsert(slotsToInsert, {
+        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
+      });
+    throwIfDbError(insertError);
+
+    // Renumber periods for all affected class sections
+    const allAffectedSections = [
+      input.sourceClassSectionId,
+      ...input.targetClassSectionIds,
+    ];
+    for (const sectionId of allAffectedSections) {
+      await this.renumberPeriodsForClassSection(
+        sectionId,
+        branchId,
+        activeYearId,
+        input.subjectTemplateId,
+      );
+    }
+
+    return { slotsReplicated: slotsToInsert.length };
+  }
+
+  /**
+   * Replicates all timetable slots from a source class section to a target class section.
+   * Only replicates slots that match the subject_template_id if provided.
+   * Existing slots in target section with the same day, time range, and template will be replaced.
+   */
+  async replicateFromSection(
+    input: ReplicateFromSectionDto,
+    branchId: string,
+  ): Promise<{ slotsReplicated: number }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // Validate source is not the same as target
+    if (input.sourceClassSectionId === input.targetClassSectionId) {
+      throw new BadRequestException('Source and target class sections cannot be the same');
+    }
+
+    // Get active academic year if not provided
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      throw new BadRequestException('No active academic year found');
+    }
+    const activeYearId = input.academicYearId ?? activeYear.id;
+
+    // Fetch all slots from source class section
+    let sourceSlotsQuery = supabase
+      .from('timetable_slots')
+      .select('*')
+      .eq('class_section_id', input.sourceClassSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYearId);
+
+    // Filter by subject_template_id if provided
+    if (input.subjectTemplateId) {
+      sourceSlotsQuery = sourceSlotsQuery.eq('subject_template_id', input.subjectTemplateId);
+    } else {
+      sourceSlotsQuery = sourceSlotsQuery.is('subject_template_id', null);
+    }
+
+    const { data: sourceSlots, error: sourceError } = await sourceSlotsQuery;
+    throwIfDbError(sourceError);
+
+    if (!sourceSlots || sourceSlots.length === 0) {
+      return { slotsReplicated: 0 };
+    }
+
+    // Prepare slots to insert for target class section
+    const slotsToInsert: Array<{
+      class_section_id: string;
+      day_of_week: number;
+      period_number: number | null;
+      start_time: string;
+      end_time: string;
+      subject_id: string | null;
+      staff_id: string | null;
+      room: string | null;
+      slot_type: 'class' | 'assembly' | 'break' | 'free';
+      branch_id: string;
+      academic_year_id: string;
+      subject_template_id: string | null;
+    }> = [];
+
+    for (const sourceSlot of sourceSlots) {
+      slotsToInsert.push({
+        class_section_id: input.targetClassSectionId,
+        day_of_week: sourceSlot.day_of_week,
+        period_number: sourceSlot.period_number,
+        start_time: sourceSlot.start_time,
+        end_time: sourceSlot.end_time,
+        subject_id: sourceSlot.subject_id,
+        staff_id: sourceSlot.staff_id,
+        room: sourceSlot.room,
+        slot_type: sourceSlot.slot_type,
+        branch_id: branchId,
+        academic_year_id: activeYearId,
+        subject_template_id: sourceSlot.subject_template_id,
+      });
+    }
+
+    if (slotsToInsert.length === 0) {
+      return { slotsReplicated: 0 };
+    }
+
+    // Upsert slots (will replace existing ones due to unique constraint)
+    const { error: insertError } = await supabase
+      .from('timetable_slots')
+      .upsert(slotsToInsert, {
+        onConflict: 'class_section_id,day_of_week,start_time,end_time,academic_year_id,subject_template_id',
+      });
+    throwIfDbError(insertError);
+
+    // Renumber periods for both affected class sections
+    await this.renumberPeriodsForClassSection(
+      input.targetClassSectionId,
+      branchId,
+      activeYearId,
+      input.subjectTemplateId,
+    );
+    await this.renumberPeriodsForClassSection(
+      input.sourceClassSectionId,
+      branchId,
+      activeYearId,
+      input.subjectTemplateId,
+    );
 
     return { slotsReplicated: slotsToInsert.length };
   }

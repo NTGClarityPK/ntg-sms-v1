@@ -35,10 +35,19 @@ export function BehavioralAssessContent() {
   const matrixQuery = useBehavioralMatrix(classSectionId, month);
 
   const classSectionOptions =
-    classSectionsQuery.data?.data?.map((cs) => ({
-      value: cs.id,
-      label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
-    })) ?? [];
+    (classSectionsQuery.data?.data ?? [])
+      .sort((a, b) => {
+        const classOrderA = a.classSortOrder ?? 999;
+        const classOrderB = b.classSortOrder ?? 999;
+        if (classOrderA !== classOrderB) return classOrderA - classOrderB;
+        const sectionOrderA = a.sectionSortOrder ?? 999;
+        const sectionOrderB = b.sectionSortOrder ?? 999;
+        return sectionOrderA - sectionOrderB;
+      })
+      .map((cs) => ({
+        value: cs.id,
+        label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
+      }));
 
   return (
     <Stack gap="md">

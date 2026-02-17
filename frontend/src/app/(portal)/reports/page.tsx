@@ -97,10 +97,22 @@ export default function ReportsPage() {
   const { data: publicCounts, isLoading: publicLoading } = usePublicClassCounts();
 
   const classList = (classSectionsQuery.data?.data as ClassSection[] | undefined) ?? [];
-  const classOptions = classList.map((cs) => ({
-    value: cs.id,
-    label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
-  }));
+  const classOptions = classList
+    .sort((a, b) => {
+      // Sort by class sort order first, then by section sort order
+      const classOrderA = a.classSortOrder ?? 999;
+      const classOrderB = b.classSortOrder ?? 999;
+      if (classOrderA !== classOrderB) {
+        return classOrderA - classOrderB;
+      }
+      const sectionOrderA = a.sectionSortOrder ?? 999;
+      const sectionOrderB = b.sectionSortOrder ?? 999;
+      return sectionOrderA - sectionOrderB;
+    })
+    .map((cs) => ({
+      value: cs.id,
+      label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
+    }));
 
   const students = (studentsQuery.data?.data as Student[] | undefined) ?? [];
   const studentOptions = students.map((s) => ({

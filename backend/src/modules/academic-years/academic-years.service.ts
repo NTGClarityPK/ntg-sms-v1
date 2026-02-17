@@ -3,6 +3,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { AcademicYearDto } from './dto/academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
+import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 
 type AcademicYearRow = {
   id: string;
@@ -113,12 +114,14 @@ export class AcademicYearsService {
   async create(
     input: { name: string; startDate: string; endDate: string },
     tenantId: string | null,
+    userEmail: string,
   ): Promise<AcademicYearDto> {
     if (input.startDate >= input.endDate) {
       throw new BadRequestException('startDate must be before endDate');
     }
 
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Idempotent behaviour: if a year with the same name already exists for this tenant, return it.
     if (tenantId) {
@@ -139,6 +142,8 @@ export class AcademicYearsService {
         start_date: input.startDate,
         end_date: input.endDate,
         tenant_id: tenantId,
+        created_by: username,
+        updated_by: username,
       })
       .select('*')
       .single();
@@ -147,8 +152,9 @@ export class AcademicYearsService {
     return mapAcademicYear(data as AcademicYearRow);
   }
 
-  async activate(id: string, tenantId: string | null): Promise<AcademicYearDto> {
+  async activate(id: string, tenantId: string | null, userEmail: string): Promise<AcademicYearDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Ensure it exists and not locked
     const { data: existing, error: existingError } = await supabase
@@ -163,14 +169,14 @@ export class AcademicYearsService {
     // Deactivate all, then activate selected (service role key bypasses RLS)
     const { error: deactivateError } = await supabase
       .from('academic_years')
-      .update({ is_active: false })
+      .update({ is_active: false, updated_by: username })
       .eq('tenant_id', tenantId)
       .eq('is_active', true);
     throwIfDbError(deactivateError);
 
     const { data, error } = await supabase
       .from('academic_years')
-      .update({ is_active: true })
+      .update({ is_active: true, updated_by: username })
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .select('*')
@@ -180,8 +186,9 @@ export class AcademicYearsService {
     return mapAcademicYear(data as AcademicYearRow);
   }
 
-  async lock(id: string, tenantId: string | null): Promise<AcademicYearDto> {
+  async lock(id: string, tenantId: string | null, userEmail: string): Promise<AcademicYearDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     const { data: existing, error: existingError } = await supabase
       .from('academic_years')
@@ -193,7 +200,7 @@ export class AcademicYearsService {
 
     const { data, error } = await supabase
       .from('academic_years')
-      .update({ is_locked: true })
+      .update({ is_locked: true, updated_by: username })
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .select('*')
@@ -203,8 +210,9 @@ export class AcademicYearsService {
     return mapAcademicYear(data as AcademicYearRow);
   }
 
-  async unlock(id: string, tenantId: string | null): Promise<AcademicYearDto> {
+  async unlock(id: string, tenantId: string | null, userEmail: string): Promise<AcademicYearDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     const { data: existing, error: existingError } = await supabase
       .from('academic_years')
@@ -219,7 +227,7 @@ export class AcademicYearsService {
 
     const { data, error } = await supabase
       .from('academic_years')
-      .update({ is_locked: false })
+      .update({ is_locked: false, updated_by: username })
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .select('*')

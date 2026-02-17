@@ -17,6 +17,7 @@ import {
   IconCreditCard,
   IconHome,
   IconLockOpen,
+  IconHistory,
   type IconProps,
 } from '@tabler/icons-react';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
@@ -35,6 +36,7 @@ const adminNavItems: NavItem[] = [
   { label: 'Assign Branch', href: '/adminportal/assign-branch', icon: IconBuilding },
   { label: 'Unlock Academic Year', href: '/adminportal/unlock-academic-year', icon: IconLockOpen },
   { label: 'Payment Model', href: '/adminportal/payment-models', icon: IconCreditCard },
+  { label: 'Audit Trail', href: '/adminportal/audit-trail', icon: IconHistory },
 ];
 
 interface AdminSidebarProps {

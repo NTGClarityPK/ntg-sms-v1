@@ -11,6 +11,7 @@ import { ClassSectionsService } from '../class-sections/class-sections.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
 import { StaffService } from '../staff/staff.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 import { AssessmentDto } from './dto/assessment.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
@@ -201,8 +202,10 @@ export class AssessmentsService {
     branchId: string,
     tenantId: string | null,
     createdByUserId: string,
+    userEmail: string,
   ): Promise<AssessmentDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Determine which mode we're using
     let classSectionIdsToCreate: string[] = [];
@@ -331,7 +334,8 @@ export class AssessmentsService {
       assessment_type_id: input.assessmentTypeId,
       subject_id: input.subjectId,
       class_section_id: classSectionId,
-      created_by: createdByUserId,
+      created_by: username,
+      updated_by: username,
       total_marks: input.totalMarks,
       due_date: input.dueDate ?? null,
       publish_date: input.publishDate ?? null,
@@ -361,8 +365,10 @@ export class AssessmentsService {
     id: string,
     input: UpdateAssessmentDto,
     branchId: string,
+    userEmail: string,
   ): Promise<AssessmentDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     const { data: existing, error: existingError } = await supabase
       .from('assessments')
@@ -393,6 +399,7 @@ export class AssessmentsService {
       payload.is_published = input.isPublished;
     if (input.allowLateSubmission !== undefined)
       payload.allow_late_submission = input.allowLateSubmission;
+    payload.updated_by = username;
 
     const { data, error } = await supabase
       .from('assessments')

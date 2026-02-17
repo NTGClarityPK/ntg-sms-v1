@@ -105,11 +105,13 @@ export class ClassSectionsController {
       return this.classSectionsService.bulkCreateClassSections(
         input as BulkCreateClassSectionDto,
         branch.branchId,
+        user.email,
       );
     }
     const data = await this.classSectionsService.createClassSection(
       input as CreateClassSectionDto,
       branch.branchId,
+      user.email,
     );
     return { data };
   }
@@ -122,7 +124,7 @@ export class ClassSectionsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'class_sections');
-    const data = await this.classSectionsService.updateClassSection(id, input, branch.branchId);
+    const data = await this.classSectionsService.updateClassSection(id, input, branch.branchId, user.email);
     return { data };
   }
 
@@ -157,6 +159,7 @@ export class ClassSectionsController {
       id,
       input.staffId ?? null,
       branch.branchId,
+      user.email,
     );
     return { data };
   }

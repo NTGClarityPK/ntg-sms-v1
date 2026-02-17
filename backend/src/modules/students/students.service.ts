@@ -12,6 +12,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { GenerateStudentIdDto } from './dto/generate-student-id.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
+import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 
 type StudentRow = {
   id: string;
@@ -459,8 +460,9 @@ export class StudentsService {
     return { studentId };
   }
 
-  async createStudent(input: CreateStudentDto, branchId: string): Promise<StudentDto> {
+  async createStudent(input: CreateStudentDto, branchId: string, userEmail: string): Promise<StudentDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Get active academic year if not provided (needed for both generation and insert)
     let academicYearId = input.academicYearId;
@@ -525,6 +527,8 @@ export class StudentsService {
         date_of_birth: input.dateOfBirth ?? null,
         gender: input.gender ?? null,
         is_active: input.isActive ?? true,
+        created_by: username,
+        updated_by: username,
       });
 
       throwIfDbError(profileError);
@@ -534,6 +538,7 @@ export class StudentsService {
         user_id: user.id,
         branch_id: branchId,
         is_primary: false,
+        created_by: username,
       });
 
       if (branchError) {
@@ -552,6 +557,7 @@ export class StudentsService {
           user_id: user.id,
           role_id: studentRole.id,
           branch_id: branchId,
+          created_by: username,
         });
       }
 
@@ -569,6 +575,8 @@ export class StudentsService {
           admission_date: input.admissionDate ?? null,
           academic_year_id: academicYearId,
           is_active: input.isActive ?? true,
+          created_by: username,
+          updated_by: username,
         })
         .select()
         .single();
@@ -590,6 +598,8 @@ export class StudentsService {
               subject_template_id: input.subjectTemplateId,
               academic_year_id: academicYearId,
               branch_id: branchId,
+              created_by: username,
+              updated_by: username,
             },
             {
               onConflict: 'student_id,academic_year_id',
@@ -610,8 +620,10 @@ export class StudentsService {
     id: string,
     input: UpdateStudentDto,
     branchId: string,
+    userEmail: string,
   ): Promise<StudentDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Verify student exists in branch
     await this.getStudentById(id, branchId);
@@ -634,6 +646,7 @@ export class StudentsService {
             date_of_birth: input.dateOfBirth,
             gender: input.gender,
             updated_at: new Date().toISOString(),
+            updated_by: username,
           })
           .eq('id', (student as { user_id: string }).user_id);
 
@@ -657,6 +670,7 @@ export class StudentsService {
       admission_date?: string | null;
       is_active?: boolean;
       updated_at: string;
+      updated_by: string;
       academic_year_id?: string | null;
     } = {
       class_id: input.classId ?? undefined,
@@ -666,6 +680,7 @@ export class StudentsService {
       admission_date: input.admissionDate,
       is_active: input.isActive,
       updated_at: new Date().toISOString(),
+      updated_by: username,
     };
 
     // Update academic_year_id if provided
@@ -700,6 +715,8 @@ export class StudentsService {
               subject_template_id: input.subjectTemplateId,
               academic_year_id: academicYearIdForTemplate,
               branch_id: branchId,
+              created_by: username,
+              updated_by: username,
             },
             {
               onConflict: 'student_id,academic_year_id',
@@ -724,12 +741,13 @@ export class StudentsService {
   async bulkImport(
     students: CreateStudentDto[],
     branchId: string,
+    userEmail: string,
   ): Promise<{ success: number; errors: Array<{ row: number; error: string }> }> {
     const results = { success: 0, errors: [] as Array<{ row: number; error: string }> };
 
     for (let i = 0; i < students.length; i++) {
       try {
-        await this.createStudent(students[i], branchId);
+        await this.createStudent(students[i], branchId, userEmail);
         results.success++;
       } catch (error) {
         const errorMessage =

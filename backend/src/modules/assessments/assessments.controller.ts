@@ -126,6 +126,7 @@ export class AssessmentsController {
       branch.branchId,
       branch.tenantId,
       user.id,
+      user.email,
     );
     return { data: created };
   }
@@ -142,6 +143,7 @@ export class AssessmentsController {
       id,
       body,
       branch.branchId,
+      user.email,
     );
     return { data: updated };
   }

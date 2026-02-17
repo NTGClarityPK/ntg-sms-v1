@@ -49,10 +49,19 @@ export function MarkAttendanceContent() {
             <Select
               label="Class-Section"
               placeholder="Select class-section"
-              data={classSections.map((cs) => ({
-                value: cs.id,
-                label: `${cs.className || cs.classDisplayName || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
-              }))}
+              data={classSections
+                .sort((a, b) => {
+                  const classOrderA = a.classSortOrder ?? 999;
+                  const classOrderB = b.classSortOrder ?? 999;
+                  if (classOrderA !== classOrderB) return classOrderA - classOrderB;
+                  const sectionOrderA = a.sectionSortOrder ?? 999;
+                  const sectionOrderB = b.sectionSortOrder ?? 999;
+                  return sectionOrderA - sectionOrderB;
+                })
+                .map((cs) => ({
+                  value: cs.id,
+                  label: `${cs.className || cs.classDisplayName || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
+                }))}
               value={selectedClassSectionId}
               onChange={setSelectedClassSectionId}
               leftSection={<IconCalendar size={16} />}

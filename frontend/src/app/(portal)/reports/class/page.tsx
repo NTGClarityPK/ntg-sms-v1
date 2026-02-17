@@ -12,10 +12,19 @@ export default function ClassReportSelectPage() {
 
   const classSectionsQuery = useClassSections({ limit: 100 });
   const list = classSectionsQuery.data?.data as ClassSection[] | undefined;
-  const options = (list ?? []).map((cs) => ({
-    value: cs.id,
-    label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
-  }));
+  const options = (list ?? [])
+    .sort((a, b) => {
+      const classOrderA = a.classSortOrder ?? 999;
+      const classOrderB = b.classSortOrder ?? 999;
+      if (classOrderA !== classOrderB) return classOrderA - classOrderB;
+      const sectionOrderA = a.sectionSortOrder ?? 999;
+      const sectionOrderB = b.sectionSortOrder ?? 999;
+      return sectionOrderA - sectionOrderB;
+    })
+    .map((cs) => ({
+      value: cs.id,
+      label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
+    }));
 
   return (
     <>

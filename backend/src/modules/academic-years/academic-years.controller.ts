@@ -34,8 +34,9 @@ export class AcademicYearsController {
   async create(
     @Body() body: CreateAcademicYearDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AcademicYearDto }> {
-    const created = await this.academicYearsService.create(body, branch.tenantId);
+    const created = await this.academicYearsService.create(body, branch.tenantId, user.email);
     return { data: created };
   }
 
@@ -43,8 +44,9 @@ export class AcademicYearsController {
   async activate(
     @Param('id') id: string,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AcademicYearDto }> {
-    const updated = await this.academicYearsService.activate(id, branch.tenantId);
+    const updated = await this.academicYearsService.activate(id, branch.tenantId, user.email);
     return { data: updated };
   }
 
@@ -52,8 +54,9 @@ export class AcademicYearsController {
   async lock(
     @Param('id') id: string,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AcademicYearDto }> {
-    const updated = await this.academicYearsService.lock(id, branch.tenantId);
+    const updated = await this.academicYearsService.lock(id, branch.tenantId, user.email);
     return { data: updated };
   }
 
@@ -73,7 +76,7 @@ export class AcademicYearsController {
       throw new ForbiddenException('This endpoint is only accessible to super admins');
     }
 
-    const updated = await this.academicYearsService.unlock(id, body.tenantId);
+    const updated = await this.academicYearsService.unlock(id, body.tenantId, user.email);
     return { data: updated };
   }
 

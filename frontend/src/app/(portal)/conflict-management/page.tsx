@@ -85,10 +85,22 @@ export default function ConflictManagementPage() {
   const effectiveAcademicYearId = selectedAcademicYearId || activeYear?.data?.id || null;
 
   // Format options for selects
-  const classSectionOptions = classSections.map((cs) => ({
-    value: cs.id,
-    label: `${cs.className || cs.classDisplayName || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
-  }));
+  const classSectionOptions = classSections
+    .sort((a, b) => {
+      // Sort by class sort order first, then by section sort order
+      const classOrderA = a.classSortOrder ?? 999;
+      const classOrderB = b.classSortOrder ?? 999;
+      if (classOrderA !== classOrderB) {
+        return classOrderA - classOrderB;
+      }
+      const sectionOrderA = a.sectionSortOrder ?? 999;
+      const sectionOrderB = b.sectionSortOrder ?? 999;
+      return sectionOrderA - sectionOrderB;
+    })
+    .map((cs) => ({
+      value: cs.id,
+      label: `${cs.className || cs.classDisplayName || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
+    }));
 
   const staffOptions = staff.map((s) => ({
     value: s.id,

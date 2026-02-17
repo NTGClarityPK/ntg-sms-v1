@@ -20,6 +20,8 @@ import { TimetableService } from './timetable.service';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import { GenerateTimetableDto } from './dto/generate-timetable.dto';
 import { ReplicateDayDto } from './dto/replicate-day.dto';
+import { ReplicateAcrossSectionsDto } from './dto/replicate-across-sections.dto';
+import { ReplicateFromSectionDto } from './dto/replicate-from-section.dto';
 import { StaffService } from '../staff/staff.service';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
@@ -240,6 +242,28 @@ export class TimetableController {
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
     const data = await this.timetableService.replicateDay(input, branch.branchId);
+    return { data };
+  }
+
+  @Post('replicate-across-sections')
+  async replicateAcrossSections(
+    @Body() input: ReplicateAcrossSectionsDto,
+    @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
+    const data = await this.timetableService.replicateAcrossSections(input, branch.branchId);
+    return { data };
+  }
+
+  @Post('replicate-from-section')
+  async replicateFromSection(
+    @Body() input: ReplicateFromSectionDto,
+    @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'timetable_management');
+    const data = await this.timetableService.replicateFromSection(input, branch.branchId);
     return { data };
   }
 }

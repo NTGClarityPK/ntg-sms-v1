@@ -11,6 +11,7 @@ import { QueryStaffDto } from './dto/query-staff.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { DeactivateStaffDto } from './dto/deactivate-staff.dto';
+import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 
 type StaffRow = {
   id: string;
@@ -362,8 +363,9 @@ export class StaffService {
       });
   }
 
-  async createStaff(input: CreateStaffDto, branchId: string): Promise<StaffDto> {
+  async createStaff(input: CreateStaffDto, branchId: string, userEmail: string): Promise<StaffDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Create auth user
     const {
@@ -397,6 +399,8 @@ export class StaffService {
         date_of_birth: input.dateOfBirth ?? null,
         gender: input.gender ?? null,
         is_active: input.isActive ?? true,
+        created_by: username,
+        updated_by: username,
       });
 
       throwIfDbError(profileError);
@@ -406,6 +410,7 @@ export class StaffService {
         user_id: user.id,
         branch_id: branchId,
         is_primary: false,
+        created_by: username,
       });
 
       if (branchError) {
@@ -418,6 +423,7 @@ export class StaffService {
           user_id: user.id,
           role_id: roleId,
           branch_id: branchId,
+          created_by: username,
         }));
 
         const { error: rolesError } = await supabase.from('user_roles').insert(roleAssignments);
@@ -437,6 +443,8 @@ export class StaffService {
           department: input.department ?? null,
           join_date: input.joinDate ?? null,
           is_active: input.isActive ?? true,
+          created_by: username,
+          updated_by: username,
         })
         .select()
         .single();
@@ -454,8 +462,9 @@ export class StaffService {
     }
   }
 
-  async updateStaff(id: string, input: UpdateStaffDto, branchId: string): Promise<StaffDto> {
+  async updateStaff(id: string, input: UpdateStaffDto, branchId: string, userEmail: string): Promise<StaffDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Verify staff exists in branch
     await this.getStaffById(id, branchId);
@@ -484,6 +493,7 @@ export class StaffService {
             date_of_birth: input.dateOfBirth,
             gender: input.gender,
             updated_at: new Date().toISOString(),
+            updated_by: username,
           })
           .eq('id', (staff as { user_id: string }).user_id);
 
@@ -500,6 +510,7 @@ export class StaffService {
         join_date: input.joinDate,
         is_active: input.isActive,
         updated_at: new Date().toISOString(),
+        updated_by: username,
       })
       .eq('id', id);
 
@@ -512,8 +523,10 @@ export class StaffService {
     id: string,
     input: DeactivateStaffDto,
     branchId: string,
+    userEmail: string,
   ): Promise<StaffDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     const staff = await this.getStaffById(id, branchId);
 
@@ -526,6 +539,7 @@ export class StaffService {
         deactivated_at: new Date().toISOString(),
         deactivation_reason: input.reason,
         updated_at: new Date().toISOString(),
+        updated_by: username,
       })
       .eq('id', id);
 

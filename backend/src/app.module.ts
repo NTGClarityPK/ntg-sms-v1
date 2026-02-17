@@ -34,6 +34,8 @@ import { SubjectTemplatesModule } from './modules/subject-templates/subject-temp
 import { EventsModule } from './modules/events/events.module';
 import { BehavioralModule } from './modules/behavioral/behavioral.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { AuditLogModule } from './common/modules/audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { ReportsModule } from './modules/reports/reports.module';
       envFilePath: '.env',
     }),
     GlobalJwtModule,
+    AuditLogModule,
     AuthModule,
     AcademicYearsModule,
     CoreLookupsModule,
@@ -70,6 +73,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     EventsModule,
     BehavioralModule,
     ReportsModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [

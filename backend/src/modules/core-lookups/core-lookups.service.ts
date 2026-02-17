@@ -13,6 +13,7 @@ import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { UpdateLevelDto } from './dto/update-level.dto';
+import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 
 type Meta = { total: number; page: number; limit: number; totalPages: number };
 
@@ -32,6 +33,8 @@ type SubjectRow = {
   updated_at: string;
   branch_id: string | null;
   tenant_id: string | null;
+  created_by: string | null;
+  updated_by: string | null;
 };
 
 type ClassRow = {
@@ -44,6 +47,8 @@ type ClassRow = {
   updated_at: string;
   branch_id: string | null;
   tenant_id: string | null;
+  created_by: string | null;
+  updated_by: string | null;
 };
 
 type SectionRow = {
@@ -55,6 +60,8 @@ type SectionRow = {
   updated_at: string;
   branch_id: string | null;
   tenant_id: string | null;
+  created_by: string | null;
+  updated_by: string | null;
 };
 
 type LevelRow = {
@@ -66,6 +73,8 @@ type LevelRow = {
   updated_at: string;
   branch_id: string | null;
   tenant_id: string | null;
+  created_by: string | null;
+  updated_by: string | null;
 };
 
 type LevelClassRow = {
@@ -166,8 +175,10 @@ export class CoreLookupsService {
     },
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<SubjectDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Idempotent behaviour for onboarding: if subject code already exists in this branch, return it.
     const code = (input.code ?? '').trim();
@@ -192,6 +203,8 @@ export class CoreLookupsService {
         sort_order: input.sortOrder ?? 0,
         branch_id: branchId,
         tenant_id: tenantId,
+        created_by: username,
+        updated_by: username,
       })
       .select('*')
       .single();
@@ -203,15 +216,18 @@ export class CoreLookupsService {
     id: string,
     input: UpdateSubjectDto,
     branchId: string,
+    userEmail: string,
   ): Promise<SubjectDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
     const updates: Partial<SubjectRow> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
     if (input.code !== undefined) updates.code = input.code || null;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
-    if (Object.keys(updates).length === 0) {
+    updates.updated_by = username;
+    if (Object.keys(updates).length === 1 && updates.updated_by) {
       const { data: existing, error: fetchError } = await supabase
         .from('subjects')
         .select('*')
@@ -321,8 +337,10 @@ export class CoreLookupsService {
     },
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<ClassDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
     const { data, error } = await supabase
       .from('classes')
       .insert({
@@ -332,6 +350,8 @@ export class CoreLookupsService {
         is_active: input.isActive ?? true,
         branch_id: branchId,
         tenant_id: tenantId,
+        created_by: username,
+        updated_by: username,
       })
       .select('*')
       .single();
@@ -343,14 +363,17 @@ export class CoreLookupsService {
     id: string,
     input: UpdateClassDto,
     branchId: string,
+    userEmail: string,
   ): Promise<ClassDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
     const updates: Partial<ClassRow> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.displayName !== undefined) updates.display_name = input.displayName;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
-    if (Object.keys(updates).length === 0) {
+    updates.updated_by = username;
+    if (Object.keys(updates).length === 1 && updates.updated_by) {
       const { data: existing, error: fetchError } = await supabase
         .from('classes')
         .select('*')
@@ -412,8 +435,10 @@ export class CoreLookupsService {
     },
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<SectionDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
     const { data, error } = await supabase
       .from('sections')
       .insert({
@@ -422,6 +447,8 @@ export class CoreLookupsService {
         sort_order: input.sortOrder ?? 0,
         branch_id: branchId,
         tenant_id: tenantId,
+        created_by: username,
+        updated_by: username,
       })
       .select('*')
       .single();
@@ -433,13 +460,16 @@ export class CoreLookupsService {
     id: string,
     input: UpdateSectionDto,
     branchId: string,
+    userEmail: string,
   ): Promise<SectionDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
     const updates: Partial<SectionRow> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
-    if (Object.keys(updates).length === 0) {
+    updates.updated_by = username;
+    if (Object.keys(updates).length === 1 && updates.updated_by) {
       const { data: existing, error: fetchError } = await supabase
         .from('sections')
         .select('*')
@@ -545,6 +575,7 @@ export class CoreLookupsService {
     },
     branchId: string,
     tenantId: string | null,
+    userEmail: string,
   ): Promise<LevelDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -591,6 +622,7 @@ export class CoreLookupsService {
       }
     }
 
+    const username = extractUsernameFromEmail(userEmail);
     const { data: level, error } = await supabase
       .from('levels')
       .insert({
@@ -599,6 +631,8 @@ export class CoreLookupsService {
         sort_order: input.sortOrder ?? 0,
         branch_id: branchId,
         tenant_id: tenantId,
+        created_by: username,
+        updated_by: username,
       })
       .select('*')
       .single();
@@ -610,6 +644,8 @@ export class CoreLookupsService {
       const payload = input.classIds.map((classId) => ({
         level_id: levelRow.id,
         class_id: classId,
+        created_by: username,
+        updated_by: username,
       }));
       const { error: insertLcError } = await supabase.from('level_classes').insert(payload);
       throwIfDbError(insertLcError);
@@ -641,8 +677,10 @@ export class CoreLookupsService {
     id: string,
     input: UpdateLevelDto,
     branchId: string,
+    userEmail: string,
   ): Promise<LevelDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     const { data: existingLevel, error: fetchError } = await supabase
       .from('levels')
@@ -658,6 +696,7 @@ export class CoreLookupsService {
     if (input.name !== undefined) updates.name = input.name;
     if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
+    updates.updated_by = username;
 
     if (Object.keys(updates).length > 0) {
       const { error: updateError } = await supabase
@@ -700,7 +739,12 @@ export class CoreLookupsService {
             `Cannot assign classes already in other levels: ${[...new Set(conflictNames)].join(', ')}`,
           );
         }
-        const payload = input.classIds.map((classId) => ({ level_id: id, class_id: classId }));
+        const payload = input.classIds.map((classId) => ({ 
+          level_id: id, 
+          class_id: classId,
+          created_by: username,
+          updated_by: username,
+        }));
         const { error: insertLcError } = await supabase.from('level_classes').insert(payload);
         throwIfDbError(insertLcError);
       }

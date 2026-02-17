@@ -14,6 +14,7 @@ import { AttendanceReportDto } from './dto/attendance-report.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LeaveRequestsService } from '../leave-requests/leave-requests.service';
+import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 
 type AttendanceRow = {
   id: string;
@@ -29,6 +30,8 @@ type AttendanceRow = {
   academic_year_id: string;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 };
 
 function throwIfDbError(error: PostgrestError | null): void {
@@ -715,8 +718,10 @@ export class AttendanceService {
     branchId: string,
     academicYearId: string,
     userId: string,
+    userEmail: string,
   ): Promise<AttendanceDto[]> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Verify class-section exists and belongs to branch
     const { data: classSectionData, error: classSectionError } = await supabase
@@ -758,6 +763,8 @@ export class AttendanceService {
       marked_by: userId,
       branch_id: branchId,
       academic_year_id: academicYearId,
+      created_by: username,
+      updated_by: username,
       updated_at: nowIso,
     }));
 
@@ -899,8 +906,10 @@ export class AttendanceService {
     input: UpdateAttendanceDto,
     branchId: string,
     userId: string,
+    userEmail: string,
   ): Promise<AttendanceDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Verify attendance exists and belongs to branch
     const { data: existing, error: fetchError } = await supabase
@@ -918,6 +927,7 @@ export class AttendanceService {
     const updateData: Partial<AttendanceRow> = {
       updated_at: new Date().toISOString(),
       marked_by: userId,
+      updated_by: username,
     };
 
     if (input.status !== undefined) {

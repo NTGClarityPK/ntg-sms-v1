@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CoreLookupsService } from './core-lookups.service';
 import { QuerySubjectsDto } from './dto/query-subjects.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
@@ -28,8 +29,9 @@ export class SubjectsController {
   async create(
     @Body() body: CreateSubjectDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: SubjectDto }> {
-    const created = await this.coreLookupsService.createSubject(body, branch.branchId, branch.tenantId);
+    const created = await this.coreLookupsService.createSubject(body, branch.branchId, branch.tenantId, user.email);
     return { data: created };
   }
 
@@ -38,8 +40,9 @@ export class SubjectsController {
     @Param('id') id: string,
     @Body() body: UpdateSubjectDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: SubjectDto }> {
-    const updated = await this.coreLookupsService.updateSubject(id, body, branch.branchId);
+    const updated = await this.coreLookupsService.updateSubject(id, body, branch.branchId, user.email);
     return { data: updated };
   }
 }

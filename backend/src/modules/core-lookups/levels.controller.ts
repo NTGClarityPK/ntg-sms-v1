@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { CoreLookupsService } from './core-lookups.service';
 import { QueryLevelsDto } from './dto/query-levels.dto';
 import { CreateLevelDto } from './dto/create-level.dto';
@@ -28,8 +29,9 @@ export class LevelsController {
   async create(
     @Body() body: CreateLevelDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: LevelDto }> {
-    const created = await this.coreLookupsService.createLevel(body, branch.branchId, branch.tenantId);
+    const created = await this.coreLookupsService.createLevel(body, branch.branchId, branch.tenantId, user.email);
     return { data: created };
   }
 
@@ -38,8 +40,9 @@ export class LevelsController {
     @Param('id') id: string,
     @Body() body: UpdateLevelDto,
     @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: LevelDto }> {
-    const updated = await this.coreLookupsService.updateLevel(id, body, branch.branchId);
+    const updated = await this.coreLookupsService.updateLevel(id, body, branch.branchId, user.email);
     return { data: updated };
   }
 }

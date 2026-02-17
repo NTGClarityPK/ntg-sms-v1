@@ -165,11 +165,20 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
     assignedSubjectIds,
   ]);
 
-  // Options already sorted since uniqueClassSections and uniqueSubjects are sorted
-  const classSectionOptions = uniqueClassSections.map((cs) => ({
-    value: cs.id,
-    label: `${cs.classDisplayName ?? cs.className ?? 'Unknown'} - ${cs.sectionName ?? 'Unknown'}`,
-  }));
+  // Sort by class sort order first, then by section sort order
+  const classSectionOptions = uniqueClassSections
+    .sort((a, b) => {
+      const classOrderA = a.classSortOrder ?? 999;
+      const classOrderB = b.classSortOrder ?? 999;
+      if (classOrderA !== classOrderB) return classOrderA - classOrderB;
+      const sectionOrderA = a.sectionSortOrder ?? 999;
+      const sectionOrderB = b.sectionSortOrder ?? 999;
+      return sectionOrderA - sectionOrderB;
+    })
+    .map((cs) => ({
+      value: cs.id,
+      label: `${cs.classDisplayName ?? cs.className ?? 'Unknown'} - ${cs.sectionName ?? 'Unknown'}`,
+    }));
   const subjectOptions = uniqueSubjects.map((s) => ({ value: s.id, label: s.name }));
 
   // Show skeleton while loading class sections or subjects
