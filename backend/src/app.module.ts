@@ -38,6 +38,9 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AuditLogModule } from './common/modules/audit-log/audit-log.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { LibraryModule } from './modules/library/library.module';
+import { UniformsModule } from './modules/uniforms/uniforms.module';
+import { UniformRequestsModule } from './modules/uniform-requests/uniform-requests.module';
+import { UniformIssuancesModule } from './modules/uniform-issuances/uniform-issuances.module';
 
 @Module({
   imports: [
@@ -78,6 +81,9 @@ import { LibraryModule } from './modules/library/library.module';
     AuditLogsModule,
     MessagesModule,
     LibraryModule,
+    UniformsModule,
+    UniformRequestsModule,
+    UniformIssuancesModule,
   ],
   controllers: [AppController],
   providers: [

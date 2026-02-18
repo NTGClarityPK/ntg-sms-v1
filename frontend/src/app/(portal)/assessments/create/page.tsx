@@ -74,7 +74,7 @@ export default function CreateAssessmentPage() {
         const actualCap = totalF > 0 ? (completed / totalF) * 70 : 0;
         progressMaxRef.current = Math.max(timeBasedCap, actualCap);
         setCompressionProgress((prev) => {
-          const next = Math.min(prev + 3, progressMaxRef.current);
+          const next = Math.min((prev ?? 0) + 3, progressMaxRef.current);
           return next;
         });
       }, 500);
@@ -85,7 +85,7 @@ export default function CreateAssessmentPage() {
           filesCompletedRef.current = i + 1;
           const newCap = ((i + 1) / total) * 70;
           progressMaxRef.current = newCap;
-          setCompressionProgress((prev) => Math.max(prev, newCap));
+          setCompressionProgress((prev) => Math.max(prev ?? 0, newCap));
           setCompressionMessage(
             total === 1
               ? 'Compressing materials…'

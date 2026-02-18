@@ -33,6 +33,8 @@ import {
   IconMessage,
   IconStar,
   IconAlertTriangle,
+  IconPackage,
+  IconClipboardList,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -94,6 +96,8 @@ const allNavItems: NavItem[] = [
   { label: 'Notification', href: '/notifications', icon: IconBell },
   { label: 'Messages', href: '/messages', icon: IconMessage },
   { label: 'Library', href: '/library', icon: IconBook },
+  { label: 'Inventory', href: '/inventory', icon: IconPackage },
+  { label: 'Request uniform', href: '/uniform-request', icon: IconClipboardList },
   { 
     label: 'My Event', 
     href: '/my-events', 
@@ -236,6 +240,11 @@ export function Sidebar({
     // Super admin sees everything - bypass all filters
     if (isSuperAdmin) return true;
 
+    // Request uniform: only for parents
+    if (item.href === '/uniform-request') {
+      return isParent;
+    }
+
     const featureCode = getFeatureCodeForPath(item.href);
     if (featureCode && !canView(featureCode)) return false;
 
@@ -320,6 +329,8 @@ export function Sidebar({
       item.href === '/notifications' ||
       item.href === '/messages' ||
       item.href === '/library' ||
+      item.href === '/inventory' ||
+      item.href === '/uniform-request' ||
       item.href === '/my-schedule' ||
       item.href === '/my-timetable' ||
       item.href === '/my-events' ||

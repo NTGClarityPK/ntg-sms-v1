@@ -35,11 +35,31 @@ export class SystemSettingsService {
     return { data: ((data as SystemSettingRow[]) ?? []).map(mapSetting) };
   }
 
+  /** Keys that return an empty array when missing (no 404). */
+  private static readonly OPTIONAL_LIST_KEYS = [
+    'inventory_categories',
+    'inventory_sizes',
+    'library_categories',
+  ];
+
   async getByKey(key: string): Promise<{ data: SystemSettingDto }> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase.from('system_settings').select('*').eq('key', key).maybeSingle();
     throwIfDbError(error);
-    if (!data) throw new NotFoundException('Setting not found');
+    if (!data) {
+      if (SystemSettingsService.OPTIONAL_LIST_KEYS.includes(key)) {
+        const now = new Date().toISOString();
+        return {
+          data: new SystemSettingDto({
+            key,
+            value: [],
+            createdAt: now,
+            updatedAt: now,
+          }),
+        };
+      }
+      throw new NotFoundException('Setting not found');
+    }
     return { data: mapSetting(data as SystemSettingRow) };
   }
 

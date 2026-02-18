@@ -581,4 +581,62 @@ export class NotificationsService {
       console.error('Failed to create early departure excused notifications:', errorMessage);
     }
   }
+
+  /**
+   * Notify staff (users with inventory edit) when a uniform request is raised.
+   */
+  async createUniformRequestRaisedNotifications(params: {
+    recipientUserIds: string[];
+    studentName: string;
+    requestId: string;
+  }): Promise<void> {
+    if (params.recipientUserIds.length === 0) return;
+    try {
+      const notifications = params.recipientUserIds.map((user_id) => ({
+        user_id,
+        type: 'uniform_request_raised',
+        title: 'New uniform request',
+        body: `Uniform request for ${params.studentName} is pending review.`,
+        data: { uniformRequestId: params.requestId },
+        is_read: false,
+      }));
+
+      const supabase = this.supabaseConfig.getClient();
+      const { error } = await supabase.from('notifications').insert(notifications);
+      if (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Failed to create uniform request raised notifications:', errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to create uniform request raised notifications:', errorMessage);
+    }
+  }
+
+  /**
+   * Notify the parent when their uniform request is approved, rejected, or issued.
+   */
+  async createUniformRequestStatusNotification(params: {
+    userId: string;
+    studentName: string;
+    status: string;
+    requestId: string;
+  }): Promise<void> {
+    try {
+      const statusText = params.status.charAt(0).toUpperCase() + params.status.slice(1);
+      await this.createNotification({
+        userId: params.userId,
+        type: 'uniform_request',
+        title: `Uniform request ${statusText}`,
+        body: `Your uniform request for ${params.studentName} has been ${params.status.toLowerCase()}.`,
+        data: {
+          uniformRequestId: params.requestId,
+          status: params.status,
+        },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to create uniform request status notification:', errorMessage);
+    }
+  }
 }

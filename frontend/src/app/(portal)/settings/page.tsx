@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -56,6 +56,8 @@ import { LeaveQuotaSetting } from '@/components/features/settings/LeaveQuotaSett
 
 import { CommunicationSettings } from '@/components/features/settings/CommunicationSettings';
 import { LibraryCategoryEditor } from '@/components/features/settings/LibraryCategoryEditor';
+import { InventoryCategoryEditor } from '@/components/features/settings/InventoryCategoryEditor';
+import { InventorySizeEditor } from '@/components/features/settings/InventorySizeEditor';
 
 import { BehaviorSettings } from '@/components/features/settings/BehaviorSettings';
 import { useTenantMe, useUpdateTenantMe } from '@/hooks/useTenant';
@@ -272,6 +274,9 @@ export default function SettingsPage() {
                 <Tabs.Tab value="behavior" leftSection={<IconMoodHappy size={16} />}>
                   Behavior
                 </Tabs.Tab>
+                <Tabs.Tab value="inventory-management" leftSection={<IconPackage size={16} />}>
+                  Inventory Management
+                </Tabs.Tab>
                 {isSchoolAdmin && (
                   <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
                     Theme Settings
@@ -317,6 +322,11 @@ export default function SettingsPage() {
               {/* Behavior Tab */}
               <Tabs.Panel value="behavior" pt="md" px="md" pb="md">
                 <BehaviorTabContent />
+              </Tabs.Panel>
+
+              {/* Inventory Management Tab */}
+              <Tabs.Panel value="inventory-management" pt="md" px="md" pb="md">
+                <InventoryManagementTabContent />
               </Tabs.Panel>
 
               {isSchoolAdmin && (
@@ -1178,4 +1188,13 @@ function CommunicationTabContent() {
 
 function BehaviorTabContent() {
   return <BehaviorSettings />;
+}
+
+function InventoryManagementTabContent() {
+  return (
+    <Stack gap="xl">
+      <InventoryCategoryEditor />
+      <InventorySizeEditor />
+    </Stack>
+  );
 }

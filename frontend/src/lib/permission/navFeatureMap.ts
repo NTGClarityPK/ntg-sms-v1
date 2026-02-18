@@ -22,6 +22,11 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/notifications': 'communication',
   '/messages': 'communication',
   '/library': 'library',
+  '/inventory': 'inventory',
+  '/inventory/items': 'inventory',
+  '/inventory/requests': 'inventory',
+  '/inventory/history': 'inventory',
+  '/uniform-request': 'inventory',
   // Split personal vs management features
   '/my-events': 'events_personal',
   '/events': 'events_management',
