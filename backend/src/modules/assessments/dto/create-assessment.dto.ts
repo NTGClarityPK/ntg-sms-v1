@@ -72,6 +72,11 @@ export class CreateAssessmentDto {
   @IsOptional()
   @IsBoolean()
   allowLateSubmission?: boolean;
+
+  /** When provided, draft files are committed to the first created assessment after size check (10MB total). */
+  @IsOptional()
+  @IsUUID('4')
+  draftId?: string;
 }
 
 

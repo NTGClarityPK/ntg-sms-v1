@@ -12,6 +12,7 @@ import { ClassSectionsService } from '../class-sections/class-sections.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
 import { StaffService } from '../staff/staff.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { BranchesService } from '../branches/branches.service';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 import { AssessmentDto } from './dto/assessment.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
@@ -106,6 +107,17 @@ function mapStudentStatusRow(
   });
 }
 
+type DraftFileRow = {
+  id: string;
+  draft_id: string;
+  branch_id: string;
+  created_by: string;
+  file_path: string;
+  file_name: string;
+  file_size_bytes: number;
+  mime_type: string | null;
+};
+
 @Injectable()
 export class AssessmentsService {
   constructor(
@@ -116,6 +128,7 @@ export class AssessmentsService {
     private readonly teacherAssignmentsService: TeacherAssignmentsService,
     private readonly staffService: StaffService,
     private readonly notificationsService: NotificationsService,
+    private readonly branchesService: BranchesService,
   ) {}
 
   async listAssessments(
@@ -207,6 +220,16 @@ export class AssessmentsService {
     userEmail: string,
   ): Promise<AssessmentDto> {
     const supabase = this.supabaseConfig.getClient();
+
+    const MATERIALS_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB total for materials
+    if (input.draftId) {
+      const draftTotal = await this.getDraftTotalSizeBytes(input.draftId, branchId);
+      if (draftTotal > MATERIALS_LIMIT_BYTES) {
+        throw new BadRequestException(
+          'Total size of materials exceeds 10MB limit. Please remove some files or use smaller files.',
+        );
+      }
+    }
 
     // Determine which mode we're using
     let classSectionIdsToCreate: string[] = [];
@@ -365,6 +388,17 @@ export class AssessmentsService {
           tenantId,
         })
         .catch(() => {});
+    }
+
+    const firstAssessmentId = (data[0] as AssessmentRow).id;
+    if (input.draftId) {
+      await this.commitDraftToAssessment(
+        input.draftId,
+        firstAssessmentId,
+        branchId,
+        createdByUserId,
+        userEmail,
+      );
     }
 
     return mapAssessment(data[0] as AssessmentRow);
@@ -1323,6 +1357,313 @@ export class AssessmentsService {
   }
 
   /**
+   * Sum of attachment sizes for an assessment (for 10MB materials limit).
+   */
+  async getAssessmentAttachmentsTotalSizeBytes(
+    assessmentId: string,
+    branchId: string,
+  ): Promise<number> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: assessment } = await supabase
+      .from('assessments')
+      .select('id')
+      .eq('id', assessmentId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    if (!assessment) return 0;
+    const { data: rows, error } = await supabase
+      .from('assessment_attachments')
+      .select('file_size_bytes')
+      .eq('assessment_id', assessmentId);
+    throwIfDbError(error);
+    const total = (rows ?? []).reduce(
+      (sum, r) => sum + (Number(r.file_size_bytes) || 0),
+      0,
+    );
+    return total;
+  }
+
+  /**
+   * Get draft total size (post-compression) for 10MB check.
+   */
+  async getDraftTotalSizeBytes(draftId: string, branchId: string): Promise<number> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: rows, error } = await supabase
+      .from('assessment_draft_files')
+      .select('file_size_bytes')
+      .eq('draft_id', draftId)
+      .eq('branch_id', branchId);
+    throwIfDbError(error);
+    return (rows ?? []).reduce((sum, r) => sum + (Number(r.file_size_bytes) || 0), 0);
+  }
+
+  /**
+   * Upload a file to draft: store as-is (no compression). Compression runs when teacher presses Create Assessment.
+   */
+  async uploadDraftFile(
+    draftId: string,
+    branchId: string,
+    userId: string,
+    file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+  ): Promise<{
+    fileUrl: string;
+    fileName: string;
+    fileSizeBytes: number;
+    mimeType: string;
+    draftFileId: string;
+    totalSizeBytes: number;
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 15);
+    const sanitized = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileName = `${timestamp}-${randomStr}-${sanitized}`;
+    const filePath = `drafts/${draftId}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('assessment-files')
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+    if (uploadError) {
+      throw new BadRequestException(`Upload failed: ${uploadError.message}`);
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('assessment-files')
+      .getPublicUrl(filePath);
+
+    const { data: row, error: insertError } = await supabase
+      .from('assessment_draft_files')
+      .insert({
+        draft_id: draftId,
+        branch_id: branchId,
+        created_by: userId,
+        file_path: filePath,
+        file_name: file.originalname,
+        file_size_bytes: file.size,
+        mime_type: file.mimetype,
+      })
+      .select('id')
+      .single();
+    throwIfDbError(insertError);
+    if (!row) {
+      throw new BadRequestException('Failed to record draft file');
+    }
+
+    const totalSizeBytes = await this.getDraftTotalSizeBytes(draftId, branchId);
+    return {
+      fileUrl: publicUrl,
+      fileName: file.originalname,
+      fileSizeBytes: file.size,
+      mimeType: file.mimetype,
+      draftFileId: row.id,
+      totalSizeBytes,
+    };
+  }
+
+  /**
+   * Compress one draft file (image or video). Replaces file in storage and updates file_size_bytes. Called when teacher presses Create Assessment.
+   */
+  async compressDraftFile(
+    draftId: string,
+    fileId: string,
+    branchId: string,
+    userId: string,
+  ): Promise<{ fileSizeBytes: number }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: row, error: fetchError } = await supabase
+      .from('assessment_draft_files')
+      .select('id, file_path, file_name, file_size_bytes, mime_type')
+      .eq('id', fileId)
+      .eq('draft_id', draftId)
+      .eq('branch_id', branchId)
+      .eq('created_by', userId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!row) {
+      throw new NotFoundException('Draft file not found');
+    }
+
+    const { data: blob, error: downloadError } = await supabase.storage
+      .from('assessment-files')
+      .download(row.file_path);
+    if (downloadError || !blob) {
+      throw new BadRequestException(`Failed to read draft file: ${row.file_name}`);
+    }
+    let buffer: Buffer = Buffer.from(await blob.arrayBuffer());
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(row.file_name);
+    const isVideo = /\.(mp4|webm|mov|avi|mkv)$/i.test(row.file_name);
+
+    if (isImage) {
+      try {
+        const sharp = await import('sharp');
+        const pipeline = sharp.default(buffer).resize(1920, null, { withoutEnlargement: true });
+        const ext = (row.file_name.split('.').pop() || '').toLowerCase();
+        if (ext === 'png') {
+          buffer = (await pipeline.png({ compressionLevel: 6 }).toBuffer()) as Buffer;
+        } else if (ext === 'webp') {
+          buffer = (await pipeline.webp({ quality: 85 }).toBuffer()) as Buffer;
+        } else if (ext === 'gif') {
+          buffer = (await pipeline.gif().toBuffer()) as Buffer;
+        } else {
+          buffer = (await pipeline.jpeg({ quality: 85 }).toBuffer()) as Buffer;
+        }
+      } catch {
+        // keep original buffer
+      }
+    } else if (isVideo) {
+      const { compressVideo } = await import('./video-compression.util');
+      buffer = (await compressVideo(buffer, row.mime_type ?? '', row.file_name)) as Buffer;
+    }
+
+    const finalSize = buffer.length;
+    const { error: uploadError } = await supabase.storage
+      .from('assessment-files')
+      .upload(row.file_path, buffer, {
+        contentType: row.mime_type ?? 'application/octet-stream',
+        upsert: true,
+      });
+    if (uploadError) {
+      throw new BadRequestException(`Failed to save compressed file: ${uploadError.message}`);
+    }
+
+    const { error: updateError } = await supabase
+      .from('assessment_draft_files')
+      .update({ file_size_bytes: finalSize })
+      .eq('id', fileId)
+      .eq('draft_id', draftId)
+      .eq('branch_id', branchId);
+    throwIfDbError(updateError);
+
+    return { fileSizeBytes: finalSize };
+  }
+
+  /**
+   * Get draft files for commit (move to assessment).
+   */
+  async getDraftFiles(draftId: string, branchId: string): Promise<DraftFileRow[]> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('assessment_draft_files')
+      .select('id, draft_id, branch_id, created_by, file_path, file_name, file_size_bytes, mime_type')
+      .eq('draft_id', draftId)
+      .eq('branch_id', branchId)
+      .order('created_at', { ascending: true });
+    throwIfDbError(error);
+    return (data ?? []) as DraftFileRow[];
+  }
+
+  /**
+   * Delete one draft file (storage + row).
+   */
+  async deleteDraftFile(
+    draftId: string,
+    fileId: string,
+    branchId: string,
+    userId: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: row, error: fetchError } = await supabase
+      .from('assessment_draft_files')
+      .select('file_path')
+      .eq('id', fileId)
+      .eq('draft_id', draftId)
+      .eq('branch_id', branchId)
+      .eq('created_by', userId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!row) {
+      throw new NotFoundException('Draft file not found');
+    }
+    await supabase.storage.from('assessment-files').remove([row.file_path]);
+    const { error: deleteError } = await supabase
+      .from('assessment_draft_files')
+      .delete()
+      .eq('id', fileId)
+      .eq('draft_id', draftId)
+      .eq('branch_id', branchId);
+    throwIfDbError(deleteError);
+  }
+
+  /**
+   * Commit draft files to an assessment: copy to assessment path, create attachments, update branch storage, delete draft.
+   */
+  async commitDraftToAssessment(
+    draftId: string,
+    assessmentId: string,
+    branchId: string,
+    _createdByUserId: string,
+    userEmail: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    const draftFiles = await this.getDraftFiles(draftId, branchId);
+    if (draftFiles.length === 0) return;
+
+    const branchData = await this.branchesService.getById(branchId);
+    const quotaBytes = branchData.storageQuotaGb * 1024 * 1024 * 1024;
+    const totalDraftBytes = draftFiles.reduce((s, f) => s + Number(f.file_size_bytes), 0);
+    if (branchData.storageUsedBytes + totalDraftBytes > quotaBytes) {
+      throw new BadRequestException('Storage quota exceeded');
+    }
+
+    for (const f of draftFiles) {
+      const { data: blob, error: downloadError } = await supabase.storage
+        .from('assessment-files')
+        .download(f.file_path);
+      if (downloadError || !blob) {
+        throw new BadRequestException(`Failed to read draft file: ${f.file_name}`);
+      }
+      const buffer = Buffer.from(await blob.arrayBuffer());
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 15);
+      const sanitized = f.file_name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const newFileName = `${timestamp}-${randomStr}-${sanitized}`;
+      const newPath = `assessments/${assessmentId}/${newFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('assessment-files')
+        .upload(newPath, buffer, {
+          contentType: f.mime_type ?? 'application/octet-stream',
+          upsert: false,
+        });
+      if (uploadError) {
+        throw new BadRequestException(`Failed to upload file: ${f.file_name}`);
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('assessment-files')
+        .getPublicUrl(newPath);
+
+      await supabase.from('assessment_attachments').insert({
+        assessment_id: assessmentId,
+        file_name: f.file_name,
+        file_url: publicUrl,
+        file_size_bytes: f.file_size_bytes,
+        mime_type: f.mime_type ?? null,
+      });
+
+      await supabase.storage.from('assessment-files').remove([f.file_path]);
+      const { error: deleteRowError } = await supabase
+        .from('assessment_draft_files')
+        .delete()
+        .eq('id', f.id);
+      throwIfDbError(deleteRowError);
+    }
+
+    const { error: quotaError } = await supabase
+      .from('branches')
+      .update({
+        storage_used_bytes: branchData.storageUsedBytes + totalDraftBytes,
+      })
+      .eq('id', branchId);
+    if (quotaError) {
+      throw new BadRequestException('Failed to update storage quota');
+    }
+  }
+
+  /**
    * Get all attachments for an assessment
    */
   async getAssessmentAttachments(assessmentId: string, branchId: string): Promise<AssessmentAttachmentDto[]> {
@@ -1386,7 +1727,7 @@ export class AssessmentsService {
         assessment_id: dto.assessmentId,
         file_name: dto.fileName,
         file_url: dto.fileUrl,
-        file_size_bytes: null,
+        file_size_bytes: dto.fileSizeBytes ?? null,
         mime_type: dto.mimeType ?? null,
       })
       .select('id, assessment_id, file_name, file_url, file_size_bytes, mime_type, created_at')

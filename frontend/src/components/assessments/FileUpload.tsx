@@ -1,15 +1,14 @@
 'use client';
 
 /**
- * File Upload Component for Assessments
+ * File Upload Component for Assessments (images compressed on backend: 1920px max, 85% quality)
  */
 
 import { useState } from 'react';
-import { Button, Group, Stack, Text, FileButton, Paper, Progress, ActionIcon, Tooltip } from '@mantine/core';
+import { Button, Group, Stack, Text, FileButton, Paper, Progress, ActionIcon, Tooltip, Alert } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconUpload, IconX, IconFile, IconDownload } from '@tabler/icons-react';
-import { useFileUpload } from '@/hooks/useFileUpload';
-import { useCreateAssessmentAttachment, useDeleteAssessmentAttachment, useAssessmentAttachments } from '@/hooks/api/useAssessmentAttachments';
+import { IconUpload, IconX, IconFile, IconDownload, IconInfoCircle } from '@tabler/icons-react';
+import { useUploadAssessmentFile, useCreateAssessmentAttachment, useDeleteAssessmentAttachment, useAssessmentAttachments } from '@/hooks/api/useAssessmentAttachments';
 import type { AssessmentAttachment } from '@/hooks/api/useAssessmentAttachments';
 
 interface FileUploadProps {
@@ -23,13 +22,10 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
   const { data: attachments = [], isLoading } = useAssessmentAttachments(assessmentId);
   const createAttachment = useCreateAssessmentAttachment(assessmentId);
   const deleteAttachment = useDeleteAssessmentAttachment();
+  const uploadFileMutation = useUploadAssessmentFile(assessmentId);
 
-  const { uploadFile, uploading, progress } = useFileUpload({
-    bucket: 'assessment-files',
-    folder: `assessments/${assessmentId}`,
-    maxSizeMB: 50, // 50MB max
-    allowedTypes: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'gif', 'txt'],
-  });
+  const uploading = uploadFileMutation.isPending;
+  const progress = uploading ? 50 : 0; // Backend upload has no progress events; show indeterminate-style
 
   const handleFileSelect = (files: File[] | null) => {
     if (!files || files.length === 0) return;
@@ -41,30 +37,19 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
 
     try {
       for (const file of selectedFiles) {
-        console.log('[FileUpload] Uploading file:', file.name);
-        const result = await uploadFile(file);
-        console.log('[FileUpload] Upload result:', result);
-        
+        const result = await uploadFileMutation.mutateAsync(file);
         if (result) {
-          console.log('[FileUpload] Creating attachment record...');
           await createAttachment.mutateAsync({
             fileName: result.fileName,
-            fileUrl: result.url,
-            mimeType: file.type || undefined,
+            fileUrl: result.fileUrl,
+            mimeType: result.mimeType || undefined,
+            fileSizeBytes: result.fileSizeBytes,
           });
-          console.log('[FileUpload] Attachment created successfully');
-        } else {
-          console.error('[FileUpload] Upload failed for file:', file.name);
         }
       }
       setSelectedFiles([]);
-    } catch (error: any) {
-      console.error('[FileUpload] Error during upload:', error);
-      notifications.show({
-        title: 'Upload Error',
-        message: error.message || 'Failed to upload files. Please check console for details.',
-        color: 'red',
-      });
+    } catch {
+      // Error already shown by upload mutation
     }
   };
 
@@ -97,10 +82,13 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
             <Text size="sm" fw={500}>
               Upload Assignment Materials
             </Text>
+            <Alert variant="light" color="blue" icon={<IconInfoCircle size={16} />} title="Compression and limit">
+              Images and videos are compressed when uploaded (images: max 1920px, 85% quality; videos: compressed). Total materials must be 10MB or less.
+            </Alert>
             <Group>
               <FileButton
                 onChange={handleFileSelect}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.txt"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.txt,.mp4,.webm,.mov,.avi,.mkv"
                 multiple
               >
                 {(props) => (
@@ -137,7 +125,7 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
               </Stack>
             )}
             <Text size="xs" c="dimmed">
-              Supported formats: PDF, Word, Excel, PowerPoint, Images, Text files (Max 50MB per file)
+              Supported: PDF, Word, Excel, PowerPoint, images, video (MP4, WebM, etc.), text. Total materials limit 10MB.
             </Text>
           </Stack>
         </Paper>

@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, MaxLength, IsUrl, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, MaxLength, IsUrl, IsUUID } from 'class-validator';
 
 export class CreateAssessmentAttachmentDto {
   @IsUUID('4')
@@ -20,6 +20,11 @@ export class CreateAssessmentAttachmentDto {
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   mimeType?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  fileSizeBytes?: number;
 }
 
 

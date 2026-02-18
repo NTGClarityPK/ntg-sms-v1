@@ -44,6 +44,9 @@ export default function MyAssessmentsPage() {
     const isPdf = mimeType.includes('pdf') || fileName.endsWith('.pdf');
     if (isPdf) return 'pdf' as const;
 
+    const isVideo = mimeType.startsWith('video/') || /\.(mp4|webm|mov|ogg|avi|mkv)$/.test(fileName);
+    if (isVideo) return 'video' as const;
+
     return 'unsupported' as const;
   }, [previewAttachment]);
 
@@ -102,6 +105,14 @@ export default function MyAssessmentsPage() {
 
   const openInNewTab = (url: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownloadAll = (attachments: MyAssessmentAttachment[]) => {
+    attachments.forEach((att, i) => {
+      setTimeout(() => {
+        window.open(att.fileUrl, '_blank', 'noopener,noreferrer');
+      }, i * 250);
+    });
   };
 
   return (
@@ -173,25 +184,23 @@ export default function MyAssessmentsPage() {
                             {item.attachments.length > 0 ? (
                               <Group gap="xs">
                                 {item.attachments.map((att) => (
-                                  <Group key={att.id} gap={4}>
-                                    <Tooltip label={`Preview: ${att.fileName}`}>
-                                      <ActionIcon
-                                        variant="subtle"
-                                        onClick={() => setPreviewAttachment(att)}
-                                      >
-                                        <IconEye size={16} />
-                                      </ActionIcon>
-                                    </Tooltip>
-                                    <Tooltip label={`Download: ${att.fileName}`}>
-                                      <ActionIcon
-                                        variant="subtle"
-                                        onClick={() => openInNewTab(att.fileUrl)}
-                                      >
-                                        <IconDownload size={16} />
-                                      </ActionIcon>
-                                    </Tooltip>
-                                  </Group>
+                                  <Tooltip key={att.id} label={`View: ${att.fileName}`}>
+                                    <ActionIcon
+                                      variant="subtle"
+                                      onClick={() => setPreviewAttachment(att)}
+                                    >
+                                      <IconEye size={16} />
+                                    </ActionIcon>
+                                  </Tooltip>
                                 ))}
+                                <Tooltip label="Download all">
+                                  <ActionIcon
+                                    variant="subtle"
+                                    onClick={() => handleDownloadAll(item.attachments)}
+                                  >
+                                    <IconDownload size={16} />
+                                  </ActionIcon>
+                                </Tooltip>
                               </Group>
                             ) : (
                               <Text size="xs" c="dimmed">
@@ -257,6 +266,22 @@ export default function MyAssessmentsPage() {
               }}
             />
           </Stack>
+        ) : previewType === 'video' ? (
+          <video
+            controls
+            style={{
+              width: '100%',
+              maxHeight: '70vh',
+              border: '1px solid var(--mantine-color-gray-3)',
+              borderRadius: '8px',
+            }}
+            src={previewAttachment.fileUrl}
+          >
+            Your browser does not support the video tag.{' '}
+            <a href={previewAttachment.fileUrl} target="_blank" rel="noopener noreferrer">
+              Download instead
+            </a>
+          </video>
         ) : (
           <Stack gap="sm">
             <Text size="sm" c="dimmed">

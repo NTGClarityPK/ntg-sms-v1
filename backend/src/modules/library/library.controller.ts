@@ -57,7 +57,7 @@ export class LibraryController {
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({
-          fileType: /(pdf|jpg|jpeg|png|webp|doc|docx|txt)$/i,
+          fileType: /(pdf|doc|docx|txt)$/i,
         })
         .addMaxSizeValidator({
           maxSize: 100 * 1024 * 1024, // 100MB
@@ -90,30 +90,13 @@ export class LibraryController {
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 15);
     const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const fileExtension = file.originalname.split('.').pop() || '';
     const fileName = `${timestamp}-${randomStr}-${sanitizedFileName}`;
     const filePath = `library/${branch.branchId}/${fileName}`;
 
-    // TODO: Image compression using sharp (when installed)
-    // For images (jpg, png, webp), compress to max 1920px width, 85% quality
-    let processedBuffer = file.buffer;
-    let finalFileSize = file.size;
-    const isImage = /\.(jpg|jpeg|png|webp)$/i.test(file.originalname);
-    
-    if (isImage) {
-      // Placeholder for compression - will be implemented when sharp is installed
-      // const sharp = require('sharp');
-      // processedBuffer = await sharp(file.buffer)
-      //   .resize(1920, null, { withoutEnlargement: true })
-      //   .jpeg({ quality: 85 })
-      //   .toBuffer();
-      // finalFileSize = processedBuffer.length;
-    }
-
-    // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    // Upload to Supabase Storage (library: PDFs and documents only, no image compression)
+    const { error: uploadError } = await supabase.storage
       .from('library-files')
-      .upload(filePath, processedBuffer, {
+      .upload(filePath, file.buffer, {
         contentType: file.mimetype,
         upsert: false,
       });
@@ -127,22 +110,14 @@ export class LibraryController {
       data: { publicUrl },
     } = supabase.storage.from('library-files').getPublicUrl(filePath);
 
-    // Set thumbnail URL
-    let thumbnailUrl: string | undefined;
-    if (/\.pdf$/i.test(file.originalname)) {
-      // Use default book.png thumbnail for PDFs (stored locally in public folder)
-      // Frontend serves it from /book.png
-      thumbnailUrl = '/book.png';
-    } else if (isImage) {
-      // For images, use the image itself as thumbnail
-      thumbnailUrl = publicUrl;
-    }
+    // Default thumbnail for PDFs (frontend serves /book.png)
+    const thumbnailUrl = /\.pdf$/i.test(file.originalname) ? '/book.png' : undefined;
 
     // Update storage quota atomically
     const { error: quotaError } = await supabase
       .from('branches')
       .update({
-        storage_used_bytes: branchData.storageUsedBytes + finalFileSize,
+        storage_used_bytes: branchData.storageUsedBytes + file.size,
       })
       .eq('id', branch.branchId);
 
@@ -156,7 +131,7 @@ export class LibraryController {
       data: {
         fileUrl: publicUrl,
         fileName: file.originalname,
-        fileSizeBytes: finalFileSize,
+        fileSizeBytes: file.size,
         mimeType: file.mimetype,
         thumbnailUrl,
       },

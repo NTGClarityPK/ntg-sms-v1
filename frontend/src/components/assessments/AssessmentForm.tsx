@@ -6,12 +6,12 @@
  */
 
 import { useForm, zodResolver } from '@mantine/form';
-import { Alert, Button, Stack, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton, Divider, MultiSelect, Checkbox } from '@mantine/core';
+import { Alert, Button, Stack, Text, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton, Divider, MultiSelect, Checkbox, Progress } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconCalendar } from '@tabler/icons-react';
 import { z } from 'zod';
-import type { Assessment, CreateAssessmentInput, UpdateAssessmentInput } from '@/types/assessment';
+import type { Assessment, CreateAssessmentInput, StagedDraftFile, UpdateAssessmentInput } from '@/types/assessment';
 import { useAssessmentTypes } from '@/hooks/useAssessmentSettings';
 import { useSubjects, useClasses } from '@/hooks/useCoreLookups';
 import { useClassSections } from '@/hooks/useClassSections';
@@ -113,11 +113,15 @@ interface AssessmentFormProps {
   assessment?: Assessment;
   onSubmit: (values: CreateAssessmentInput | UpdateAssessmentInput) => void;
   isLoading?: boolean;
-  filesToUpload?: File[];
-  onFilesChange?: (files: File[]) => void;
+  /** When set, show compression progress bar (0–100) and message. Button disabled during compression. */
+  compressionProgress?: number | null;
+  compressionMessage?: string;
+  draftId?: string;
+  stagedFiles?: StagedDraftFile[];
+  onStagedFilesChange?: (files: StagedDraftFile[]) => void;
 }
 
-export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload = [], onFilesChange }: AssessmentFormProps) {
+export function AssessmentForm({ assessment, onSubmit, isLoading, compressionProgress = null, compressionMessage = 'Compressing materials…', draftId = '', stagedFiles = [], onStagedFilesChange }: AssessmentFormProps) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const isEditMode = !!assessment;
@@ -636,12 +640,30 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, filesToUpload 
             <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>
               Optional: Assignment materials
             </div>
-            <FileUploadForCreate files={filesToUpload} onFilesChange={onFilesChange || (() => {})} />
+            <FileUploadForCreate
+              draftId={draftId}
+              stagedFiles={stagedFiles}
+              onStagedFilesChange={onStagedFilesChange || (() => {})}
+            />
           </>
         )}
 
+        {compressionProgress !== null && compressionProgress !== undefined && (
+          <Stack gap="xs" mt="md">
+            <Text size="sm" c="dimmed">
+              {compressionMessage}
+              {compressionProgress < 100 ? ` ${Math.round(compressionProgress)}%` : ''}
+            </Text>
+            <Progress value={compressionProgress} size="lg" radius="xl" />
+          </Stack>
+        )}
+
         <Group justify="flex-end" mt="md">
-          <Button type="submit" loading={isLoading}>
+          <Button
+            type="submit"
+            loading={isLoading}
+            disabled={compressionProgress !== null && compressionProgress !== undefined}
+          >
             {assessment ? 'Update Assessment' : 'Create Assessment'}
           </Button>
         </Group>

@@ -1,15 +1,21 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  HttpStatus,
   Param,
+  ParseFilePipeBuilder,
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
-  ForbiddenException,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import {
@@ -35,6 +41,14 @@ import { StudentAssessmentStatusDto } from './dto/student-assessment-status.dto'
 import { AssessmentStudentStatusDto } from './dto/assessment-student-status.dto';
 import { UpdateStudentAssessmentStatusDto } from './dto/update-student-assessment-status.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { BranchesService } from '../branches/branches.service';
+
+type UploadedFileType = {
+  originalname: string;
+  mimetype: string;
+  buffer: Buffer;
+  size: number;
+};
 
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/assessments')
@@ -42,6 +56,7 @@ export class AssessmentsController {
   constructor(
     private readonly assessmentsService: AssessmentsService,
     private readonly supabaseConfig: SupabaseConfig,
+    private readonly branchesService: BranchesService,
   ) {}
 
   private async ensureAssessmentEditAccess(
@@ -129,6 +144,90 @@ export class AssessmentsController {
       user.email,
     );
     return { data: created };
+  }
+
+  /**
+   * Upload a file to a draft (create-assessment flow). Compresses images and videos, stores under draft. Total checked on Create.
+   */
+  @Post('draft/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDraftFile(
+    @Body('draftId') draftId: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: /(pdf|doc|docx|xls|xlsx|ppt|pptx|jpg|jpeg|png|gif|webp|txt|mp4|webm|mov|avi|mkv)$/i,
+        })
+        .addMaxSizeValidator({ maxSize: 50 * 1024 * 1024 }) // allow larger input; compression may reduce
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: true,
+        }),
+    )
+    file: UploadedFileType,
+  ): Promise<{
+    data: {
+      fileUrl: string;
+      fileName: string;
+      fileSizeBytes: number;
+      mimeType: string;
+      draftFileId: string;
+      totalSizeBytes: number;
+    };
+  }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
+    if (!draftId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(draftId)) {
+      throw new BadRequestException('Valid draftId is required');
+    }
+    const result = await this.assessmentsService.uploadDraftFile(
+      draftId,
+      branch.branchId,
+      user.id,
+      {
+        buffer: file.buffer,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+      },
+    );
+    return { data: result };
+  }
+
+  /**
+   * Remove a file from a draft
+   */
+  @Delete('draft/:draftId/files/:fileId')
+  async deleteDraftFile(
+    @Param('draftId') draftId: string,
+    @Param('fileId') fileId: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: { ok: boolean } }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
+    await this.assessmentsService.deleteDraftFile(draftId, fileId, branch.branchId, user.id);
+    return { data: { ok: true } };
+  }
+
+  /**
+   * Compress one draft file (image/video). Used when teacher presses Create Assessment to compress all materials with progress.
+   */
+  @Post('draft/:draftId/files/:fileId/compress')
+  async compressDraftFile(
+    @Param('draftId') draftId: string,
+    @Param('fileId') fileId: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: { fileSizeBytes: number } }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
+    const result = await this.assessmentsService.compressDraftFile(
+      draftId,
+      fileId,
+      branch.branchId,
+      user.id,
+    );
+    return { data: result };
   }
 
   @Put(':id')
@@ -334,6 +433,125 @@ export class AssessmentsController {
       user.email,
     );
     return { data: attachment };
+  }
+
+  /**
+   * Upload a file for an assessment (images/videos compressed). Total materials limit 10MB (post-compression).
+   */
+  @Post(':id/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAssessmentFile(
+    @Param('id') id: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: /(pdf|doc|docx|xls|xlsx|ppt|pptx|jpg|jpeg|png|gif|webp|txt|mp4|webm|mov|avi|mkv)$/i,
+        })
+        .addMaxSizeValidator({ maxSize: 50 * 1024 * 1024 }) // allow larger input; compression may reduce
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: true,
+        }),
+    )
+    file: UploadedFileType,
+  ): Promise<{
+    data: { fileUrl: string; fileName: string; fileSizeBytes: number; mimeType: string };
+  }> {
+    await this.ensureAssessmentEditAccess(user, branch.branchId);
+
+    const MATERIALS_LIMIT_BYTES = 10 * 1024 * 1024;
+    const existingTotal = await this.assessmentsService.getAssessmentAttachmentsTotalSizeBytes(
+      id,
+      branch.branchId,
+    );
+
+    const supabase = this.supabaseConfig.getClient();
+    const branchData = await this.branchesService.getById(branch.branchId);
+    const quotaBytes = branchData.storageQuotaGb * 1024 * 1024 * 1024;
+
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 15);
+    const sanitized = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileName = `${timestamp}-${randomStr}-${sanitized}`;
+    const filePath = `assessments/${id}/${fileName}`;
+
+    let processedBuffer = file.buffer;
+    let finalSize = file.size;
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.originalname);
+    const isVideo = /\.(mp4|webm|mov|avi|mkv)$/i.test(file.originalname);
+
+    if (isImage) {
+      try {
+        const sharp = await import('sharp');
+        const pipeline = sharp.default(file.buffer).resize(1920, null, {
+          withoutEnlargement: true,
+        });
+        const ext = (file.originalname.split('.').pop() || '').toLowerCase();
+        if (ext === 'png') {
+          processedBuffer = await pipeline.png({ compressionLevel: 6 }).toBuffer();
+        } else if (ext === 'webp') {
+          processedBuffer = await pipeline.webp({ quality: 85 }).toBuffer();
+        } else if (ext === 'gif') {
+          processedBuffer = await pipeline.gif().toBuffer();
+        } else {
+          processedBuffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
+        }
+        finalSize = processedBuffer.length;
+      } catch {
+        // fallback to original
+      }
+    } else if (isVideo) {
+      const { compressVideo } = await import('./video-compression.util');
+      processedBuffer = await compressVideo(file.buffer, file.mimetype, file.originalname);
+      finalSize = processedBuffer.length;
+    }
+
+    if (existingTotal + finalSize > MATERIALS_LIMIT_BYTES) {
+      throw new BadRequestException(
+        'Total size of materials would exceed 10MB limit. Please remove some files or use smaller files.',
+      );
+    }
+    if (branchData.storageUsedBytes + finalSize > quotaBytes) {
+      throw new BadRequestException('Storage quota exceeded');
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from('assessment-files')
+      .upload(filePath, processedBuffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new BadRequestException(`Upload failed: ${uploadError.message}`);
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('assessment-files')
+      .getPublicUrl(filePath);
+
+    const { error: quotaError } = await supabase
+      .from('branches')
+      .update({
+        storage_used_bytes: branchData.storageUsedBytes + finalSize,
+      })
+      .eq('id', branch.branchId);
+
+    if (quotaError) {
+      await supabase.storage.from('assessment-files').remove([filePath]);
+      throw new BadRequestException('Failed to update storage quota');
+    }
+
+    return {
+      data: {
+        fileUrl: publicUrl,
+        fileName: file.originalname,
+        fileSizeBytes: finalSize,
+        mimeType: file.mimetype,
+      },
+    };
   }
 
   /**

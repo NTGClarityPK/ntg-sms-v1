@@ -1,27 +1,61 @@
 'use client';
 
 /**
- * File Upload Component for Assessment Creation
- * Allows selecting files before assessment is created
+ * File Upload for Assessment Creation
+ * Uploads and compresses each file to draft as the user adds them. Total materials limit 10MB (post-compression).
  */
 
-import { Group, Stack, Text, FileButton, Paper, Button } from '@mantine/core';
-import { IconUpload, IconFile } from '@tabler/icons-react';
+import { Group, Stack, Text, FileButton, Paper, Button, Alert, Loader } from '@mantine/core';
+import { IconUpload, IconFile, IconInfoCircle } from '@tabler/icons-react';
+import { useUploadDraftFile, useDeleteDraftFile } from '@/hooks/api/useAssessmentAttachments';
+import type { StagedDraftFile } from '@/types/assessment';
+
+const MATERIALS_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB
 
 interface FileUploadForCreateProps {
-  files: File[];
-  onFilesChange: (files: File[]) => void;
+  draftId: string;
+  stagedFiles: StagedDraftFile[];
+  onStagedFilesChange: (files: StagedDraftFile[]) => void;
 }
 
-export function FileUploadForCreate({ files, onFilesChange }: FileUploadForCreateProps) {
-  const handleFileSelect = (selectedFiles: File[] | null) => {
+export function FileUploadForCreate({
+  draftId,
+  stagedFiles,
+  onStagedFilesChange,
+}: FileUploadForCreateProps) {
+  const uploadDraft = useUploadDraftFile(draftId);
+  const deleteDraft = useDeleteDraftFile(draftId);
+
+  const handleFileSelect = async (selectedFiles: File[] | null) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
-    onFilesChange([...files, ...selectedFiles]);
+    for (const file of selectedFiles) {
+      try {
+        const result = await uploadDraft.mutateAsync(file);
+        onStagedFilesChange([
+          ...stagedFiles,
+          {
+            draftFileId: result.draftFileId,
+            fileName: result.fileName,
+            fileSizeBytes: result.fileSizeBytes,
+            fileUrl: result.fileUrl,
+            mimeType: result.mimeType,
+          },
+        ]);
+      } catch {
+        // Error already shown by hook
+      }
+    }
   };
 
-  const handleRemoveFile = (index: number) => {
-    const newFiles = files.filter((_, i) => i !== index);
-    onFilesChange(newFiles);
+  const handleRemoveFile = async (index: number) => {
+    const file = stagedFiles[index];
+    if (!file) return;
+    try {
+      await deleteDraft.mutateAsync(file.draftFileId);
+      onStagedFilesChange(stagedFiles.filter((_, i) => i !== index));
+    } catch {
+      // Error already shown by hook
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -30,38 +64,63 @@ export function FileUploadForCreate({ files, onFilesChange }: FileUploadForCreat
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const totalBytes = stagedFiles.reduce((s, f) => s + f.fileSizeBytes, 0);
+  const totalExceeds = totalBytes > MATERIALS_LIMIT_BYTES;
+
   return (
     <Paper p="md" withBorder>
       <Stack gap="md">
         <Text size="sm" fw={500}>
           Upload Assignment Materials
         </Text>
+        <Alert variant="light" color="blue" icon={<IconInfoCircle size={16} />} title="Compression and limit">
+          When you press Create Assessment, images and videos are compressed (images: max 1920px, 85% quality; videos: compressed).
+          Total size after compression must be 10MB or less. PDFs and documents are stored as-is.
+        </Alert>
         <Group>
           <FileButton
             onChange={handleFileSelect}
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.txt"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.txt,.mp4,.webm,.mov,.avi,.mkv"
             multiple
+            disabled={uploadDraft.isPending}
           >
             {(props) => (
-              <Button leftSection={<IconUpload size={16} />} {...props}>
+              <Button
+                leftSection={uploadDraft.isPending ? <Loader size={16} /> : <IconUpload size={16} />}
+                {...props}
+              >
                 Select Files
               </Button>
             )}
           </FileButton>
         </Group>
-        {files.length > 0 && (
+        {stagedFiles.length > 0 && (
           <Stack gap="xs">
-            <Text size="sm" fw={500}>
-              Selected Files ({files.length})
-            </Text>
-            {files.map((file, index) => (
-              <Group key={index} justify="space-between" p="xs" style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: '4px' }}>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>
+                Materials ({stagedFiles.length})
+              </Text>
+              <Text size="sm" c={totalExceeds ? 'red' : 'dimmed'}>
+                Total: {formatFileSize(totalBytes)} / 10 MB
+                {totalExceeds && ' — exceeds limit'}
+              </Text>
+            </Group>
+            {stagedFiles.map((file, index) => (
+              <Group
+                key={file.draftFileId}
+                justify="space-between"
+                p="xs"
+                style={{
+                  border: '1px solid var(--mantine-color-gray-3)',
+                  borderRadius: '4px',
+                }}
+              >
                 <Group gap="xs">
                   <IconFile size={20} />
                   <Stack gap={0}>
-                    <Text size="sm">{file.name}</Text>
+                    <Text size="sm">{file.fileName}</Text>
                     <Text size="xs" c="dimmed">
-                      {formatFileSize(file.size)}
+                      {formatFileSize(file.fileSizeBytes)}
                     </Text>
                   </Stack>
                 </Group>
@@ -70,22 +129,18 @@ export function FileUploadForCreate({ files, onFilesChange }: FileUploadForCreat
                   color="red"
                   size="xs"
                   onClick={() => handleRemoveFile(index)}
+                  loading={deleteDraft.isPending}
                 >
                   Remove
                 </Button>
               </Group>
             ))}
-            <Text size="xs" c="dimmed" mt="xs">
-              Files will be uploaded after the assessment is created
-            </Text>
           </Stack>
         )}
         <Text size="xs" c="dimmed">
-          Supported formats: PDF, Word, Excel, PowerPoint, Images, Text files (Max 50MB per file)
+          Supported: PDF, Word, Excel, PowerPoint, images, video (MP4, WebM, etc.), text. Total after compression must be ≤10MB.
         </Text>
       </Stack>
     </Paper>
   );
 }
-
-

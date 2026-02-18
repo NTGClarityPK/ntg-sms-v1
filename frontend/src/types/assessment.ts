@@ -49,6 +49,16 @@ export interface CreateAssessmentInput {
   publishDate?: string;
   isPublished?: boolean;
   allowLateSubmission?: boolean;
+  /** When set, draft materials (already compressed) are committed to the first created assessment. Total must be ≤10MB. */
+  draftId?: string;
+}
+
+export interface StagedDraftFile {
+  draftFileId: string;
+  fileName: string;
+  fileSizeBytes: number;
+  fileUrl: string;
+  mimeType: string;
 }
 
 export interface UpdateAssessmentInput {

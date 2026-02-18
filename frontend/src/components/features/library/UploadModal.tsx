@@ -1,6 +1,7 @@
 'use client';
 
 import { Modal, TextInput, Select, Button, Stack, Textarea, Group, FileButton, Progress, Text, Alert } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
@@ -159,7 +160,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
           {!isEdit && (
             <>
               <StorageQuotaBar />
-              <FileButton onChange={setSelectedFile} accept="application/pdf,image/*,.doc,.docx,.txt">
+              <FileButton onChange={setSelectedFile} accept=".pdf,.doc,.docx,.txt,application/pdf">
                 {(props) => (
                   <Button {...props} leftSection={<IconUpload size={16} />} variant="light" fullWidth>
                     {selectedFile ? `Selected: ${selectedFile.name}` : 'Select File'}
