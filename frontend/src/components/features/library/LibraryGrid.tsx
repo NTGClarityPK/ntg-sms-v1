@@ -1,6 +1,6 @@
 'use client';
 
-import { SimpleGrid, Pagination, Group, Text, Badge, Card, Image, Stack, ActionIcon } from '@mantine/core';
+import { SimpleGrid, Pagination, Group, Text, Badge, Card, Image, Stack, ActionIcon, Modal } from '@mantine/core';
 import { IconDownload, IconEye, IconEdit, IconTrash } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useDownloadLibraryItem, useDeleteLibraryItem, useIncrementLibraryViewCount } from '@/hooks/useLibrary';
@@ -34,16 +34,21 @@ interface LibraryGridProps {
   canEdit?: boolean;
 }
 
+const isPdf = (fileName: string) => /\.pdf$/i.test(fileName);
+
 export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: LibraryGridProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<{ fileUrl: string; fileName: string } | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
   const downloadMutation = useDownloadLibraryItem();
   const deleteMutation = useDeleteLibraryItem();
   const viewMutation = useIncrementLibraryViewCount();
 
   const handleView = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
     await viewMutation.mutateAsync(id);
-    window.open(items.find((item) => item.id === id)?.fileUrl, '_blank');
+    setPreviewItem({ fileUrl: item.fileUrl, fileName: item.fileName });
   };
 
   const handleDownload = async (id: string) => {
@@ -103,15 +108,19 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
                 </Text>
               )}
               <Group justify="space-between" mt="xs">
-                <Group gap="xs">
-                  <Text size="xs" c="dimmed">
-                    <IconEye size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {item.viewCount}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    <IconDownload size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />{' '}
-                    {item.downloadCount}
-                  </Text>
-                </Group>
+                {canEdit ? (
+                  <Group gap="xs">
+                    <Text size="xs" c="dimmed">
+                      <IconEye size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {item.viewCount}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      <IconDownload size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />{' '}
+                      {item.downloadCount}
+                    </Text>
+                  </Group>
+                ) : (
+                  <div />
+                )}
                 <Group gap="xs">
                   <ActionIcon variant="light" size="sm" onClick={() => handleView(item.id)}>
                     <IconEye size={16} />
@@ -145,6 +154,47 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
       {canEdit && editingId && (
         <UploadModal opened={opened} onClose={() => { close(); setEditingId(null); }} itemId={editingId} />
       )}
+
+      <Modal
+        opened={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+        title={previewItem?.fileName ?? 'Preview'}
+        size="xl"
+        centered
+      >
+        {previewItem && (isPdf(previewItem.fileName) ? (
+          <Stack gap="sm">
+            <Text size="xs" c="dimmed">
+              PDF preview depends on browser support. If it does not render, use download.
+            </Text>
+            <iframe
+              src={previewItem.fileUrl}
+              title={previewItem.fileName}
+              style={{
+                width: '100%',
+                minHeight: '70vh',
+                border: '1px solid var(--mantine-color-gray-3)',
+                borderRadius: '8px',
+              }}
+            />
+          </Stack>
+        ) : (
+          <Stack gap="sm">
+            <Text size="sm" c="dimmed">
+              In-app preview is not available for this file type. Please download to view.
+            </Text>
+            <Group justify="flex-end">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                onClick={() => window.open(previewItem.fileUrl, '_blank')}
+              >
+                <IconDownload size={18} />
+              </ActionIcon>
+            </Group>
+          </Stack>
+        ))}
+      </Modal>
     </>
   );
 }

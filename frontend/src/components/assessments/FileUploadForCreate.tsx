@@ -8,6 +8,7 @@
 import { Group, Stack, Text, FileButton, Paper, Button, Alert, Loader } from '@mantine/core';
 import { IconUpload, IconFile, IconInfoCircle } from '@tabler/icons-react';
 import { useUploadDraftFile, useDeleteDraftFile } from '@/hooks/api/useAssessmentAttachments';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { StagedDraftFile } from '@/types/assessment';
 
 const MATERIALS_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB
@@ -23,6 +24,7 @@ export function FileUploadForCreate({
   stagedFiles,
   onStagedFilesChange,
 }: FileUploadForCreateProps) {
+  const colors = useThemeColors();
   const uploadDraft = useUploadDraftFile(draftId);
   const deleteDraft = useDeleteDraftFile(draftId);
 
@@ -73,7 +75,7 @@ export function FileUploadForCreate({
         <Text size="sm" fw={500}>
           Upload Assignment Materials
         </Text>
-        <Alert variant="light" color="blue" icon={<IconInfoCircle size={16} />} title="Compression and limit">
+        <Alert variant="light" color={colors.info} icon={<IconInfoCircle size={16} />} title="Compression and limit">
           When you press Create Assessment, images and videos are compressed (images: max 1920px, 85% quality; videos: compressed).
           Total size after compression must be 10MB or less. PDFs and documents are stored as-is.
         </Alert>

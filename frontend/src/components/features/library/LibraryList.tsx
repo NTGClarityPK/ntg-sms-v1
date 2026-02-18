@@ -1,6 +1,6 @@
 'use client';
 
-import { Table, Pagination, Group, Text, Badge, ActionIcon, Image } from '@mantine/core';
+import { Table, Pagination, Group, Text, Badge, ActionIcon, Image, Modal, Stack } from '@mantine/core';
 import { IconDownload, IconEye, IconEdit, IconTrash } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useDownloadLibraryItem, useDeleteLibraryItem, useIncrementLibraryViewCount } from '@/hooks/useLibrary';
@@ -36,15 +36,20 @@ interface LibraryListProps {
 
 export function LibraryList({ items, meta, onPageChange, canEdit = false }: LibraryListProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<{ fileUrl: string; fileName: string } | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
   const downloadMutation = useDownloadLibraryItem();
   const deleteMutation = useDeleteLibraryItem();
   const viewMutation = useIncrementLibraryViewCount();
 
   const handleView = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
     await viewMutation.mutateAsync(id);
-    window.open(items.find((item) => item.id === id)?.fileUrl, '_blank');
+    setPreviewItem({ fileUrl: item.fileUrl, fileName: item.fileName });
   };
+
+  const isPdf = (fileName: string) => /\.pdf$/i.test(fileName);
 
   const handleDownload = async (id: string) => {
     const url = await downloadMutation.mutateAsync(id);
@@ -80,8 +85,8 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
             <Table.Th>Title</Table.Th>
             <Table.Th>Author</Table.Th>
             <Table.Th>Category</Table.Th>
-            <Table.Th>Views</Table.Th>
-            <Table.Th>Downloads</Table.Th>
+            {canEdit && <Table.Th>Views</Table.Th>}
+            {canEdit && <Table.Th>Downloads</Table.Th>}
             <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
           </Table.Tr>
         </Table.Thead>
@@ -113,12 +118,16 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
                   {item.category}
                 </Badge>
               </Table.Td>
-              <Table.Td>
-                <Text size="sm">{item.viewCount}</Text>
-              </Table.Td>
-              <Table.Td>
-                <Text size="sm">{item.downloadCount}</Text>
-              </Table.Td>
+              {canEdit && (
+                <Table.Td>
+                  <Text size="sm">{item.viewCount}</Text>
+                </Table.Td>
+              )}
+              {canEdit && (
+                <Table.Td>
+                  <Text size="sm">{item.downloadCount}</Text>
+                </Table.Td>
+              )}
               <Table.Td>
                 <Group gap="xs" justify="flex-end">
                   <ActionIcon variant="light" size="sm" onClick={() => handleView(item.id)}>
@@ -153,6 +162,47 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
       {canEdit && editingId && (
         <UploadModal opened={opened} onClose={() => { close(); setEditingId(null); }} itemId={editingId} />
       )}
+
+      <Modal
+        opened={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+        title={previewItem?.fileName ?? 'Preview'}
+        size="xl"
+        centered
+      >
+        {previewItem && (isPdf(previewItem.fileName) ? (
+            <Stack gap="sm">
+              <Text size="xs" c="dimmed">
+                PDF preview depends on browser support. If it does not render, use download.
+              </Text>
+              <iframe
+                src={previewItem.fileUrl}
+                title={previewItem.fileName}
+                style={{
+                  width: '100%',
+                  minHeight: '70vh',
+                  border: '1px solid var(--mantine-color-gray-3)',
+                  borderRadius: '8px',
+                }}
+              />
+            </Stack>
+          ) : (
+            <Stack gap="sm">
+              <Text size="sm" c="dimmed">
+                In-app preview is not available for this file type. Please download to view.
+              </Text>
+              <Group justify="flex-end">
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  onClick={() => window.open(previewItem.fileUrl, '_blank')}
+                >
+                  <IconDownload size={18} />
+                </ActionIcon>
+              </Group>
+            </Stack>
+          ))}
+      </Modal>
     </>
   );
 }
