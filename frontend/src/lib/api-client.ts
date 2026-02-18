@@ -23,6 +23,11 @@ class ApiClient {
     // Request interceptor - inject auth token and branch header
     this.client.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
+        // Remove Content-Type header for FormData to let axios set it with boundary
+        if (config.data instanceof FormData) {
+          delete config.headers['Content-Type'];
+        }
+
         const {
           data: { session },
         } = await supabase.auth.getSession();

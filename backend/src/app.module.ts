@@ -37,6 +37,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AuditLogModule } from './common/modules/audit-log/audit-log.module';
 import { MessagesModule } from './modules/messages/messages.module';
+import { LibraryModule } from './modules/library/library.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { MessagesModule } from './modules/messages/messages.module';
     ReportsModule,
     AuditLogsModule,
     MessagesModule,
+    LibraryModule,
   ],
   controllers: [AppController],
   providers: [

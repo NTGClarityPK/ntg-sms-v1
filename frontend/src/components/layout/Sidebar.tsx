@@ -55,8 +55,8 @@ const allNavItems: NavItem[] = [
   { label: 'Student', href: '/students', icon: IconUsers },
   { label: 'User', href: '/users', icon: IconUsers },
   { label: 'Class', href: '/academic/class-sections', icon: IconSchool },
-  { label: 'Teacher Mapping', href: '/academic/teacher-mapping', icon: IconBook },
-  { label: 'Parent Association', href: '/parent-associations', icon: IconUsersGroup },
+  { label: 'Teacher', href: '/academic/teacher-mapping', icon: IconBook },
+  { label: 'Parent', href: '/parent-associations', icon: IconUsersGroup },
   { label: 'My Child', href: '/my-children', icon: IconUsersGroup },
   { label: 'Child Timetable', href: '/children-timetable', icon: IconCalendarClock },
   { label: 'Attendance', href: '/attendance', icon: IconCalendar },
@@ -93,6 +93,7 @@ const allNavItems: NavItem[] = [
   { label: 'Early Departure', href: '/early-departure', icon: IconWalk },
   { label: 'Notification', href: '/notifications', icon: IconBell },
   { label: 'Messages', href: '/messages', icon: IconMessage },
+  { label: 'Library', href: '/library', icon: IconBook },
   { 
     label: 'My Event', 
     href: '/my-events', 
@@ -147,7 +148,7 @@ const allNavItems: NavItem[] = [
     }
   },
   {
-    label: 'Conflict Management',
+    label: 'Conflict',
     href: '/conflict-management',
     icon: IconAlertTriangle,
     showCondition: () => {
@@ -318,6 +319,7 @@ export function Sidebar({
       item.href === '/early-departure' ||
       item.href === '/notifications' ||
       item.href === '/messages' ||
+      item.href === '/library' ||
       item.href === '/my-schedule' ||
       item.href === '/my-timetable' ||
       item.href === '/my-events' ||

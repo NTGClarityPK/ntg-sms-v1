@@ -8,6 +8,7 @@ import { AuthModule } from '../auth/auth.module';
   imports: [AuthModule],
   controllers: [BranchesController],
   providers: [BranchesService, SupabaseConfig],
+  exports: [BranchesService],
 })
 export class BranchesModule {}
 
