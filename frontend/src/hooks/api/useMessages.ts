@@ -144,8 +144,8 @@ export function useSendMessage(conversationId: string | null) {
               return { data: [optimisticMessage], meta: undefined };
             }
             const list = prev.data ?? [];
-            // Create new array reference to ensure React Query detects the change
-            return { ...prev, data: [...list, optimisticMessage] };
+            // API returns newest first; prepend so optimistic appears at bottom after .reverse()
+            return { ...prev, data: [optimisticMessage, ...list] };
           },
         );
       });
@@ -174,17 +174,11 @@ export function useSendMessage(conversationId: string | null) {
         (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
           if (!prev) return { data: [data], meta: undefined };
           const list = prev.data ?? [];
-          
-          // Check if real message already exists (from Realtime)
-          if (list.some((m) => m.id === data.id)) {
-            // Already added by Realtime, just remove any temp messages
-            const filtered = list.filter((m) => !m.id.startsWith('temp-'));
-            return { ...prev, data: filtered };
-          }
-          
-          // Replace optimistic message(s) with real one
           const filtered = list.filter((m) => !m.id.startsWith('temp-'));
-          return { ...prev, data: [...filtered, data] };
+          // Already added by Realtime
+          if (filtered.some((m) => m.id === data.id)) return { ...prev, data: filtered };
+          // API returns newest first; put real message at front
+          return { ...prev, data: [data, ...filtered] };
         },
       );
 

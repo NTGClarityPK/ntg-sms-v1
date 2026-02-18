@@ -183,47 +183,49 @@ export default function MessagesPage() {
               },
               (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
                 if (!prev) {
-                  console.log('[Realtime] No cache found, creating new entry');
                   return { data: [newMessage], meta: undefined };
                 }
                 const list = prev.data ?? [];
-                
-                // Check if message already exists (by ID)
-                if (list.some((m) => m.id === newMessage.id)) {
-                  console.log('[Realtime] Message already in cache, skipping');
-                  return prev;
-                }
-                
-                // Replace optimistic message (temp-*) if it matches this real message
-                // Match by: same sender, same body, within 5 seconds
+                if (list.some((m) => m.id === newMessage.id)) return prev;
+
+                // Remove matching optimistic message (temp-*) if present
                 const now = Date.now();
-                const updatedList = list.map((m) => {
-                  if (
-                    m.id.startsWith('temp-') &&
-                    m.senderId === newMessage.senderId &&
-                    m.body === newMessage.body &&
-                    Math.abs(now - new Date(m.createdAt).getTime()) < 5000
-                  ) {
-                    console.log('[Realtime] Replacing optimistic message with real one');
-                    return newMessage;
-                  }
-                  return m;
+                const withoutTemp = list.filter(
+                  (m) =>
+                    !(
+                      m.id.startsWith('temp-') &&
+                      m.senderId === newMessage.senderId &&
+                      m.body === newMessage.body &&
+                      Math.abs(now - new Date(m.createdAt).getTime()) < 5000
+                    ),
+                );
+                // API returns newest first; prepend so new message appears at bottom after .reverse()
+                const next = { ...prev, data: [newMessage, ...withoutTemp] };
+
+                // Resolve sender name from users cache to avoid "User" / refetch
+                const usersEntries = queryClient.getQueriesData<{ data?: Array<{ id: string; fullName?: string }> }>({
+                  predicate: (q) => q.queryKey[0] === 'users',
                 });
-                
-                // If no optimistic message was replaced, append the new message
-                const wasReplaced = updatedList.some((m) => m.id === newMessage.id);
-                const finalList = wasReplaced ? updatedList : [...updatedList, newMessage];
-                
-                const updated = { ...prev, data: finalList };
-                console.log('[Realtime] ✅ Updated cache, message count:', updated.data?.length);
-                return updated;
+                let senderName: string | undefined;
+                for (const [, res] of usersEntries) {
+                  const list = res?.data ?? [];
+                  const u = list.find((x) => x.id === newMessage.senderId);
+                  if (u?.fullName) {
+                    senderName = u.fullName;
+                    break;
+                  }
+                }
+                if (senderName) {
+                  return {
+                    ...next,
+                    data: next.data!.map((m) =>
+                      m.id === newMessage.id ? { ...m, senderName } : m,
+                    ),
+                  };
+                }
+                return next;
               },
             );
-            
-            // Invalidate to trigger re-render
-            queryClient.invalidateQueries({
-              queryKey: ['conversation-messages', conversationId],
-            });
           },
         )
         .on(
@@ -479,7 +481,7 @@ export default function MessagesPage() {
                               >
                                 {!own && (
                                   <Text size="xs" fw={500} c={own ? 'white' : 'dimmed'} mb={2}>
-                                    {m.senderName ?? 'Unknown'}
+                                    {m.senderName ?? 'User'}
                                   </Text>
                                 )}
                                 <Text

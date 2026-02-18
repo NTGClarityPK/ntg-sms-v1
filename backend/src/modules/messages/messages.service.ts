@@ -597,13 +597,21 @@ export class MessagesService {
       throwIfDbError(readError);
     }
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single();
+    const senderName = (profile as { full_name: string | null } | null)?.full_name ?? 'Someone';
+
     try {
-      const notificationBody = (dto.body ?? '').trim().slice(0, 80) || 'You have a new message';
+      const notificationBody = (dto.body ?? '').trim().slice(0, 80) || 'New message';
+      const notificationTitle = `Message from ${senderName}`;
       for (const recipientId of recipientIds) {
         await this.notificationsService.createNotification({
           userId: recipientId,
           type: 'message',
-          title: 'New message',
+          title: notificationTitle,
           body: notificationBody,
           data: { conversationId, messageId: msgRow.id },
         });
@@ -611,13 +619,6 @@ export class MessagesService {
     } catch {
       // non-fatal
     }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', userId)
-      .single();
-    const senderName = (profile as { full_name: string | null } | null)?.full_name ?? undefined;
 
     return new MessageDto({
       id: msgRow.id,

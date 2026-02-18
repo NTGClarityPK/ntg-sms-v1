@@ -1,14 +1,19 @@
 'use client';
 
-import { ActionIcon, Badge, Popover, Stack, Text } from '@mantine/core';
-import { IconBell } from '@tabler/icons-react';
+import { ActionIcon, Badge, Popover } from '@mantine/core';
+import { IconBell, IconBellOff } from '@tabler/icons-react';
 import { useUnreadCount } from '@/hooks/useNotifications';
 import { NotificationDropdown } from './NotificationDropdown';
 import { useDisclosure } from '@mantine/hooks';
+import { useAuth } from '@/hooks/useAuth';
+import { useNotificationAlertSettings } from '@/hooks/useNotificationAlertSettings';
+import { primeNotificationSound } from '@/lib/notifications/sound';
 
 export function NotificationBell() {
   const [opened, { close, toggle }] = useDisclosure(false);
   const { data: unreadCount = 0 } = useUnreadCount();
+  const { user } = useAuth();
+  const { alertsEnabled, toggleAlertsEnabled } = useNotificationAlertSettings(user?.id);
 
   return (
     <Popover
@@ -22,10 +27,13 @@ export function NotificationBell() {
         <ActionIcon
           variant="subtle"
           size="lg"
-          onClick={toggle}
+          onClick={() => {
+            void primeNotificationSound();
+            toggle();
+          }}
           style={{ position: 'relative' }}
         >
-          <IconBell size={20} />
+          {alertsEnabled ? <IconBell size={20} /> : <IconBellOff size={20} />}
           {unreadCount > 0 && (
             <Badge
               size="xs"
@@ -50,7 +58,11 @@ export function NotificationBell() {
         </ActionIcon>
       </Popover.Target>
       <Popover.Dropdown p={0} style={{ width: '380px', maxHeight: '500px', overflow: 'hidden' }}>
-        <NotificationDropdown onClose={close} />
+        <NotificationDropdown
+          onClose={close}
+          alertsEnabled={alertsEnabled}
+          onToggleAlerts={toggleAlertsEnabled}
+        />
       </Popover.Dropdown>
     </Popover>
   );

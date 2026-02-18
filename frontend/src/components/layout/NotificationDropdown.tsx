@@ -10,8 +10,10 @@ import {
   Skeleton,
   ScrollArea,
   Divider,
+  ActionIcon,
+  Tooltip,
 } from '@mantine/core';
-import { IconCheck, IconChecks, IconBell } from '@tabler/icons-react';
+import { IconCheck, IconChecks, IconBell, IconBellOff } from '@tabler/icons-react';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '@/hooks/useNotifications';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRouter } from 'next/navigation';
@@ -19,9 +21,15 @@ import type { Notification } from '@/types/notifications';
 
 interface NotificationDropdownProps {
   onClose: () => void;
+  alertsEnabled: boolean;
+  onToggleAlerts: () => void;
 }
 
-export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
+export function NotificationDropdown({
+  onClose,
+  alertsEnabled,
+  onToggleAlerts,
+}: NotificationDropdownProps) {
   const router = useRouter();
   const notifyColors = useThemeColors();
   const { data: notificationsData, isLoading } = useNotifications({
@@ -102,19 +110,36 @@ export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
             </Badge>
           )}
         </Group>
-        {notifications.length > 0 && (
-          <Button
-            variant="subtle"
-            size="xs"
-            leftSection={<IconChecks size={14} />}
-            onClick={() => {
-              markAllAsRead.mutate();
-            }}
-            loading={markAllAsRead.isPending}
+        <Group gap="xs">
+          <Tooltip
+            label={alertsEnabled ? 'Disable notification alerts' : 'Enable notification alerts'}
+            position="bottom"
+            withArrow
           >
-            Mark all read
-          </Button>
-        )}
+            <ActionIcon
+              variant="subtle"
+              size="sm"
+              onClick={onToggleAlerts}
+              aria-label={alertsEnabled ? 'Disable notification alerts' : 'Enable notification alerts'}
+            >
+              {alertsEnabled ? <IconBell size={16} /> : <IconBellOff size={16} />}
+            </ActionIcon>
+          </Tooltip>
+
+          {notifications.length > 0 && (
+            <Button
+              variant="subtle"
+              size="xs"
+              leftSection={<IconChecks size={14} />}
+              onClick={() => {
+                markAllAsRead.mutate();
+              }}
+              loading={markAllAsRead.isPending}
+            >
+              Mark all read
+            </Button>
+          )}
+        </Group>
       </Group>
 
       <Divider mb="sm" />
