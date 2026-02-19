@@ -42,6 +42,7 @@ import { AssessmentStudentStatusDto } from './dto/assessment-student-status.dto'
 import { UpdateStudentAssessmentStatusDto } from './dto/update-student-assessment-status.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { BranchesService } from '../branches/branches.service';
+import { StorageService } from '../storage/storage.service';
 
 type UploadedFileType = {
   originalname: string;
@@ -57,6 +58,7 @@ export class AssessmentsController {
     private readonly assessmentsService: AssessmentsService,
     private readonly supabaseConfig: SupabaseConfig,
     private readonly branchesService: BranchesService,
+    private readonly storageService: StorageService,
   ) {}
 
   private async ensureAssessmentEditAccess(
@@ -543,6 +545,8 @@ export class AssessmentsController {
       await supabase.storage.from('assessment-files').remove([filePath]);
       throw new BadRequestException('Failed to update storage quota');
     }
+
+    this.storageService.ensureStorageAlerts(branch.branchId).catch(() => {});
 
     return {
       data: {

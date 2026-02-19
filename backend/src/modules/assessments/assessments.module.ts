@@ -7,11 +7,12 @@ import { ClassSectionsModule } from '../class-sections/class-sections.module';
 import { TeacherAssignmentsModule } from '../teacher-assignments/teacher-assignments.module';
 import { StaffModule } from '../staff/staff.module';
 import { BranchesModule } from '../branches/branches.module';
+import { StorageModule } from '../storage/storage.module';
 import { AssessmentsService } from './assessments.service';
 import { AssessmentsController } from './assessments.controller';
 
 @Module({
-  imports: [AssessmentModule, AcademicYearsModule, ClassSectionsModule, TeacherAssignmentsModule, StaffModule, NotificationsModule, BranchesModule],
+  imports: [AssessmentModule, AcademicYearsModule, ClassSectionsModule, TeacherAssignmentsModule, StaffModule, NotificationsModule, BranchesModule, StorageModule],
   controllers: [AssessmentsController],
   providers: [AssessmentsService, SupabaseConfig],
   exports: [AssessmentsService], // Export so GradesModule can use it

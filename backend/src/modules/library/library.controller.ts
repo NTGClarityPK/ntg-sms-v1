@@ -31,6 +31,7 @@ import { QueryLibraryItemsDto } from './dto/query-library-items.dto';
 import { CreateLibraryItemDto } from './dto/create-library-item.dto';
 import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
 import { BranchesService } from '../branches/branches.service';
+import { StorageService } from '../storage/storage.service';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
 type UploadedFileType = {
@@ -46,6 +47,7 @@ export class LibraryController {
   constructor(
     private readonly libraryService: LibraryService,
     private readonly branchesService: BranchesService,
+    private readonly storageService: StorageService,
     private readonly supabaseConfig: SupabaseConfig,
   ) {}
 
@@ -126,6 +128,8 @@ export class LibraryController {
       await supabase.storage.from('library-files').remove([filePath]);
       throw new BadRequestException('Failed to update storage quota');
     }
+
+    this.storageService.ensureStorageAlerts(branch.branchId).catch(() => {});
 
     return {
       data: {

@@ -35,6 +35,7 @@ import {
   IconAlertTriangle,
   IconPackage,
   IconClipboardList,
+  IconDatabase,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -172,6 +173,15 @@ const allNavItems: NavItem[] = [
       return true; // Filtered by permission (reports) and role in render
     },
   },
+  {
+    label: 'Storage',
+    href: '/admin/storage',
+    icon: IconDatabase,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true; // Filtered by role (school_admin, principal) in render
+    },
+  },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 
@@ -244,6 +254,10 @@ export function Sidebar({
       roleName === 'school_admin'
     );
   }) || false;
+  const canManageStorage = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return roleName === 'school_admin' || roleName === 'principal' || roleName === 'super_admin';
+  }) || false;
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
     // Super admin sees everything - bypass all filters
@@ -298,6 +312,10 @@ export function Sidebar({
       // Administrative Reports: staff/coordinator/principal/admin only (not parent/student)
       if (item.href === '/reports/administrative') {
         return !isParent && !isStudent && (isTeacher || canManageTimetable || canManageEvents);
+      }
+      // Storage: school_admin, principal, super_admin only
+      if (item.href === '/admin/storage') {
+        return canManageStorage;
       }
       // Parent-facing view only page
       if (item.href === '/my-children') {
@@ -360,6 +378,7 @@ export function Sidebar({
       item.href === '/parent-associations' ||
       item.href === '/events' ||
       item.href === '/reports' ||
+      item.href === '/admin/storage' ||
       item.href === '/settings'
   );
 

@@ -35,6 +35,7 @@ import { AddOrUpdateStockDto } from './dto/add-or-update-stock.dto';
 import { UpdateStockQuantityDto } from './dto/update-stock-quantity.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { BranchesService } from '../branches/branches.service';
+import { StorageService } from '../storage/storage.service';
 
 type UploadedImageFile = {
   originalname: string;
@@ -50,6 +51,7 @@ export class UniformsController {
     private readonly uniformsService: UniformsService,
     private readonly supabaseConfig: SupabaseConfig,
     private readonly branchesService: BranchesService,
+    private readonly storageService: StorageService,
   ) {}
 
   private async ensureFeatureEditAccess(
@@ -213,6 +215,8 @@ export class UniformsController {
       await supabase.storage.from('inventory-images').remove([filePath]);
       throw new BadRequestException('Failed to update storage quota');
     }
+
+    this.storageService.ensureStorageAlerts(branch.branchId).catch(() => {});
 
     return { data: { imageUrl: publicUrl } };
   }

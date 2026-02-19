@@ -5,6 +5,7 @@ import { AppShell as MantineAppShell, Burger, Group } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { StorageWarningBanner } from './StorageWarningBanner';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -60,7 +61,10 @@ export function AppShell({ children }: AppShellProps) {
         />
       </MantineAppShell.Navbar>
 
-      <MantineAppShell.Main>{children}</MantineAppShell.Main>
+      <MantineAppShell.Main>
+          <StorageWarningBanner />
+          {children}
+        </MantineAppShell.Main>
     </MantineAppShell>
   );
 }

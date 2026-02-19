@@ -13,6 +13,7 @@ import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assign
 import { StaffService } from '../staff/staff.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { BranchesService } from '../branches/branches.service';
+import { StorageService } from '../storage/storage.service';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 import { AssessmentDto } from './dto/assessment.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
@@ -129,6 +130,7 @@ export class AssessmentsService {
     private readonly staffService: StaffService,
     private readonly notificationsService: NotificationsService,
     private readonly branchesService: BranchesService,
+    private readonly storageService: StorageService,
   ) {}
 
   async listAssessments(
@@ -1661,6 +1663,7 @@ export class AssessmentsService {
     if (quotaError) {
       throw new BadRequestException('Failed to update storage quota');
     }
+    this.storageService.ensureStorageAlerts(branchId).catch(() => {});
   }
 
   /**

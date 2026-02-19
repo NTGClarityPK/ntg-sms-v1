@@ -41,6 +41,7 @@ import { LibraryModule } from './modules/library/library.module';
 import { UniformsModule } from './modules/uniforms/uniforms.module';
 import { UniformRequestsModule } from './modules/uniform-requests/uniform-requests.module';
 import { UniformIssuancesModule } from './modules/uniform-issuances/uniform-issuances.module';
+import { StorageModule } from './modules/storage/storage.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { UniformIssuancesModule } from './modules/uniform-issuances/uniform-issu
     UniformsModule,
     UniformRequestsModule,
     UniformIssuancesModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [
