@@ -18,7 +18,7 @@ import {
   Button,
   Menu,
 } from '@mantine/core';
-import { IconChartBar, IconCalendar, IconSchool, IconFileExport, IconFileTypePdf, IconFileSpreadsheet } from '@tabler/icons-react';
+import { IconChartBar, IconCalendar, IconSchool, IconFileExport, IconFileTypePdf, IconFileSpreadsheet, IconFolderOff } from '@tabler/icons-react';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useSubjects } from '@/hooks/useCoreLookups';
 import {
@@ -29,6 +29,8 @@ import {
   useAcademicReportBySubject,
 } from '@/hooks/useReports';
 import { apiClient } from '@/lib/api-client';
+import { saveDocumentForOffline } from '@/lib/offline/documents';
+import { notifications } from '@mantine/notifications';
 import type { ClassSection } from '@/types/class-sections';
 
 function getPeriodDates(period: string): { startDate: string; endDate: string } {
@@ -132,6 +134,49 @@ export default function AdministrativeReportsPage() {
     }
   };
 
+  const handleSaveAttendanceOffline = async (format: 'pdf' | 'excel') => {
+    setExportLoading(true);
+    try {
+      const params = new URLSearchParams({ format, startDate, endDate });
+      if (classSectionId) params.set('classSectionId', classSectionId);
+      const blob = await apiClient.getBlob(`/api/v1/reports/attendance/export?${params}`);
+      const type = format === 'pdf' ? 'report_pdf' : 'report_excel';
+      const title = `Attendance report (${format.toUpperCase()}) ${startDate}–${endDate}`;
+      await saveDocumentForOffline(title, type, `/api/v1/reports/attendance/export?${params}`, blob);
+      notifications.show({ title: 'Saved for offline', message: 'You can open it from Offline documents.', color: 'green' });
+    } catch (e) {
+      notifications.show({
+        title: 'Failed to save',
+        message: e instanceof Error ? e.message : 'Unknown error',
+        color: 'red',
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleSaveAcademicOffline = async (format: 'pdf' | 'excel') => {
+    setExportLoading(true);
+    try {
+      const params = new URLSearchParams({ format });
+      if (classSectionId) params.set('classSectionId', classSectionId);
+      if (subjectId) params.set('subjectId', subjectId);
+      const blob = await apiClient.getBlob(`/api/v1/reports/academic/export?${params}`);
+      const type = format === 'pdf' ? 'report_pdf' : 'report_excel';
+      const title = `Academic report (${format.toUpperCase()})`;
+      await saveDocumentForOffline(title, type, `/api/v1/reports/academic/export?${params}`, blob);
+      notifications.show({ title: 'Saved for offline', message: 'You can open it from Offline documents.', color: 'green' });
+    } catch (e) {
+      notifications.show({
+        title: 'Failed to save',
+        message: e instanceof Error ? e.message : 'Unknown error',
+        color: 'red',
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="page-title-bar">
@@ -196,6 +241,19 @@ export default function AdministrativeReportsPage() {
                           onClick={() => handleAttendanceExport('excel')}
                         >
                           Excel
+                        </Menu.Item>
+                        <Menu.Divider />
+                        <Menu.Item
+                          leftSection={<IconFolderOff size={14} />}
+                          onClick={() => handleSaveAttendanceOffline('pdf')}
+                        >
+                          Save PDF for offline
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconFolderOff size={14} />}
+                          onClick={() => handleSaveAttendanceOffline('excel')}
+                        >
+                          Save Excel for offline
                         </Menu.Item>
                       </Menu.Dropdown>
                     </Menu>
@@ -361,6 +419,21 @@ export default function AdministrativeReportsPage() {
                           disabled={!classSectionId && !subjectId}
                         >
                           Excel
+                        </Menu.Item>
+                        <Menu.Divider />
+                        <Menu.Item
+                          leftSection={<IconFolderOff size={14} />}
+                          onClick={() => handleSaveAcademicOffline('pdf')}
+                          disabled={!classSectionId && !subjectId}
+                        >
+                          Save PDF for offline
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconFolderOff size={14} />}
+                          onClick={() => handleSaveAcademicOffline('excel')}
+                          disabled={!classSectionId && !subjectId}
+                        >
+                          Save Excel for offline
                         </Menu.Item>
                       </Menu.Dropdown>
                     </Menu>

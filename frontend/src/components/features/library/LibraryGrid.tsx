@@ -1,10 +1,12 @@
 'use client';
 
 import { SimpleGrid, Pagination, Group, Text, Badge, Card, Image, Stack, ActionIcon, Modal } from '@mantine/core';
-import { IconDownload, IconEye, IconEdit, IconTrash } from '@tabler/icons-react';
+import { IconDownload, IconEye, IconEdit, IconTrash, IconFolderOff } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useDownloadLibraryItem, useDeleteLibraryItem, useIncrementLibraryViewCount } from '@/hooks/useLibrary';
+import { saveDocumentForOffline } from '@/lib/offline/documents';
 import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
 import { UploadModal } from './UploadModal';
 import { useState } from 'react';
 
@@ -53,8 +55,31 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
 
   const handleDownload = async (id: string) => {
     const url = await downloadMutation.mutateAsync(id);
-    // Open in new tab to avoid losing current page
     window.open(url, '_blank');
+  };
+
+  const handleSaveForOffline = async (id: string) => {
+    const libraryItem = items.find((i) => i.id === id);
+    if (!libraryItem) return;
+    try {
+      const url = await downloadMutation.mutateAsync(id);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch file');
+      const blob = await res.blob();
+      await saveDocumentForOffline(
+        libraryItem.title,
+        'library_item',
+        url,
+        blob
+      );
+      notifications.show({ title: 'Saved for offline', message: 'Open it from Offline documents.', color: 'green' });
+    } catch (e) {
+      notifications.show({
+        title: 'Failed to save',
+        message: e instanceof Error ? e.message : 'Unknown error',
+        color: 'red',
+      });
+    }
   };
 
   const handleEdit = (id: string) => {
@@ -122,11 +147,14 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
                   <div />
                 )}
                 <Group gap="xs">
-                  <ActionIcon variant="light" size="sm" onClick={() => handleView(item.id)}>
+                  <ActionIcon variant="light" size="sm" onClick={() => handleView(item.id)} title="View">
                     <IconEye size={16} />
                   </ActionIcon>
-                  <ActionIcon variant="light" size="sm" onClick={() => handleDownload(item.id)}>
+                  <ActionIcon variant="light" size="sm" onClick={() => handleDownload(item.id)} title="Download">
                     <IconDownload size={16} />
+                  </ActionIcon>
+                  <ActionIcon variant="light" size="sm" onClick={() => handleSaveForOffline(item.id)} title="Save for offline">
+                    <IconFolderOff size={16} />
                   </ActionIcon>
                   {canEdit && (
                     <>

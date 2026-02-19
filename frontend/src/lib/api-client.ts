@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { ApiResponse } from '@/types/api';
 import { supabase } from './supabase/client';
+import { enqueue } from './offline/queue';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -101,21 +102,37 @@ class ApiClient {
   }
 
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+      await enqueue('POST', url, data ?? null);
+      return { data: { _queued: true } as T };
+    }
     const response = await this.client.post<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
   async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+      await enqueue('PUT', url, data ?? null);
+      return { data: { _queued: true } as T };
+    }
     const response = await this.client.put<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
   async patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+      await enqueue('PATCH', url, data ?? null);
+      return { data: { _queued: true } as T };
+    }
     const response = await this.client.patch<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+      await enqueue('DELETE', url, null);
+      return { data: { _queued: true } as T };
+    }
     const response = await this.client.delete<ApiResponse<T>>(url, config);
     return response.data;
   }

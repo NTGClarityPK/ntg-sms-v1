@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AppShell as MantineAppShell, Burger, Group } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { AppShell as MantineAppShell, Box, Burger, Group } from '@mantine/core';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { StorageWarningBanner } from './StorageWarningBanner';
@@ -13,6 +13,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   // Desktop navbar collapsed state (persisted to localStorage, like RMS)
   const [navbarCollapsed, setNavbarCollapsed] = useState<boolean>(() => {
@@ -28,8 +29,8 @@ export function AppShell({ children }: AppShellProps) {
     document.body.setAttribute('data-navbar-collapsed', String(navbarCollapsed));
   }, [navbarCollapsed]);
 
-  // Calculate navbar width based on collapsed state
-  const navbarWidth = navbarCollapsed ? 100 : 270;
+  // On mobile use full drawer width; on desktop use collapsed/expanded width
+  const navbarWidth = isMobile ? 280 : (navbarCollapsed ? 100 : 270);
 
   return (
     <MantineAppShell
@@ -42,22 +43,28 @@ export function AppShell({ children }: AppShellProps) {
       padding="md"
     >
       <MantineAppShell.Header>
-        <Group h="100%" px="md">
-          <Burger
-            opened={mobileOpened}
-            onClick={toggleMobile}
-            hiddenFrom="sm"
-            size="sm"
-          />
-          <Header />
+        <Group h="100%" px="md" wrap="nowrap" style={{ minHeight: 60, overflow: 'hidden' }}>
+          {/* Mobile menu toggle - visible only below sm, never shrinks */}
+          <Box hiddenFrom="sm" style={{ flexShrink: 0 }}>
+            <Burger
+              opened={mobileOpened}
+              onClick={toggleMobile}
+              size="sm"
+              aria-label="Toggle menu"
+            />
+          </Box>
+          <Box style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
+            <Header />
+          </Box>
         </Group>
       </MantineAppShell.Header>
 
-      <MantineAppShell.Navbar p={navbarCollapsed ? 'xs' : 'md'}>
+      <MantineAppShell.Navbar p={navbarCollapsed && !isMobile ? 'xs' : 'md'}>
         <Sidebar
           collapsed={navbarCollapsed}
           onCollapseChange={setNavbarCollapsed}
           onMobileClose={() => mobileOpened && toggleMobile()}
+          isMobile={isMobile}
         />
       </MantineAppShell.Navbar>
 

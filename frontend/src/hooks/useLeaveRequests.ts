@@ -1,9 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import { enqueue } from '@/lib/offline/queue';
 import type { LeaveRequest, LeaveQuota, LeaveStatus } from '@/types/leaves';
 import { useAuth } from './useAuth';
 import { notifications } from '@mantine/notifications';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
+function isQueuedResponse(data: unknown): data is { _queued: true } {
+  return typeof data === 'object' && data !== null && '_queued' in data && (data as { _queued?: boolean })._queued === true;
+}
 
 interface QueryLeaveParams {
   page?: number;
@@ -83,20 +88,27 @@ export function useCreateLeaveRequest() {
 
   return useMutation({
     mutationFn: async (input: CreateLeaveInput) => {
-      const response = await apiClient.post<{ data: LeaveRequest }>(
+      if (typeof window !== 'undefined' && !window.navigator.onLine) {
+        await enqueue('POST', '/api/v1/leave-requests', input);
+        return { _queued: true } as { _queued: true };
+      }
+      const response = await apiClient.post<LeaveRequest>(
         '/api/v1/leave-requests',
         input,
       );
-      return response.data;
+      return response.data as LeaveRequest | { _queued: true };
     },
-    onSuccess: () => {
-      // Invalidate all leave-related queries to ensure fresh data
-      queryClient.invalidateQueries({ 
-        queryKey: ['leaves'],
-        exact: false, // Match all queries starting with 'leaves'
-      });
-      // Force refetch all leave queries
-      queryClient.refetchQueries({ 
+    onSuccess: (data) => {
+      if (isQueuedResponse(data)) {
+        notifications.show({
+          title: 'Saved for later',
+          message: "You're offline. Your submission has been queued and will be synced when you're back online.",
+          color: notifyColors.success,
+        });
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['leaves'], exact: false });
+      queryClient.refetchQueries({
         predicate: (query) => query.queryKey[0] === 'leaves' && query.queryKey[1] === branchId,
       });
       notifications.show({
@@ -134,13 +146,25 @@ export function useUpdateLeaveStatus() {
       reviewNotes?: string;
     }) => {
       const { id, action, reviewNotes } = params;
-      const response = await apiClient.put<{ data: LeaveRequest }>(
+      if (typeof window !== 'undefined' && !window.navigator.onLine) {
+        await enqueue('PUT', `/api/v1/leave-requests/${id}/${action}`, reviewNotes ? { reviewNotes } : {});
+        return { _queued: true } as { _queued: true };
+      }
+      const response = await apiClient.put<LeaveRequest>(
         `/api/v1/leave-requests/${id}/${action}`,
         reviewNotes ? { reviewNotes } : {},
       );
-      return response.data;
+      return response.data as LeaveRequest | { _queued: true };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (isQueuedResponse(data)) {
+        notifications.show({
+          title: 'Saved for later',
+          message: "You're offline. Your update has been queued and will be synced when you're back online.",
+          color: notifyColors.success,
+        });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['leaves'] });
       notifications.show({
         title: 'Success',

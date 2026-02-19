@@ -36,6 +36,7 @@ import {
   IconPackage,
   IconClipboardList,
   IconDatabase,
+  IconFolderOff,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -97,6 +98,7 @@ const allNavItems: NavItem[] = [
   { label: 'Notification', href: '/notifications', icon: IconBell },
   { label: 'Messages', href: '/messages', icon: IconMessage },
   { label: 'Library', href: '/library', icon: IconBook },
+  { label: 'Offline documents', href: '/offline-documents', icon: IconFolderOff },
   { label: 'Inventory', href: '/inventory', icon: IconPackage },
   { label: 'Request uniform', href: '/uniform-request', icon: IconClipboardList },
   { 
@@ -189,13 +191,18 @@ interface SidebarProps {
   onMobileClose?: () => void;
   collapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
+  /** When true (mobile drawer), always show expanded layout with labels */
+  isMobile?: boolean;
 }
 
 export function Sidebar({
   onMobileClose,
   collapsed = false,
   onCollapseChange,
+  isMobile = false,
 }: SidebarProps = {}) {
+  // On mobile drawer always show full nav with labels; on desktop use collapsed state
+  const effectiveCollapsed = collapsed && !isMobile;
   const router = useRouter();
   const pathname = usePathname();
   const theme = useMantineTheme();
@@ -389,7 +396,7 @@ export function Sidebar({
     const active = isActive(item.href);
     
     // Apply active styling ONLY when collapsed (like RMS)
-    const shouldShowActive = collapsed && active;
+    const shouldShowActive = effectiveCollapsed && active;
     
     const content = (
       <Button
@@ -397,11 +404,11 @@ export function Sidebar({
         type="button"
         variant="subtle"
         size="md"
-        fullWidth={!collapsed}
-        leftSection={collapsed ? undefined : <item.icon size={NAV_ICON_SIZE} />}
+        fullWidth={!effectiveCollapsed}
+        leftSection={effectiveCollapsed ? undefined : <item.icon size={NAV_ICON_SIZE} />}
         className="nav-item-button"
         data-active={active}
-        data-collapsed={collapsed}
+        data-collapsed={effectiveCollapsed}
         onClick={() => {
           router.push(item.href);
           onMobileClose?.();
@@ -427,11 +434,11 @@ export function Sidebar({
           },
         }}
       >
-        {collapsed ? <item.icon size={NAV_ICON_SIZE} /> : item.label}
+        {effectiveCollapsed ? <item.icon size={NAV_ICON_SIZE} /> : item.label}
       </Button>
     );
 
-    if (collapsed) {
+    if (effectiveCollapsed) {
       return (
         <Tooltip key={item.href} label={item.label} position="right" withArrow>
           <Box style={{ display: 'inline-block', width: '100%' }}>{content}</Box>
@@ -455,9 +462,9 @@ export function Sidebar({
         scrollbarSize={8}
         type="auto"
       >
-        <Stack gap="xs" p={collapsed ? 'xs' : 'md'}>
+        <Stack gap="xs" p={effectiveCollapsed ? 'xs' : 'md'}>
           {/* Main Navigation */}
-          {!collapsed && mainItems.length > 0 && (
+          {!effectiveCollapsed && mainItems.length > 0 && (
             <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
               Main
             </Text>
@@ -467,8 +474,8 @@ export function Sidebar({
           {/* Management Section */}
           {managementItems.length > 0 && (
             <>
-              {!collapsed && <Divider my="sm" />}
-              {!collapsed && (
+              {!effectiveCollapsed && <Divider my="sm" />}
+              {!effectiveCollapsed && (
                 <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
                   Management
                 </Text>
@@ -479,9 +486,10 @@ export function Sidebar({
         </Stack>
       </ScrollArea>
 
-      {/* Bottom collapse toggle button - like RMS (button beneath nav items) */}
+      {/* Bottom collapse toggle - desktop only (mobile drawer closes via overlay) */}
       <Box
         p={collapsed ? 'xs' : 'md'}
+        visibleFrom="sm"
         style={{
           borderTop: '1px solid rgba(0, 0, 0, 0.08)',
           display: 'flex',

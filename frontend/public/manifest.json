@@ -1,0 +1,18 @@
+{
+  "name": "School Management System",
+  "short_name": "SMS",
+  "description": "Multi-tenant school management system",
+  "theme_color": "#4caf50",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/ntg-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

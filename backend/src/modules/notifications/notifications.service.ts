@@ -8,6 +8,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { NotificationDto } from './dto/notification.dto';
 import { QueryNotificationsDto } from './dto/query-notifications.dto';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { PushService } from '../push/push.service';
 
 type NotificationRow = {
   id: string;
@@ -29,7 +30,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly pushService: PushService,
+  ) {}
 
   async listNotifications(
     userId: string,
@@ -285,7 +289,7 @@ export class NotificationsService {
     }
 
     const row = data as NotificationRow;
-    return new NotificationDto({
+    const dto = new NotificationDto({
       id: row.id,
       userId: row.user_id,
       type: row.type,
@@ -296,6 +300,13 @@ export class NotificationsService {
       isCritical: row.is_critical ?? false,
       createdAt: row.created_at,
     });
+    this.pushService.sendPushToUser(input.userId, {
+      title: input.title,
+      body: input.body,
+      url: '/notifications',
+      tag: input.type,
+    });
+    return dto;
   }
 
   async createAttendanceNotification(
@@ -358,14 +369,21 @@ export class NotificationsService {
       .from('notifications')
       .insert(notifications);
 
-    // Don't throw error if notification creation fails - log and continue
     if (insertError) {
       const errorMessage =
         insertError instanceof Error
           ? insertError.message
           : 'Unknown error';
       console.error('Failed to create attendance notifications:', errorMessage);
+      return;
     }
+    const parentIds = parentStudents.map((ps) => ps.parent_user_id);
+    this.pushService.sendPushToUsers(parentIds, {
+      title: 'Attendance Marked',
+      body: `${studentName} was marked ${attendanceData.status} on ${new Date(attendanceData.date).toLocaleDateString()}`,
+      url: '/notifications',
+      tag: 'attendance',
+    });
   }
 
   /**
@@ -413,7 +431,14 @@ export class NotificationsService {
       if (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('Failed to create leave request raised notifications:', errorMessage);
+        return;
       }
+      this.pushService.sendPushToUsers(params.recipientUserIds, {
+        title: 'New leave request',
+        body: `${params.studentName}'s leave request for ${dateRange} is pending review.`,
+        url: '/leaves',
+        tag: 'leave_request_raised',
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Failed to create leave request raised notifications:', errorMessage);
@@ -462,7 +487,6 @@ export class NotificationsService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      // eslint-disable-next-line no-console
       console.error('Failed to create leave notification:', errorMessage);
     }
   }
@@ -500,7 +524,14 @@ export class NotificationsService {
       if (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('Failed to create early departure request raised notifications:', errorMessage);
+        return;
       }
+      this.pushService.sendPushToUsers(params.recipientUserIds, {
+        title: 'New early departure request',
+        body: `${params.studentName}'s early departure request for ${dateFormatted} at ${params.time} is pending review.`,
+        url: '/early-departure',
+        tag: 'early_departure_request_raised',
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Failed to create early departure request raised notifications:', errorMessage);
@@ -531,7 +562,6 @@ export class NotificationsService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      // eslint-disable-next-line no-console
       console.error(
         'Failed to create early departure notification:',
         errorMessage,
@@ -575,7 +605,14 @@ export class NotificationsService {
       if (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('Failed to create early departure excused notifications:', errorMessage);
+        return;
       }
+      this.pushService.sendPushToUsers(params.recipientUserIds, {
+        title: 'Early departure authorized',
+        body: `${params.studentName}'s early departure has been authorized by staff for ${dateFormatted} at ${params.time}.`,
+        url: '/early-departure',
+        tag: 'early_departure_excused',
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Failed to create early departure excused notifications:', errorMessage);
@@ -606,7 +643,14 @@ export class NotificationsService {
       if (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('Failed to create uniform request raised notifications:', errorMessage);
+        return;
       }
+      this.pushService.sendPushToUsers(params.recipientUserIds, {
+        title: 'New uniform request',
+        body: `Uniform request for ${params.studentName} is pending review.`,
+        url: '/inventory/requests',
+        tag: 'uniform_request_raised',
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Failed to create uniform request raised notifications:', errorMessage);

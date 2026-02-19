@@ -8,6 +8,9 @@ import { ModalsProvider } from '@mantine/modals';
 import { queryClient } from '@/lib/query-client';
 import { createDynamicTheme } from '@/lib/utils/createDynamicTheme';
 import { DynamicThemeProvider } from '@/components/providers/DynamicThemeProvider';
+import { InstallPrompt } from '@/components/common/InstallPrompt';
+import { SyncProgressModal } from '@/components/common/SyncProgressModal';
+import { PushSubscribe } from '@/components/common/PushSubscribe';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeStore } from '@/lib/store/theme-store';
 
@@ -32,6 +35,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeWrapper>
         <Notifications />
+        <InstallPrompt />
+        <SyncProgressModal />
+        <PushSubscribe />
         {children}
         <ReactQueryDevtools initialIsOpen={false} />
       </ThemeWrapper>

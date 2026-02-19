@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Group, Text, Badge, Tooltip, Box, Image, Menu } from '@mantine/core';
 import { IconCircle, IconSchool, IconCrown } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
@@ -10,6 +10,8 @@ import { NotificationBell } from './NotificationBell';
 import { useThemeColors, useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTenantMe } from '@/hooks/useTenant';
 import { useAuth } from '@/hooks/useAuth';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { SyncStatus } from '@/components/common/SyncStatus';
 import { useMyStudent } from '@/hooks/useStudents';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
 import { useThemeStore } from '@/lib/store/theme-store';
@@ -19,7 +21,7 @@ export function Header() {
   const colors = useThemeColors();
   const successColor = useSuccessColor();
   const errorColor = useErrorColor();
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const { isOnline, pendingCount } = useOfflineSync();
   const tenantQuery = useTenantMe();
   const { name: tenantName, logoUrl: tenantLogo, setBranding } = useTenantBrandingStore();
   const { setPrimaryColor } = useThemeStore();
@@ -47,27 +49,11 @@ export function Header() {
     setPrimaryColor(data.primaryColor || DEFAULT_THEME_COLOR);
   }, [tenantQuery.data?.data, setBranding, setPrimaryColor]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const updateStatus = () => {
-      setIsOnline(window.navigator.onLine);
-    };
-
-    updateStatus();
-    window.addEventListener('online', updateStatus);
-    window.addEventListener('offline', updateStatus);
-
-    return () => {
-      window.removeEventListener('online', updateStatus);
-      window.removeEventListener('offline', updateStatus);
-    };
-  }, []);
-
   return (
-    <Group justify="space-between" style={{ flex: 1 }}>
-      <Group gap="sm" align="center">
-        <Group gap="xs" align="center">
+    <Group justify="space-between" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
+      {/* Left: logo + tenant name (compact on mobile) */}
+      <Group gap="sm" align="center" style={{ minWidth: 0, flexShrink: 1 }} wrap="nowrap">
+        <Group gap="xs" align="center" style={{ minWidth: 0 }} wrap="nowrap">
           <Box
             style={{
               width: '32px',
@@ -93,57 +79,61 @@ export function Header() {
               <IconSchool size={26} stroke={1.5} />
             )}
           </Box>
-          <div>
-            <Text fw={700} size="lg" style={{ lineHeight: 1 }}>
+          <div style={{ minWidth: 0 }}>
+            <Text fw={700} size="lg" style={{ lineHeight: 1 }} truncate>
               {tenantName || 'School'}
             </Text>
-            <Text size="xs" c="dimmed" style={{ lineHeight: 1 }}>
+            <Text size="xs" c="dimmed" style={{ lineHeight: 1 }} visibleFrom="sm">
               School Management System
             </Text>
           </div>
         </Group>
         {isStudent && studentClassName && (
-          <Badge variant="light" color={colors.primary} size="lg">
+          <Badge variant="light" color={colors.primary} size="lg" visibleFrom="sm">
             {studentClassName}
           </Badge>
         )}
       </Group>
 
-      <Group gap="md" align="center">
-        {/* Super Admin Badge */}
+      {/* Right: actions - hide non-essential on mobile so bar stays readable */}
+      <Group gap="md" align="center" style={{ flexShrink: 0 }} wrap="nowrap">
+        {/* Super Admin Badge - desktop only */}
         {isSuperAdmin && (
-          <Menu shadow="md" width={200}>
-            <Menu.Target>
-              <Badge
-                variant="filled"
-                color="yellow"
-                size="lg"
-                leftSection={<IconCrown size={14} />}
-                style={{
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0 12px',
-                  background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
-                  color: '#000',
-                  border: '1px solid #FFD700',
-                }}
-              >
-                SUPER USER
-              </Badge>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item onClick={() => router.push('/admin/assign-branch')}>
-                Assign Branch to Tenant
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+          <Box visibleFrom="sm">
+            <Menu shadow="md" width={200}>
+              <Menu.Target>
+                <Badge
+                  variant="filled"
+                  color="yellow"
+                  size="lg"
+                  leftSection={<IconCrown size={14} />}
+                  style={{
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0 12px',
+                    background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                    color: '#000',
+                    border: '1px solid #FFD700',
+                  }}
+                >
+                  SUPER USER
+                </Badge>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={() => router.push('/admin/assign-branch')}>
+                  Assign Branch to Tenant
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Box>
         )}
 
-        {/* NTG Logo */}
+        {/* NTG Logo - desktop only */}
         <Box
+          visibleFrom="sm"
           style={{
             width: '64px',
             height: '32px',
@@ -169,13 +159,20 @@ export function Header() {
           />
         </Box>
 
-        {/* Online/Offline Status Badge (RMS-style) */}
+        {/* Online/Offline Status Badge - desktop only */}
         <Tooltip
-          label={isOnline ? 'Connected to server' : 'No internet connection'}
+          label={
+            isOnline
+              ? pendingCount > 0
+                ? `${pendingCount} change(s) pending sync`
+                : 'Connected to server'
+              : 'No internet connection'
+          }
           position="bottom"
           withArrow
         >
           <Badge
+            visibleFrom="sm"
             variant="light"
             color={isOnline ? successColor : errorColor}
             size="sm"
@@ -199,7 +196,12 @@ export function Header() {
           </Badge>
         </Tooltip>
 
-        <CurrentBranchBadge />
+        <Box visibleFrom="sm">
+          <SyncStatus />
+        </Box>
+        <Box visibleFrom="sm">
+          <CurrentBranchBadge />
+        </Box>
         <NotificationBell />
         <UserMenu />
       </Group>

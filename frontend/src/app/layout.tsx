@@ -30,6 +30,11 @@ const monoFont = JetBrains_Mono({
 export const metadata = {
   title: 'School Management System',
   description: 'Multi-tenant school management system',
+  manifest: '/manifest.json',
+};
+
+export const viewport = {
+  themeColor: '#4caf50',
 };
 
 export default function RootLayout({

@@ -22,6 +22,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/notifications': 'communication',
   '/messages': 'communication',
   '/library': 'library',
+  '/offline-documents': 'library',
   '/inventory': 'inventory',
   '/inventory/items': 'inventory',
   '/inventory/requests': 'inventory',
