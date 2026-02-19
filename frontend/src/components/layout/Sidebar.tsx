@@ -163,6 +163,15 @@ const allNavItems: NavItem[] = [
     }
   },
   { label: 'Report', href: '/reports', icon: IconChartBar },
+  {
+    label: 'Administrative Reports',
+    href: '/reports/administrative',
+    icon: IconChartBar,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true; // Filtered by permission (reports) and role in render
+    },
+  },
   { label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 
@@ -285,6 +294,10 @@ export function Sidebar({
       // For "Behavioral", show only for roles that can assess
       if (item.href === '/behavioral') {
         return canAssessBehavioral;
+      }
+      // Administrative Reports: staff/coordinator/principal/admin only (not parent/student)
+      if (item.href === '/reports/administrative') {
+        return !isParent && !isStudent && (isTeacher || canManageTimetable || canManageEvents);
       }
       // Parent-facing view only page
       if (item.href === '/my-children') {

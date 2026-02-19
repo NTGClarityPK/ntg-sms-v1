@@ -10,6 +10,8 @@ export class BranchDto {
   storageQuotaGb!: number;
   storageUsedBytes!: number;
   isActive!: boolean;
+  /** Whether public statistics page is enabled for this branch (password not exposed). */
+  publicStatsEnabled?: boolean;
   createdAt!: string;
   updatedAt!: string;
 

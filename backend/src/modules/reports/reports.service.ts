@@ -31,6 +31,18 @@ import { QueryReportPeriodDto, ReportPeriodType } from './dto/query-report-perio
 import { AssignmentStatisticsDto } from './dto/assignment-statistics.dto';
 import { AssignmentEngagementDto } from './dto/assignment-engagement.dto';
 import { ClassStudentCountDto } from './dto/class-student-count.dto';
+import { AttendanceReportByClassDto, AttendanceReportStudentRowDto } from './dto/attendance-report-by-class.dto';
+import { AttendanceSummaryBranchDto, AttendanceSummaryClassItemDto } from './dto/attendance-summary-branch.dto';
+import { LowAttendanceReportDto, LowAttendanceStudentDto } from './dto/low-attendance.dto';
+import { QueryAttendanceReportDto } from './dto/query-attendance-report.dto';
+import {
+  AcademicReportBySubjectDto,
+  SubjectClassPerformanceDto,
+} from './dto/academic-report-by-subject.dto';
+import {
+  AcademicComparisonDto,
+  AcademicComparisonItemDto,
+} from './dto/academic-comparison.dto';
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
@@ -1063,6 +1075,970 @@ export class ReportsService {
     }
 
     throw new ForbiddenException('You can only access reports for class sections you teach');
+  }
+
+  /**
+   * Get list of class section IDs the user is allowed to see for admin reports.
+   * school_admin, principal, super_admin, admin_assistant → all in branch.
+   * academic_coordinator → all in branch.
+   * class_teacher → only class sections where they are class_teacher_id.
+   * subject_teacher → only class sections from teacher_assignments.
+   * Others (parent, student, etc.) → empty array.
+   */
+  async getAllowedClassSectionIdsForAdminReports(
+    userId: string,
+    userRoles: string[] | undefined,
+    branchId: string,
+    academicYearId: string,
+  ): Promise<string[]> {
+    const supabase = this.supabaseConfig.getClient();
+    const roles = (userRoles || []).map((r) => String(r).toLowerCase());
+
+    const isFullAccess = roles.some((r) =>
+      ['school_admin', 'principal', 'super_admin', 'admin_assistant', 'academic_coordinator'].includes(r),
+    );
+    if (isFullAccess) {
+      const { data: list } = await supabase
+        .from('class_sections')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', academicYearId);
+      return (list || []).map((r: { id: string }) => r.id);
+    }
+
+    const isClassTeacher = roles.includes('class_teacher');
+    const isSubjectTeacher = roles.includes('subject_teacher');
+    if (!isClassTeacher && !isSubjectTeacher) {
+      return [];
+    }
+
+    const { data: staff } = await supabase
+      .from('staff')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!staff) return [];
+
+    const staffId = (staff as { id: string }).id;
+    const sectionIds: string[] = [];
+
+    if (isClassTeacher) {
+      const { data: asClassTeacher } = await supabase
+        .from('class_sections')
+        .select('id')
+        .eq('class_teacher_id', staffId)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', academicYearId);
+      (asClassTeacher || []).forEach((r: { id: string }) => sectionIds.push(r.id));
+    }
+    if (isSubjectTeacher) {
+      const { data: assigned } = await supabase
+        .from('teacher_assignments')
+        .select('class_section_id')
+        .eq('staff_id', staffId);
+      const csIds = (assigned || [])
+        .map((r: { class_section_id: string }) => r.class_section_id)
+        .filter((id) => !sectionIds.includes(id));
+      const { data: valid } = await supabase
+        .from('class_sections')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', academicYearId)
+        .in('id', csIds);
+      (valid || []).forEach((r: { id: string }) => sectionIds.push(r.id));
+    }
+
+    return [...new Set(sectionIds)];
+  }
+
+  /**
+   * Get list of subject IDs the user is allowed to see for admin academic reports.
+   * Full access roles → all subjects in branch; subject_teacher → only assigned subjects.
+   */
+  async getAllowedSubjectIdsForAdminReports(
+    userId: string,
+    userRoles: string[] | undefined,
+    branchId: string,
+  ): Promise<string[]> {
+    const supabase = this.supabaseConfig.getClient();
+    const roles = (userRoles || []).map((r) => String(r).toLowerCase());
+
+    const isFullAccess = roles.some((r) =>
+      ['school_admin', 'principal', 'super_admin', 'admin_assistant', 'academic_coordinator'].includes(r),
+    );
+    if (isFullAccess) {
+      const { data: list } = await supabase
+        .from('subjects')
+        .select('id')
+        .eq('branch_id', branchId);
+      return (list || []).map((r: { id: string }) => r.id);
+    }
+
+    if (!roles.includes('subject_teacher')) return [];
+
+    const { data: staff } = await supabase
+      .from('staff')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!staff) return [];
+
+    const { data: assigned } = await supabase
+      .from('teacher_assignments')
+      .select('subject_id')
+      .eq('staff_id', (staff as { id: string }).id);
+    const subjectIds = [...new Set((assigned || []).map((r: { subject_id: string }) => r.subject_id))];
+    return subjectIds;
+  }
+
+  async getAttendanceReportByClass(
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string | undefined,
+    startDate: string | undefined,
+    endDate: string | undefined,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<{ data: AttendanceReportByClassDto }> {
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+
+    const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
+    if (!allowed.includes(classSectionId)) {
+      throw new ForbiddenException('You do not have access to this class section report');
+    }
+
+    const raw = await this.attendanceService.getAttendanceReportByClassSection(
+      classSectionId,
+      branchId,
+      yearId,
+      startDate,
+      endDate,
+    );
+
+    const studentIds = raw.students.map((s) => s.studentId);
+    const { data: students } = await this.supabaseConfig
+      .getClient()
+      .from('students')
+      .select('id, user_id')
+      .in('id', studentIds);
+    const userIds = (students || [])
+      .map((s: { user_id: string | null }) => s.user_id)
+      .filter(Boolean) as string[];
+    const profileMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await this.supabaseConfig
+        .getClient()
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      (profiles || []).forEach((p: { id: string; full_name: string }) => profileMap.set(p.id, p.full_name));
+    }
+    const studentIdToUserId = new Map(
+      (students || []).map((s: { id: string; user_id: string | null }) => [s.id, s.user_id]),
+    );
+
+    const studentDtos = raw.students.map(
+      (s) =>
+        new AttendanceReportStudentRowDto({
+          ...s,
+          studentName: studentIdToUserId.get(s.studentId)
+            ? profileMap.get(studentIdToUserId.get(s.studentId)!) ?? 'Unknown'
+            : 'Unknown',
+        }),
+    );
+
+    return {
+      data: new AttendanceReportByClassDto({
+        classSectionId: raw.classSectionId,
+        className: raw.className,
+        sectionName: raw.sectionName,
+        startDate: raw.startDate,
+        endDate: raw.endDate,
+        students: studentDtos,
+        classSummary: raw.classSummary,
+      }),
+    };
+  }
+
+  async getAttendanceSummaryBranch(
+    branchId: string,
+    startDate: string,
+    endDate: string,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<{ data: AttendanceSummaryBranchDto }> {
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = activeYear.id;
+
+    const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
+    if (allowed.length === 0) {
+      return {
+        data: new AttendanceSummaryBranchDto({
+          startDate,
+          endDate,
+          byClass: [],
+          overall: {
+            averageAttendance: 0,
+            totalStudents: 0,
+            totalPresent: 0,
+            totalAbsent: 0,
+            totalLate: 0,
+            totalExcused: 0,
+          },
+        }),
+      };
+    }
+
+    const byClass: AttendanceSummaryClassItemDto[] = [];
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let totalLate = 0;
+    let totalExcused = 0;
+    let totalStudents = 0;
+
+    for (const csId of allowed) {
+      const raw = await this.attendanceService.getAttendanceReportByClassSection(
+        csId,
+        branchId,
+        yearId,
+        startDate,
+        endDate,
+      );
+      byClass.push(
+        new AttendanceSummaryClassItemDto({
+          classSectionId: raw.classSectionId,
+          className: raw.className,
+          sectionName: raw.sectionName,
+          averageAttendance: raw.classSummary.averageAttendance,
+          studentCount: raw.classSummary.studentCount,
+          totalPresent: raw.classSummary.totalPresent,
+          totalAbsent: raw.classSummary.totalAbsent,
+          totalLate: raw.classSummary.totalLate,
+          totalExcused: raw.classSummary.totalExcused,
+        }),
+      );
+      totalPresent += raw.classSummary.totalPresent;
+      totalAbsent += raw.classSummary.totalAbsent;
+      totalLate += raw.classSummary.totalLate;
+      totalExcused += raw.classSummary.totalExcused;
+      totalStudents += raw.classSummary.studentCount;
+    }
+
+    const totalDays = totalPresent + totalAbsent + totalLate + totalExcused;
+    const averageAttendance =
+      byClass.length > 0
+        ? Math.round(byClass.reduce((sum, c) => sum + c.averageAttendance, 0) / byClass.length)
+        : 0;
+
+    return {
+      data: new AttendanceSummaryBranchDto({
+        startDate,
+        endDate,
+        byClass,
+        overall: {
+          averageAttendance,
+          totalStudents,
+          totalPresent,
+          totalAbsent,
+          totalLate,
+          totalExcused,
+        },
+      }),
+    };
+  }
+
+  async getLowAttendanceStudents(
+    branchId: string,
+    startDate: string,
+    endDate: string,
+    threshold: number,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<{ data: LowAttendanceReportDto }> {
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = activeYear.id;
+
+    const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
+    const lowList: LowAttendanceStudentDto[] = [];
+
+    for (const csId of allowed) {
+      const raw = await this.attendanceService.getAttendanceReportByClassSection(
+        csId,
+        branchId,
+        yearId,
+        startDate,
+        endDate,
+      );
+      const studentIds = raw.students.map((s) => s.studentId);
+      const { data: students } = await this.supabaseConfig
+        .getClient()
+        .from('students')
+        .select('id, user_id')
+        .in('id', studentIds);
+      const userIds = (students || [])
+        .map((s: { user_id: string | null }) => s.user_id)
+        .filter(Boolean) as string[];
+      const profileMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: profiles } = await this.supabaseConfig
+          .getClient()
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        (profiles || []).forEach((p: { id: string; full_name: string }) => profileMap.set(p.id, p.full_name));
+      }
+      const studentIdToUserId = new Map(
+        (students || []).map((s: { id: string; user_id: string | null }) => [s.id, s.user_id]),
+      );
+
+      for (const s of raw.students) {
+        if (s.percentage < threshold && s.totalDays > 0) {
+          lowList.push(
+            new LowAttendanceStudentDto({
+              studentId: s.studentId,
+              studentName: studentIdToUserId.get(s.studentId)
+                ? profileMap.get(studentIdToUserId.get(s.studentId)!) ?? 'Unknown'
+                : 'Unknown',
+              classSectionId: raw.classSectionId,
+              className: raw.className,
+              sectionName: raw.sectionName,
+              percentage: s.percentage,
+              presentDays: s.presentDays,
+              absentDays: s.absentDays,
+              totalDays: s.totalDays,
+              belowThreshold: threshold,
+            }),
+          );
+        }
+      }
+    }
+
+    return {
+      data: new LowAttendanceReportDto({
+        startDate,
+        endDate,
+        threshold,
+        students: lowList,
+      }),
+    };
+  }
+
+  async exportAttendanceReportPdf(
+    branchId: string,
+    academicYearId: string | undefined,
+    startDate: string,
+    endDate: string,
+    classSectionId: string | undefined,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<Buffer> {
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+
+    if (classSectionId) {
+      const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
+      if (!allowed.includes(classSectionId)) throw new ForbiddenException('Access denied');
+      const { data: report } = await this.getAttendanceReportByClass(
+        classSectionId,
+        branchId,
+        yearId,
+        startDate,
+        endDate,
+        userId,
+        userRoles,
+      );
+      return this.renderAttendanceReportPdf(report);
+    }
+
+    const { data: summary } = await this.getAttendanceSummaryBranch(
+      branchId,
+      startDate,
+      endDate,
+      userId,
+      userRoles,
+    );
+    return this.renderAttendanceSummaryPdf(summary);
+  }
+
+  private async renderAttendanceReportPdf(report: AttendanceReportByClassDto): Promise<Buffer> {
+    let htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+table{border-collapse:collapse;width:100%;} th,td{border:1px solid #333;padding:8px;text-align:left;}
+th{background:#eee;}
+</style></head>
+<body>
+<h2>Attendance Report - ${this.escapeHtml(report.className)} ${this.escapeHtml(report.sectionName)}</h2>
+<p>Period: ${report.startDate} to ${report.endDate}</p>
+<table>
+<tr><th>Student</th><th>Present</th><th>Absent</th><th>Late</th><th>Excused</th><th>Total</th><th>%</th></tr>
+`;
+    report.students.forEach((s) => {
+      htmlContent += `<tr><td>${this.escapeHtml(s.studentName)}</td><td>${s.presentDays}</td><td>${s.absentDays}</td><td>${s.lateDays}</td><td>${s.excusedDays}</td><td>${s.totalDays}</td><td>${s.percentage}%</td></tr>
+`;
+    });
+    htmlContent += `</table><p>Class average: ${report.classSummary.averageAttendance}% | Students: ${report.classSummary.studentCount}</p></body></html>`;
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      const pdf = await page.pdf({
+        format: 'A4',
+        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        printBackground: true,
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async renderAttendanceSummaryPdf(summary: AttendanceSummaryBranchDto): Promise<Buffer> {
+    let htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+table{border-collapse:collapse;width:100%;} th,td{border:1px solid #333;padding:8px;text-align:left;}
+th{background:#eee;}
+</style></head>
+<body>
+<h2>Branch Attendance Summary</h2>
+<p>Period: ${summary.startDate} to ${summary.endDate}</p>
+<table>
+<tr><th>Class</th><th>Section</th><th>Avg %</th><th>Students</th><th>Present</th><th>Absent</th><th>Late</th><th>Excused</th></tr>
+`;
+    summary.byClass.forEach((c) => {
+      htmlContent += `<tr><td>${this.escapeHtml(c.className)}</td><td>${this.escapeHtml(c.sectionName)}</td><td>${c.averageAttendance}%</td><td>${c.studentCount}</td><td>${c.totalPresent}</td><td>${c.totalAbsent}</td><td>${c.totalLate}</td><td>${c.totalExcused}</td></tr>
+`;
+    });
+    htmlContent += `</table><p>Overall average: ${summary.overall.averageAttendance}% | Total students: ${summary.overall.totalStudents}</p></body></html>`;
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      const pdf = await page.pdf({
+        format: 'A4',
+        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        printBackground: true,
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  }
+
+  async exportAttendanceReportExcel(
+    branchId: string,
+    academicYearId: string | undefined,
+    startDate: string,
+    endDate: string,
+    classSectionId: string | undefined,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<Buffer> {
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'NTG SMS';
+
+    if (classSectionId) {
+      const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
+      if (!allowed.includes(classSectionId)) throw new ForbiddenException('Access denied');
+      const { data: report } = await this.getAttendanceReportByClass(
+        classSectionId,
+        branchId,
+        yearId,
+        startDate,
+        endDate,
+        userId,
+        userRoles,
+      );
+      const ws = workbook.addWorksheet('Attendance Data');
+      ws.columns = [
+        { header: 'Student', key: 'name', width: 28 },
+        { header: 'Present', key: 'present', width: 10 },
+        { header: 'Absent', key: 'absent', width: 10 },
+        { header: 'Late', key: 'late', width: 8 },
+        { header: 'Excused', key: 'excused', width: 10 },
+        { header: 'Total', key: 'total', width: 8 },
+        { header: '%', key: 'pct', width: 8 },
+      ];
+      report.students.forEach((s) => {
+        ws.addRow({
+          name: s.studentName,
+          present: s.presentDays,
+          absent: s.absentDays,
+          late: s.lateDays,
+          excused: s.excusedDays,
+          total: s.totalDays,
+          pct: `${s.percentage}%`,
+        });
+      });
+    } else {
+      const { data: summary } = await this.getAttendanceSummaryBranch(
+        branchId,
+        startDate,
+        endDate,
+        userId,
+        userRoles,
+      );
+      const ws = workbook.addWorksheet('Attendance Summary');
+      ws.columns = [
+        { header: 'Class', key: 'className', width: 20 },
+        { header: 'Section', key: 'sectionName', width: 12 },
+        { header: 'Avg %', key: 'avg', width: 10 },
+        { header: 'Students', key: 'count', width: 10 },
+        { header: 'Present', key: 'present', width: 10 },
+        { header: 'Absent', key: 'absent', width: 10 },
+        { header: 'Late', key: 'late', width: 8 },
+        { header: 'Excused', key: 'excused', width: 10 },
+      ];
+      summary.byClass.forEach((c) => {
+        ws.addRow({
+          className: c.className,
+          sectionName: c.sectionName,
+          avg: `${c.averageAttendance}%`,
+          count: c.studentCount,
+          present: c.totalPresent,
+          absent: c.totalAbsent,
+          late: c.totalLate,
+          excused: c.totalExcused,
+        });
+      });
+    }
+
+    return (await workbook.xlsx.writeBuffer()) as Buffer;
+  }
+
+  /** Administrative academic report by class: reuse class report with allowed check. */
+  async getAcademicReportByClass(
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string | undefined,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<{ data: ClassReportDto }> {
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+    const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
+    if (!allowed.includes(classSectionId)) {
+      throw new ForbiddenException('You do not have access to this class section report');
+    }
+    return this.getClassReport(classSectionId, branchId, yearId, userId, userRoles);
+  }
+
+  /** Subject performance across allowed class sections. */
+  async getAcademicReportBySubject(
+    subjectId: string,
+    branchId: string,
+    academicYearId: string | undefined,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<{ data: AcademicReportBySubjectDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+
+    const [allowedSections, allowedSubjects] = await Promise.all([
+      this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId),
+      this.getAllowedSubjectIdsForAdminReports(userId, userRoles, branchId),
+    ]);
+    if (!allowedSubjects.includes(subjectId)) {
+      throw new ForbiddenException('You do not have access to this subject report');
+    }
+
+    const { data: subjectRow } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .eq('id', subjectId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    if (!subjectRow) throw new NotFoundException('Subject not found');
+    const subjectName = (subjectRow as { name?: string }).name ?? 'Unknown';
+
+    const byClass: SubjectClassPerformanceDto[] = [];
+    for (const csId of allowedSections) {
+      const { data: cs } = await supabase
+        .from('class_sections')
+        .select('id, class_id, section_id')
+        .eq('id', csId)
+        .single();
+      if (!cs) continue;
+      const c = cs as { class_id: string; section_id: string };
+      const [classRes, sectionRes, studentsRes] = await Promise.all([
+        supabase.from('classes').select('display_name').eq('id', c.class_id).single(),
+        supabase.from('sections').select('name').eq('id', c.section_id).single(),
+        supabase
+          .from('students')
+          .select('id, user_id')
+          .eq('class_id', c.class_id)
+          .eq('section_id', c.section_id)
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', yearId)
+          .eq('is_active', true),
+      ]);
+      const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
+      const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
+      const students = (studentsRes.data || []) as { id: string; user_id: string | null }[];
+      const studentIds = students.map((s) => s.id);
+      if (studentIds.length === 0) {
+        byClass.push(
+          new SubjectClassPerformanceDto({
+            classSectionId: csId,
+            className,
+            sectionName,
+            averagePercentage: 0,
+            studentCount: 0,
+            topPerformers: [],
+            struggling: [],
+          }),
+        );
+        continue;
+      }
+
+      const { data: assessList } = await supabase
+        .from('assessments')
+        .select('id, total_marks')
+        .eq('class_section_id', csId)
+        .eq('subject_id', subjectId)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', yearId);
+      const assessmentIds = (assessList || []).map((a: { id: string }) => a.id);
+      const studentPcts = new Map<string, number[]>();
+      if (assessmentIds.length > 0) {
+        const { data: gradeRows } = await supabase
+          .from('student_grades')
+          .select('student_id, marks_obtained, assessment_id')
+          .in('student_id', studentIds)
+          .in('assessment_id', assessmentIds);
+        const totalMap = new Map(
+          (assessList || []).map((a: { id: string; total_marks: number }) => [a.id, Number(a.total_marks) || 1]),
+        );
+        for (const row of gradeRows || []) {
+          const r = row as { student_id: string; marks_obtained: number; assessment_id: string };
+          const total = totalMap.get(r.assessment_id) ?? 1;
+          const pct = Math.round((Number(r.marks_obtained) / total) * 100);
+          const list = studentPcts.get(r.student_id) || [];
+          list.push(pct);
+          studentPcts.set(r.student_id, list);
+        }
+      }
+      const averages = new Map<string, number>();
+      studentPcts.forEach((pcts, sid) => {
+        const avg = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+        averages.set(sid, Math.round(avg));
+      });
+      const userIds = students.map((s) => s.user_id).filter(Boolean) as string[];
+      const profileMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        (profiles || []).forEach((p: { id: string; full_name: string }) => profileMap.set(p.id, p.full_name));
+      }
+      const studentIdToName = new Map(
+        students.map((s) => [s.id, s.user_id ? profileMap.get(s.user_id) ?? 'Unknown' : 'Unknown']),
+      );
+      const sorted = [...averages.entries()].sort((a, b) => b[1] - a[1]);
+      const top5 = sorted.slice(0, 5).map(([id, pct]) => ({
+        studentId: id,
+        studentName: studentIdToName.get(id) ?? 'Unknown',
+        percentage: pct,
+      }));
+      const bottom5 = sorted.slice(-5).reverse().map(([id, pct]) => ({
+        studentId: id,
+        studentName: studentIdToName.get(id) ?? 'Unknown',
+        percentage: pct,
+      }));
+      const avgPct =
+        sorted.length > 0
+          ? Math.round(sorted.reduce((sum, [, pct]) => sum + pct, 0) / sorted.length)
+          : 0;
+      byClass.push(
+        new SubjectClassPerformanceDto({
+          classSectionId: csId,
+          className,
+          sectionName,
+          averagePercentage: avgPct,
+          studentCount: sorted.length,
+          topPerformers: top5,
+          struggling: bottom5,
+        }),
+      );
+    }
+
+    return {
+      data: new AcademicReportBySubjectDto({
+        subjectId,
+        subjectName,
+        academicYearId: yearId,
+        byClass,
+      }),
+    };
+  }
+
+  /** Compare classes or subjects by average. */
+  async getAcademicComparison(
+    branchId: string,
+    academicYearId: string | undefined,
+    classSectionIds: string[] | undefined,
+    subjectIds: string[] | undefined,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<{ data: AcademicComparisonDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+
+    const allowedSections = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
+    const allowedSubjects = await this.getAllowedSubjectIdsForAdminReports(userId, userRoles, branchId);
+
+    const items: AcademicComparisonItemDto[] = [];
+
+    if (classSectionIds && classSectionIds.length > 0) {
+      const filtered = classSectionIds.filter((id) => allowedSections.includes(id));
+      for (const csId of filtered) {
+        const { data: report } = await this.getClassReport(csId, branchId, yearId, userId, userRoles);
+        const avg =
+          report.students.length > 0
+            ? Math.round(
+                report.students.reduce((s, st) => s + (st.averagePercentage ?? 0), 0) / report.students.length,
+              )
+            : 0;
+        items.push({
+          id: csId,
+          name: `${report.className} ${report.sectionName}`,
+          averagePercentage: avg,
+          studentCount: report.students.length,
+        });
+      }
+      return {
+        data: new AcademicComparisonDto({
+          type: 'class',
+          academicYearId: yearId,
+          items,
+        }),
+      };
+    }
+
+    if (subjectIds && subjectIds.length > 0) {
+      const filtered = subjectIds.filter((id) => allowedSubjects.includes(id));
+      for (const subId of filtered) {
+        const { data: subRow } = await supabase
+          .from('subjects')
+          .select('id, name')
+          .eq('id', subId)
+          .maybeSingle();
+        const name = (subRow as { name?: string } | null)?.name ?? 'Unknown';
+        const { data: report } = await this.getAcademicReportBySubject(subId, branchId, yearId, userId, userRoles);
+        const avg =
+          report.byClass.length > 0
+            ? Math.round(
+                report.byClass.reduce((s, c) => s + c.averagePercentage, 0) / report.byClass.length,
+              )
+            : 0;
+        const totalStudents = report.byClass.reduce((s, c) => s + c.studentCount, 0);
+        items.push({
+          id: subId,
+          name,
+          averagePercentage: avg,
+          studentCount: totalStudents,
+        });
+      }
+      return {
+        data: new AcademicComparisonDto({
+          type: 'subject',
+          academicYearId: yearId,
+          items,
+        }),
+      };
+    }
+
+    return {
+      data: new AcademicComparisonDto({
+        type: 'class',
+        academicYearId: yearId,
+        items: [],
+      }),
+    };
+  }
+
+  async exportAcademicReportPdf(
+    branchId: string,
+    academicYearId: string | undefined,
+    classSectionId: string | undefined,
+    subjectId: string | undefined,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<Buffer> {
+    if (classSectionId) {
+      const { data: report } = await this.getAcademicReportByClass(
+        classSectionId,
+        branchId,
+        academicYearId,
+        userId,
+        userRoles,
+      );
+      let htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+table{border-collapse:collapse;width:100%;} th,td{border:1px solid #333;padding:8px;text-align:left;}
+th{background:#eee;}
+</style></head>
+<body>
+<h2>Academic Report - ${this.escapeHtml(report.className)} ${this.escapeHtml(report.sectionName)}</h2>
+<table>
+<tr><th>Student</th><th>Attendance %</th><th>Average %</th></tr>
+`;
+      report.students.forEach((s) => {
+        htmlContent += `<tr><td>${this.escapeHtml(s.studentName)}</td><td>${s.attendancePercentage}%</td><td>${s.averagePercentage ?? '-'}%</td></tr>
+`;
+      });
+      htmlContent += `</table></body></html>`;
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+      try {
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        const pdf = await page.pdf({
+          format: 'A4',
+          margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+          printBackground: true,
+        });
+        return Buffer.from(pdf);
+      } finally {
+        await browser.close();
+      }
+    }
+    if (subjectId) {
+      const { data: report } = await this.getAcademicReportBySubject(
+        subjectId,
+        branchId,
+        academicYearId,
+        userId,
+        userRoles,
+      );
+      let htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+table{border-collapse:collapse;width:100%;} th,td{border:1px solid #333;padding:8px;text-align:left;}
+th{background:#eee;}
+</style></head>
+<body>
+<h2>Subject Report - ${this.escapeHtml(report.subjectName)}</h2>
+<table>
+<tr><th>Class</th><th>Section</th><th>Avg %</th><th>Students</th></tr>
+`;
+      report.byClass.forEach((c) => {
+        htmlContent += `<tr><td>${this.escapeHtml(c.className)}</td><td>${this.escapeHtml(c.sectionName)}</td><td>${c.averagePercentage}%</td><td>${c.studentCount}</td></tr>
+`;
+      });
+      htmlContent += `</table></body></html>`;
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+      try {
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        const pdf = await page.pdf({
+          format: 'A4',
+          margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+          printBackground: true,
+        });
+        return Buffer.from(pdf);
+      } finally {
+        await browser.close();
+      }
+    }
+    throw new BadRequestException('Provide classSectionId or subjectId for academic export');
+  }
+
+  async exportAcademicReportExcel(
+    branchId: string,
+    academicYearId: string | undefined,
+    classSectionId: string | undefined,
+    subjectId: string | undefined,
+    userId: string,
+    userRoles: string[] | undefined,
+  ): Promise<Buffer> {
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'NTG SMS';
+
+    if (classSectionId) {
+      const { data: report } = await this.getAcademicReportByClass(
+        classSectionId,
+        branchId,
+        academicYearId,
+        userId,
+        userRoles,
+      );
+      const ws = workbook.addWorksheet('Academic - Class');
+      ws.columns = [
+        { header: 'Student', key: 'name', width: 28 },
+        { header: 'Attendance %', key: 'attPct', width: 14 },
+        { header: 'Average %', key: 'avgPct', width: 12 },
+      ];
+      report.students.forEach((s) => {
+        ws.addRow({
+          name: s.studentName,
+          attPct: `${s.attendancePercentage}%`,
+          avgPct: s.averagePercentage != null ? `${s.averagePercentage}%` : '',
+        });
+      });
+      return (await workbook.xlsx.writeBuffer()) as Buffer;
+    }
+
+    if (subjectId) {
+      const { data: report } = await this.getAcademicReportBySubject(
+        subjectId,
+        branchId,
+        academicYearId,
+        userId,
+        userRoles,
+      );
+      const ws = workbook.addWorksheet('Academic - Subject');
+      ws.columns = [
+        { header: 'Class', key: 'className', width: 20 },
+        { header: 'Section', key: 'sectionName', width: 12 },
+        { header: 'Avg %', key: 'avg', width: 10 },
+        { header: 'Students', key: 'count', width: 10 },
+      ];
+      report.byClass.forEach((c) => {
+        ws.addRow({
+          className: c.className,
+          sectionName: c.sectionName,
+          avg: `${c.averagePercentage}%`,
+          count: c.studentCount,
+        });
+      });
+      return (await workbook.xlsx.writeBuffer()) as Buffer;
+    }
+
+    throw new BadRequestException('Provide classSectionId or subjectId for academic export');
   }
 
   async getClassReport(

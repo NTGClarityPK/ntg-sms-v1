@@ -8,6 +8,11 @@ import type {
   AttendanceSection,
   ClassReport,
   Rankings,
+  AttendanceReportByClass,
+  AttendanceSummaryBranch,
+  LowAttendanceReport,
+  AcademicReportBySubject,
+  AcademicComparison,
 } from '@/types/reports';
 import { ReportPeriodType } from '@/types/reports';
 import { useAuth } from './useAuth';
@@ -167,5 +172,159 @@ export function useClassStudentCounts(classSectionId: string | null, academicYea
     },
     enabled: !!classSectionId && !!branchId,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// --- Administrative Reports (no meta → return response.data) ---
+
+export function useAttendanceSummary(startDate: string | null, endDate: string | null) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['reports', 'attendance', 'summary', branchId, startDate, endDate],
+    queryFn: async (): Promise<AttendanceSummaryBranch | null> => {
+      if (!branchId || !startDate || !endDate) return null;
+      const params = new URLSearchParams({ startDate, endDate });
+      const response = await apiClient.get<AttendanceSummaryBranch>(
+        `/api/v1/reports/attendance/summary?${params}`,
+      );
+      return response.data;
+    },
+    enabled: !!branchId && !!startDate && !!endDate,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useLowAttendance(
+  startDate: string | null,
+  endDate: string | null,
+  threshold: number = 80,
+) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['reports', 'attendance', 'low', branchId, startDate, endDate, threshold],
+    queryFn: async (): Promise<LowAttendanceReport | null> => {
+      if (!branchId || !startDate || !endDate) return null;
+      const params = new URLSearchParams({ startDate, endDate, threshold: String(threshold) });
+      const response = await apiClient.get<LowAttendanceReport>(
+        `/api/v1/reports/attendance/low-attendance?${params}`,
+      );
+      return response.data;
+    },
+    enabled: !!branchId && !!startDate && !!endDate,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useAttendanceReportByClass(
+  classSectionId: string | null,
+  startDate: string | null,
+  endDate: string | null,
+  academicYearId?: string,
+) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: [
+      'reports',
+      'attendance',
+      'class',
+      classSectionId,
+      branchId,
+      startDate,
+      endDate,
+      academicYearId,
+    ],
+    queryFn: async (): Promise<AttendanceReportByClass | null> => {
+      if (!classSectionId || !branchId) return null;
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (academicYearId) params.append('academicYearId', academicYearId);
+      const q = params.toString();
+      const response = await apiClient.get<AttendanceReportByClass>(
+        `/api/v1/reports/attendance/class/${classSectionId}${q ? `?${q}` : ''}`,
+      );
+      return response.data;
+    },
+    enabled: !!classSectionId && !!branchId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useAcademicReportByClass(classSectionId: string | null, academicYearId?: string) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['reports', 'academic', 'class', classSectionId, branchId, academicYearId],
+    queryFn: async (): Promise<ClassReport | null> => {
+      if (!classSectionId || !branchId) return null;
+      const params = academicYearId ? `?academicYearId=${academicYearId}` : '';
+      const response = await apiClient.get<ClassReport>(
+        `/api/v1/reports/academic/class/${classSectionId}${params}`,
+      );
+      return response.data;
+    },
+    enabled: !!classSectionId && !!branchId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useAcademicReportBySubject(subjectId: string | null, academicYearId?: string) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['reports', 'academic', 'subject', subjectId, branchId, academicYearId],
+    queryFn: async (): Promise<AcademicReportBySubject | null> => {
+      if (!subjectId || !branchId) return null;
+      const params = academicYearId ? `?academicYearId=${academicYearId}` : '';
+      const response = await apiClient.get<AcademicReportBySubject>(
+        `/api/v1/reports/academic/subject/${subjectId}${params}`,
+      );
+      return response.data;
+    },
+    enabled: !!subjectId && !!branchId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useAcademicComparison(
+  classSectionIds: string[] | null,
+  subjectIds: string[] | null,
+  academicYearId?: string,
+) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: [
+      'reports',
+      'academic',
+      'comparison',
+      branchId,
+      academicYearId,
+      classSectionIds?.join(','),
+      subjectIds?.join(','),
+    ],
+    queryFn: async (): Promise<AcademicComparison | null> => {
+      if (!branchId) return null;
+      const params = new URLSearchParams();
+      if (academicYearId) params.append('academicYearId', academicYearId);
+      if (classSectionIds?.length) params.append('classSectionIds', classSectionIds.join(','));
+      if (subjectIds?.length) params.append('subjectIds', subjectIds.join(','));
+      const q = params.toString();
+      const response = await apiClient.get<AcademicComparison>(
+        `/api/v1/reports/academic/comparison${q ? `?${q}` : ''}`,
+      );
+      return response.data;
+    },
+    enabled: !!branchId && (!!classSectionIds?.length || !!subjectIds?.length),
+    staleTime: 2 * 60 * 1000,
   });
 }

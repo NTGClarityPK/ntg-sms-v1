@@ -1342,6 +1342,176 @@ export class AttendanceService {
     });
   }
 
+  /**
+   * Get per-student attendance for a class section within a date range (for admin reports).
+   * Single query for attendance + aggregate in memory; then student list and names.
+   */
+  async getAttendanceReportByClassSection(
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<{
+    classSectionId: string;
+    className: string;
+    sectionName: string;
+    startDate: string;
+    endDate: string;
+    students: Array<{
+      studentId: string;
+      presentDays: number;
+      absentDays: number;
+      lateDays: number;
+      excusedDays: number;
+      totalDays: number;
+      percentage: number;
+    }>;
+    classSummary: {
+      averageAttendance: number;
+      studentCount: number;
+      totalPresent: number;
+      totalAbsent: number;
+      totalLate: number;
+      totalExcused: number;
+    };
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: cs, error: csErr } = await supabase
+      .from('class_sections')
+      .select('id, class_id, section_id')
+      .eq('id', classSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId)
+      .maybeSingle();
+    throwIfDbError(csErr);
+    if (!cs) {
+      throw new NotFoundException('Class section not found');
+    }
+
+    const c = cs as { class_id: string; section_id: string };
+    let dateStart: string;
+    let dateEnd: string;
+    if (startDate && endDate) {
+      dateStart = startDate;
+      dateEnd = endDate;
+    } else {
+      const { data: yearRow, error: yearErr } = await supabase
+        .from('academic_years')
+        .select('start_date, end_date')
+        .eq('id', academicYearId)
+        .single();
+      throwIfDbError(yearErr);
+      if (!yearRow) throw new NotFoundException('Academic year not found');
+      dateStart = (yearRow as { start_date: string }).start_date;
+      dateEnd = (yearRow as { end_date: string }).end_date;
+    }
+
+    const [classRes, sectionRes, studentRows, attendanceRows] = await Promise.all([
+      supabase.from('classes').select('display_name').eq('id', c.class_id).single(),
+      supabase.from('sections').select('name').eq('id', c.section_id).single(),
+      supabase
+        .from('students')
+        .select('id')
+        .eq('class_id', c.class_id)
+        .eq('section_id', c.section_id)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', academicYearId)
+        .eq('is_active', true),
+      supabase
+        .from('attendance')
+        .select('student_id, status')
+        .eq('class_section_id', classSectionId)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', academicYearId)
+        .gte('date', dateStart)
+        .lte('date', dateEnd),
+    ]);
+
+    const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
+    const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
+    const students = (studentRows.data || []) as { id: string }[];
+    const attRows = (attendanceRows.data || []) as { student_id: string; status: string }[];
+
+    const byStudent = new Map<
+      string,
+      { present: number; absent: number; late: number; excused: number }
+    >();
+    for (const s of students) {
+      byStudent.set(s.id, { present: 0, absent: 0, late: 0, excused: 0 });
+    }
+    for (const row of attRows) {
+      const cur = byStudent.get(row.student_id);
+      if (!cur) continue;
+      if (row.status === 'present') cur.present += 1;
+      else if (row.status === 'absent') cur.absent += 1;
+      else if (row.status === 'late') cur.late += 1;
+      else if (row.status === 'excused') cur.excused += 1;
+    }
+
+    const studentResults: Array<{
+      studentId: string;
+      presentDays: number;
+      absentDays: number;
+      lateDays: number;
+      excusedDays: number;
+      totalDays: number;
+      percentage: number;
+    }> = [];
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let totalLate = 0;
+    let totalExcused = 0;
+
+    byStudent.forEach((counts, studentId) => {
+      const totalDays = counts.present + counts.absent + counts.late + counts.excused;
+      const percentage =
+        totalDays > 0
+          ? Math.round(((counts.present + counts.late) / totalDays) * 100)
+          : 0;
+      studentResults.push({
+        studentId,
+        presentDays: counts.present,
+        absentDays: counts.absent,
+        lateDays: counts.late,
+        excusedDays: counts.excused,
+        totalDays,
+        percentage,
+      });
+      totalPresent += counts.present;
+      totalAbsent += counts.absent;
+      totalLate += counts.late;
+      totalExcused += counts.excused;
+    });
+
+    const studentCount = studentResults.length;
+    const totalDaysAll = totalPresent + totalAbsent + totalLate + totalExcused;
+    const averageAttendance =
+      studentCount > 0 && totalDaysAll > 0
+        ? Math.round(
+            (studentResults.reduce((sum, s) => sum + s.percentage, 0) / studentCount),
+          )
+        : 0;
+
+    return {
+      classSectionId,
+      className,
+      sectionName,
+      startDate: dateStart,
+      endDate: dateEnd,
+      students: studentResults,
+      classSummary: {
+        averageAttendance,
+        studentCount,
+        totalPresent,
+        totalAbsent,
+        totalLate,
+        totalExcused,
+      },
+    };
+  }
+
   private async hydrateSingleAttendanceRow(row: AttendanceRow): Promise<AttendanceDto> {
     const supabase = this.supabaseConfig.getClient();
 

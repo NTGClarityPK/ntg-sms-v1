@@ -22,6 +22,8 @@ type BranchRow = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  public_stats_enabled?: boolean;
+  public_stats_password?: string | null;
 };
 
 function mapBranch(row: BranchRow): BranchDto {
@@ -37,6 +39,7 @@ function mapBranch(row: BranchRow): BranchDto {
     storageQuotaGb: row.storage_quota_gb,
     storageUsedBytes: row.storage_used_bytes,
     isActive: row.is_active,
+    publicStatsEnabled: row.public_stats_enabled ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -100,6 +103,53 @@ export class BranchesService {
       throw new NotFoundException('Branch not found');
     }
     return mapBranch(data as BranchRow);
+  }
+
+  async getByCode(code: string): Promise<{
+    id: string;
+    code: string | null;
+    public_stats_enabled: boolean;
+    public_stats_password: string | null;
+  } | null> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('branches')
+      .select('id, code, public_stats_enabled, public_stats_password')
+      .eq('code', code)
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!data) return null;
+    const row = data as {
+      id: string;
+      code: string | null;
+      public_stats_enabled: boolean | null;
+      public_stats_password: string | null;
+    };
+    return {
+      id: row.id,
+      code: row.code,
+      public_stats_enabled: row.public_stats_enabled ?? false,
+      public_stats_password: row.public_stats_password ?? null,
+    };
+  }
+
+  async updatePublicStats(
+    branchId: string,
+    enabled: boolean,
+    password: string | null | undefined,
+    userEmail: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    const payload: Record<string, unknown> = {
+      public_stats_enabled: enabled,
+      updated_at: new Date().toISOString(),
+      updated_by: userEmail,
+    };
+    if (password !== undefined) {
+      payload.public_stats_password = password;
+    }
+    const { error } = await supabase.from('branches').update(payload).eq('id', branchId);
+    throwIfDbError(error);
   }
 
   async create(input: CreateBranchDto, userEmail: string): Promise<BranchDto> {

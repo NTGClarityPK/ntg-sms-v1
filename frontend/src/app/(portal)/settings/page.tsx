@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -64,6 +64,7 @@ import { useTenantMe, useUpdateTenantMe } from '@/hooks/useTenant';
 import { useBranchById, useUpdateBranch } from '@/hooks/useBranches';
 import { SubjectTemplatesTabContent } from '@/components/features/settings/SubjectTemplatesTabContent';
 import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettingsPanel';
+import { PublicStatsSettings } from '@/components/features/settings/PublicStatsSettings';
 
 // Common timezones list with GMT offsets (matching RMS)
 const TIMEZONE_DATA = [
@@ -278,9 +279,14 @@ export default function SettingsPage() {
                   Inventory Management
                 </Tabs.Tab>
                 {isSchoolAdmin && (
-                  <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
-                    Theme Settings
-                  </Tabs.Tab>
+                  <>
+                    <Tabs.Tab value="public-statistics" leftSection={<IconChartBar size={16} />}>
+                      Public statistics
+                    </Tabs.Tab>
+                    <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
+                      Theme Settings
+                    </Tabs.Tab>
+                  </>
                 )}
               </Tabs.List>
 
@@ -330,9 +336,14 @@ export default function SettingsPage() {
               </Tabs.Panel>
 
               {isSchoolAdmin && (
-                <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">
-                  <ThemeSettingsPanel showTitle={false} />
-                </Tabs.Panel>
+                <>
+                  <Tabs.Panel value="public-statistics" pt="md" px="md" pb="md">
+                    <PublicStatsSettings />
+                  </Tabs.Panel>
+                  <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">
+                    <ThemeSettingsPanel showTitle={false} />
+                  </Tabs.Panel>
+                </>
               )}
             </Tabs>
           </>

@@ -116,3 +116,109 @@ export interface Rankings {
   subjectName: string;
   entries: RankingEntry[];
 }
+
+// Administrative attendance reports
+export interface AttendanceReportStudentRow {
+  studentId: string;
+  studentName: string;
+  presentDays: number;
+  absentDays: number;
+  lateDays: number;
+  excusedDays: number;
+  totalDays: number;
+  percentage: number;
+}
+
+export interface AttendanceReportByClass {
+  classSectionId: string;
+  className: string;
+  sectionName: string;
+  startDate: string;
+  endDate: string;
+  students: AttendanceReportStudentRow[];
+  classSummary: {
+    averageAttendance: number;
+    studentCount: number;
+    totalPresent: number;
+    totalAbsent: number;
+    totalLate: number;
+    totalExcused: number;
+  };
+}
+
+export interface AttendanceSummaryClassItem {
+  classSectionId: string;
+  className: string;
+  sectionName: string;
+  averageAttendance: number;
+  studentCount: number;
+  totalPresent: number;
+  totalAbsent: number;
+  totalLate: number;
+  totalExcused: number;
+}
+
+export interface AttendanceSummaryBranch {
+  startDate: string;
+  endDate: string;
+  byClass: AttendanceSummaryClassItem[];
+  overall: {
+    averageAttendance: number;
+    totalStudents: number;
+    totalPresent: number;
+    totalAbsent: number;
+    totalLate: number;
+    totalExcused: number;
+  };
+}
+
+export interface LowAttendanceStudent {
+  studentId: string;
+  studentName: string;
+  classSectionId: string;
+  className: string;
+  sectionName: string;
+  percentage: number;
+  presentDays: number;
+  absentDays: number;
+  totalDays: number;
+  belowThreshold: number;
+}
+
+export interface LowAttendanceReport {
+  startDate: string;
+  endDate: string;
+  threshold: number;
+  students: LowAttendanceStudent[];
+}
+
+// Administrative academic reports
+export interface SubjectClassPerformance {
+  classSectionId: string;
+  className: string;
+  sectionName: string;
+  averagePercentage: number;
+  studentCount: number;
+  topPerformers: Array<{ studentId: string; studentName: string; percentage: number }>;
+  struggling: Array<{ studentId: string; studentName: string; percentage: number }>;
+}
+
+export interface AcademicReportBySubject {
+  subjectId: string;
+  subjectName: string;
+  academicYearId: string;
+  byClass: SubjectClassPerformance[];
+}
+
+export interface AcademicComparisonItem {
+  id: string;
+  name: string;
+  averagePercentage: number;
+  studentCount: number;
+}
+
+export interface AcademicComparison {
+  type: 'class' | 'subject';
+  academicYearId: string;
+  items: AcademicComparisonItem[];
+}

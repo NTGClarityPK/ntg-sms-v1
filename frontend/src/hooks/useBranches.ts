@@ -20,6 +20,7 @@ export interface BranchDetails {
   storageQuotaGb: number;
   storageUsedBytes: number;
   isActive: boolean;
+  publicStatsEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -67,6 +68,34 @@ export function useUpdateBranch() {
       await qc.invalidateQueries({ queryKey: branchesKeys.byId(variables.id) });
       await qc.invalidateQueries({ queryKey: branchesKeys.byTenant() });
       await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+    },
+  });
+}
+
+export interface UpdatePublicStatsPayload {
+  enabled: boolean;
+  password?: string | null;
+}
+
+export function useUpdatePublicStats() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      branchId,
+      payload,
+    }: {
+      branchId: string;
+      payload: UpdatePublicStatsPayload;
+    }) => {
+      const res = await apiClient.put<{ success: boolean }>(
+        `/api/v1/branches/${branchId}/public-stats`,
+        payload,
+      );
+      return res;
+    },
+    onSuccess: async (_, variables) => {
+      await qc.invalidateQueries({ queryKey: branchesKeys.byId(variables.branchId) });
     },
   });
 }

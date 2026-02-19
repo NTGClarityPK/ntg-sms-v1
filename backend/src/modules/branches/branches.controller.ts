@@ -7,6 +7,7 @@ import { BranchDto } from './dto/branch.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { AssignBranchToTenantDto } from './dto/assign-branch-to-tenant.dto';
+import { UpdatePublicStatsDto } from './dto/update-public-stats.dto';
 import { AuthService } from '../auth/auth.service';
 
 @Controller('api/v1/branches')
@@ -37,6 +38,29 @@ export class BranchesController {
     const tenantId = branches.length > 0 ? branches[0].tenantId : null;
     
     return this.branchesService.listByTenant(tenantId, user.id);
+  }
+
+  @Put(':id/public-stats')
+  async updatePublicStats(
+    @Param('id') id: string,
+    @Body() body: UpdatePublicStatsDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: { success: boolean } }> {
+    const roleNames = user.roles || [];
+    const canEdit =
+      roleNames.includes('school_admin') ||
+      roleNames.includes('principal') ||
+      roleNames.includes('super_admin');
+    if (!canEdit) {
+      throw new ForbiddenException('Only school admin or principal can update public statistics');
+    }
+    await this.branchesService.updatePublicStats(
+      id,
+      body.enabled,
+      body.password,
+      user.email ?? '',
+    );
+    return { data: { success: true } };
   }
 
   @Get(':id/storage')

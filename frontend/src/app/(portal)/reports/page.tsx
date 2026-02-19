@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Group,
   Title,
@@ -16,7 +17,7 @@ import {
   Badge,
   Skeleton,
 } from '@mantine/core';
-import { IconUser, IconUsersGroup, IconChartBar } from '@tabler/icons-react';
+import { IconUser, IconUsersGroup, IconChartBar, IconReportAnalytics } from '@tabler/icons-react';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStudents, useMyStudent } from '@/hooks/useStudents';
 import { useAuth } from '@/hooks/useAuth';
@@ -73,8 +74,19 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
 
+  const router = useRouter();
   const { user } = useAuth();
   const isStudent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'student') ?? false;
+  const isParent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'parent') ?? false;
+  const isTeacher = user?.roles?.some((r) => {
+    const n = r.roleName?.toLowerCase();
+    return n === 'subject_teacher' || n === 'class_teacher';
+  }) ?? false;
+  const canManageReports = user?.roles?.some((r) => {
+    const n = r.roleName?.toLowerCase();
+    return n === 'school_admin' || n === 'principal' || n === 'academic_coordinator';
+  }) ?? false;
+  const showAdministrativeTab = !isParent && !isStudent && (isTeacher || canManageReports);
   const myStudentQuery = useMyStudent();
   const studentsQuery = useStudents({ limit: 100 });
   const classSectionsQuery = useClassSections({ limit: 100 });
@@ -126,6 +138,12 @@ export default function ReportsPage() {
     }
   }, [isStudent, myStudentQuery.data?.data, studentId]);
 
+  useEffect(() => {
+    if (activeTab === 'administrative') {
+      router.push('/reports/administrative');
+    }
+  }, [activeTab, router]);
+
   const report = classReportQuery.data;
 
   return (
@@ -157,6 +175,11 @@ export default function ReportsPage() {
             <Tabs.Tab value="public" leftSection={<IconChartBar size={16} />}>
               Public report
             </Tabs.Tab>
+            {showAdministrativeTab && (
+              <Tabs.Tab value="administrative" leftSection={<IconReportAnalytics size={16} />}>
+                Administrative
+              </Tabs.Tab>
+            )}
           </Tabs.List>
 
           <Tabs.Panel value="student" pt="md" px="md" pb="md">
@@ -384,6 +407,15 @@ export default function ReportsPage() {
               </Paper>
             </Stack>
           </Tabs.Panel>
+
+          {showAdministrativeTab && (
+            <Tabs.Panel value="administrative" pt="md" px="md" pb="md">
+              <Stack align="center" gap="md" py="xl">
+                <Skeleton height={24} width={200} />
+                <Skeleton height={16} width={160} />
+              </Stack>
+            </Tabs.Panel>
+          )}
         </Tabs>
       </div>
     </>
