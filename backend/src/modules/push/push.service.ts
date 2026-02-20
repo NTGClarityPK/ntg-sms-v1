@@ -40,6 +40,12 @@ export class PushService {
     }
   }
 
+  /**
+   * Register a push subscription for the current user.
+   * Ensures one endpoint = one user: if this endpoint was previously registered
+   * for another user (e.g. same device, different login), it is reassociated to
+   * the current user so the sender never receives their own message push.
+   */
   async subscribe(
     userId: string,
     endpoint: string,
@@ -47,6 +53,21 @@ export class PushService {
     auth: string,
   ): Promise<void> {
     const supabase = this.supabaseConfig.getClient();
+
+    // Reassociate this endpoint with the current user only (prevents same device
+    // receiving pushes for a different user, e.g. parent getting "message to admin").
+    const { error: deleteError } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint)
+      .neq('user_id', userId);
+
+    if (deleteError) {
+      throw new Error(
+        deleteError instanceof Error ? deleteError.message : 'Failed to reassociate subscription',
+      );
+    }
+
     const { error } = await supabase
       .from('push_subscriptions')
       .upsert(
@@ -89,7 +110,28 @@ export class PushService {
   }
 
   /**
+   * Remove a push subscription by endpoint (e.g. after 410 Gone / 404 Not Found).
+   */
+  async removeSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+  }
+
+  /**
+   * Unsubscribe current user from push (remove subscription by endpoint for this user).
+   */
+  async unsubscribe(userId: string, endpoint: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('endpoint', endpoint);
+  }
+
+  /**
    * Send Web Push to all subscriptions for a user. Fire-and-forget; errors are logged.
+   * Subscriptions that return 410 Gone or 404 Not Found are removed from the database.
    */
   sendPushToUser(userId: string, payload: PushPayload): void {
     if (!this.initialized) return;
@@ -114,14 +156,23 @@ export class PushService {
               },
             ),
           ),
-        );
+        ).then((results) => ({ results, subs }));
       })
-      .then((results) => {
+      .then(({ results, subs }) => {
+        const toRemove: string[] = [];
         results.forEach((r, i) => {
           if (r.status === 'rejected') {
-            // eslint-disable-next-line no-console
-            console.error('Push send failed:', r.reason);
+            const statusCode = (r.reason as { statusCode?: number } | undefined)?.statusCode;
+            if (statusCode === 410 || statusCode === 404) {
+              toRemove.push(subs[i].endpoint);
+            } else {
+              // eslint-disable-next-line no-console
+              console.error('Push send failed:', r.reason);
+            }
           }
+        });
+        toRemove.forEach((endpoint) => {
+          this.removeSubscriptionByEndpoint(endpoint).catch(() => {});
         });
       })
       .catch((err) => {

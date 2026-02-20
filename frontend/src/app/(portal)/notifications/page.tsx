@@ -12,9 +12,12 @@ import {
   Table,
   Skeleton,
   Chip,
+  Tabs,
+  Alert,
 } from '@mantine/core';
-import { IconBell, IconChecks } from '@tabler/icons-react';
+import { IconBell, IconChecks, IconBellRinging, IconBellOff, IconSettings } from '@tabler/icons-react';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '@/hooks/useNotifications';
+import { usePushSubscribe } from '@/hooks/usePushSubscribe';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRouter } from 'next/navigation';
 import type { Notification } from '@/types/notifications';
@@ -25,6 +28,14 @@ export default function NotificationsPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
+  const {
+    requestSubscribe,
+    disablePush,
+    isSupported: pushSupported,
+    permission: pushPermission,
+    isSubscribed: pushSubscribed,
+    isLoading: pushLoading,
+  } = usePushSubscribe();
 
   const { data: allNotificationsData, isLoading: isLoadingAll } = useNotifications({
     limit: 100,
@@ -215,35 +226,101 @@ export default function NotificationsPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Paper withBorder p="md">
-          {/* Multiselect filter chips (RMS New Order / Orders screen reference) */}
-          <Paper p="sm" withBorder mb="md">
-            <Group gap="xs" wrap="wrap" className="filter-chip-group">
-              <Chip
-                checked={selectedFilters.length === 0}
-                onChange={() => setSelectedFilters([])}
-                variant="filled"
-              >
-                All ({allNotifications.length})
-              </Chip>
-              <Chip.Group multiple value={selectedFilters} onChange={setSelectedFilters}>
-                <Group gap="xs" wrap="wrap">
-                  <Chip value="unread" variant="filled">
-                    Unread ({unreadCount})
-                  </Chip>
-                  <Chip value="read" variant="filled">
-                    Read ({readCount})
-                  </Chip>
-                  <Chip value="attendance" variant="filled">
-                    Attendance ({attendanceCount})
-                  </Chip>
-                </Group>
-              </Chip.Group>
-            </Group>
-          </Paper>
+        <Tabs defaultValue="all">
+          <Tabs.List>
+            <Tabs.Tab value="all" leftSection={<IconBell size={16} />}>
+              All notifications
+            </Tabs.Tab>
+            <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>
+              Notification settings
+            </Tabs.Tab>
+          </Tabs.List>
 
-          {renderNotificationsTable(filteredNotifications, isLoadingAll)}
-        </Paper>
+          <Tabs.Panel value="all" pt="md">
+            <Paper withBorder p="md">
+              <Paper p="sm" withBorder mb="md">
+                <Group gap="xs" wrap="wrap" className="filter-chip-group">
+                  <Chip
+                    checked={selectedFilters.length === 0}
+                    onChange={() => setSelectedFilters([])}
+                    variant="filled"
+                  >
+                    All ({allNotifications.length})
+                  </Chip>
+                  <Chip.Group multiple value={selectedFilters} onChange={setSelectedFilters}>
+                    <Group gap="xs" wrap="wrap">
+                      <Chip value="unread" variant="filled">
+                        Unread ({unreadCount})
+                      </Chip>
+                      <Chip value="read" variant="filled">
+                        Read ({readCount})
+                      </Chip>
+                      <Chip value="attendance" variant="filled">
+                        Attendance ({attendanceCount})
+                      </Chip>
+                    </Group>
+                  </Chip.Group>
+                </Group>
+              </Paper>
+              {renderNotificationsTable(filteredNotifications, isLoadingAll)}
+            </Paper>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="settings" pt="md">
+            <Paper withBorder p="md">
+              <Stack gap="md">
+                <Title order={3}>Push notifications</Title>
+                <Text size="sm" c="dimmed">
+                  Allow this app to show push notifications in your browser. You can enable or disable them below.
+                </Text>
+                {!pushSupported && (
+                  <Alert color="gray">
+                    Push notifications are not supported in this browser.
+                  </Alert>
+                )}
+                {pushSupported && (
+                  <Stack gap="sm">
+                    <Group gap="xs">
+                      <Text size="sm" fw={500}>Permission:</Text>
+                      <Badge variant="light" color={pushPermission === 'granted' ? 'green' : pushPermission === 'denied' ? 'red' : 'gray'}>
+                        {pushPermission}
+                      </Badge>
+                    </Group>
+                    <Group gap="xs">
+                      <Text size="sm" fw={500}>Push subscribed:</Text>
+                      <Badge variant="light" color={pushSubscribed ? 'green' : 'gray'}>
+                        {pushSubscribed ? 'Yes' : 'No'}
+                      </Badge>
+                    </Group>
+                    <Group gap="sm" mt="sm">
+                      <Button
+                        leftSection={<IconBellRinging size={16} />}
+                        onClick={() => requestSubscribe()}
+                        loading={pushLoading}
+                        disabled={pushSubscribed}
+                      >
+                        Allow notifications
+                      </Button>
+                      <Button
+                        variant="light"
+                        color="red"
+                        leftSection={<IconBellOff size={16} />}
+                        onClick={() => disablePush()}
+                        loading={pushLoading}
+                        disabled={!pushSubscribed}
+                      >
+                        Disable push notifications
+                      </Button>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      Click &quot;Allow notifications&quot; to trigger your browser&apos;s permission dialog. In Safari, you must click this button to enable push.
+                    </Text>
+                  </Stack>
+                )}
+              </Stack>
+            </Paper>
+          </Tabs.Panel>
+        </Tabs>
       </div>
     </>
   );

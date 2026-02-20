@@ -6,8 +6,10 @@ import { apiClient } from '@/lib/api-client';
 import { urlBase64ToUint8Array } from '@/lib/push/vapid';
 
 /**
- * When the user is authenticated, requests notification permission and subscribes
- * to Web Push, then sends the subscription to the backend. Renders nothing.
+ * When the user is authenticated and has already granted notification permission,
+ * ensures push subscription is registered. Does NOT call requestPermission() on load
+ * so Safari (and Firefox) work—they require a user gesture for the permission prompt.
+ * For first-time / Safari users, use the "Enable push notifications" button (usePushSubscribe).
  */
 export function PushSubscribe() {
   const subscribedRef = useRef(false);
@@ -16,6 +18,9 @@ export function PushSubscribe() {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       return;
     }
+    // Only auto-subscribe when permission was already granted (e.g. returning Chrome user).
+    // Never call requestPermission() here—Safari blocks it without a user gesture.
+    if (Notification.permission !== 'granted') return;
 
     const run = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -24,9 +29,6 @@ export function PushSubscribe() {
       const res = await apiClient.get<{ vapidPublicKey: string | null }>('/api/v1/push/vapid-public-key');
       const vapidPublicKey = res.data?.vapidPublicKey ?? null;
       if (!vapidPublicKey) return;
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return;
 
       try {
         const registration = await navigator.serviceWorker.ready;
@@ -46,7 +48,7 @@ export function PushSubscribe() {
         });
         subscribedRef.current = true;
       } catch {
-        // Permission denied or subscribe failed; ignore
+        // Subscribe failed; ignore
       }
     };
 

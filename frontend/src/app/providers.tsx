@@ -11,6 +11,8 @@ import { DynamicThemeProvider } from '@/components/providers/DynamicThemeProvide
 import { InstallPrompt } from '@/components/common/InstallPrompt';
 import { SyncProgressModal } from '@/components/common/SyncProgressModal';
 import { PushSubscribe } from '@/components/common/PushSubscribe';
+import { InstallAppProvider } from '@/lib/install-app-context';
+import { SafariInstallModal } from '@/components/common/SafariInstallModal';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeStore } from '@/lib/store/theme-store';
 
@@ -34,11 +36,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeWrapper>
-        <Notifications />
-        <InstallPrompt />
-        <SyncProgressModal />
-        <PushSubscribe />
-        {children}
+        <InstallAppProvider>
+          <Notifications />
+          <InstallPrompt />
+          <SafariInstallModal />
+          <SyncProgressModal />
+          <PushSubscribe />
+          {children}
+        </InstallAppProvider>
         <ReactQueryDevtools initialIsOpen={false} />
       </ThemeWrapper>
     </QueryClientProvider>

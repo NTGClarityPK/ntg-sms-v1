@@ -28,6 +28,29 @@ function throwIfDbError(error: PostgrestError | null): void {
   throw new BadRequestException(errorMessage);
 }
 
+/** Build push deep-link URL from notification type and data so tapping opens the right screen. */
+function pushUrlForType(type: string, data?: Record<string, unknown> | null): string {
+  if (data?.conversationId && typeof data.conversationId === 'string') {
+    return `/messages?conversation=${encodeURIComponent(data.conversationId)}`;
+  }
+  switch (type) {
+    case 'leave':
+    case 'leave_request_raised':
+      return '/leaves';
+    case 'early_departure':
+    case 'early_departure_request_raised':
+    case 'early_departure_excused':
+      return '/early-departure';
+    case 'uniform_request':
+    case 'uniform_request_raised':
+      return '/inventory/requests';
+    case 'attendance':
+      return '/attendance/child';
+    default:
+      return '/notifications';
+  }
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -266,6 +289,11 @@ export class NotificationsService {
     throwIfDbError(error);
   }
 
+  /**
+   * Create one in-app notification and send a web push for it.
+   * Every in-app notification triggers a push (when VAPID is configured) so the user
+   * gets it when the app is in background or closed.
+   */
   async createNotification(input: CreateNotificationDto): Promise<NotificationDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -300,10 +328,13 @@ export class NotificationsService {
       isCritical: row.is_critical ?? false,
       createdAt: row.created_at,
     });
+
+    // Always send push for this notification (shows when app is background/closed)
+    const pushUrl = pushUrlForType(input.type, input.data);
     this.pushService.sendPushToUser(input.userId, {
       title: input.title,
       body: input.body,
-      url: '/notifications',
+      url: pushUrl,
       tag: input.type,
     });
     return dto;

@@ -9,10 +9,10 @@ import {
   Badge,
   Group,
   Button,
+  Box,
 } from '@mantine/core';
 import { IconDownload } from '@tabler/icons-react';
 import type { Attendance } from '@/types/attendance';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 interface AttendanceReportProps {
   attendance: Attendance[];
@@ -27,8 +27,6 @@ export function AttendanceReport({
   startDate,
   endDate,
 }: AttendanceReportProps) {
-  const notifyColors = useThemeColors();
-
   if (isLoading) {
     return (
       <Paper withBorder p="xl">
@@ -50,21 +48,6 @@ export function AttendanceReport({
     total > 0
       ? Math.round(((presentCount + lateCount) / total) * 100)
       : 0;
-
-  const getStatusColor = (status: Attendance['status']) => {
-    switch (status) {
-      case 'present':
-        return notifyColors.success;
-      case 'absent':
-        return notifyColors.error;
-      case 'late':
-        return notifyColors.warning;
-      case 'excused':
-        return notifyColors.info;
-      default:
-        return notifyColors.primary;
-    }
-  };
 
   const handleExport = () => {
     // Future: Export to CSV/Excel
@@ -119,7 +102,7 @@ export function AttendanceReport({
           </Text>
         ) : null}
 
-        <Group grow>
+        <Group grow wrap="wrap" gap="sm">
           <Paper withBorder p="sm">
             <Stack gap="xs" align="center">
               <Text size="sm" c="dimmed">
@@ -135,8 +118,8 @@ export function AttendanceReport({
               <Text size="sm" c="dimmed">
                 Present
               </Text>
-              <Badge variant="light" color={notifyColors.success} size="lg">
-                {presentCount}
+              <Badge variant="filled" color="green" size="lg">
+                {String(presentCount)}
               </Badge>
             </Stack>
           </Paper>
@@ -145,8 +128,8 @@ export function AttendanceReport({
               <Text size="sm" c="dimmed">
                 Absent
               </Text>
-              <Badge variant="light" color={notifyColors.error} size="lg">
-                {absentCount}
+              <Badge variant="filled" color="red" size="lg">
+                {String(absentCount)}
               </Badge>
             </Stack>
           </Paper>
@@ -155,8 +138,8 @@ export function AttendanceReport({
               <Text size="sm" c="dimmed">
                 Late
               </Text>
-              <Badge variant="light" color={notifyColors.warning} size="lg">
-                {lateCount}
+              <Badge variant="filled" color="yellow" size="lg">
+                {String(lateCount)}
               </Badge>
             </Stack>
           </Paper>
@@ -177,40 +160,60 @@ export function AttendanceReport({
             No attendance records found for the selected filters
           </Text>
         ) : (
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Date</Table.Th>
-                <Table.Th>Student Name</Table.Th>
-                <Table.Th>Student ID</Table.Th>
-                <Table.Th>Class</Table.Th>
-                <Table.Th>Section</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Entry Time</Table.Th>
-                <Table.Th>Exit Time</Table.Th>
-                <Table.Th>Notes</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {attendance.map((record) => (
-                <Table.Tr key={`${record.id}-${record.date}-${record.studentId}`}>
-                  <Table.Td>{new Date(record.date).toLocaleDateString()}</Table.Td>
-                  <Table.Td>{record.studentName}</Table.Td>
-                  <Table.Td>{record.studentIdNumber || record.studentId}</Table.Td>
-                  <Table.Td>{record.className}</Table.Td>
-                  <Table.Td>{record.sectionName}</Table.Td>
-                  <Table.Td>
-                    <Badge variant="light" color={getStatusColor(record.status)}>
-                      {record.status.toUpperCase()}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>{record.entryTime || '-'}</Table.Td>
-                  <Table.Td>{record.exitTime || '-'}</Table.Td>
-                  <Table.Td>{record.notes || '-'}</Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+          <Box
+            style={{
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              margin: -4,
+              padding: 4,
+            }}
+          >
+            <Table striped highlightOnHover style={{ minWidth: 600 }}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Date</Table.Th>
+                    <Table.Th>Student Name</Table.Th>
+                    <Table.Th>Student ID</Table.Th>
+                    <Table.Th>Class</Table.Th>
+                    <Table.Th>Section</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Entry Time</Table.Th>
+                    <Table.Th>Exit Time</Table.Th>
+                    <Table.Th>Notes</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {attendance.map((record) => (
+                    <Table.Tr key={`${record.id}-${record.date}-${record.studentId}`}>
+                      <Table.Td>{new Date(record.date).toLocaleDateString()}</Table.Td>
+                      <Table.Td>{record.studentName}</Table.Td>
+                      <Table.Td>{record.studentIdNumber || record.studentId}</Table.Td>
+                      <Table.Td>{record.className}</Table.Td>
+                      <Table.Td>{record.sectionName}</Table.Td>
+                      <Table.Td>
+                        <Badge
+                          variant="filled"
+                          color={
+                            record.status === 'present'
+                              ? 'green'
+                              : record.status === 'absent'
+                                ? 'red'
+                                : record.status === 'late'
+                                  ? 'yellow'
+                                  : 'blue'
+                          }
+                        >
+                          {record.status.toUpperCase()}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>{record.entryTime || '-'}</Table.Td>
+                      <Table.Td>{record.exitTime || '-'}</Table.Td>
+                      <Table.Td>{record.notes || '-'}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+          </Box>
         )}
       </Stack>
     </Paper>

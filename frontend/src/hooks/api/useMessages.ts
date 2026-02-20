@@ -111,9 +111,9 @@ export function useSendMessage(conversationId: string | null) {
         queryKey: ['conversation-messages', conversationId],
       });
 
-      // Optimistically add message to cache IMMEDIATELY (synchronous)
+      const optimisticId = `temp-${Date.now()}`;
       const optimisticMessage: Message = {
-        id: `temp-${Date.now()}`,
+        id: optimisticId,
         conversationId,
         senderId: user.id,
         messageType: input.messageType ?? 'other',
@@ -125,7 +125,6 @@ export function useSendMessage(conversationId: string | null) {
       };
 
       // Update ALL matching queries IMMEDIATELY (synchronous)
-      // Use flushSync to ensure React processes the update synchronously and triggers immediate re-render
       flushSync(() => {
         queryClient.setQueriesData(
           {
@@ -144,21 +143,21 @@ export function useSendMessage(conversationId: string | null) {
               return { data: [optimisticMessage], meta: undefined };
             }
             const list = prev.data ?? [];
-            // API returns newest first; prepend so optimistic appears at bottom after .reverse()
             return { ...prev, data: [optimisticMessage, ...list] };
           },
         );
       });
 
-      // Cancel outgoing refetches AFTER optimistic update (non-blocking)
       queryClient.cancelQueries({ queryKey: ['conversation-messages', conversationId] }).catch(() => {});
 
-      return { previousData };
+      return { previousData, optimisticId };
     },
     onSuccess: (data, variables, context) => {
       if (!conversationId || !data) return;
 
-      // Replace optimistic message with real one from server
+      const optimisticId = context?.optimisticId as string | undefined;
+
+      // Replace only this mutation's optimistic message with the real one (keeps other in-flight messages visible)
       queryClient.setQueriesData(
         {
           predicate: (query) => {
@@ -174,10 +173,16 @@ export function useSendMessage(conversationId: string | null) {
         (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
           if (!prev) return { data: [data], meta: undefined };
           const list = prev.data ?? [];
-          const filtered = list.filter((m) => !m.id.startsWith('temp-'));
           // Already added by Realtime
-          if (filtered.some((m) => m.id === data.id)) return { ...prev, data: filtered };
-          // API returns newest first; put real message at front
+          if (list.some((m) => m.id === data.id)) {
+            const withoutThisTemp = optimisticId ? list.filter((m) => m.id !== optimisticId) : list;
+            return { ...prev, data: withoutThisTemp };
+          }
+          if (optimisticId) {
+            const next = list.map((m) => (m.id === optimisticId ? data : m));
+            return { ...prev, data: next };
+          }
+          const filtered = list.filter((m) => !m.id.startsWith('temp-'));
           return { ...prev, data: [data, ...filtered] };
         },
       );
@@ -185,8 +190,27 @@ export function useSendMessage(conversationId: string | null) {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (error, variables, context) => {
-      // Rollback optimistic update on error
-      if (context?.previousData) {
+      const optimisticId = context?.optimisticId as string | undefined;
+      if (optimisticId) {
+        // Remove only the failed optimistic message so other in-flight messages stay
+        queryClient.setQueriesData(
+          {
+            predicate: (query) => {
+              const key = query.queryKey;
+              return (
+                Array.isArray(key) &&
+                key.length >= 2 &&
+                key[0] === 'conversation-messages' &&
+                key[1] === conversationId
+              );
+            },
+          },
+          (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
+            if (!prev?.data) return prev;
+            return { ...prev, data: prev.data.filter((m) => m.id !== optimisticId) };
+          },
+        );
+      } else if (context?.previousData) {
         context.previousData.forEach(([queryKey, data]) => {
           queryClient.setQueryData(queryKey, data);
         });

@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { Avatar, Menu, Text, Group } from '@mantine/core';
-import { IconUser, IconSettings, IconLogout, IconSwitchHorizontal } from '@tabler/icons-react';
+import { IconUser, IconSettings, IconLogout, IconSwitchHorizontal, IconDownload } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { signOut } from '@/lib/auth';
+import { useInstallApp } from '@/lib/install-app-context';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
@@ -28,6 +29,17 @@ export function UserMenu() {
 
   const branches = (userTyped?.branches || []) as Branch[];
   const hasMultipleBranches = branches.length > 1;
+  const { promptInstall, canInstallDirectly, isSafari, isInstalled, setShowSafariModal } = useInstallApp();
+
+  const handleInstallApp = () => {
+    if (canInstallDirectly) {
+      void promptInstall();
+    } else if (isSafari && !isInstalled) {
+      setShowSafariModal(true);
+    }
+  };
+
+  const showInstallApp = !isInstalled && (canInstallDirectly || isSafari);
 
   const handleLogout = async () => {
     try {
@@ -109,6 +121,15 @@ export function UserMenu() {
         <Menu.Item leftSection={<IconSettings size={14} />} disabled>
           Settings
         </Menu.Item>
+
+        {showInstallApp && (
+          <Menu.Item
+            leftSection={<IconDownload size={14} />}
+            onClick={handleInstallApp}
+          >
+            Install app
+          </Menu.Item>
+        )}
         
         {hasMultipleBranches && (
           <>

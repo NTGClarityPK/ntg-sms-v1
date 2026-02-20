@@ -13,8 +13,9 @@ import {
   ActionIcon,
   Tooltip,
 } from '@mantine/core';
-import { IconCheck, IconChecks, IconBell, IconBellOff } from '@tabler/icons-react';
+import { IconCheck, IconChecks, IconBell, IconBellOff, IconBellRinging } from '@tabler/icons-react';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '@/hooks/useNotifications';
+import { usePushSubscribe } from '@/hooks/usePushSubscribe';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRouter } from 'next/navigation';
 import type { Notification } from '@/types/notifications';
@@ -37,6 +38,7 @@ export function NotificationDropdown({
   });
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
+  const { requestSubscribe, needsPermission, isLoading: pushLoading } = usePushSubscribe();
 
   // Show the latest few notifications (read + unread). The red bubble on the bell
   // still reflects the unread count via useUnreadCount.
@@ -143,6 +145,20 @@ export function NotificationDropdown({
       </Group>
 
       <Divider mb="sm" />
+
+      {needsPermission && (
+        <Button
+          variant="light"
+          fullWidth
+          size="sm"
+          leftSection={<IconBellRinging size={16} />}
+          onClick={() => requestSubscribe()}
+          loading={pushLoading}
+          mb="sm"
+        >
+          Enable push notifications
+        </Button>
+      )}
 
       {isLoading ? (
         <Stack gap="md" py="xl">

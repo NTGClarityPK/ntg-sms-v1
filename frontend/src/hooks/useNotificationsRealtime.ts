@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import type { Notification } from '@/types/notifications';
 import { notifications as mantineNotifications } from '@mantine/notifications';
@@ -26,17 +27,21 @@ function rowToNotification(row: Record<string, unknown>): Notification {
  * Subscribes to Supabase Realtime for the current user's notifications.
  * Updates React Query cache on INSERT and UPDATE so the notification dropdown
  * and unread count stay in sync without polling.
+ * Suppresses in-app toast/sound for message notifications when user is on /messages.
  */
 export function useNotificationsRealtime(
   userId: string | undefined,
   options?: { alertsEnabled?: boolean },
 ) {
   const queryClient = useQueryClient();
+  const pathname = usePathname();
   const colors = useThemeColors();
   const alertsEnabled = options?.alertsEnabled ?? true;
   const alertsEnabledRef = useRef<boolean>(alertsEnabled);
+  const pathnameRef = useRef<string>(pathname);
 
   alertsEnabledRef.current = alertsEnabled;
+  pathnameRef.current = pathname;
 
   useEffect(() => {
     if (!userId) return;
@@ -99,9 +104,10 @@ export function useNotificationsRealtime(
             queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count', userId] });
 
             // Alerts = toast + sound only. Realtime list/unread count updates above always run.
-            if (alertsEnabledRef.current && !notification.isRead) {
-              // Toast + sound alert (snackbar-style)
-              // Note: sound may be blocked until the user interacts with the page at least once.
+            // Do not show message toast/sound when user is on messages page (chat open).
+            const isOnMessagesPage = pathnameRef.current?.startsWith('/messages') === true;
+            const suppressMessageAlert = notification.type === 'message' && isOnMessagesPage;
+            if (alertsEnabledRef.current && !notification.isRead && !suppressMessageAlert) {
               mantineNotifications.show({
                 title: notification.title,
                 message: notification.body || 'You have a new notification.',

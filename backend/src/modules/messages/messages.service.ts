@@ -605,6 +605,7 @@ export class MessagesService {
     const senderName = (profile as { full_name: string | null } | null)?.full_name ?? 'Someone';
 
     try {
+      // Only notify recipients (recipientIds excludes sender); push is sent per recipient in createNotification.
       const notificationBody = (dto.body ?? '').trim().slice(0, 80) || 'New message';
       const notificationTitle = `Message from ${senderName}`;
       for (const recipientId of recipientIds) {

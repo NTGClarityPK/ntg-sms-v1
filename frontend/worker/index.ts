@@ -12,6 +12,8 @@ interface SWScope {
 }
 interface WindowClient {
   url: string;
+  visibilityState?: string;
+  focused?: boolean;
   navigate(url: string): Promise<WindowClient | null>;
   focus(): Promise<WindowClient>;
 }
@@ -32,8 +34,17 @@ self.addEventListener('push', (event: Event) => {
     body: payload.body ?? '',
     tag: payload.tag ?? 'notification',
     data: { url: payload.url ?? '/' },
+    requireInteraction: false,
   };
-  e.waitUntil(sw.registration.showNotification(title, options));
+  // Only show system notification when no window is visible (app closed or in background tab).
+  // When a window is visible, in-app toast (Realtime) is shown instead to avoid duplicate.
+  const promise = sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    const hasVisibleWindow = clientList.some((c) => (c as WindowClient).visibilityState === 'visible');
+    if (!hasVisibleWindow) {
+      return sw.registration.showNotification(title, options);
+    }
+  });
+  e.waitUntil(promise);
 });
 
 self.addEventListener('notificationclick', (event: Event) => {
