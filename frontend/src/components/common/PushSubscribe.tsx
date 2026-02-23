@@ -23,14 +23,14 @@ export function PushSubscribe() {
     if (Notification.permission !== 'granted') return;
 
     const run = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token || subscribedRef.current) return;
-
-      const res = await apiClient.get<{ vapidPublicKey: string | null }>('/api/v1/push/vapid-public-key');
-      const vapidPublicKey = res.data?.vapidPublicKey ?? null;
-      if (!vapidPublicKey) return;
-
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token || subscribedRef.current) return;
+
+        const res = await apiClient.get<{ vapidPublicKey: string | null }>('/api/v1/push/vapid-public-key');
+        const vapidPublicKey = res.data?.vapidPublicKey ?? null;
+        if (!vapidPublicKey) return;
+
         const registration = await navigator.serviceWorker.ready;
         const existing = await registration.pushManager.getSubscription();
         if (existing) {
@@ -48,7 +48,7 @@ export function PushSubscribe() {
         });
         subscribedRef.current = true;
       } catch {
-        // Subscribe failed; ignore
+        // API unreachable or subscribe failed; ignore
       }
     };
 

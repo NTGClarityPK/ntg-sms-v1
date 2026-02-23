@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Group,
   Title,
@@ -32,6 +32,7 @@ import { ExportButton } from '@/components/features/reports/ExportButton';
 import type { ClassSection } from '@/types/class-sections';
 import type { Student } from '@/types/students';
 import { ReportPeriodType } from '@/types/reports';
+import { AdministrativeReportContent } from '@/components/features/reports/AdministrativeReportContent';
 
 function getPeriodDates(period: string): { periodType: ReportPeriodType; startDate: string | null; endDate: string | null } {
   const now = new Date();
@@ -74,6 +75,7 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
 
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
   const isStudent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'student') ?? false;
@@ -139,10 +141,18 @@ export default function ReportsPage() {
   }, [isStudent, myStudentQuery.data?.data, studentId]);
 
   useEffect(() => {
-    if (activeTab === 'administrative') {
-      router.push('/reports/administrative');
+    const tab = searchParams.get('tab');
+    if (tab === 'administrative' && showAdministrativeTab) {
+      setActiveTab('administrative');
     }
-  }, [activeTab, router]);
+  }, [searchParams, showAdministrativeTab]);
+
+  const handleTabChange = (value: string | null) => {
+    setActiveTab(value);
+    if (value === 'administrative') {
+      router.replace('/reports?tab=administrative', { scroll: false });
+    }
+  };
 
   const report = classReportQuery.data;
 
@@ -164,7 +174,7 @@ export default function ReportsPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs value={activeTab} onChange={setActiveTab}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
           <Tabs.List>
             <Tabs.Tab value="student" leftSection={<IconUser size={16} />}>
               Student report
@@ -410,10 +420,7 @@ export default function ReportsPage() {
 
           {showAdministrativeTab && (
             <Tabs.Panel value="administrative" pt="md" px="md" pb="md">
-              <Stack align="center" gap="md" py="xl">
-                <Skeleton height={24} width={200} />
-                <Skeleton height={16} width={160} />
-              </Stack>
+              <AdministrativeReportContent />
             </Tabs.Panel>
           )}
         </Tabs>

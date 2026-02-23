@@ -36,6 +36,24 @@ export function useEvents(params: QueryEventsInput = {}) {
 }
 
 /**
+ * Hook to get counts of upcoming events and how many have conflicts
+ * (assessment or overlapping event). For admin dashboard.
+ */
+export function useUpcomingEventsConflictCount() {
+  return useQuery({
+    queryKey: ['events', 'upcoming-conflict-count'],
+    queryFn: async () => {
+      const response = await apiClient.get<{
+        totalUpcoming: number;
+        eventsWithConflicts: number;
+      }>('/api/v1/events/upcoming-conflict-count');
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+/**
  * Hook to get events for current user (role-aware)
  */
 export function useMyEvents() {

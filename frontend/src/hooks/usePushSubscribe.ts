@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { apiClient } from '@/lib/api-client';
 import { urlBase64ToUint8Array } from '@/lib/push/vapid';
+
+/** Cached VAPID key and SW registration so subscribe is fast after permission. */
+interface PushCache {
+  vapidPublicKey: string | null;
+  registration: ServiceWorkerRegistration | null;
+}
 
 /**
  * Push subscription state and user-triggered subscribe.
@@ -15,22 +21,51 @@ export function usePushSubscribe(options?: { enabled?: boolean }) {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const cacheRef = useRef<PushCache>({ vapidPublicKey: null, registration: null });
 
   const isSupported =
     typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
     'PushManager' in window;
 
+  /** Pre-warm VAPID and SW so subscribe is fast when user grants permission. */
+  useEffect(() => {
+    if (!enabled || !isSupported || typeof window === 'undefined') return;
+    const cache = cacheRef.current;
+    (async () => {
+      try {
+        const [vapidRes, registration] = await Promise.all([
+          apiClient.get<{ vapidPublicKey: string | null }>('/api/v1/push/vapid-public-key'),
+          navigator.serviceWorker.ready,
+        ]);
+        cache.vapidPublicKey = vapidRes.data?.vapidPublicKey ?? null;
+        cache.registration = registration;
+      } catch {
+        // ignore; performSubscribe will fetch again
+      }
+    })();
+  }, [enabled, isSupported]);
+
   const performSubscribe = useCallback(async () => {
     if (!isSupported) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
 
-    const res = await apiClient.get<{ vapidPublicKey: string | null }>('/api/v1/push/vapid-public-key');
-    const vapidPublicKey = res.data?.vapidPublicKey ?? null;
-    if (!vapidPublicKey) return;
+    const cache = cacheRef.current;
+    let vapidPublicKey = cache.vapidPublicKey;
+    let registration = cache.registration;
+    if (!vapidPublicKey) {
+      const res = await apiClient.get<{ vapidPublicKey: string | null }>('/api/v1/push/vapid-public-key');
+      vapidPublicKey = res.data?.vapidPublicKey ?? null;
+      if (vapidPublicKey) cache.vapidPublicKey = vapidPublicKey;
+    }
+    if (!registration) {
+      registration = await navigator.serviceWorker.ready;
+      cache.registration = registration;
+    }
+    if (!vapidPublicKey || !registration) return;
 
-    const registration = await navigator.serviceWorker.ready;
     const existing = await registration.pushManager.getSubscription();
     if (existing) {
       setIsSubscribed(true);
@@ -55,11 +90,17 @@ export function usePushSubscribe(options?: { enabled?: boolean }) {
     try {
       const perm = await Notification.requestPermission();
       setPermission(perm);
+      setIsLoading(false);
       if (perm !== 'granted') return;
-      await performSubscribe();
+      setIsSubscribing(true);
+      try {
+        await performSubscribe();
+      } catch {
+        // subscribe failed; permission still granted
+      } finally {
+        setIsSubscribing(false);
+      }
     } catch {
-      // Permission denied or subscribe failed
-    } finally {
       setIsLoading(false);
     }
   }, [isSupported, performSubscribe]);
@@ -113,6 +154,7 @@ export function usePushSubscribe(options?: { enabled?: boolean }) {
     permission,
     isSubscribed,
     isLoading,
+    isSubscribing,
     needsPermission: isSupported && permission !== 'granted',
   };
 }

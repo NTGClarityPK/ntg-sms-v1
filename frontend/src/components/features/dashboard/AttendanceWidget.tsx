@@ -27,7 +27,12 @@ interface ClassSection {
   classTeacherId?: string;
 }
 
-export function AttendanceWidget() {
+interface AttendanceWidgetProps {
+  /** When true, omit outer Paper and title (for use inside WidgetContainer) */
+  embedded?: boolean;
+}
+
+export function AttendanceWidget({ embedded }: AttendanceWidgetProps = {}) {
   const { user } = useAuth();
   const notifyColors = useThemeColors();
 
@@ -59,15 +64,14 @@ export function AttendanceWidget() {
   }
 
   if (isLoading) {
-    return (
-      <Paper withBorder p="md">
-        <Stack gap="md">
-          <Skeleton height={30} width="60%" />
-          <Skeleton height={100} />
-          <Skeleton height={40} />
-        </Stack>
-      </Paper>
+    const content = (
+      <Stack gap="md">
+        <Skeleton height={30} width="60%" />
+        <Skeleton height={100} />
+        <Skeleton height={40} />
+      </Stack>
     );
+    return embedded ? content : <Paper withBorder p="md">{content}</Paper>;
   }
 
   const summary = summaryData || null;
@@ -77,9 +81,9 @@ export function AttendanceWidget() {
   const total = summary?.totalDays || 0;
   const percentage = summary?.percentage || 0;
 
-  return (
-    <Paper withBorder p="md">
-      <Stack gap="md">
+  const content = (
+    <Stack gap="md">
+      {!embedded && (
         <Group justify="space-between">
           <Stack gap={2}>
             <Text fw={500} size="lg">
@@ -91,6 +95,7 @@ export function AttendanceWidget() {
             </Text>
           </Stack>
         </Group>
+      )}
 
         {total === 0 ? (
           <Alert color={notifyColors.warning}>
@@ -137,6 +142,7 @@ export function AttendanceWidget() {
           </>
         )}
 
+      {!embedded && (
         <Group grow>
           <Button
             component={Link}
@@ -155,8 +161,9 @@ export function AttendanceWidget() {
             View History
           </Button>
         </Group>
-      </Stack>
-    </Paper>
+      )}
+    </Stack>
   );
+  return embedded ? content : <Paper withBorder p="md">{content}</Paper>;
 }
 

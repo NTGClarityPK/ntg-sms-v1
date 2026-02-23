@@ -1,0 +1,593 @@
+'use client';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Title,
+  Stack,
+  Table,
+  Group,
+  Badge,
+  Text,
+  Paper,
+  Skeleton,
+  Alert,
+  Grid,
+  Select,
+  Card,
+} from '@mantine/core';
+import { DateInput } from '@mantine/dates';
+import { IconAlertCircle, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react';
+import {
+  inventoryApi,
+  Ingredient,
+  StockTransaction,
+} from '@/lib/api/inventory';
+import { useLanguageStore } from '@/lib/store/language-store';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { useBranchStore } from '@/lib/store/branch-store';
+import { t } from '@/lib/utils/translations';
+import { useBranches } from '@/lib/hooks/use-branches';
+import { useInventoryRefresh } from '@/lib/contexts/inventory-refresh-context';
+import { useErrorColor, useSuccessColor, useWarningColor } from '@/lib/hooks/use-theme-colors';
+import { useThemeColor } from '@/lib/hooks/use-theme-color';
+import { getWarningColor, getBadgeColorForText } from '@/lib/utils/theme';
+import { useCurrency } from '@/lib/hooks/use-currency';
+import { formatCurrency } from '@/lib/utils/currency-formatter';
+import { INGREDIENT_CATEGORIES } from '@/shared/constants/ingredients.constants';
+
+const CATEGORIES = [
+  { value: '', label: 'All Categories' },
+  ...INGREDIENT_CATEGORIES,
+];
+
+export function InventoryReportsPage() {
+  const { language } = useLanguageStore();
+  const { user } = useAuthStore();
+  const { selectedBranchId } = useBranchStore();
+  const { refreshKey } = useInventoryRefresh();
+  const currency = useCurrency();
+  const errorColor = useErrorColor();
+  const successColor = useSuccessColor();
+  const warningColor = useWarningColor();
+  const primaryColor = useThemeColor();
+  const [currentStock, setCurrentStock] = useState<any[]>([]);
+  const [lowStockAlerts, setLowStockAlerts] = useState<Ingredient[]>([]);
+  const [stockMovement, setStockMovement] = useState<StockTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('current-stock');
+  const { branches } = useBranches(); // Use shared cached hook
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('');
+
+  // Note: loadBranches removed - using useBranches hook instead
+  const loadingRef = useRef(false);
+  const lastLoadParamsRef = useRef<string>('');
+
+  const loadCurrentStock = useCallback(async () => {
+    if (!user?.tenantId) return;
+
+    try {
+      const filters: any = {};
+      if (categoryFilter) filters.category = categoryFilter;
+      if (lowStockOnly) filters.lowStockOnly = true;
+      // Use selectedBranchFilter if set and not 'all', otherwise use selectedBranchId from store
+      // When 'all' is selected, don't pass branchId to get aggregate report
+      const branchIdToUse = selectedBranchFilter === 'all' 
+        ? undefined 
+        : (selectedBranchFilter || selectedBranchId || undefined);
+      if (branchIdToUse) filters.branchId = branchIdToUse;
+
+      const serverData = await inventoryApi.getCurrentStockReport(filters, language);
+      setCurrentStock(serverData);
+    } catch (err: any) {
+      console.error('Failed to load current stock:', err);
+    }
+  }, [user?.tenantId, categoryFilter, lowStockOnly, selectedBranchId, selectedBranchFilter, language]);
+
+  const loadLowStockAlerts = useCallback(async () => {
+    if (!user?.tenantId) return;
+
+    try {
+      // Use selectedBranchFilter if set and not 'all', otherwise use selectedBranchId from store
+      // When 'all' is selected, don't pass branchId to get aggregate report
+      const branchIdToUse = selectedBranchFilter === 'all' 
+        ? undefined 
+        : (selectedBranchFilter || selectedBranchId || undefined);
+      const serverData = await inventoryApi.getLowStockAlerts(branchIdToUse, language);
+      setLowStockAlerts(serverData);
+    } catch (err: any) {
+      console.error('Failed to load low stock alerts:', err);
+    }
+  }, [user?.tenantId, selectedBranchId, selectedBranchFilter, language]);
+
+  const loadStockMovement = useCallback(async () => {
+    if (!user?.tenantId) return;
+
+    try {
+      const filters: any = {};
+      // Use selectedBranchFilter if set and not 'all', otherwise use selectedBranchId from store
+      // When 'all' is selected, don't pass branchId to get aggregate report
+      const branchIdToUse = selectedBranchFilter === 'all' 
+        ? undefined 
+        : (selectedBranchFilter || selectedBranchId || undefined);
+      if (branchIdToUse) filters.branchId = branchIdToUse;
+      if (startDate) filters.startDate = startDate.toISOString().split('T')[0];
+      if (endDate) filters.endDate = endDate.toISOString().split('T')[0];
+
+      const serverData = await inventoryApi.getStockMovementReport(filters, language);
+      setStockMovement(serverData);
+    } catch (err: any) {
+      console.error('Failed to load stock movement:', err);
+    }
+  }, [user?.tenantId, selectedBranchId, selectedBranchFilter, startDate, endDate, language]);
+
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    if (loadingRef.current) return; // Prevent duplicate calls
+
+    // Create a key from all relevant parameters
+    const paramsKey = JSON.stringify({
+      categoryFilter,
+      lowStockOnly,
+      selectedBranchId,
+      selectedBranchFilter,
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      language,
+      refreshKey,
+    });
+
+    // Skip if same parameters are being loaded
+    if (paramsKey === lastLoadParamsRef.current) {
+      return;
+    }
+
+    const loadData = async () => {
+      loadingRef.current = true;
+      lastLoadParamsRef.current = paramsKey;
+      
+      try {
+        setLoading(true);
+        await Promise.all([loadCurrentStock(), loadLowStockAlerts(), loadStockMovement()]);
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    };
+    
+    loadData();
+  }, [
+    user?.tenantId,
+    categoryFilter,
+    lowStockOnly,
+    selectedBranchId,
+    selectedBranchFilter,
+    startDate,
+    endDate,
+    language,
+    refreshKey,
+    loadCurrentStock,
+    loadLowStockAlerts,
+    loadStockMovement,
+  ]);
+
+  // Calculate summary statistics
+  const totalStockValue = currentStock.reduce((sum, item) => sum + (item.stockValue || 0), 0);
+  const totalLowStockItems = lowStockAlerts.length;
+  const totalIngredients = currentStock.length;
+
+  const getTransactionTypeLabel = (type: string) => {
+    const typeMap: Record<string, string> = {
+      purchase: t('inventory.purchase', language),
+      usage: t('inventory.usage', language),
+      adjustment: t('inventory.adjustment', language),
+      transfer_in: t('inventory.transferIn', language),
+      transfer_out: t('inventory.transferOut', language),
+      waste: t('inventory.waste', language),
+    };
+    return typeMap[type] || type;
+  };
+
+  // Helper function to get translated ingredient name
+  // The backend already returns translated names, so we just use the name from the data
+  const getTranslatedIngredientName = useCallback((ingredientId: string | undefined, fallbackName: string | undefined): string => {
+    if (!fallbackName) return '';
+    // Backend already returns translated names based on the language parameter
+    return fallbackName;
+  }, []);
+
+  // Helper function to translate unit of measurement
+  const getTranslatedUnit = useCallback((unit: string | undefined | null): string => {
+    if (!unit) return '';
+    
+    // Try exact match first
+    let translated = t(`inventory.${unit}` as any, language);
+    // Check if translation was found (not the key itself)
+    if (translated && translated !== `inventory.${unit}`) {
+      // Check if it's a non-ASCII translation (Arabic, Kurdish) or different from original
+      const hasNonAscii = /[^\x00-\x7F]/.test(translated);
+      if (hasNonAscii || translated.toLowerCase() !== unit.toLowerCase()) {
+        return translated;
+      }
+    }
+    
+    // Try uppercase version
+    const upperUnit = unit.toUpperCase();
+    if (upperUnit !== unit) {
+      translated = t(`inventory.${upperUnit}` as any, language);
+      if (translated && translated !== `inventory.${upperUnit}`) {
+        const hasNonAscii = /[^\x00-\x7F]/.test(translated);
+        if (hasNonAscii || translated.toLowerCase() !== upperUnit.toLowerCase()) {
+          return translated;
+        }
+      }
+    }
+    
+    // Try lowercase version
+    const lowerUnit = unit.toLowerCase();
+    if (lowerUnit !== unit && lowerUnit !== upperUnit) {
+      translated = t(`inventory.${lowerUnit}` as any, language);
+      if (translated && translated !== `inventory.${lowerUnit}`) {
+        const hasNonAscii = /[^\x00-\x7F]/.test(translated);
+        if (hasNonAscii || translated.toLowerCase() !== lowerUnit.toLowerCase()) {
+          return translated;
+        }
+      }
+    }
+    
+    // If no translation found, return original
+    return unit;
+  }, [language]);
+
+  // Helper function to translate reason text (e.g., auto deduction messages)
+  const getTranslatedReason = useCallback((reason: string | undefined | null): string => {
+    if (!reason) return '-';
+    
+    // Check if it's an auto deduction token message (new format)
+    const autoDeductionMatch = reason.match(/^AUTO_DEDUCTION_TOKEN:(\d+)$/);
+    if (autoDeductionMatch) {
+      const tokenNumber = autoDeductionMatch[1];
+      const translated = t('inventory.autoDeductionToken', language);
+      return translated.replace('{token}', tokenNumber);
+    }
+    
+    // Check if it's an auto deduction token message (old format for backward compatibility)
+    const oldFormatMatch = reason.match(/^Auto deduction - Token: (\d+)$/);
+    if (oldFormatMatch) {
+      const tokenNumber = oldFormatMatch[1];
+      const translated = t('inventory.autoDeductionToken', language);
+      return translated.replace('{token}', tokenNumber);
+    }
+    
+    // Normalize reason for case-insensitive matching
+    const normalizedReason = reason.trim();
+    const lowerReason = normalizedReason.toLowerCase();
+    
+    // Map common reason values to translation keys
+    const reasonMap: Record<string, string> = {
+      'damaged': 'inventory.damaged',
+      'adding stock': 'inventory.addingStock',
+      'low stock': 'inventory.lowStock',
+      'new day': 'inventory.newDay',
+      'purchase': 'inventory.purchase',
+      'usage': 'inventory.usage',
+      'adjustment': 'inventory.adjustment',
+    };
+    
+    // Check if we have a translation for this reason
+    const translationKey = reasonMap[lowerReason];
+    if (translationKey) {
+      const translated = t(translationKey as any, language);
+      // Return translation if it exists and is different from the key
+      if (translated && translated !== translationKey) {
+        return translated;
+      }
+    }
+    
+    // Try direct translation with inventory prefix
+    const directTranslation = t(`inventory.${normalizedReason}` as any, language);
+    if (directTranslation && directTranslation !== `inventory.${normalizedReason}`) {
+      return directTranslation;
+    }
+    
+    // Return original reason if no translation found
+    return reason;
+  }, [language]);
+
+  return (
+    <Stack gap="md">
+
+      {/* Summary Cards */}
+      <Grid mb="xl">
+        <Grid.Col span={{ base: 12, md: 4 }}>
+          <Card withBorder>
+            <Stack gap="xs">
+              <Text size="sm" c="dimmed">{t('inventory.totalIngredients', language) || 'Total Ingredients'}</Text>
+              <Text size="xl" fw={700} style={{ color: primaryColor }}>
+                {totalIngredients}
+              </Text>
+            </Stack>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, md: 4 }}>
+          <Card withBorder>
+            <Stack gap="xs">
+              <Text size="sm" c="dimmed">{t('inventory.totalStockValue', language) || 'Total Stock Value'}</Text>
+              <Text size="xl" fw={700} style={{ color: successColor }}>
+                {formatCurrency(totalStockValue, currency)}
+              </Text>
+            </Stack>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, md: 4 }}>
+          <Card withBorder>
+            <Stack gap="xs">
+              <Text size="sm" c="dimmed">{t('inventory.lowStockItems', language) || 'Low Stock Items'}</Text>
+              <Text size="xl" fw={700} style={{ color: totalLowStockItems > 0 ? warningColor : successColor }}>
+                {totalLowStockItems}
+              </Text>
+            </Stack>
+          </Card>
+        </Grid.Col>
+      </Grid>
+
+      {/* Low Stock Alerts */}
+      {lowStockAlerts.length > 0 && (
+        <Alert
+          icon={<IconAlertCircle size={16} />}
+          color={warningColor}
+          mb="xl"
+          title={t('inventory.lowStockAlerts', language)}
+        >
+          <Stack gap="xs">
+            {lowStockAlerts.slice(0, 5).map((ingredient) => {
+              const deficit = ingredient.minimumThreshold - ingredient.currentStock;
+              return (
+                <Text key={ingredient.id} size="sm">
+                  • {getTranslatedIngredientName(ingredient.id, ingredient.name)}: {ingredient.currentStock} {getTranslatedUnit(ingredient.unitOfMeasurement)} 
+                  ({t('inventory.stockDeficit', language)}: {deficit} {getTranslatedUnit(ingredient.unitOfMeasurement)})
+                </Text>
+              );
+            })}
+            {lowStockAlerts.length > 5 && (
+              <Text size="sm" c="dimmed">
+                + {lowStockAlerts.length - 5} {t('inventory.moreItems', language) || 'more items'}
+              </Text>
+            )}
+          </Stack>
+        </Alert>
+      )}
+
+      {/* Filters */}
+      <Paper p="md" withBorder mb="md">
+        <Grid>
+          <Grid.Col span={{ base: 12, md: 3 }}>
+            <Select
+              label={t('reports.filterByBranch' as any, language) || t('inventory.branch' as any, language) || 'Branch'}
+              data={branches.map((b) => ({
+                value: b.value || '',
+                label: String(b.label || ''),
+              }))}
+              value={selectedBranchFilter}
+              onChange={(value) => setSelectedBranchFilter(value || '')}
+              clearable
+              placeholder={t('reports.allBranches' as any, language) || 'All Branches'}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 3 }}>
+            <Select
+              label={t('inventory.category', language)}
+              data={CATEGORIES.map(cat => ({
+                value: cat.value,
+                label: cat.value ? (t(`inventory.${cat.value}` as any, language) || cat.label) : t('inventory.allCategories', language)
+              }))}
+              value={categoryFilter}
+              onChange={(value) => setCategoryFilter(value || '')}
+              clearable
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 2 }}>
+            <DateInput
+              label={t('inventory.startDate', language)}
+              value={startDate}
+              onChange={setStartDate}
+              clearable
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 2 }}>
+            <DateInput
+              label={t('inventory.endDate', language)}
+              value={endDate}
+              onChange={setEndDate}
+              clearable
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 2 }}>
+            <Select
+              label={(t('common.filter' as any, language) || 'Filter')}
+              data={[
+                { value: 'all', label: t('inventory.allItems', language) || 'All Items' },
+                { value: 'lowStock', label: t('inventory.lowStockOnly' as any, language) || 'Low Stock Only' },
+              ]}
+              value={lowStockOnly ? 'lowStock' : 'all'}
+              onChange={(value) => setLowStockOnly(value === 'lowStock')}
+            />
+          </Grid.Col>
+        </Grid>
+      </Paper>
+
+      {/* Current Stock Report */}
+      {loading ? (
+        <Stack gap="md">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Paper key={i} p="md" withBorder>
+              <Skeleton height={20} width="100%" mb="xs" />
+              <Skeleton height={16} width="60%" />
+            </Paper>
+          ))}
+        </Stack>
+      ) : (
+        <Table.ScrollContainer minWidth={1000}>
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('inventory.ingredientName', language)}</Table.Th>
+                <Table.Th>{t('inventory.category', language)}</Table.Th>
+                <Table.Th>{t('inventory.currentStock', language)}</Table.Th>
+                <Table.Th>{t('inventory.minimumThreshold', language)}</Table.Th>
+                <Table.Th>{t('inventory.costPerUnit', language)}</Table.Th>
+                <Table.Th>{t('inventory.stockValue', language)}</Table.Th>
+                <Table.Th>{(t('common.status' as any, language) || 'Status')}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {currentStock.map((item) => (
+                <Table.Tr key={item.id}>
+                  <Table.Td>
+                    <Text fw={500}>
+                      {getTranslatedIngredientName(item.id, item.name)}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {item.category ? (
+                      <Badge variant="light" color={getBadgeColorForText(t(`inventory.${item.category}` as any, language) || item.category)}>
+                        {t(`inventory.${item.category}` as any, language) || item.category}
+                      </Badge>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <Text>{item.currentStock} {getTranslatedUnit(item.unitOfMeasurement)}</Text>
+                      {item.isLowStock && (
+                        <Badge variant="light" color={getBadgeColorForText(t('inventory.isLowStock', language))} size="sm">
+                          {t('inventory.isLowStock', language)}
+                        </Badge>
+                      )}
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text>{item.minimumThreshold} {getTranslatedUnit(item.unitOfMeasurement)}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {formatCurrency(item.costPerUnit || 0, currency)}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text fw={500}>
+                      {formatCurrency(item.stockValue || 0, currency)}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge variant="light" color={getBadgeColorForText(item.isLowStock ? t('inventory.isLowStock', language) : (t('common.active' as any, language) || 'Active'))}>
+                      {item.isLowStock ? t('inventory.isLowStock', language) : (t('common.active' as any, language) || 'Active')}
+                    </Badge>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+      )}
+
+      {/* Stock Movement Report Section */}
+      <Title order={3} mt="xl" mb="md">{t('inventory.stockMovementReport', language)}</Title>
+
+      {loading ? (
+        <Stack gap="md">
+          {[1, 2, 3].map((i) => (
+            <Paper key={i} p="md" withBorder>
+              <Skeleton height={20} width="100%" mb="xs" />
+              <Skeleton height={16} width="60%" />
+            </Paper>
+          ))}
+        </Stack>
+      ) : stockMovement.length === 0 ? (
+        <Paper p="xl" withBorder>
+          <Text ta="center" c="dimmed">
+            {t('inventory.noTransactions', language)}
+          </Text>
+        </Paper>
+      ) : (
+        <Table.ScrollContainer minWidth={1000}>
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('inventory.transactionDate', language)}</Table.Th>
+                <Table.Th>{t('inventory.ingredient', language)}</Table.Th>
+                <Table.Th>{t('inventory.transactionType', language)}</Table.Th>
+                <Table.Th>{t('inventory.quantity', language)}</Table.Th>
+                <Table.Th>{t('inventory.unitCost', language)}</Table.Th>
+                <Table.Th>{t('inventory.totalCost', language)}</Table.Th>
+                <Table.Th>{t('inventory.reason', language)}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {stockMovement.map((tx) => (
+                <Table.Tr key={tx.id}>
+                  <Table.Td>
+                    <Text size="sm">
+                      {new Date(tx.transactionDate).toLocaleDateString(language === 'ar' ? 'ar' : 'en')}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {tx.ingredient ? (
+                      <Text fw={500}>
+                        {getTranslatedIngredientName(tx.ingredientId, tx.ingredient?.name)}
+                      </Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge
+                      variant="light"
+                      color={getBadgeColorForText(getTransactionTypeLabel(tx.transactionType))}
+                    >
+                      {getTransactionTypeLabel(tx.transactionType)}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      {tx.quantity > 0 ? (
+                        <IconTrendingUp size={14} color={primaryColor} />
+                      ) : (
+                        <IconTrendingDown size={14} color={primaryColor} />
+                      )}
+                      <Text fw={tx.quantity > 0 ? 500 : undefined} c={tx.quantity < 0 ? errorColor : undefined}>
+                        {tx.quantity > 0 ? '+' : ''}{tx.quantity}
+                      </Text>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    {tx.unitCost ? (
+                      <Text>{formatCurrency(tx.unitCost, currency)}</Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {tx.totalCost ? (
+                      <Text fw={500}>
+                        {formatCurrency(tx.totalCost, currency)}
+                      </Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{getTranslatedReason(tx.reason)}</Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+      )}
+    </Stack>
+  );
+}
+

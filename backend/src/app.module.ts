@@ -43,6 +43,7 @@ import { UniformRequestsModule } from './modules/uniform-requests/uniform-reques
 import { UniformIssuancesModule } from './modules/uniform-issuances/uniform-issuances.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { PushModule } from './modules/push/push.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { PushModule } from './modules/push/push.module';
     UniformIssuancesModule,
     StorageModule,
     PushModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [

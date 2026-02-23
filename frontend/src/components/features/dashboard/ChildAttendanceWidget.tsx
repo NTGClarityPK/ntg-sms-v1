@@ -25,7 +25,12 @@ interface Child {
   studentName?: string;
 }
 
-export function ChildAttendanceWidget() {
+interface ChildAttendanceWidgetProps {
+  /** When true, omit outer Paper and title (for use inside WidgetContainer) */
+  embedded?: boolean;
+}
+
+export function ChildAttendanceWidget({ embedded }: ChildAttendanceWidgetProps = {}) {
   const { user } = useAuth();
   const userTyped = user as User | undefined;
   const notifyColors = useThemeColors();
@@ -63,15 +68,14 @@ export function ChildAttendanceWidget() {
   }
 
   if (isLoading) {
-    return (
-      <Paper withBorder p="md">
-        <Stack gap="md">
-          <Skeleton height={30} width="60%" />
-          <Skeleton height={100} />
-          <Skeleton height={40} />
-        </Stack>
-      </Paper>
+    const content = (
+      <Stack gap="md">
+        <Skeleton height={30} width="60%" />
+        <Skeleton height={100} />
+        <Skeleton height={40} />
+      </Stack>
     );
+    return embedded ? content : <Paper withBorder p="md">{content}</Paper>;
   }
 
   const attendance = attendanceData || [];
@@ -92,9 +96,9 @@ export function ChildAttendanceWidget() {
     }
   };
 
-  return (
-    <Paper withBorder p="md">
-      <Stack gap="md">
+  const content = (
+    <Stack gap="md">
+      {!embedded && (
         <Group justify="space-between">
           <Stack gap={2}>
             <Text fw={500} size="lg">
@@ -105,6 +109,7 @@ export function ChildAttendanceWidget() {
             </Text>
           </Stack>
         </Group>
+      )}
 
         {!todayAttendance ? (
           <Alert color={notifyColors.warning}>
@@ -143,6 +148,7 @@ export function ChildAttendanceWidget() {
           </Stack>
         )}
 
+      {!embedded && (
         <Button
           component={Link}
           href="/attendance/child"
@@ -152,8 +158,9 @@ export function ChildAttendanceWidget() {
         >
           View Full History
         </Button>
-      </Stack>
-    </Paper>
+      )}
+    </Stack>
   );
+  return embedded ? content : <Paper withBorder p="md">{content}</Paper>;
 }
 

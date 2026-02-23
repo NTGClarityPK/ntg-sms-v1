@@ -14,6 +14,7 @@ import {
   Chip,
   Tabs,
   Alert,
+  Loader,
 } from '@mantine/core';
 import { IconBell, IconChecks, IconBellRinging, IconBellOff, IconSettings } from '@tabler/icons-react';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '@/hooks/useNotifications';
@@ -35,6 +36,7 @@ export default function NotificationsPage() {
     permission: pushPermission,
     isSubscribed: pushSubscribed,
     isLoading: pushLoading,
+    isSubscribing: pushSubscribing,
   } = usePushSubscribe();
 
   const { data: allNotificationsData, isLoading: isLoadingAll } = useNotifications({
@@ -288,16 +290,23 @@ export default function NotificationsPage() {
                     </Group>
                     <Group gap="xs">
                       <Text size="sm" fw={500}>Push subscribed:</Text>
-                      <Badge variant="light" color={pushSubscribed ? 'green' : 'gray'}>
-                        {pushSubscribed ? 'Yes' : 'No'}
-                      </Badge>
+                      {pushSubscribing ? (
+                        <Group gap="xs">
+                          <Loader size="sm" />
+                          <Text size="sm" c="dimmed">Subscribing…</Text>
+                        </Group>
+                      ) : (
+                        <Badge variant="light" color={pushSubscribed ? 'green' : 'gray'}>
+                          {pushSubscribed ? 'Yes' : 'No'}
+                        </Badge>
+                      )}
                     </Group>
                     <Group gap="sm" mt="sm">
                       <Button
                         leftSection={<IconBellRinging size={16} />}
                         onClick={() => requestSubscribe()}
                         loading={pushLoading}
-                        disabled={pushSubscribed}
+                        disabled={pushSubscribed || pushSubscribing}
                       >
                         Allow notifications
                       </Button>

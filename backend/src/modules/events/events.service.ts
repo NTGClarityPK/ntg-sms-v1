@@ -866,6 +866,93 @@ export class EventsService {
     return mapEventConsent(data as EventConsentRow);
   }
 
+  /**
+   * Returns counts of upcoming/ongoing events and how many of them have conflicts
+   * (assessment or overlapping event). "Upcoming" = not yet ended (end_date >= today).
+   * Overlap is checked against all events in the branch/year, not just the upcoming set.
+   */
+  async getUpcomingEventsConflictCount(
+    branchId: string,
+  ): Promise<{ totalUpcoming: number; eventsWithConflicts: number }> {
+    const supabase = this.supabaseConfig.getClient();
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      return { totalUpcoming: 0, eventsWithConflicts: 0 };
+    }
+    const today = new Date().toISOString().split('T')[0];
+    // Include ongoing and upcoming: events that have not ended yet (end_date >= today)
+    const { data: eventsData } = await supabase
+      .from('events')
+      .select('id, start_date, end_date')
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYear.id)
+      .gte('end_date', today)
+      .order('start_date', { ascending: true });
+    const events = (eventsData || []) as Array<{ id: string; start_date: string; end_date: string }>;
+    if (events.length === 0) {
+      return { totalUpcoming: 0, eventsWithConflicts: 0 };
+    }
+    const eventIds = events.map((e) => e.id);
+    const { data: participants } = await supabase
+      .from('event_participants')
+      .select('event_id, class_section_id')
+      .in('event_id', eventIds)
+      .eq('branch_id', branchId)
+      .not('class_section_id', 'is', null);
+    const eventToSections = new Map<string, string[]>();
+    for (const p of participants || []) {
+      const eid = p.event_id as string;
+      const cid = p.class_section_id as string;
+      if (!eventToSections.has(eid)) eventToSections.set(eid, []);
+      const arr = eventToSections.get(eid)!;
+      if (!arr.includes(cid)) arr.push(cid);
+    }
+    const allSectionIds = [...new Set((participants || []).map((p) => p.class_section_id as string))];
+    const eventIdsWithConflict = new Set<string>();
+    if (allSectionIds.length > 0) {
+      const minStart = events.reduce((a, e) => (e.start_date < a ? e.start_date : a), events[0].start_date);
+      const maxEnd = events.reduce((a, e) => (e.end_date > a ? e.end_date : a), events[0].end_date);
+      const { data: assessments } = await supabase
+        .from('assessments')
+        .select('class_section_id, due_date')
+        .eq('branch_id', branchId)
+        .in('class_section_id', allSectionIds)
+        .gte('due_date', minStart)
+        .lte('due_date', maxEnd);
+      for (const event of events) {
+        const sections = eventToSections.get(event.id) ?? [];
+        if (sections.length === 0) continue;
+        const hasAssessment = (assessments || []).some(
+          (a) =>
+            sections.includes(a.class_section_id as string) &&
+            (a.due_date as string) >= event.start_date &&
+            (a.due_date as string) <= event.end_date,
+        );
+        if (hasAssessment) eventIdsWithConflict.add(event.id);
+      }
+    }
+    // Fetch all events in branch/year to detect overlap (same logic as getConflicts)
+    const { data: allEventsData } = await supabase
+      .from('events')
+      .select('id, start_date, end_date')
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYear.id);
+    const allEvents = (allEventsData || []) as Array<{ id: string; start_date: string; end_date: string }>;
+    for (const event of events) {
+      const hasOverlap = allEvents.some(
+        (other) =>
+          other.id !== event.id &&
+          other.start_date <= event.end_date &&
+          other.end_date >= event.start_date,
+      );
+      if (hasOverlap) eventIdsWithConflict.add(event.id);
+    }
+    return {
+      totalUpcoming: events.length,
+      eventsWithConflicts: eventIdsWithConflict.size,
+    };
+  }
+
   async getConflicts(
     eventId: string,
     branchId: string,
@@ -990,14 +1077,10 @@ export class EventsService {
   ): Promise<{ data: EventDto[] }> {
     const supabase = this.supabaseConfig.getClient();
 
-    console.log('[getMyEvents] userId:', userId, 'branchId:', branchId, 'userRoles:', userRoles);
-
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) {
       throw new BadRequestException('No active academic year found');
     }
-
-    console.log('[getMyEvents] activeYear:', activeYear.id, activeYear.name);
 
     let eventIds: string[] = [];
 
@@ -1014,16 +1097,12 @@ export class EventsService {
         ),
       ];
 
-      console.log('[getMyEvents] studentIds:', studentIds);
-
       if (studentIds.length > 0) {
         // Get class-section IDs for these students
         const { data: students } = await supabase
           .from('students')
           .select('id, class_id, section_id')
           .in('id', studentIds);
-
-        console.log('[getMyEvents] students data:', students);
 
         // Build class-section lookup
         const classSectionConditions: { classId: string; sectionId: string }[] = [];
@@ -1036,8 +1115,6 @@ export class EventsService {
           }
         }
 
-        console.log('[getMyEvents] classSectionConditions:', classSectionConditions);
-
         if (classSectionConditions.length > 0) {
           // Get class-section IDs
           const { data: classSections } = await supabase
@@ -1045,8 +1122,6 @@ export class EventsService {
             .select('id, class_id, section_id, branch_id, academic_year_id')
             .eq('branch_id', branchId)
             .eq('academic_year_id', activeYear.id);
-
-          console.log('[getMyEvents] classSections from DB:', classSections);
 
           const classSectionIds: string[] = [];
           for (const cs of classSections || []) {
@@ -1056,8 +1131,6 @@ export class EventsService {
               }
             }
           }
-
-          console.log('[getMyEvents] matched classSectionIds:', classSectionIds);
 
           // Query event_participants for both student_id and class_section_id
           const { data: participantsByStudent } = await supabase
@@ -1075,13 +1148,9 @@ export class EventsService {
             ...(participantsByClass || []),
           ];
 
-          console.log('[getMyEvents] allParticipants:', allParticipants);
-
           eventIds = [
             ...new Set(allParticipants.map((p) => p.event_id as string)),
           ];
-
-          console.log('[getMyEvents] eventIds from participants:', eventIds);
         }
       }
     }
@@ -1216,13 +1285,11 @@ export class EventsService {
 
     // For parents, populate student names for each event
     if (userRoles.includes('parent')) {
-      console.log('[getMyEvents] PARENT ROLE DETECTED - Populating student names');
       // Get parent's student IDs
       const { data: parentStudents } = await supabase
         .from('parent_students')
         .select('student_id')
         .eq('parent_user_id', userId);
-      console.log('[getMyEvents] parentStudents:', parentStudents);
 
       const parentStudentIds = [
         ...new Set((parentStudents || []).map((ps) => ps.student_id as string)),
@@ -1230,16 +1297,10 @@ export class EventsService {
 
       if (parentStudentIds.length > 0) {
         // Get student details with user_id
-        console.log('[getMyEvents] Fetching students with IDs:', parentStudentIds);
-        const { data: students, error: studentsError } = await supabase
+        const { data: students } = await supabase
           .from('students')
           .select('id, user_id, class_id, section_id')
           .in('id', parentStudentIds);
-        
-        if (studentsError) {
-          console.error('[getMyEvents] Error fetching students:', studentsError);
-        }
-        console.log('[getMyEvents] students from DB:', students);
 
         // Fetch student names from profiles via user_id
         const userIds = (students || [])
@@ -1249,16 +1310,11 @@ export class EventsService {
 
         const profilesMap = new Map<string, string>();
         if (uniqueUserIds.length > 0) {
-          const { data: profiles, error: profilesError } = await supabase
+          const { data: profiles } = await supabase
             .from('profiles')
             .select('id, full_name')
             .in('id', uniqueUserIds);
-          
-          if (profilesError) {
-            console.error('[getMyEvents] Error fetching profiles:', profilesError);
-          }
-          console.log('[getMyEvents] profiles from DB:', profiles);
-          
+
           for (const p of profiles ?? []) {
             profilesMap.set((p as any).id as string, (p as any).full_name as string);
           }
@@ -1273,7 +1329,6 @@ export class EventsService {
             studentNamesMap.set(student.id as string, fullName);
           }
         }
-        console.log('[getMyEvents] studentNamesMap:', Object.fromEntries(studentNamesMap));
 
         // For each event, find which of the parent's children are involved
         for (const event of events) {
@@ -1284,29 +1339,22 @@ export class EventsService {
             .from('event_participants')
             .select('class_section_id, student_id')
             .eq('event_id', event.id);
-          
-          console.log(`[getMyEvents] Event "${event.title}" (${event.id}) participants:`, participants);
 
           for (const participant of participants || []) {
             // Check if directly assigned to a student
             if (participant.student_id) {
-              console.log(`[getMyEvents] Checking direct student assignment: ${participant.student_id}`);
               const studentName = studentNamesMap.get(participant.student_id as string);
               if (studentName) {
-                console.log(`[getMyEvents] Found matching student: ${studentName}`);
                 involvedStudentNames.push(studentName);
               }
             }
             // Check if assigned to a class-section
             else if (participant.class_section_id) {
-              console.log(`[getMyEvents] Checking class-section assignment: ${participant.class_section_id}`);
               const { data: classSection } = await supabase
                 .from('class_sections')
                 .select('class_id, section_id')
                 .eq('id', participant.class_section_id as string)
                 .maybeSingle();
-
-              console.log(`[getMyEvents] Class-section data:`, classSection);
 
               if (classSection) {
                 // Find students in this class-section
@@ -1317,7 +1365,6 @@ export class EventsService {
                   ) {
                     const studentName = studentNamesMap.get(student.id as string);
                     if (studentName) {
-                      console.log(`[getMyEvents] Matched student in class-section: ${studentName}`);
                       involvedStudentNames.push(studentName);
                     }
                   }
@@ -1328,7 +1375,6 @@ export class EventsService {
 
           // Remove duplicates and add to event
           event.studentNames = [...new Set(involvedStudentNames)];
-          console.log(`[getMyEvents] Final studentNames for event "${event.title}":`, event.studentNames);
 
           // If event requires consent, fetch consent statuses for parent's children
           if (event.requiresConsent) {
@@ -1399,7 +1445,6 @@ export class EventsService {
           }
         }
       }
-      console.log('[getMyEvents] Events with student names:', JSON.stringify(events.map(e => ({ id: e.id, title: e.title, studentNames: e.studentNames })), null, 2));
     }
 
     return { data: events };

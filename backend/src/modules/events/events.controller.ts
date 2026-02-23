@@ -124,6 +124,14 @@ export class EventsController {
     );
   }
 
+  @Get('upcoming-conflict-count')
+  async getUpcomingEventsConflictCount(
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: { totalUpcoming: number; eventsWithConflicts: number } }> {
+    const result = await this.eventsService.getUpcomingEventsConflictCount(branch.branchId);
+    return { data: result };
+  }
+
   @Get()
   async listEvents(
     @Query() query: QueryEventsDto,

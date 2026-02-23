@@ -23,7 +23,15 @@ async function bootstrap() {
       if (origin === frontendUrl) {
         return callback(null, true);
       }
-      callback(new Error('Not allowed by CORS'));
+      // Allow Cloudflare tunnel URLs
+      if (origin && origin.includes('.trycloudflare.com')) {
+        return callback(null, true);
+      }
+      // Allow ngrok URLs
+      if (origin && origin.includes('.ngrok-free.dev')) {
+        return callback(null, true);
+      }
+      callback(new Error('Not allowed by CORS')); 
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

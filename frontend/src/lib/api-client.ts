@@ -56,6 +56,19 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError<ApiResponse<unknown>>) => {
+        // Make network errors (backend unreachable) clearer
+        const isNetworkError =
+          error.code === 'ERR_NETWORK' || error.message === 'Network Error';
+        if (isNetworkError) {
+          const baseURL = this.client.defaults.baseURL ?? 'http://localhost:3001';
+          const friendly = new Error(
+            `Unable to reach the API at ${baseURL}. Ensure the backend is running (e.g. \`npm run start:dev\` in the backend folder).`,
+          ) as AxiosError<ApiResponse<unknown>>;
+          friendly.code = error.code;
+          friendly.name = error.name;
+          return Promise.reject(friendly);
+        }
+
         if (error.response?.status === 401) {
           const body = error.response.data as { error?: { message?: string } } | undefined;
           const message = body?.error?.message ?? (body as { message?: string })?.message ?? '';
