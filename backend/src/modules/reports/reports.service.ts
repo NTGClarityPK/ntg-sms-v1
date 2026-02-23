@@ -1292,6 +1292,18 @@ export class ReportsService {
       };
     }
 
+    const raws = await Promise.all(
+      allowed.map((csId) =>
+        this.attendanceService.getAttendanceReportByClassSection(
+          csId,
+          branchId,
+          yearId,
+          startDate,
+          endDate,
+        ),
+      ),
+    );
+
     const byClass: AttendanceSummaryClassItemDto[] = [];
     let totalPresent = 0;
     let totalAbsent = 0;
@@ -1299,14 +1311,7 @@ export class ReportsService {
     let totalExcused = 0;
     let totalStudents = 0;
 
-    for (const csId of allowed) {
-      const raw = await this.attendanceService.getAttendanceReportByClassSection(
-        csId,
-        branchId,
-        yearId,
-        startDate,
-        endDate,
-      );
+    for (const raw of raws) {
       byClass.push(
         new AttendanceSummaryClassItemDto({
           classSectionId: raw.classSectionId,
@@ -1365,36 +1370,38 @@ export class ReportsService {
     const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
     const lowList: LowAttendanceStudentDto[] = [];
 
-    for (const csId of allowed) {
-      const raw = await this.attendanceService.getAttendanceReportByClassSection(
-        csId,
-        branchId,
-        yearId,
-        startDate,
-        endDate,
-      );
-      const studentIds = raw.students.map((s) => s.studentId);
-      const { data: students } = await this.supabaseConfig
-        .getClient()
-        .from('students')
-        .select('id, user_id')
-        .in('id', studentIds);
-      const userIds = (students || [])
-        .map((s: { user_id: string | null }) => s.user_id)
-        .filter(Boolean) as string[];
-      const profileMap = new Map<string, string>();
-      if (userIds.length > 0) {
-        const { data: profiles } = await this.supabaseConfig
-          .getClient()
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', userIds);
-        (profiles || []).forEach((p: { id: string; full_name: string }) => profileMap.set(p.id, p.full_name));
-      }
-      const studentIdToUserId = new Map(
-        (students || []).map((s: { id: string; user_id: string | null }) => [s.id, s.user_id]),
-      );
+    const raws = await Promise.all(
+      allowed.map((csId) =>
+        this.attendanceService.getAttendanceReportByClassSection(
+          csId,
+          branchId,
+          yearId,
+          startDate,
+          endDate,
+        ),
+      ),
+    );
 
+    const allStudentIds = [...new Set(raws.flatMap((r) => r.students.map((s) => s.studentId)))];
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: studentsData } =
+      allStudentIds.length > 0
+        ? await supabase.from('students').select('id, user_id').in('id', allStudentIds)
+        : { data: [] as { id: string; user_id: string | null }[] };
+    const students = studentsData || [];
+    const userIds = [...new Set(students.map((s) => s.user_id).filter(Boolean) as string[])];
+    const profileMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      (profiles || []).forEach((p: { id: string; full_name: string }) => profileMap.set(p.id, p.full_name));
+    }
+    const studentIdToUserId = new Map(students.map((s) => [s.id, s.user_id]));
+
+    for (const raw of raws) {
       for (const s of raw.students) {
         if (s.percentage < threshold && s.totalDays > 0) {
           lowList.push(

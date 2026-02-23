@@ -116,26 +116,28 @@ export default function MessagesPage() {
       });
 
       const channelName = `messages-${selectedId}`;
-      
-      // Test channel: Subscribe to ALL messages (no filter) to verify events are received
-      testChannel = supabase
-        .channel(`test-all-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-          },
-          (payload) => {
-            console.log('[Realtime] 🔍 TEST: Received ANY message INSERT:', payload);
-            console.log('[Realtime] 🔍 TEST: Conversation ID:', payload.new?.conversation_id);
-            console.log('[Realtime] 🔍 TEST: Full payload:', JSON.stringify(payload, null, 2));
-          },
-        )
-        .subscribe((status, err) => {
-          console.log('[Realtime] 🔍 TEST channel status:', status, err ? `Error: ${err.message}` : '');
-        });
+
+      // Test channel: dev only – subscribe to ALL messages to verify events (do not run in production)
+      if (process.env.NODE_ENV !== 'production') {
+        testChannel = supabase
+          .channel(`test-all-${Date.now()}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages',
+            },
+            (payload) => {
+              console.log('[Realtime] 🔍 TEST: Received ANY message INSERT:', payload);
+              console.log('[Realtime] 🔍 TEST: Conversation ID:', payload.new?.conversation_id);
+              console.log('[Realtime] 🔍 TEST: Full payload:', JSON.stringify(payload, null, 2));
+            },
+          )
+          .subscribe((status, err) => {
+            console.log('[Realtime] 🔍 TEST channel status:', status, err ? `Error: ${err.message}` : '');
+          });
+      }
 
       // Actual filtered subscription
       channel = supabase

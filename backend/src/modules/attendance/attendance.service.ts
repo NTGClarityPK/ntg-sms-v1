@@ -1287,9 +1287,10 @@ export class AttendanceService {
     branchId: string,
     academicYearId?: string,
   ): Promise<AttendanceReportDto> {
-    // Get all attendance records (no pagination for reports)
+    // Get attendance records for report; cap at 2000 to avoid timeouts and heavy payloads
+    const cappedLimit = Math.min(query.limit ?? 10000, 2000);
     const attendanceList = await this.listAttendance(
-      { ...query, page: 1, limit: 10000 } as QueryAttendanceDto,
+      { ...query, page: 1, limit: cappedLimit } as QueryAttendanceDto,
       branchId,
       academicYearId,
     );

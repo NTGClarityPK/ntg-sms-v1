@@ -24,7 +24,6 @@ import {
   IconFileSpreadsheet,
   IconFolderOff,
 } from '@tabler/icons-react';
-import { useClassSections } from '@/hooks/useClassSections';
 import { useSubjects } from '@/hooks/useCoreLookups';
 import {
   useAttendanceSummary,
@@ -37,6 +36,12 @@ import { apiClient } from '@/lib/api-client';
 import { saveDocumentForOffline } from '@/lib/offline/documents';
 import { notifications } from '@mantine/notifications';
 import type { ClassSection } from '@/types/class-sections';
+
+export interface AdministrativeReportContentProps {
+  classOptions: Array<{ value: string; label: string }>;
+  classList: ClassSection[];
+  isActive: boolean;
+}
 
 function getPeriodDates(period: string): { startDate: string; endDate: string } {
   const now = new Date();
@@ -79,7 +84,11 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-export function AdministrativeReportContent() {
+export function AdministrativeReportContent({
+  classOptions,
+  classList,
+  isActive,
+}: AdministrativeReportContentProps) {
   const [activeTab, setActiveTab] = useState<string | null>('attendance');
   const [periodChip, setPeriodChip] = useState<string>('month');
   const [thresholdChip, setThresholdChip] = useState<string>('80');
@@ -89,14 +98,7 @@ export function AdministrativeReportContent() {
 
   const { startDate, endDate } = useMemo(() => getPeriodDates(periodChip), [periodChip]);
 
-  const classSectionsQuery = useClassSections({ limit: 200, minimal: true });
   const subjectsQuery = useSubjects();
-
-  const classList = (classSectionsQuery.data?.data as ClassSection[] | undefined) ?? [];
-  const classOptions = classList.map((cs) => ({
-    value: cs.id,
-    label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
-  }));
 
   const subjectList = (subjectsQuery.data as { data?: { id: string; name?: string; display_name?: string }[] } | undefined)?.data ?? [];
   const subjectOptions = subjectList.map((s) => ({
@@ -104,8 +106,13 @@ export function AdministrativeReportContent() {
     label: s.display_name ?? s.name ?? s.id,
   }));
 
-  const summaryQuery = useAttendanceSummary(startDate, endDate);
-  const lowQuery = useLowAttendance(startDate, endDate, parseInt(thresholdChip, 10) || 80);
+  const summaryQuery = useAttendanceSummary(startDate, endDate, { enabled: isActive });
+  const lowQuery = useLowAttendance(
+    startDate,
+    endDate,
+    parseInt(thresholdChip, 10) || 80,
+    { enabled: isActive },
+  );
   const attendanceClassQuery = useAttendanceReportByClass(classSectionId, startDate, endDate);
   const academicClassQuery = useAcademicReportByClass(classSectionId);
   const academicSubjectQuery = useAcademicReportBySubject(subjectId);

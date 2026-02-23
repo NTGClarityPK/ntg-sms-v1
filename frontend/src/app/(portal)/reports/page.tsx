@@ -91,7 +91,7 @@ export default function ReportsPage() {
   const showAdministrativeTab = !isParent && !isStudent && (isTeacher || canManageReports);
   const myStudentQuery = useMyStudent();
   const studentsQuery = useStudents({ limit: 100 });
-  const classSectionsQuery = useClassSections({ limit: 100 });
+  const classSectionsQuery = useClassSections({ limit: 200, minimal: true });
 
   const periodParams = useMemo(() => {
     if (periodType === ReportPeriodType.CUSTOM) {
@@ -420,7 +420,11 @@ export default function ReportsPage() {
 
           {showAdministrativeTab && (
             <Tabs.Panel value="administrative" pt="md" px="md" pb="md">
-              <AdministrativeReportContent />
+              <AdministrativeReportContent
+                classOptions={classOptions}
+                classList={classList}
+                isActive={activeTab === 'administrative'}
+              />
             </Tabs.Panel>
           )}
         </Tabs>

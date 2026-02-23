@@ -105,11 +105,13 @@ class ApiClient {
   /**
    * Fetch a URL as binary (e.g. PDF/Excel export). Uses auth and branch headers.
    * Returns the blob for download; does not parse as JSON.
+   * Uses 60s timeout for exports (overrides default if not provided).
    */
   async getBlob(url: string, config?: AxiosRequestConfig): Promise<Blob> {
     const response = await this.client.get<Blob>(url, {
       ...config,
       responseType: 'blob',
+      timeout: config?.timeout ?? 60000,
     });
     return response.data;
   }

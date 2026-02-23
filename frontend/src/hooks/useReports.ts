@@ -177,7 +177,11 @@ export function useClassStudentCounts(classSectionId: string | null, academicYea
 
 // --- Administrative Reports (no meta → return response.data) ---
 
-export function useAttendanceSummary(startDate: string | null, endDate: string | null) {
+export function useAttendanceSummary(
+  startDate: string | null,
+  endDate: string | null,
+  options?: { enabled?: boolean },
+) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
 
@@ -188,10 +192,15 @@ export function useAttendanceSummary(startDate: string | null, endDate: string |
       const params = new URLSearchParams({ startDate, endDate });
       const response = await apiClient.get<AttendanceSummaryBranch>(
         `/api/v1/reports/attendance/summary?${params}`,
+        { timeout: 60000 },
       );
       return response.data;
     },
-    enabled: !!branchId && !!startDate && !!endDate,
+    enabled:
+      !!branchId &&
+      !!startDate &&
+      !!endDate &&
+      (options?.enabled !== false),
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -200,6 +209,7 @@ export function useLowAttendance(
   startDate: string | null,
   endDate: string | null,
   threshold: number = 80,
+  options?: { enabled?: boolean },
 ) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
@@ -211,10 +221,15 @@ export function useLowAttendance(
       const params = new URLSearchParams({ startDate, endDate, threshold: String(threshold) });
       const response = await apiClient.get<LowAttendanceReport>(
         `/api/v1/reports/attendance/low-attendance?${params}`,
+        { timeout: 60000 },
       );
       return response.data;
     },
-    enabled: !!branchId && !!startDate && !!endDate,
+    enabled:
+      !!branchId &&
+      !!startDate &&
+      !!endDate &&
+      (options?.enabled !== false),
     staleTime: 2 * 60 * 1000,
   });
 }
