@@ -24,7 +24,7 @@ import { useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeColor } from '@/lib/hooks/use-theme-color';
 import { generateThemeColors } from '@/lib/utils/themeColors';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getEffectiveApiBaseURL } from '@/lib/api-client';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 import { useThemeStore } from '@/lib/store/theme-store';
 import type { Tenant } from '@/types/tenant';
@@ -184,7 +184,7 @@ export default function LoginPage() {
 
   const handleGoogleLogin = () => {
     // Redirect to backend Google OAuth endpoint
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/auth/google`;
+    window.location.href = `${getEffectiveApiBaseURL()}/api/v1/auth/google`;
   };
 
   const handleForgotPassword = async (values: { email: string }) => {

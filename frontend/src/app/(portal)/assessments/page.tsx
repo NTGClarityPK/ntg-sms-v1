@@ -25,8 +25,9 @@ import {
   Table,
   ScrollArea,
 } from '@mantine/core';
-import { IconPlus, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye, IconChartBar } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye, IconChartBar } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAssessments, useDeleteAssessment } from '@/hooks/api/useAssessments';
 import { useFeaturePermission } from '@/hooks/usePermissions';
 import { modals } from '@mantine/modals';
@@ -34,6 +35,7 @@ import dayjs from 'dayjs';
 import type { Assessment } from '@/types/assessment';
 
 export default function AssessmentsPage() {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const { canEdit } = useFeaturePermission('assessment');
   const [page, setPage] = useState(1);
@@ -42,7 +44,7 @@ export default function AssessmentsPage() {
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState<string | null>(null);
 
-  const { data, isLoading, error } = useAssessments({
+  const { data, isLoading, error, isRefetching } = useAssessments({
     page,
     limit: 20,
     search: search || undefined,
@@ -72,11 +74,23 @@ export default function AssessmentsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Assessment</Title>
-          {canEdit && (
-            <Button leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
-              Create Assessment
-            </Button>
-          )}
+          <Group gap="sm">
+            <Tooltip label="Refresh">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                loading={isRefetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['assessments'] })}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            {canEdit && (
+              <Button leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
+                Create Assessment
+              </Button>
+            )}
+          </Group>
         </Group>
       </div>
 
@@ -117,7 +131,7 @@ export default function AssessmentsPage() {
 
         {/* Assessments Table */}
         <Paper p="md" withBorder>
-          {isLoading ? (
+          {isLoading || isRefetching ? (
             <Stack gap="md">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} height={60} />

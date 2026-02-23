@@ -15,8 +15,11 @@ import {
   Alert,
   Card,
   Divider,
+  Tooltip,
+  ActionIcon,
 } from '@mantine/core';
 import { IconAlertTriangle, IconExternalLink, IconRefresh } from '@tabler/icons-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useConflicts } from '@/hooks/useTimetable';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStaff } from '@/hooks/useStaff';
@@ -57,6 +60,7 @@ function getConflictTypeColor(type: string): string {
 }
 
 export default function ConflictManagementPage() {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const colors = useThemeColors();
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
@@ -70,7 +74,7 @@ export default function ConflictManagementPage() {
   const { data: activeYear } = useActiveAcademicYear();
   const { data: academicYearsData } = useAcademicYearsList();
 
-  const { data: conflictsData, isLoading: isLoadingConflicts, refetch } = useConflicts({
+  const { data: conflictsData, isLoading: isLoadingConflicts, isRefetching } = useConflicts({
     classSectionId: selectedClassSectionId ?? undefined,
     staffId: selectedStaffId ?? undefined,
     academicYearId: selectedAcademicYearId ?? undefined,
@@ -164,13 +168,16 @@ export default function ConflictManagementPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Conflict Management</Title>
-          <Button
-            leftSection={<IconRefresh size={16} />}
-            onClick={() => refetch()}
-            variant="light"
-          >
-            Refresh
-          </Button>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['timetable', 'conflicts'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </div>
       <div
@@ -254,7 +261,7 @@ export default function ConflictManagementPage() {
           )}
 
           {/* Conflicts List */}
-          {isLoadingConflicts ? (
+          {isLoadingConflicts || isRefetching ? (
             <Stack gap="md">
               <Skeleton height={100} />
               <Skeleton height={100} />

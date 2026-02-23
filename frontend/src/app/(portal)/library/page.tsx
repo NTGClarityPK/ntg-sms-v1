@@ -12,9 +12,9 @@ import {
   Skeleton,
   Alert,
   Text,
-  SegmentedControl,
+  Chip,
 } from '@mantine/core';
-import { IconPlus, IconSearch, IconLayoutGrid, IconList } from '@tabler/icons-react';
+import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useLibraryItems, useLibraryCategories } from '@/hooks/useLibrary';
 import { useCoreLookups } from '@/hooks/useCoreLookups';
@@ -150,14 +150,21 @@ export default function LibraryPage() {
                   clearable
                   searchable
                 />
-                <SegmentedControl
-                  value={viewMode}
-                  onChange={(value) => setViewMode(value as 'grid' | 'list')}
-                  data={[
-                    { label: 'Grid', value: 'grid' },
-                    { label: 'List', value: 'list' },
-                  ]}
-                />
+                <Group gap="xs" wrap="wrap" className="filter-chip-group">
+                  <Chip.Group
+                    value={viewMode}
+                    onChange={(v) => setViewMode((Array.isArray(v) ? v[0] : v) ?? 'grid')}
+                  >
+                    <Group gap="xs" wrap="wrap">
+                      <Chip value="grid" variant="filled">
+                        Grid
+                      </Chip>
+                      <Chip value="list" variant="filled">
+                        List
+                      </Chip>
+                    </Group>
+                  </Chip.Group>
+                </Group>
               </Group>
             </Stack>
           </Paper>

@@ -17,10 +17,15 @@ export function useAuth() {
     refetch,
     isFetching,
     status,
-  } = useQuery({
+  } =   useQuery({
     queryKey: ['auth', 'me'],
     queryFn: fetchCurrentUser,
-    retry: false,
+    retry: (failureCount, error) => {
+      // Retry on network error (e.g. backend not ready on refresh), up to 2 times
+      const isNetwork = (error as { code?: string; message?: string })?.code === 'ERR_NETWORK' || (error as Error)?.message === 'Network Error';
+      return isNetwork && failureCount < 2;
+    },
+    retryDelay: 800,
     refetchOnWindowFocus: false,
     enabled: true,
     staleTime: 5 * 60 * 1000,  // 5 minutes - user data rarely changes

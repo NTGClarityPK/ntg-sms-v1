@@ -9,22 +9,36 @@ import {
   Text,
   Paper,
   Skeleton,
+  Tooltip,
+  ActionIcon,
 } from '@mantine/core';
-import { IconTable, IconListCheck } from '@tabler/icons-react';
+import { IconTable, IconListCheck, IconRefresh } from '@tabler/icons-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePendingBehavioral } from '@/hooks/useBehavioral';
 import { BehavioralAssessContent } from '@/components/features/behavioral/BehavioralAssessContent';
 
 export default function BehavioralPage() {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<string | null>('matrix');
   const pendingQuery = usePendingBehavioral();
   const pending = pendingQuery.data ?? [];
-  const isLoadingPending = pendingQuery.isLoading || !pendingQuery.data;
+  const isLoadingPending = pendingQuery.isLoading || pendingQuery.isRefetching || !pendingQuery.data;
 
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Behavioural Assessment</Title>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={pendingQuery.isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['behavioral'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </div>
       <div className="page-sub-title-bar" />

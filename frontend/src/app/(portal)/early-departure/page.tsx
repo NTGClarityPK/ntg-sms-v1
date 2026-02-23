@@ -12,9 +12,12 @@ import {
   Paper,
   Skeleton,
   Badge,
+  Button,
+  Tooltip,
+  ActionIcon,
 } from '@mantine/core';
-import { IconUser } from '@tabler/icons-react';
-import { useQuery } from '@tanstack/react-query';
+import { IconUser, IconRefresh } from '@tabler/icons-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
 import { useEarlyDepartures, useStudentEarlyDepartureStats, useEarlyDepartureStatistics } from '@/hooks/useEarlyDepartures';
@@ -40,6 +43,7 @@ interface ParentChild {
 }
 
 export default function EarlyDeparturePage() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
   const [page, setPage] = useState(1);
@@ -138,6 +142,16 @@ export default function EarlyDeparturePage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Early Departure</Title>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={requestsQuery.isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['early-departures'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </div>
       <div
@@ -314,7 +328,7 @@ export default function EarlyDeparturePage() {
 
           <Tabs.Panel value="all-requests" pt="md">
             <Stack gap="md">
-              {requestsQuery.isLoading ? (
+              {requestsQuery.isLoading || requestsQuery.isRefetching ? (
                 <Stack gap="md">
                   <Skeleton height={40} width="30%" />
                   <Skeleton height={400} />

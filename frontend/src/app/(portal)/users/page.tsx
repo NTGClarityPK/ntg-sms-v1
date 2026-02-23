@@ -1,9 +1,10 @@
 'use client';
 
-import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip } from '@mantine/core';
+import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip, Tooltip, ActionIcon } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { UserTable } from '@/components/features/users/UserTable';
 import { UserForm } from '@/components/features/users/UserForm';
 import { useUsers } from '@/hooks/useUsers';
@@ -16,6 +17,7 @@ const PAGE_SIZE = 20;
 const FETCH_LIMIT = 500; // Fetch all branch users once; filter All/Active/Inactive on frontend
 
 export default function UsersPage() {
+  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { isLoading: permissionsLoading } = usePermissions();
   const { canEdit } = useFeaturePermission('user_management');
@@ -111,11 +113,23 @@ export default function UsersPage() {
           <div>
             <Title order={1}>User</Title>
           </div>
-          {canEdit && (
-            <Button leftSection={<IconPlus size={16} />} onClick={open}>
-              Create User
-            </Button>
-          )}
+          <Group gap="sm">
+            <Tooltip label="Refresh">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                loading={usersQuery.isRefetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            {canEdit && (
+              <Button leftSection={<IconPlus size={16} />} onClick={open}>
+                Create User
+              </Button>
+            )}
+          </Group>
         </Group>
       </div>
 
@@ -190,7 +204,7 @@ export default function UsersPage() {
           </Group>
         </Paper>
 
-        {usersQuery.isLoading || !usersQuery.data ? (
+        {usersQuery.isLoading || usersQuery.isRefetching || !usersQuery.data ? (
           <Stack gap="md">
             <Skeleton height={40} width="30%" />
             <Skeleton height={400} />

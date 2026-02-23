@@ -26,8 +26,9 @@ import {
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconPlus, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEvents, useDeleteEvent, useEventConflicts } from '@/hooks/api/useEvents';
 import { modals } from '@mantine/modals';
 import dayjs from 'dayjs';
@@ -35,6 +36,7 @@ import type { Event } from '@/types/events';
 import { IconAlertTriangle } from '@tabler/icons-react';
 
 export default function EventsPage() {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -43,7 +45,7 @@ export default function EventsPage() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
 
-  const { data, isLoading } = useEvents({
+  const { data, isLoading, isRefetching } = useEvents({
     page,
     limit: 20,
     status: status as 'upcoming' | 'past' | 'all' | undefined,
@@ -113,12 +115,24 @@ export default function EventsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Event</Title>
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={() => router.push('/events/create')}
-          >
-            Create Event
-          </Button>
+          <Group gap="sm">
+            <Tooltip label="Refresh">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                loading={isRefetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['events'] })}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => router.push('/events/create')}
+            >
+              Create Event
+            </Button>
+          </Group>
         </Group>
       </div>
 
@@ -183,7 +197,7 @@ export default function EventsPage() {
 
           {/* Events Table */}
           <Paper p="md" withBorder>
-            {isLoading || !data ? (
+            {isLoading || isRefetching || !data ? (
               <Stack gap="md">
                 {[...Array(5)].map((_, i) => (
                   <Skeleton key={i} height={60} />

@@ -12,8 +12,11 @@ import {
   Table,
   Badge,
   Button,
+  Tooltip,
+  ActionIcon,
 } from '@mantine/core';
-import { useQuery } from '@tanstack/react-query';
+import { IconRefresh } from '@tabler/icons-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
 import { useUniformRequests } from '@/hooks/useUniformRequests';
@@ -47,6 +50,7 @@ function formatItemsSummary(items: UniformRequest['items']): string {
 }
 
 export default function UniformRequestPage() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
   const userId = (user as User | undefined)?.id;
@@ -101,7 +105,7 @@ export default function UniformRequestPage() {
   const requests = requestsResponse?.data ?? [];
   const historyMeta = requestsResponse?.meta;
   const isLoadingHistory =
-    requestsQuery.isLoading || !requestsQuery.data;
+    requestsQuery.isLoading || requestsQuery.isRefetching || !requestsQuery.data;
   const isEmptyHistory = !isLoadingHistory && requests.length === 0;
 
   return (
@@ -109,6 +113,16 @@ export default function UniformRequestPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Request uniform</Title>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={requestsQuery.isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['uniform-requests'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </div>
 

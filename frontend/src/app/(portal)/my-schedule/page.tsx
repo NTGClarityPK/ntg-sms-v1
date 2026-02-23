@@ -1,6 +1,7 @@
 'use client';
 
-import { Title, Skeleton, Text, Stack, Alert, Button } from '@mantine/core';
+import { Title, Skeleton, Text, Stack, Alert, Button, Group, Tooltip, ActionIcon } from '@mantine/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMyTimetable } from '@/hooks/useTimetable';
 import { useMyStaff } from '@/hooks/useStaff';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -8,9 +9,10 @@ import { TeacherWeekView } from '@/components/features/timetable/TeacherWeekView
 import { IconRefresh } from '@tabler/icons-react';
 
 export default function MySchedulePage() {
+  const queryClient = useQueryClient();
   const { data: myStaffData, isLoading: isLoadingStaff } = useMyStaff();
   const myStaff = myStaffData?.data || null;
-  const { data: timetableData, isLoading: isLoadingTimetable, error, refetch } = useMyTimetable();
+  const { data: timetableData, isLoading: isLoadingTimetable, error, refetch, isRefetching } = useMyTimetable();
   const colors = useThemeColors();
 
   // CRITICAL: Hook returns full response object, component accesses timetableData?.data
@@ -20,7 +22,19 @@ export default function MySchedulePage() {
   return (
     <>
       <div className="page-title-bar">
-        <Title order={1}>My Schedule</Title>
+        <Group justify="space-between" w="100%">
+          <Title order={1}>My Schedule</Title>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['timetable'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </div>
       <div
         style={{
@@ -55,7 +69,7 @@ export default function MySchedulePage() {
               Retry
             </Button>
           </Alert>
-        ) : isLoadingTimetable || !timetableData ? (
+        ) : isLoadingTimetable || isRefetching || !timetableData ? (
           <Stack gap="md">
             <Skeleton height={40} width="30%" />
             <Skeleton height={400} />

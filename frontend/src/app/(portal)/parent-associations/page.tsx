@@ -1,9 +1,10 @@
 'use client';
 
-import { Box, Flex, Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, Select } from '@mantine/core';
+import { Box, Flex, Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, Select, Tooltip, ActionIcon } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ParentAssociationTable } from '@/components/features/parents/ParentAssociationTable';
 import { CreateParentAssociationModal } from '@/components/features/parents/CreateParentAssociationModal';
 import { useParentAssociations } from '@/hooks/useParentAssociations';
@@ -13,6 +14,7 @@ import { useRoles } from '@/hooks/useRoles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function ParentAssociationsPage() {
+  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
@@ -62,9 +64,21 @@ export default function ParentAssociationsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Parent-Student Association</Title>
-          <Button leftSection={<IconPlus size={16} />} onClick={open}>
-            Create Association
-          </Button>
+          <Group gap="sm">
+            <Tooltip label="Refresh">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                loading={associationsQuery.isRefetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['parent-associations'] })}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Button leftSection={<IconPlus size={16} />} onClick={open}>
+              Create Association
+            </Button>
+          </Group>
         </Group>
       </div>
 
@@ -119,7 +133,7 @@ export default function ParentAssociationsPage() {
           </Box>
         </Flex>
 
-        {associationsQuery.isLoading || !associationsQuery.data ? (
+        {associationsQuery.isLoading || associationsQuery.isRefetching || !associationsQuery.data ? (
           <Stack gap="md">
             <Skeleton height={40} width="30%" />
             <Skeleton height={400} />

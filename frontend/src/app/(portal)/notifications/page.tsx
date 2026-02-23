@@ -15,8 +15,11 @@ import {
   Tabs,
   Alert,
   Loader,
+  Tooltip,
+  ActionIcon,
 } from '@mantine/core';
-import { IconBell, IconChecks, IconBellRinging, IconBellOff, IconSettings } from '@tabler/icons-react';
+import { IconBell, IconChecks, IconBellRinging, IconBellOff, IconSettings, IconRefresh } from '@tabler/icons-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '@/hooks/useNotifications';
 import { usePushSubscribe } from '@/hooks/usePushSubscribe';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -39,7 +42,8 @@ export default function NotificationsPage() {
     isSubscribing: pushSubscribing,
   } = usePushSubscribe();
 
-  const { data: allNotificationsData, isLoading: isLoadingAll } = useNotifications({
+  const queryClient = useQueryClient();
+  const { data: allNotificationsData, isLoading: isLoadingAll, isRefetching } = useNotifications({
     limit: 100,
   });
 
@@ -207,15 +211,27 @@ export default function NotificationsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Notification</Title>
-          {unreadCount > 0 && (
-            <Button
-              leftSection={<IconChecks size={18} />}
-              onClick={() => markAllAsRead.mutate()}
-              loading={markAllAsRead.isPending}
-            >
-              Mark All as Read
-            </Button>
-          )}
+          <Group gap="sm">
+            <Tooltip label="Refresh">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                loading={isRefetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['notifications'] })}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            {unreadCount > 0 && (
+              <Button
+                leftSection={<IconChecks size={18} />}
+                onClick={() => markAllAsRead.mutate()}
+                loading={markAllAsRead.isPending}
+              >
+                Mark All as Read
+              </Button>
+            )}
+          </Group>
         </Group>
       </div>
 
@@ -264,7 +280,7 @@ export default function NotificationsPage() {
                   </Chip.Group>
                 </Group>
               </Paper>
-              {renderNotificationsTable(filteredNotifications, isLoadingAll)}
+              {renderNotificationsTable(filteredNotifications, isLoadingAll || isRefetching)}
             </Paper>
           </Tabs.Panel>
 

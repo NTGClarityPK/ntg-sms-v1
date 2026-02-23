@@ -21,14 +21,16 @@ import {
   Modal,
   Image,
 } from '@mantine/core';
-import { IconDownload, IconEye } from '@tabler/icons-react';
+import { IconDownload, IconEye, IconRefresh } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMyAssessments, useUpdateMyAssessmentStatus } from '@/hooks/api/useMyAssessments';
 import type { MyAssessmentAttachment } from '@/hooks/api/useMyAssessments';
 
 export default function MyAssessmentsPage() {
-  const { data, isLoading, error } = useMyAssessments();
+  const queryClient = useQueryClient();
+  const { data, isLoading, error, isRefetching } = useMyAssessments();
   const updateStatus = useUpdateMyAssessmentStatus();
   const [previewAttachment, setPreviewAttachment] = useState<MyAssessmentAttachment | null>(null);
 
@@ -120,6 +122,16 @@ export default function MyAssessmentsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>My Assessment</Title>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['my-assessments'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </div>
 
@@ -134,7 +146,7 @@ export default function MyAssessmentsPage() {
       >
         <Stack gap="md">
           <Paper p="md" withBorder>
-            {isLoading ? (
+            {isLoading || isRefetching ? (
               <Stack gap="md">
                 {[...Array(3)].map((_, i) => (
                   <Skeleton key={i} height={60} />

@@ -3,11 +3,20 @@ import { ApiResponse } from '@/types/api';
 import { supabase } from './supabase/client';
 import { enqueue } from './offline/queue';
 
+/** When running on localhost, always use local API so old builds/cache don't keep hitting a previous API URL (e.g. Cloudflare tunnel). Export for use in pages that build API URLs manually (e.g. fetch, redirects). */
+export function getEffectiveApiBaseURL(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:3001';
+  }
+  return fromEnv;
+}
+
 class ApiClient {
   private client: AxiosInstance;
 
   constructor() {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const baseURL = getEffectiveApiBaseURL();
 
     this.client = axios.create({
       baseURL,
@@ -21,7 +30,8 @@ class ApiClient {
   }
 
   private setupInterceptors(): void {
-    // Request interceptor - inject auth token and branch header
+    // Request interceptor - inject auth token and branch header.
+    // Never let getSession() fail the request: on refresh Supabase can be slow; proceed without token if it throws.
     this.client.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
         // Remove Content-Type header for FormData to let axios set it with boundary
@@ -29,12 +39,15 @@ class ApiClient {
           delete config.headers['Content-Type'];
         }
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (session?.access_token) {
-          config.headers.Authorization = `Bearer ${session.access_token}`;
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            config.headers.Authorization = `Bearer ${session.access_token}`;
+          }
+        } catch {
+          // Supabase slow/unavailable on first load; send request without auth (backend will 401 if needed)
         }
 
         // Get branch ID from localStorage (set by auth flow) or from query cache
@@ -78,16 +91,20 @@ class ApiClient {
             // ready yet or race on page load) – do NOT logout so the user isn’t kicked out unnecessarily.
           const isNoToken = typeof message === 'string' && message.toLowerCase().includes('no token provided');
           if (!isNoToken && typeof window !== 'undefined') {
-            const {
-              data: { session },
-            } = await supabase.auth.getSession();
+            try {
+              const {
+                data: { session },
+              } = await supabase.auth.getSession();
 
-            const hasSession = Boolean(session?.access_token);
-            if (!hasSession) {
-              await supabase.auth.signOut();
-              if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
+              const hasSession = Boolean(session?.access_token);
+              if (!hasSession) {
+                await supabase.auth.signOut();
+                if (window.location.pathname !== '/login') {
+                  window.location.href = '/login';
+                }
               }
+            } catch {
+              // Supabase getSession/signOut can throw (e.g. network). Don't override the API error.
             }
           }
         }

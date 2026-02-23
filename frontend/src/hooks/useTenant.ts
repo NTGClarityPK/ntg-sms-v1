@@ -14,6 +14,11 @@ export function useTenantMe() {
       const res = await apiClient.get<Tenant>('/api/v1/tenants/me');
       return res;
     },
+    retry: (failureCount, error) => {
+      const isNetwork = (error as { code?: string })?.code === 'ERR_NETWORK' || (error as Error)?.message === 'Network Error';
+      return isNetwork && failureCount < 2;
+    },
+    retryDelay: 800,
     staleTime: 5 * 60 * 1000,  // 5 minutes - tenant data rarely changes
   });
 }

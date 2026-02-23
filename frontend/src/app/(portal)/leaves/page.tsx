@@ -14,9 +14,12 @@ import {
   Table,
   Badge,
   Alert,
+  Button,
+  Tooltip,
+  ActionIcon,
 } from '@mantine/core';
-import { IconUser } from '@tabler/icons-react';
-import { useQuery } from '@tanstack/react-query';
+import { IconUser, IconRefresh } from '@tabler/icons-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
 import { useLeaveRequests, useStudentLeaveStats, useLeaveQuota } from '@/hooks/useLeaveRequests';
@@ -42,6 +45,7 @@ interface ParentChild {
 }
 
 export default function LeavesPage() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
   const [page, setPage] = useState(1);
@@ -164,6 +168,16 @@ export default function LeavesPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Leave</Title>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={leaveQuery.isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['leaves'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </div>
       <div
@@ -351,7 +365,7 @@ export default function LeavesPage() {
 
           <Tabs.Panel value="all-requests" pt="md">
             <Stack gap="md">
-              {leaveQuery.isLoading ? (
+              {leaveQuery.isLoading || leaveQuery.isRefetching ? (
                 <Table striped highlightOnHover>
                   <Table.Thead>
                     <Table.Tr>

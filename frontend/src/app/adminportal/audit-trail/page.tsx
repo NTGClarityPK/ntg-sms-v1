@@ -24,6 +24,7 @@ import {
   Divider,
 } from '@mantine/core';
 import { IconHistory, IconRefresh, IconSearch, IconEye, IconX } from '@tabler/icons-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuditLogs, type AuditLog } from '@/hooks/useAuditLogs';
 import { useThemeColors, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useDisclosure } from '@mantine/hooks';
@@ -37,6 +38,7 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function AuditTrailPage() {
+  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const [page, setPage] = useState(1);
   const [tableName, setTableName] = useState<string | undefined>(undefined);
@@ -81,14 +83,16 @@ export default function AuditTrailPage() {
             <IconHistory size={24} />
             <Title order={1}>Audit Trail</Title>
           </Group>
-          <Button
-            leftSection={<IconRefresh size={16} />}
-            variant="light"
-            onClick={() => auditLogsQuery.refetch()}
-            loading={auditLogsQuery.isRefetching}
-          >
-            Refresh
-          </Button>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={auditLogsQuery.isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['audit-logs'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </div>
 
@@ -206,7 +210,7 @@ export default function AuditTrailPage() {
                 )}
               </Group>
 
-              {auditLogsQuery.isLoading ? (
+              {auditLogsQuery.isLoading || auditLogsQuery.isRefetching ? (
                 <Stack gap="xs">
                   <Skeleton height={50} />
                   <Skeleton height={50} />

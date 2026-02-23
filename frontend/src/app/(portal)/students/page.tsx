@@ -1,9 +1,10 @@
 'use client';
 
-import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect } from '@mantine/core';
+import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Tooltip, ActionIcon } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { StudentTable } from '@/components/features/students/StudentTable';
 import { StudentForm } from '@/components/features/students/StudentForm';
 import { useStudents } from '@/hooks/useStudents';
@@ -14,6 +15,7 @@ import type { ClassEntity } from '@/types/settings';
 import type { Student } from '@/types/students';
 
 export default function StudentsPage() {
+  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { canEdit } = useFeaturePermission('students');
   const [opened, { open, close }] = useDisclosure(false);
@@ -60,11 +62,23 @@ export default function StudentsPage() {
           <div>
             <Title order={1}>Student</Title>
           </div>
-          {canEdit && (
-            <Button leftSection={<IconPlus size={16} />} onClick={open}>
-              Create Student
-            </Button>
-          )}
+          <Group gap="sm">
+            <Tooltip label="Refresh">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                loading={studentsQuery.isRefetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['students'] })}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            {canEdit && (
+              <Button leftSection={<IconPlus size={16} />} onClick={open}>
+                Create Student
+              </Button>
+            )}
+          </Group>
         </Group>
       </div>
 
@@ -121,7 +135,7 @@ export default function StudentsPage() {
           </div>
         </Group>
 
-        {studentsQuery.isLoading || !studentsResponse ? (
+        {studentsQuery.isLoading || studentsQuery.isRefetching || !studentsResponse ? (
           <Stack gap="md">
             <Skeleton height={40} width="30%" />
             <Skeleton height={400} />

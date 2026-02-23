@@ -1,7 +1,26 @@
 /**
  * Custom worker code injected by next-pwa. Handles push and notificationclick.
  * Runs in ServiceWorkerGlobalScope; use sw for typed access to registration/clients.
+ *
+ * We also handle fetch for API requests first: pass them through to the network only.
+ * This prevents Workbox's cross-origin NetworkFirst route from intercepting them and
+ * throwing "no-response" when the network fails (e.g. backend unreachable).
  */
+function isApiRequest(url: URL): boolean {
+  return url.pathname.includes('/api/');
+}
+
+self.addEventListener('fetch', (event: Event) => {
+  const req = (event as FetchEvent).request;
+  try {
+    const url = new URL(req.url);
+    if (!isApiRequest(url)) return;
+    (event as FetchEvent).respondWith(fetch(req));
+  } catch {
+    // Ignore URL parse errors; let other handlers deal with it
+  }
+}, { capture: true });
+
 interface SWScope {
   registration: { showNotification(title: string, options?: NotificationOptions): Promise<void> };
   location: { origin: string };

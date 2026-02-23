@@ -6,6 +6,7 @@ import { Container, Title, Text, Loader, Stack, Button } from '@mantine/core';
 import { PasswordGate } from '@/components/features/public/PasswordGate';
 import { StudentCountTable } from '@/components/features/public/StudentCountTable';
 import { StatisticsSummary } from '@/components/features/public/StatisticsSummary';
+import { getEffectiveApiBaseURL } from '@/lib/api-client';
 import type { ClassStudentCount } from '@/hooks/useReports';
 
 const STORAGE_KEY_PREFIX = 'public-stats-token-';
@@ -40,7 +41,7 @@ export default function PublicStatisticsPage() {
 
   const fetchStats = useCallback(
     async (authToken: string) => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const baseUrl = getEffectiveApiBaseURL();
       const url = `${baseUrl}/api/v1/public/statistics/${encodeURIComponent(branchCode)}`;
       setStatsLoading(true);
       setStatsError(null);
@@ -72,7 +73,7 @@ export default function PublicStatisticsPage() {
 
   const handleVerify = useCallback(
     async (password: string) => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const baseUrl = getEffectiveApiBaseURL();
       const url = `${baseUrl}/api/v1/public/statistics/${encodeURIComponent(branchCode)}/verify`;
       setVerifyError(null);
       setVerifyLoading(true);

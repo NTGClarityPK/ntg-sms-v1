@@ -12,9 +12,12 @@ import {
   Paper,
   SimpleGrid,
   Text,
+  Tooltip,
+  ActionIcon,
 } from '@mantine/core';
-import { IconPlus, IconSearch } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
+import { useQueryClient } from '@tanstack/react-query';
 import { modals } from '@mantine/modals';
 import { useUniforms, useLowStock, useDeleteUniform } from '@/hooks/useInventory';
 import { useFeaturePermission } from '@/hooks/usePermissions';
@@ -32,6 +35,7 @@ const GENDERS = [
 ];
 
 export default function InventoryItemsPage() {
+  const queryClient = useQueryClient();
   const { canEdit } = useFeaturePermission('inventory');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -76,7 +80,7 @@ export default function InventoryItemsPage() {
     | undefined;
   const items = response?.data ?? [];
   const meta = response?.meta;
-  const isLoading = uniformsQuery.isLoading || !uniformsQuery.data;
+  const isLoading = uniformsQuery.isLoading || uniformsQuery.isRefetching || !uniformsQuery.data;
   const isEmpty = !isLoading && items.length === 0;
 
   const handleEdit = (item: UniformItem) => {
@@ -126,17 +130,29 @@ export default function InventoryItemsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Uniform items</Title>
-          {canEdit && (
-            <Button
-              leftSection={<IconPlus size={16} />}
-              onClick={() => {
-                setSelectedItem(null);
-                openForm();
-              }}
-            >
-              Add item
-            </Button>
-          )}
+          <Group gap="sm">
+            <Tooltip label="Refresh">
+              <ActionIcon
+                variant="light"
+                size="lg"
+                loading={uniformsQuery.isRefetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['uniforms'] })}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            {canEdit && (
+              <Button
+                leftSection={<IconPlus size={16} />}
+                onClick={() => {
+                  setSelectedItem(null);
+                  openForm();
+                }}
+              >
+                Add item
+              </Button>
+            )}
+          </Group>
         </Group>
       </div>
 

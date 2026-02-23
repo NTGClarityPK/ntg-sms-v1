@@ -13,8 +13,10 @@ import {
   Table,
   Badge,
   ActionIcon,
+  Tooltip,
 } from '@mantine/core';
-import { IconCheck, IconX, IconTruck, IconTrash } from '@tabler/icons-react';
+import { IconCheck, IconX, IconTruck, IconTrash, IconRefresh } from '@tabler/icons-react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useUniformRequests,
   useApproveUniformRequest,
@@ -54,6 +56,7 @@ function formatItemsSummary(items: UniformRequest['items']): string {
 }
 
 export default function InventoryRequestsPage() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { canEdit } = useFeaturePermission('inventory');
   const currentUserId = user?.id;
@@ -82,7 +85,7 @@ export default function InventoryRequestsPage() {
     | undefined;
   const requests = response?.data ?? [];
   const meta = response?.meta;
-  const isLoading = requestsQuery.isLoading || !requestsQuery.data;
+  const isLoading = requestsQuery.isLoading || requestsQuery.isRefetching || !requestsQuery.data;
   const isEmpty = !isLoading && requests.length === 0;
 
   const handleApprove = (req: UniformRequest) => {
@@ -137,6 +140,16 @@ export default function InventoryRequestsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>Uniform requests</Title>
+          <Tooltip label="Refresh">
+            <ActionIcon
+              variant="light"
+              size="lg"
+              loading={requestsQuery.isRefetching}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['uniform-requests'] })}
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </div>
 
