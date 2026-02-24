@@ -10,6 +10,8 @@ export class ParentStudentDto {
   // Joined data
   parentName?: string;
   studentName?: string;
+  firstName?: string;
+  lastName?: string;
   studentStudentId?: string;
   parentPhone?: string; // Phone number from profiles table
   parentEmail?: string; // Email from auth.users

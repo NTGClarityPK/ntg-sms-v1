@@ -1,0 +1,449 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+import {
+  Button,
+  FileInput,
+  Alert,
+  Table,
+  Badge,
+  Title,
+  Text,
+  Group,
+  Stack,
+  Paper,
+  Select,
+  Skeleton,
+  TextInput,
+} from '@mantine/core';
+import { IconUpload, IconCheck, IconX, IconAlertCircle, IconDownload } from '@tabler/icons-react';
+import { useBulkImportPreview, useBulkImport, useBulkImportTemplate } from '@/hooks/useBulkImport';
+import { useAcademicYearsList } from '@/hooks/useAcademicYears';
+import { notifications } from '@mantine/notifications';
+import * as XLSX from 'xlsx';
+import type { BulkImportPreview, BulkImportResult, BulkStudentRowDto } from '@/hooks/useBulkImport';
+
+export default function BulkImportStudentsPage() {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<BulkImportPreview | null>(null);
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
+  const [lastImportResult, setLastImportResult] = useState<BulkImportResult | null>(null);
+
+  const previewMutation = useBulkImportPreview();
+  const importMutation = useBulkImport();
+  const { data: templateData } = useBulkImportTemplate();
+  const { data: academicYearsResponse } = useAcademicYearsList({ page: 1, limit: 50 });
+  const academicYears = academicYearsResponse?.data ?? [];
+
+  const handleFileUpload = async (uploadedFile: File | null) => {
+    if (!uploadedFile) {
+      setFile(null);
+      setPreview(null);
+      setSelectedYear(null);
+      setLastImportResult(null);
+      return;
+    }
+    setFile(uploadedFile);
+    setPreview(null);
+    setSelectedYear(null);
+    setLastImportResult(null);
+    try {
+      const result = await previewMutation.mutateAsync(uploadedFile);
+      setPreview(result);
+      if (result.invalidRows > 0) {
+        notifications.show({
+          title: 'Validation issues',
+          message: `${result.invalidRows} of ${result.totalRows} rows have errors. Please review below.`,
+          color: 'yellow',
+          icon: <IconAlertCircle size={16} />,
+        });
+      } else {
+        notifications.show({
+          title: 'Ready to import',
+          message: `All ${result.validRows} rows are valid and ready to import.`,
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to parse file';
+      notifications.show({
+        title: 'Upload failed',
+        message,
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    }
+  };
+
+  const handleImport = async () => {
+    if (!preview || !selectedYear) {
+      notifications.show({
+        title: 'Missing information',
+        message: 'Please select an academic year',
+        color: 'red',
+      });
+      return;
+    }
+    const validRows = preview.rows
+      .filter((r) => r.data.first_name?.trim() && r.data.last_name?.trim() && r.data.email?.trim() && r.data.gender?.trim())
+      .map((r) => r.data);
+    if (validRows.length === 0) {
+      notifications.show({
+        title: 'No valid rows',
+        message: 'There are no valid rows to import.',
+        color: 'red',
+      });
+      return;
+    }
+    try {
+      const result = await importMutation.mutateAsync({
+        rows: validRows,
+        academicYearId: selectedYear,
+      });
+      setLastImportResult(result);
+      notifications.show({
+        title: 'Import complete',
+        message: result.errors.length > 0
+          ? `${result.successCount} imported, ${result.failureCount} failed. See details below.`
+          : `Successfully imported ${result.successCount} students.`,
+        color: result.failureCount === 0 ? 'green' : 'yellow',
+        icon: <IconCheck size={16} />,
+      });
+      setFile(null);
+      setPreview(null);
+      setSelectedYear(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to import students';
+      notifications.show({
+        title: 'Import failed',
+        message,
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const columns = templateData?.columns ?? [
+      { key: 'First Name', label: 'First Name', example: 'Ahmed' },
+      { key: 'Last Name', label: 'Last Name', example: 'Ali' },
+      { key: 'Email', label: 'Email', example: 'ahmed.ali@example.com' },
+      { key: 'Phone', label: 'Phone (optional)', example: '+9647701234567' },
+      { key: 'Date of Birth', label: 'Date of Birth (optional)', example: '2010-05-15' },
+      { key: 'Gender', label: 'Gender', example: 'male' },
+      { key: 'Student ID', label: 'Student ID (optional)', example: 'STU-2024-0001' },
+      { key: 'Class', label: 'Class name or ID (optional)', example: 'Grade 1' },
+      { key: 'Section', label: 'Section name or ID (optional)', example: 'A' },
+      { key: 'Subject Template', label: 'Subject Template name or ID (optional)', example: 'Primary Curriculum' },
+      { key: 'Parent Name', label: 'Parent Name (optional)', example: 'Ali Ahmed' },
+      { key: 'Parent Email', label: 'Parent Email (optional)', example: 'parent@example.com' },
+      { key: 'Parent Phone', label: 'Parent Phone (optional)', example: '+9647709876543' },
+    ];
+    const sampleRow: Record<string, string> = {};
+    columns.forEach((col) => {
+      sampleRow[col.label] = col.example;
+    });
+    const ws = XLSX.utils.json_to_sheet([sampleRow]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students');
+    XLSX.writeFile(wb, 'students-import-template.xlsx');
+    notifications.show({
+      title: 'Template downloaded',
+      message: 'Check your downloads folder',
+      color: 'green',
+      icon: <IconCheck size={16} />,
+    });
+  };
+
+  const updatePreviewRow = useCallback(
+    (rowIndex: number, field: keyof BulkStudentRowDto, value: string | undefined) => {
+      setPreview((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          rows: prev.rows.map((r, i) =>
+            i === rowIndex ? { ...r, data: { ...r.data, [field]: value ?? '' } } : r
+          ),
+        };
+      });
+    },
+    []
+  );
+
+  const editableValidCount =
+    preview?.rows.filter(
+      (r) =>
+        r.data.first_name?.trim() &&
+        r.data.last_name?.trim() &&
+        r.data.email?.trim() &&
+        r.data.gender?.trim()
+    ).length ?? 0;
+
+  return (
+    <>
+      <div className="page-title-bar">
+        <Group justify="space-between" w="100%">
+          <Title order={1}>Bulk Import Students</Title>
+          <Button
+            leftSection={<IconDownload size={16} />}
+            variant="light"
+            onClick={handleDownloadTemplate}
+          >
+            Download Template
+          </Button>
+        </Group>
+      </div>
+
+      <div style={{ marginTop: '60px', padding: 'var(--mantine-spacing-md)' }}>
+        <Stack gap="lg">
+          <Alert icon={<IconAlertCircle size={16} />} title="How to use" color="blue">
+            <ol style={{ margin: 0, paddingLeft: 20 }}>
+              <li>Download the template Excel file</li>
+              <li>
+                Fill in student information (required: First Name, Last Name, Email, Gender).
+                Optional: Phone, Date of Birth; Class and Section (name or ID from Settings);
+                Subject Template (must be linked to the class in Settings).
+              </li>
+              <li>Upload the completed file to preview</li>
+              <li>Edit any cell in the preview table if needed, then select an academic year and click &quot;Import Students&quot;</li>
+            </ol>
+          </Alert>
+
+          {lastImportResult != null && (
+            <Paper p="md" withBorder>
+              <Stack gap="xs">
+                <Title order={5}>Last import result</Title>
+                <Text size="sm">
+                  {lastImportResult.successCount} student(s) imported successfully.
+                  {lastImportResult.failureCount > 0 && (
+                    <> {lastImportResult.failureCount} row(s) failed.</>
+                  )}
+                </Text>
+                {lastImportResult.successCount > 0 && (
+                  <Text size="xs" c="dimmed">
+                    Imported students appear in the Student list. Clear class/section filters if you do not see them.
+                  </Text>
+                )}
+                {lastImportResult.errors.length > 0 && (
+                  <>
+                    <Alert color="red" title="Errors by row">
+                      <Stack gap={4}>
+                        {lastImportResult.errors
+                          .filter((e) => !e.message.startsWith('Student imported but:'))
+                          .map((e, idx) => (
+                            <Text key={idx} size="sm">
+                              Row {e.row}: {e.message}
+                            </Text>
+                          ))}
+                      </Stack>
+                    </Alert>
+                    {lastImportResult.errors.some((e) =>
+                      e.message.startsWith('Student imported but:')
+                    ) && (
+                      <Alert color="yellow" title="Warnings (student imported with issues)">
+                        <Stack gap={4}>
+                          {lastImportResult.errors
+                            .filter((e) => e.message.startsWith('Student imported but:'))
+                            .map((e, idx) => (
+                              <Text key={idx} size="sm">
+                                Row {e.row}: {e.message}
+                              </Text>
+                            ))}
+                        </Stack>
+                      </Alert>
+                    )}
+                  </>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          <Paper p="md" withBorder>
+            <Stack gap="md">
+              <FileInput
+                label="Upload Excel or CSV file"
+                placeholder="Click to select file"
+                accept=".xlsx,.xls,.csv"
+                value={file}
+                onChange={handleFileUpload}
+                leftSection={<IconUpload size={16} />}
+                disabled={previewMutation.isPending}
+              />
+              {previewMutation.isPending && (
+                <Skeleton height={8} radius="xl" animate />
+              )}
+              {preview && (
+                <Select
+                  label="Academic year"
+                  placeholder="Select academic year"
+                  value={selectedYear}
+                  onChange={setSelectedYear}
+                  data={academicYears.map((y) => ({ value: y.id, label: y.name }))}
+                  required
+                />
+              )}
+            </Stack>
+          </Paper>
+
+          {preview && (
+            <Paper p="md" withBorder>
+              <Stack gap="md">
+                <Group justify="space-between">
+                  <div>
+                    <Title order={4}>Preview — edit any cell before importing</Title>
+                    <Text size="sm" c="dimmed">
+                      {editableValidCount} valid / {preview.totalRows} total rows (required: First name, Last name, Email, Gender)
+                    </Text>
+                  </div>
+                  <Button
+                    onClick={handleImport}
+                    disabled={
+                      editableValidCount === 0 ||
+                      !selectedYear ||
+                      importMutation.isPending
+                    }
+                    loading={importMutation.isPending}
+                    leftSection={<IconCheck size={16} />}
+                  >
+                    Import {editableValidCount} Students
+                  </Button>
+                </Group>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <Table striped highlightOnHover>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Row</Table.Th>
+                        <Table.Th>Status</Table.Th>
+                        <Table.Th>First Name</Table.Th>
+                        <Table.Th>Last Name</Table.Th>
+                        <Table.Th>Email</Table.Th>
+                        <Table.Th>Gender</Table.Th>
+                        <Table.Th>Class</Table.Th>
+                        <Table.Th>Section</Table.Th>
+                        <Table.Th>Subject Template</Table.Th>
+                        <Table.Th>Errors</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {preview.rows.map((row, rowIndex) => {
+                        const hasRequired =
+                          row.data.first_name?.trim() &&
+                          row.data.last_name?.trim() &&
+                          row.data.email?.trim() &&
+                          row.data.gender?.trim();
+                        return (
+                          <Table.Tr
+                            key={row.rowNumber}
+                            bg={hasRequired ? undefined : 'red.0'}
+                          >
+                            <Table.Td>{row.rowNumber}</Table.Td>
+                            <Table.Td>
+                              <Badge
+                                color={hasRequired ? 'green' : 'red'}
+                                size="sm"
+                              >
+                                {hasRequired ? 'Valid' : 'Error'}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                size="xs"
+                                value={row.data.first_name ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(rowIndex, 'first_name', e.target.value)
+                                }
+                                placeholder="First name"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                size="xs"
+                                value={row.data.last_name ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(rowIndex, 'last_name', e.target.value)
+                                }
+                                placeholder="Last name"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                size="xs"
+                                value={row.data.email ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(rowIndex, 'email', e.target.value)
+                                }
+                                placeholder="Email"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <Select
+                                size="xs"
+                                value={row.data.gender ?? ''}
+                                onChange={(v) =>
+                                  updatePreviewRow(rowIndex, 'gender', v ?? undefined)
+                                }
+                                data={[
+                                  { value: 'male', label: 'Male' },
+                                  { value: 'female', label: 'Female' },
+                                  { value: 'other', label: 'Other' },
+                                ]}
+                                placeholder="Gender"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                size="xs"
+                                value={row.data.class_name_or_id ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(rowIndex, 'class_name_or_id', e.target.value)
+                                }
+                                placeholder="Class"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                size="xs"
+                                value={row.data.section_name_or_id ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(rowIndex, 'section_name_or_id', e.target.value)
+                                }
+                                placeholder="Section"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                size="xs"
+                                value={row.data.subject_template_name_or_id ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(
+                                    rowIndex,
+                                    'subject_template_name_or_id',
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Subject template"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              {row.errors.length > 0 && (
+                                <Text size="xs" c="red">
+                                  {row.errors.join(', ')}
+                                </Text>
+                              )}
+                            </Table.Td>
+                          </Table.Tr>
+                        );
+                      })}
+                    </Table.Tbody>
+                  </Table>
+                </div>
+              </Stack>
+            </Paper>
+          )}
+        </Stack>
+      </div>
+    </>
+  );
+}

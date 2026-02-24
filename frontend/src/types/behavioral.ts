@@ -1,7 +1,8 @@
 export interface PendingStudent {
   id: string;
   studentId: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   className?: string;
   sectionName?: string;
 }

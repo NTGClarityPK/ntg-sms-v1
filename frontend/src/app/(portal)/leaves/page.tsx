@@ -86,14 +86,15 @@ export default function LeavesPage() {
     // Create minimal Student objects from children data
     // The form only needs student.id (the UUID), so this is sufficient
     availableStudents = children.map((c) => ({
-      id: c.studentId, // This is the student UUID, which is what we need
+      id: c.studentId,
       userId: '',
       branchId: '',
-      studentId: c.studentStudentId || '', // student's student_id (e.g., "ST001")
+      studentId: c.studentStudentId || '',
       isActive: true,
       createdAt: c.createdAt,
       updatedAt: c.createdAt,
-      fullName: c.studentName,
+      firstName: (c as { firstName?: string }).firstName ?? (c.studentName?.split(' ')[0] ?? ''),
+      lastName: (c as { lastName?: string }).lastName ?? (c.studentName?.split(' ').slice(1).join(' ') ?? ''),
     } as Student));
   } else if (!isParent && studentsData?.data) {
     availableStudents = studentsData.data;
@@ -158,8 +159,8 @@ export default function LeavesPage() {
   // Create a map of studentId -> student name for display in cards
   const studentNameMap = new Map<string, string>();
   availableStudents.forEach((student) => {
-    if (student.id && student.fullName) {
-      studentNameMap.set(student.id, student.fullName);
+    if (student.id && (student.firstName || student.lastName)) {
+      studentNameMap.set(student.id, `${student.firstName ?? ''} ${student.lastName ?? ''}`.trim());
     }
   });
 
@@ -232,7 +233,7 @@ export default function LeavesPage() {
                             placeholder="Choose a student"
                             data={availableStudents.map((s) => ({
                               value: s.id,
-                              label: s.fullName || s.studentId || `Student ${s.id.slice(0, 8)}`,
+                              label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || `Student ${s.id.slice(0, 8)}`,
                             }))}
                             value={selectedStudentId}
                             onChange={(value) => setSelectedStudentId(value)}

@@ -176,26 +176,11 @@ export class BehavioralService {
       return { data: [] };
     }
 
-    // 6) Fetch student details and profiles
     const { data: studentRows, error: studentErr } = await supabase
       .from('students')
-      .select('id, student_id, user_id, class_id, section_id')
+      .select('id, student_id, user_id, class_id, section_id, first_name, last_name')
       .in('id', pendingStudentIds);
     throwIfDbError(studentErr);
-    const userIds = (studentRows || [])
-      .map((s: { user_id: string | null }) => s.user_id)
-      .filter(Boolean) as string[];
-    if (userIds.length === 0) {
-      return { data: [] };
-    }
-
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', userIds);
-    const profileMap = new Map(
-      (profiles || []).map((p: { id: string; full_name: string }) => [p.id, p.full_name]),
-    );
 
     const classIds = [...new Set((studentRows || []).map((s: { class_id: string }) => s.class_id).filter(Boolean))];
     const sectionIds = [...new Set((studentRows || []).map((s: { section_id: string }) => s.section_id).filter(Boolean))];
@@ -208,13 +193,15 @@ export class BehavioralService {
       (s: {
         id: string;
         student_id: string;
-        user_id: string | null;
         class_id: string | null;
         section_id: string | null;
+        first_name: string | null;
+        last_name: string | null;
       }) => ({
         id: s.id,
         studentId: s.student_id,
-        fullName: profileMap.get(s.user_id || '') || 'Unknown',
+        firstName: s.first_name ?? '',
+        lastName: s.last_name ?? '',
         className: s.class_id ? classMap.get(s.class_id) : undefined,
         sectionName: s.section_id ? sectionMap.get(s.section_id) : undefined,
       }),

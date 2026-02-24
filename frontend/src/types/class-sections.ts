@@ -40,6 +40,7 @@ export interface AssignClassTeacherInput {
 export interface ClassSectionStudent {
   id: string;
   studentId: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
 }
 

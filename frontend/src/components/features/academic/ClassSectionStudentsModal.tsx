@@ -60,7 +60,7 @@ export function ClassSectionStudentsModal({
                   {students.map((student) => (
                     <Table.Tr key={student.id}>
                       <Table.Td>{student.studentId}</Table.Td>
-                      <Table.Td>{student.fullName}</Table.Td>
+                      <Table.Td>{`${student.firstName} ${student.lastName}`.trim() || 'N/A'}</Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>

@@ -134,9 +134,24 @@ export class PushService {
    * Subscriptions that return 410 Gone or 404 Not Found are removed from the database.
    */
   sendPushToUser(userId: string, payload: PushPayload): void {
-    if (!this.initialized) return;
+    if (!this.initialized) {
+      // eslint-disable-next-line no-console
+      console.warn('Push: not initialized (missing VAPID keys), skip');
+      return;
+    }
+    type Sub = { endpoint: string; keys: { p256dh: string; auth: string } };
+    type SendResult = webPush.SendResult;
+    type Settled = { results: PromiseSettledResult<SendResult>[]; subs: Sub[] };
+
     this.getSubscriptionsForUser(userId)
-      .then((subs) => {
+      .then((subs): Promise<Settled> => {
+        if (subs.length === 0) {
+          // eslint-disable-next-line no-console
+          console.warn(`Push: no subscriptions for user ${userId} (user may not have enabled push on this device)`);
+          return Promise.resolve({ results: [], subs: [] });
+        }
+        // eslint-disable-next-line no-console
+        console.log(`Push: sending to user ${userId}, ${subs.length} subscription(s), title="${payload.title}"`);
         const body = JSON.stringify({
           title: payload.title,
           body: payload.body ?? '',
@@ -159,8 +174,9 @@ export class PushService {
         ).then((results) => ({ results, subs }));
       })
       .then(({ results, subs }) => {
+        if (subs.length === 0) return;
         const toRemove: string[] = [];
-        results.forEach((r, i) => {
+        results.forEach((r: PromiseSettledResult<SendResult>, i: number) => {
           if (r.status === 'rejected') {
             const statusCode = (r.reason as { statusCode?: number } | undefined)?.statusCode;
             if (statusCode === 410 || statusCode === 404) {

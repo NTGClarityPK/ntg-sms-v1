@@ -16,7 +16,10 @@ export class CreateStudentDto {
   password!: string;
 
   @IsString()
-  fullName!: string;
+  firstName!: string;
+
+  @IsString()
+  lastName!: string;
 
   @IsOptional()
   @IsString()

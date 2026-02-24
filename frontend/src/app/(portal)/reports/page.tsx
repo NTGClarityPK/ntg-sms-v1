@@ -131,7 +131,7 @@ export default function ReportsPage() {
   const students = (studentsQuery.data?.data as Student[] | undefined) ?? [];
   const studentOptions = students.map((s) => ({
     value: s.id,
-    label: `${s.fullName ?? 'Unknown'} (${s.studentId})`,
+    label: `${`${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'Unknown'} (${s.studentId})`,
   }));
 
   useEffect(() => {

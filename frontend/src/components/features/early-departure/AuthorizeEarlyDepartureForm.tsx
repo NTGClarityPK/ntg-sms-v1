@@ -183,7 +183,7 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
             placeholder="Select student"
             data={availableStudents.map((s) => ({
               value: s.id,
-              label: s.fullName || s.studentId || `Student ${s.id.slice(0, 8)}`,
+              label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || `Student ${s.id.slice(0, 8)}`,
             }))}
             value={form.values.studentId}
             onChange={(value) => form.setFieldValue('studentId', value ?? '')}

@@ -13,7 +13,8 @@ export class StudentDto {
   createdAt!: string;
   updatedAt!: string;
   // Joined data
-  fullName?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   className?: string;
   sectionName?: string;

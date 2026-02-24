@@ -3,7 +3,11 @@ import { IsString, IsOptional, IsBoolean, IsUUID } from 'class-validator';
 export class UpdateStudentDto {
   @IsOptional()
   @IsString()
-  fullName?: string;
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
 
   @IsOptional()
   @IsString()

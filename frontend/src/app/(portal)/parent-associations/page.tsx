@@ -39,7 +39,7 @@ export default function ParentAssociationsPage() {
   const { data: studentsData } = useStudents({ page: 1, limit: 100 });
 
   const parents = usersData?.data || [];
-  const students = (studentsData as { data?: Array<{ id: string; fullName?: string | null; studentId: string }> } | null | undefined)?.data || [];
+  const students = (studentsData as { data?: Array<{ id: string; firstName?: string | null; lastName?: string | null; studentId: string }> } | null | undefined)?.data || [];
 
   // Filter by search term
   const filteredParentId = useMemo(() => {
@@ -119,7 +119,7 @@ export default function ParentAssociationsPage() {
               placeholder="Filter by student"
               data={students.map((s) => ({
                 value: s.id,
-                label: `${s.fullName || 'N/A'} (${s.studentId})`,
+                label: `${`${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'N/A'} (${s.studentId})`,
               }))}
               value={studentFilter}
               onChange={(value) => {

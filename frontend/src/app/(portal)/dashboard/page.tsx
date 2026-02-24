@@ -138,7 +138,7 @@ export default function DashboardPage() {
         ) : (
           <Stack gap="md">
             <DashboardGrid
-              widgets={widgets}
+              widgets={widgets ?? []}
               renderWidget={renderWidget}
               widgetIdsOrder={widgetIdsOrder}
             />

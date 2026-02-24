@@ -5,7 +5,8 @@ export class PendingStudentDto {
 
   id!: string;
   studentId!: string;
-  fullName!: string;
+  firstName!: string;
+  lastName!: string;
   className?: string;
   sectionName?: string;
 }

@@ -12,7 +12,8 @@ export interface Student {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  fullName?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   phone?: string;
   address?: string;
@@ -24,10 +25,17 @@ export interface Student {
   subjectTemplateName?: string;
 }
 
+/** Display name for a student (first + second name). */
+export function formatStudentName(s: { firstName?: string | null; lastName?: string | null }): string {
+  const name = `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim();
+  return name || 'N/A';
+}
+
 export interface CreateStudentInput {
   email: string;
   password: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   avatarUrl?: string;
   phone?: string;
   address?: string;
@@ -45,7 +53,8 @@ export interface CreateStudentInput {
 }
 
 export interface UpdateStudentInput {
-  fullName?: string;
+  firstName?: string;
+  lastName?: string;
   phone?: string;
   address?: string;
   dateOfBirth?: string;

@@ -89,7 +89,7 @@ export default function InventoryHistoryPage() {
                 placeholder="All students"
                 data={students.map((s) => ({
                   value: s.id,
-                  label: s.fullName ?? s.studentId ?? s.id,
+                  label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || s.id,
                 }))}
                 value={studentFilter}
                 onChange={setStudentFilter}
@@ -134,7 +134,7 @@ export default function InventoryHistoryPage() {
                 placeholder="Select student to view history"
                 data={students.map((s) => ({
                   value: s.id,
-                  label: s.fullName ?? s.studentId ?? s.id,
+                  label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || s.id,
                 }))}
                 value={selectedStudentId}
                 onChange={setSelectedStudentId}

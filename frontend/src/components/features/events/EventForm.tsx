@@ -228,7 +228,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
     () =>
       studentsData?.data?.map((s) => ({
         value: s.id,
-        label: `${s.studentId} - ${s.fullName || 'Unknown'}`,
+        label: `${s.studentId} - ${`${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'Unknown'}`,
       })) || [],
     [studentsData],
   );

@@ -84,42 +84,18 @@ export class ParentsService {
 
     const { data: students, error: studentsError } = await supabase
       .from('students')
-      .select('id, student_id, user_id')
+      .select('id, student_id, user_id, first_name, last_name')
       .in('id', studentIds);
     throwIfDbError(studentsError);
 
-    const studentRows = (students || []) as unknown as StudentRowLite[];
-    const studentUserIds = [
-      ...new Set(
-        studentRows
-          .map((s) => s.user_id)
-          .filter((id): id is string => !!id),
-      ),
-    ];
-
-    const { data: studentProfiles, error: studentProfilesError } =
-      studentUserIds.length > 0
-        ? await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .in('id', studentUserIds)
-        : { data: [], error: null };
-    throwIfDbError(studentProfilesError);
-
-    const studentNameByUserId = new Map(
-      (studentProfiles || []).map((p) => [
-        (p as { id: string }).id,
-        (p as { full_name: string }).full_name,
-      ]),
-    );
-
+    const studentRows = (students || []) as unknown as Array<StudentRowLite & { first_name?: string | null; last_name?: string | null }>;
     const studentById = new Map(studentRows.map((s) => [s.id, s]));
 
     return rows.map((row) => {
       const student = studentById.get(row.student_id);
-      const studentName = student?.user_id
-        ? studentNameByUserId.get(student.user_id)
-        : undefined;
+      const firstName = student?.first_name ?? undefined;
+      const lastName = student?.last_name ?? undefined;
+      const studentName = [firstName, lastName].filter(Boolean).join(' ') || undefined;
 
       return new ParentStudentDto({
         id: row.id,
@@ -132,6 +108,8 @@ export class ParentsService {
         createdAt: row.created_at,
         parentName: parentNameById.get(row.parent_user_id),
         studentName,
+        firstName,
+        lastName,
         studentStudentId: student?.student_id,
         parentPhone: parentPhoneById.get(row.parent_user_id),
         parentEmail: emailMap.get(row.parent_user_id),

@@ -535,13 +535,11 @@ export class ClassSectionsService {
   async getStudentsInClassSection(
     id: string,
     branchId: string,
-  ): Promise<{ data: Array<{ id: string; studentId: string; fullName: string }> }> {
-    // Verify class-section exists
+  ): Promise<{ data: Array<{ id: string; studentId: string; firstName: string; lastName: string }> }> {
     await this.getClassSectionById(id, branchId);
 
     const supabase = this.supabaseConfig.getClient();
 
-    // Get class-section details to find class_id and section_id
     const { data: classSection, error: csError } = await supabase
       .from('class_sections')
       .select('class_id, section_id')
@@ -555,10 +553,9 @@ export class ClassSectionsService {
 
     const cs = classSection as { class_id: string; section_id: string };
 
-    // Get students in this class-section
     const { data: students, error: studentsError } = await supabase
       .from('students')
-      .select('id, student_id, user_id')
+      .select('id, student_id, first_name, last_name')
       .eq('branch_id', branchId)
       .eq('class_id', cs.class_id)
       .eq('section_id', cs.section_id)
@@ -566,28 +563,13 @@ export class ClassSectionsService {
 
     throwIfDbError(studentsError);
 
-    // Get user IDs and fetch profiles
-    const userIds = (students || [])
-      .map((s) => (s as { user_id: string }).user_id)
-      .filter((id): id is string => !!id);
-
-    const { data: profiles } = userIds.length > 0
-      ? await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', userIds)
-      : { data: [] };
-
-    const profileMap = new Map(
-      (profiles || []).map((p) => [p.id, p.full_name]),
-    );
-
     const studentList = (students || []).map((s) => {
-      const student = s as { id: string; student_id: string; user_id: string };
+      const row = s as { id: string; student_id: string; first_name: string | null; last_name: string | null };
       return {
-        id: student.id,
-        studentId: student.student_id,
-        fullName: profileMap.get(student.user_id) || '',
+        id: row.id,
+        studentId: row.student_id,
+        firstName: row.first_name ?? '',
+        lastName: row.last_name ?? '',
       };
     });
 

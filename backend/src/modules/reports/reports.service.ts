@@ -402,7 +402,7 @@ export class ReportsService {
     return {
       data: new StudentReportDto({
         studentId,
-        studentName: student.fullName ?? 'Unknown',
+        studentName: [student.firstName, student.lastName].filter(Boolean).join(' ') || 'Unknown',
         academicYearId: yearId,
         academicYearName: activeYear.name,
         academic,

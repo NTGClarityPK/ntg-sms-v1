@@ -29,6 +29,8 @@ type StudentRow = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  first_name: string | null;
+  last_name: string | null;
 };
 
 function throwIfDbError(error: PostgrestError | null): void {
@@ -117,65 +119,44 @@ export class StudentsService {
     // Map frontend sortBy to database columns
     const sortColumnMap: Record<string, string> = {
       studentId: 'student_id',
+      fullName: 'first_name',
+      firstName: 'first_name',
+      lastName: 'last_name',
       className: 'class_id',
       sectionName: 'section_id',
       isActive: 'is_active',
       createdAt: 'created_at',
       created_at: 'created_at',
     };
-    
+
     const dbSortColumn = sortColumnMap[sortBy] || 'created_at';
     dbQuery = dbQuery.order(dbSortColumn, { ascending });
 
-    // Don't filter by student_id in DB query when searching - we'll filter by name client-side
-    // This allows searching by both student_id and full_name
-    // Note: We fetch more records than needed when searching, then filter client-side
-    // Multi-term search: space-delimited words are OR'd (e.g. "Ma Mu" => name contains "Ma" OR "Mu")
+    // Search: by student_id, first_name, last_name (DB filter for name; client-side for student_id + email)
     const searchTerms = (query.search ?? '')
       .trim()
       .split(/\s+/)
       .map((t) => t.trim())
       .filter(Boolean);
     const hasSearch = searchTerms.length > 0;
-    const fetchLimit = hasSearch ? 1000 : limit; // Fetch more when searching to allow client-side filtering
-    const fetchTo = hasSearch ? from + fetchLimit - 1 : to;
+    if (hasSearch) {
+      const nameOrFilter = searchTerms
+        .map((t) => `first_name.ilike.%${t}%,last_name.ilike.%${t}%`)
+        .join(',');
+      dbQuery = dbQuery.or(nameOrFilter);
+    }
 
+    const fetchLimit = hasSearch ? 1000 : limit;
+    const fetchTo = hasSearch ? from + fetchLimit - 1 : to;
     let dbQueryWithLimit = dbQuery.range(from, fetchTo);
 
     const { data, error, count } = await dbQueryWithLimit;
 
     throwIfDbError(error);
 
-    // Get user IDs and fetch profiles separately
     const userIds = (data as unknown as Array<{ user_id: string }>)
       .map((s) => s.user_id)
       .filter((id): id is string => !!id);
-
-    // Fetch profiles - if searching, also filter by full_name in DB
-    let profilesQuery = supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', userIds);
-
-    if (hasSearch && userIds.length > 0) {
-      // Filter profiles by full_name: one term = single ilike; multiple terms = OR (any term matches)
-      if (searchTerms.length === 1) {
-        profilesQuery = profilesQuery.ilike('full_name', `%${searchTerms[0]}%`);
-      } else {
-        const orFilter = searchTerms
-          .map((t) => `full_name.ilike.%${t}%`)
-          .join(',');
-        profilesQuery = profilesQuery.or(orFilter);
-      }
-    }
-
-    const { data: profilesData } = userIds.length > 0
-      ? await profilesQuery
-      : { data: [] };
-
-    const profileMap = new Map(
-      (profilesData || []).map((p) => [p.id, p.full_name]),
-    );
 
     // OPTIMISED: Fetch emails only for needed users via batched individual lookups
     // (instead of fetching ALL auth users and filtering client-side)
@@ -217,7 +198,7 @@ export class StudentsService {
       }),
     );
 
-    let students = (data as unknown as Array<{
+    const students = (data as unknown as Array<{
       id: string;
       user_id: string;
       branch_id: string;
@@ -231,72 +212,59 @@ export class StudentsService {
       is_active: boolean;
       created_at: string;
       updated_at: string;
+      first_name: string | null;
+      last_name: string | null;
       classes: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
       sections: { name: string } | { name: string }[] | null;
-    }>)
-      .filter((row) => {
-        // Filter by profile match when searching (profiles already filtered in DB)
-        if (hasSearch && !profileMap.has(row.user_id)) {
-          return false;
-        }
-        return true;
-      })
-      .map((row) => {
-        const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
-        const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
-        const fullName = profileMap.get(row.user_id);
+    }>).map((row) => {
+      const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
+      const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
+      const templateInfo = templateMap.get(row.id);
 
-        const templateInfo = templateMap.get(row.id);
-
-        return new StudentDto({
-          id: row.id,
-          userId: row.user_id,
-          branchId: row.branch_id,
-          studentId: row.student_id,
-          classId: row.class_id ?? undefined,
-          sectionId: row.section_id ?? undefined,
-          bloodGroup: row.blood_group ?? undefined,
-          medicalNotes: row.medical_notes ?? undefined,
-          admissionDate: row.admission_date ?? undefined,
-          academicYearId: row.academic_year_id ?? undefined,
-          isActive: row.is_active,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
-          fullName: fullName,
-          email: emailMap.get(row.user_id),
-          className: classData?.display_name ?? classData?.name,
-          sectionName: sectionData?.name,
-          subjectTemplateId: templateInfo?.templateId,
-          subjectTemplateName: templateInfo?.templateName,
-        });
+      return new StudentDto({
+        id: row.id,
+        userId: row.user_id,
+        branchId: row.branch_id,
+        studentId: row.student_id,
+        classId: row.class_id ?? undefined,
+        sectionId: row.section_id ?? undefined,
+        bloodGroup: row.blood_group ?? undefined,
+        medicalNotes: row.medical_notes ?? undefined,
+        admissionDate: row.admission_date ?? undefined,
+        academicYearId: row.academic_year_id ?? undefined,
+        isActive: row.is_active,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        firstName: row.first_name ?? undefined,
+        lastName: row.last_name ?? undefined,
+        email: emailMap.get(row.user_id),
+        className: classData?.display_name ?? classData?.name,
+        sectionName: sectionData?.name,
+        subjectTemplateId: templateInfo?.templateId,
+        subjectTemplateName: templateInfo?.templateName,
       });
+    });
 
-    // Apply search filter on student_id, full_name, email (case-insensitive)
-    // Multi-term: match if ANY term appears in id, name, or email (OR)
+    // Apply search filter on student_id and email when searching (name already filtered in DB)
+    let filteredStudents = students;
     if (hasSearch) {
       const termsLower = searchTerms.map((t) => t.toLowerCase());
-      students = students.filter((s) =>
+      filteredStudents = students.filter((s) =>
         termsLower.some(
           (term) =>
             s.studentId.toLowerCase().includes(term) ||
-            s.fullName?.toLowerCase().includes(term) ||
+            [s.firstName ?? '', s.lastName ?? ''].some((n) => n.toLowerCase().includes(term)) ||
             (s.email?.toLowerCase().includes(term) ?? false),
         ),
       );
     }
 
-    // Calculate total and pagination
-    // When searching, total is the filtered count; otherwise use DB count
-    const total = hasSearch ? students.length : (count ?? 0);
+    const total = hasSearch ? filteredStudents.length : (count ?? 0);
     const totalPages = Math.max(1, Math.ceil(total / limit));
-
-    // Apply pagination to filtered results when searching
-    if (hasSearch) {
-      students = students.slice(from, from + limit);
-    }
+    const paginatedData = hasSearch ? filteredStudents.slice(from, from + limit) : filteredStudents;
 
     return {
-      data: students,
+      data: paginatedData,
       meta: { total, page, limit, totalPages },
     };
   }
@@ -332,23 +300,17 @@ export class StudentsService {
       is_active: boolean;
       created_at: string;
       updated_at: string;
+      first_name: string | null;
+      last_name: string | null;
       classes: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
       sections: { name: string } | { name: string }[] | null;
     };
-
-    // Fetch profile separately
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', row.user_id)
-      .single();
 
     const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
     const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
 
     const { data: authUser } = await supabase.auth.admin.getUserById(row.user_id);
 
-    // Fetch subject template assignment
     const { data: templateAssignment } = await supabase
       .from('student_subject_template_assignments')
       .select('subject_template_id, subject_templates:subject_template_id(name)')
@@ -373,7 +335,8 @@ export class StudentsService {
       isActive: row.is_active,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      fullName: profile?.full_name,
+      firstName: row.first_name ?? undefined,
+      lastName: row.last_name ?? undefined,
       email: authUser.user?.email,
       className: classData?.display_name ?? classData?.name,
       sectionName: sectionData?.name,
@@ -518,11 +481,12 @@ export class StudentsService {
       throw new BadRequestException('Failed to create user');
     }
 
+    const displayName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+
     try {
-      // Create profile
       const { error: profileError } = await supabase.from('profiles').insert({
         id: user.id,
-        full_name: input.fullName,
+        full_name: displayName,
         avatar_url: input.avatarUrl ?? null,
         phone: input.phone ?? null,
         address: input.address ?? null,
@@ -563,13 +527,14 @@ export class StudentsService {
         });
       }
 
-      // Create student record
       const { data: student, error: studentError } = await supabase
         .from('students')
         .insert({
           user_id: user.id,
           branch_id: branchId,
           student_id: studentId,
+          first_name: input.firstName.trim(),
+          last_name: input.lastName.trim(),
           class_id: input.classId ?? null,
           section_id: input.sectionId ?? null,
           blood_group: input.bloodGroup ?? null,
@@ -643,8 +608,12 @@ export class StudentsService {
       throw new NotFoundException('Student not found');
     }
 
-    // Update profile if fullName provided
-    if (input.fullName || input.phone || input.address || input.dateOfBirth || input.gender) {
+    const oldRowWithName = oldRow as { first_name?: string | null; last_name?: string | null; user_id: string };
+    const newFirst = input.firstName !== undefined ? input.firstName.trim() : (oldRowWithName.first_name ?? '');
+    const newLast = input.lastName !== undefined ? input.lastName.trim() : (oldRowWithName.last_name ?? '');
+    const displayName = `${newFirst} ${newLast}`.trim();
+
+    if (displayName || input.phone !== undefined || input.address !== undefined || input.dateOfBirth !== undefined || input.gender !== undefined) {
       const { data: student } = await supabase
         .from('students')
         .select('user_id')
@@ -652,17 +621,19 @@ export class StudentsService {
         .single();
 
       if (student) {
+        const profilePayload: Record<string, unknown> = {
+          updated_at: new Date().toISOString(),
+          updated_by: username,
+        };
+        if ((input.firstName !== undefined || input.lastName !== undefined) && displayName) profilePayload.full_name = displayName;
+        if (input.phone !== undefined) profilePayload.phone = input.phone;
+        if (input.address !== undefined) profilePayload.address = input.address;
+        if (input.dateOfBirth !== undefined) profilePayload.date_of_birth = input.dateOfBirth ?? null;
+        if (input.gender !== undefined) profilePayload.gender = input.gender ?? null;
+
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({
-            full_name: input.fullName,
-            phone: input.phone,
-            address: input.address,
-            date_of_birth: input.dateOfBirth,
-            gender: input.gender,
-            updated_at: new Date().toISOString(),
-            updated_by: username,
-          })
+          .update(profilePayload)
           .eq('id', (student as { user_id: string }).user_id);
 
         throwIfDbError(profileError);
@@ -676,8 +647,9 @@ export class StudentsService {
       .eq('id', id)
       .single();
 
-    // Update student record (including academic_year_id if provided)
     const updatePayload: {
+      first_name?: string;
+      last_name?: string;
       class_id?: string;
       section_id?: string;
       blood_group?: string | null;
@@ -697,6 +669,8 @@ export class StudentsService {
       updated_at: new Date().toISOString(),
       updated_by: username,
     };
+    if (input.firstName !== undefined) updatePayload.first_name = input.firstName.trim();
+    if (input.lastName !== undefined) updatePayload.last_name = input.lastName.trim();
 
     // Update academic_year_id if provided
     if (input.academicYearId !== undefined) {

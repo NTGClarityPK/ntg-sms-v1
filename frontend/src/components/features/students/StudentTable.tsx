@@ -56,7 +56,8 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
         <Table.Thead>
           <Table.Tr>
             <SortableHeader field="studentId">Student ID</SortableHeader>
-            <SortableHeader field="fullName">Name</SortableHeader>
+            <SortableHeader field="firstName">First Name</SortableHeader>
+            <SortableHeader field="lastName">Last Name</SortableHeader>
             <SortableHeader field="className">Class</SortableHeader>
             <SortableHeader field="sectionName">Section</SortableHeader>
             <Table.Th>Subject Template</Table.Th>
@@ -67,7 +68,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
         <Table.Tbody>
           {students.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={7}>
+              <Table.Td colSpan={8}>
                 <Text c="dimmed" ta="center" py="md">
                   No students found
                 </Text>
@@ -80,7 +81,10 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                   <Text fw={500}>{student.studentId}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Text>{student.fullName || 'N/A'}</Text>
+                  <Text>{student.firstName ?? '—'}</Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text>{student.lastName ?? '—'}</Text>
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">{student.className || 'N/A'}</Text>

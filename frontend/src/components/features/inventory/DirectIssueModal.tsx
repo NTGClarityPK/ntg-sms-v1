@@ -73,7 +73,7 @@ export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
             placeholder="Select student"
             data={students.map((s) => ({
               value: s.id,
-              label: s.fullName ?? s.studentId ?? s.id,
+              label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || s.id,
             }))}
             searchable
             {...form.getInputProps('studentId')}

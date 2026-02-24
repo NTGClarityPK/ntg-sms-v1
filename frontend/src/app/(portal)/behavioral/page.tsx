@@ -81,7 +81,7 @@ export default function BehavioralPage() {
                   <Stack gap="xs">
                     {pending.slice(0, 50).map((s) => (
                       <Text key={s.id} size="sm">
-                        {s.fullName}
+                        {`${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'N/A'}
                         {s.className || s.sectionName
                           ? ` (${[s.className, s.sectionName].filter(Boolean).join(' ')})`
                           : ''}

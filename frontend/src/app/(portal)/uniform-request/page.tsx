@@ -91,7 +91,7 @@ export default function UniformRequestPage() {
     }
     return studentsFromApi.map((s) => ({
       value: s.id,
-      label: s.fullName ?? s.studentId ?? s.id,
+      label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || s.id,
     }));
   }, [isParent, children, studentsFromApi]);
 

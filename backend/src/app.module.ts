@@ -44,6 +44,7 @@ import { UniformIssuancesModule } from './modules/uniform-issuances/uniform-issu
 import { StorageModule } from './modules/storage/storage.module';
 import { PushModule } from './modules/push/push.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { BulkImportModule } from './modules/bulk-import/bulk-import.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     StorageModule,
     PushModule,
     DashboardModule,
+    BulkImportModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,9 +1,10 @@
 'use client';
 
 import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Tooltip, ActionIcon } from '@mantine/core';
-import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconSearch, IconUpload } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { StudentTable } from '@/components/features/students/StudentTable';
 import { StudentForm } from '@/components/features/students/StudentForm';
@@ -74,9 +75,14 @@ export default function StudentsPage() {
               </ActionIcon>
             </Tooltip>
             {canEdit && (
-              <Button leftSection={<IconPlus size={16} />} onClick={open}>
-                Create Student
-              </Button>
+              <>
+                <Button component={Link} href="/students/bulk-import" variant="light" leftSection={<IconUpload size={16} />}>
+                  Bulk Import
+                </Button>
+                <Button leftSection={<IconPlus size={16} />} onClick={open}>
+                  Create Student
+                </Button>
+              </>
             )}
           </Group>
         </Group>

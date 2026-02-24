@@ -18,7 +18,8 @@ import { IconPhone, IconUser } from '@tabler/icons-react';
 const createStudentSchema = z.object({
   email: z.string().email('Invalid email'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  fullName: z.string().min(1, 'Full name is required'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Second name is required'),
   phone: z.string().optional(),
   address: z.string().optional(),
   dateOfBirth: z.string().optional(),
@@ -32,7 +33,8 @@ const createStudentSchema = z.object({
 });
 
 const updateStudentSchema = z.object({
-  fullName: z.string().min(1, 'Full name is required'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Second name is required'),
   phone: z.string().optional(),
   address: z.string().optional(),
   dateOfBirth: z.string().optional(),
@@ -70,7 +72,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     initialValues: {
       email: '',
       password: '',
-      fullName: '',
+      firstName: '',
+      lastName: '',
       phone: '',
       address: '',
       dateOfBirth: '',
@@ -128,7 +131,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       form.setValues({
         email: student.email || '',
         password: '',
-        fullName: student.fullName || '',
+        firstName: student.firstName || '',
+        lastName: student.lastName || '',
         phone: student.phone || '',
         address: student.address || '',
         dateOfBirth: student.dateOfBirth || '',
@@ -152,7 +156,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     try {
       if (isEdit && student) {
         const updateData: UpdateStudentInput = {
-          fullName: values.fullName,
+          firstName: values.firstName,
+          lastName: values.lastName,
           phone: values.phone || undefined,
           address: values.address || undefined,
           dateOfBirth: values.dateOfBirth || undefined,
@@ -172,7 +177,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         const createData: CreateStudentInput = {
           email: values.email,
           password: values.password,
-          fullName: values.fullName,
+          firstName: values.firstName,
+          lastName: values.lastName,
           phone: values.phone || undefined,
           address: values.address || undefined,
           dateOfBirth: values.dateOfBirth || undefined,
@@ -216,7 +222,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
             </>
           )}
 
-          <TextInput label="Full Name" placeholder="John Doe" required {...form.getInputProps('fullName')} />
+          <TextInput label="First Name" placeholder="John" required {...form.getInputProps('firstName')} />
+          <TextInput label="Second Name" placeholder="Doe" required {...form.getInputProps('lastName')} />
 
           {isEdit && (
             <TextInput

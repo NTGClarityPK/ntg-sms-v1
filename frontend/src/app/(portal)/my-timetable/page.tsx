@@ -430,7 +430,7 @@ export default function MyTimetablePage() {
           {/* Student Info Banner */}
           <Paper p="md" withBorder style={{ backgroundColor: bannerBackgroundColor }}>
             <Text size="sm" fw={500}>
-              Showing Timetable for <Text component="span" fw={600}>{myStudentData.data.fullName}</Text> of{' '}
+              Showing Timetable for <Text component="span" fw={600}>{[myStudentData.data.firstName, myStudentData.data.lastName].filter(Boolean).join(' ') || 'Student'}</Text> of{' '}
               <Text component="span" fw={600}>{subjectTemplate?.name || 'Unknown Template'}</Text> for{' '}
               <Text component="span" fw={600}>
                 {timetable ? `${timetable.className} - ${timetable.sectionName}` : 'Unknown Class'}

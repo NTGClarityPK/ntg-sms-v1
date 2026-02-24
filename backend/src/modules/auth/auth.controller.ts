@@ -70,7 +70,7 @@ export class AuthController {
   async currentChild(
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{
-    data: { id: string; studentId: string; fullName: string } | null;
+    data: { id: string; studentId: string; firstName: string; lastName: string } | null;
   }> {
     const current = await this.authService.getCurrentChild(user.id);
     return { data: current };

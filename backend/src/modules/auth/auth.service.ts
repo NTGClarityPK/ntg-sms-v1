@@ -252,7 +252,8 @@ export class AuthService {
   async getCurrentChild(userId: string): Promise<{
     id: string;
     studentId: string;
-    fullName: string;
+    firstName: string;
+    lastName: string;
   } | null> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -302,10 +303,9 @@ export class AuthService {
       return null;
     }
 
-    // Fetch the student record
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, student_id, user_id')
+      .select('id, student_id, user_id, first_name, last_name')
       .eq('id', studentIdToFetch)
       .single();
 
@@ -313,17 +313,12 @@ export class AuthService {
       return null;
     }
 
-    // Fetch profile separately to get full_name
-    const { data: studentProfile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', student.user_id)
-      .maybeSingle();
-
+    const row = student as { id: string; student_id: string; first_name: string | null; last_name: string | null };
     return {
-      id: student.id,
-      studentId: student.student_id,
-      fullName: studentProfile?.full_name || '',
+      id: row.id,
+      studentId: row.student_id,
+      firstName: row.first_name ?? '',
+      lastName: row.last_name ?? '',
     };
   }
 }

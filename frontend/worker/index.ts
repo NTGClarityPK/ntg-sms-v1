@@ -46,14 +46,16 @@ const sw = self as unknown as SWScope;
 
 self.addEventListener('push', (event: Event) => {
   const e = event as unknown as { data?: { json(): unknown; text(): string }; waitUntil(p: Promise<unknown>): void };
-  if (!e.data) return;
-  const payload = (() => {
+  let payload: { title?: string; body?: string; url?: string; tag?: string };
+  if (!e.data) {
+    payload = { title: 'Notification', body: '', url: '/', tag: 'notification' };
+  } else {
     try {
-      return e.data.json() as { title?: string; body?: string; url?: string; tag?: string };
+      payload = e.data.json() as { title?: string; body?: string; url?: string; tag?: string };
     } catch {
-      return { title: 'Notification', body: e.data.text(), url: '/', tag: 'notification' };
+      payload = { title: 'Notification', body: e.data.text(), url: '/', tag: 'notification' };
     }
-  })();
+  }
   const title = payload.title ?? 'Notification';
   const options: NotificationOptions = {
     body: payload.body ?? '',
@@ -61,14 +63,13 @@ self.addEventListener('push', (event: Event) => {
     data: { url: payload.url ?? '/' },
     requireInteraction: false,
   };
-  // Only show system notification when no window is visible (app closed or in background tab).
-  // When a window is visible, in-app toast (Realtime) is shown instead to avoid duplicate.
-  const promise = sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-    const hasVisibleWindow = clientList.some((c) => (c as WindowClient).visibilityState === 'visible');
-    if (!hasVisibleWindow) {
-      return sw.registration.showNotification(title, options);
-    }
-  });
+  // Always show system notification so it appears in the OS tray when the app is minimized.
+  const promise = sw.registration
+    .showNotification(title, options)
+    .catch((err: unknown) => {
+      // Permission revoked or browser blocked; log for debugging (visible in SW devtools).
+      console.error('[SW] showNotification failed:', err);
+    });
   e.waitUntil(promise);
 });
 

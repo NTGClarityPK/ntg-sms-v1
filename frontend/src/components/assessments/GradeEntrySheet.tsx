@@ -65,7 +65,7 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
       const existing = gradesMap.get(student.id);
       return {
         studentId: student.id,
-        studentName: student.fullName || `${student.studentId}`,
+        studentName: `${student.firstName ?? ''} ${student.lastName ?? ''}`.trim() || `${student.studentId}`,
         assessmentId: assessment.id,
         marksObtained: existing?.marksObtained ?? 0,
         isAbsent: existing?.isAbsent ?? false,
