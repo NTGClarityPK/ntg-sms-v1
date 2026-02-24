@@ -38,8 +38,9 @@ export function useDashboardWidgets(role?: string) {
       );
       return response.data ?? [];
     },
-    enabled: !!branchId,
+    enabled: !!branchId && role !== undefined,
     staleTime: 5 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
   });
 }
 

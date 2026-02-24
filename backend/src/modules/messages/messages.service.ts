@@ -115,7 +115,7 @@ export class MessagesService {
     query: QueryConversationsDto,
   ): Promise<{
     data: ConversationListDto[];
-    meta: { total: number; page: number; limit: number; totalPages: number };
+    meta: { total: number; page: number; limit: number; totalPages: number; allConversationIds: string[] };
   }> {
     const supabase = this.supabaseConfig.getClient();
     const page = query.page ?? 1;
@@ -128,12 +128,27 @@ export class MessagesService {
       .select('conversation_id')
       .eq('user_id', userId);
     throwIfDbError(partError);
-    const conversationIds = (participantRows || []).map((p) => p.conversation_id);
+    const allParticipantIds = (participantRows || []).map((p) => p.conversation_id);
+    const emptyMeta = {
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+      allConversationIds: allParticipantIds,
+    };
+    if (allParticipantIds.length === 0) {
+      return { data: [], meta: emptyMeta };
+    }
+
+    const { data: hiddenRows } = await supabase
+      .from('conversation_hidden')
+      .select('conversation_id')
+      .eq('user_id', userId)
+      .in('conversation_id', allParticipantIds);
+    const hiddenSet = new Set((hiddenRows || []).map((r: { conversation_id: string }) => r.conversation_id));
+    const conversationIds = allParticipantIds.filter((id) => !hiddenSet.has(id));
     if (conversationIds.length === 0) {
-      return {
-        data: [],
-        meta: { total: 0, page, limit, totalPages: 0 },
-      };
+      return { data: [], meta: emptyMeta };
     }
 
     let convQuery = supabase
@@ -190,6 +205,7 @@ export class MessagesService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        allConversationIds: allParticipantIds,
       },
     };
   }
@@ -375,13 +391,27 @@ export class MessagesService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    let clearedAt: string | null = null;
+    const { data: clearedRow } = await supabase
+      .from('conversation_cleared')
+      .select('cleared_at')
+      .eq('user_id', userId)
+      .eq('conversation_id', conversationId)
+      .maybeSingle();
+    if (clearedRow && (clearedRow as { cleared_at: string }).cleared_at) {
+      clearedAt = (clearedRow as { cleared_at: string }).cleared_at;
+    }
+
     let msgQuery = supabase
       .from('messages')
       .select('id, conversation_id, sender_id, message_type, subject, body, created_at', {
         count: 'exact',
       })
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false });
+      .eq('conversation_id', conversationId);
+    if (clearedAt) {
+      msgQuery = msgQuery.gt('created_at', clearedAt);
+    }
+    msgQuery = msgQuery.order('created_at', { ascending: false });
 
     const { data: msgRows, error: msgError, count } = await msgQuery.range(from, to);
     throwIfDbError(msgError);
@@ -597,6 +627,16 @@ export class MessagesService {
       throwIfDbError(readError);
     }
 
+    // Unhide conversation for all recipients so it reappears in their list when someone messages them
+    if (recipientIds.length > 0) {
+      const { error: unhideError } = await supabase
+        .from('conversation_hidden')
+        .delete()
+        .eq('conversation_id', conversationId)
+        .in('user_id', recipientIds);
+      throwIfDbError(unhideError);
+    }
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('full_name')
@@ -713,5 +753,68 @@ export class MessagesService {
       .eq('user_id', userId)
       .in('message_id', messageIds)
       .is('read_at', null);
+  }
+
+  /** Hide conversation from this user's list only (per-user; other participants still see it). */
+  async deleteConversation(
+    conversationId: string,
+    userId: string,
+    branchId: string,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: conv, error: convError } = await supabase
+      .from('conversations')
+      .select('id, branch_id')
+      .eq('id', conversationId)
+      .single();
+    throwIfDbError(convError);
+    if (!conv) throw new NotFoundException('Conversation not found');
+    if ((conv as { branch_id: string }).branch_id !== branchId) {
+      throw new ForbiddenException('Conversation does not belong to current branch');
+    }
+
+    const { data: partRows, error: partError } = await supabase
+      .from('conversation_participants')
+      .select('user_id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+    throwIfDbError(partError);
+    if (!partRows || partRows.length === 0) {
+      throw new ForbiddenException('You are not a participant in this conversation');
+    }
+
+    const now = new Date().toISOString();
+    const { error: upsertError } = await supabase
+      .from('conversation_hidden')
+      .upsert(
+        { user_id: userId, conversation_id: conversationId, hidden_at: now },
+        { onConflict: 'user_id,conversation_id' },
+      );
+    throwIfDbError(upsertError);
+  }
+
+  /** Clear chat for the current user only (per-user; other participants still see all messages). */
+  async clearConversationMessages(conversationId: string, userId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: partRows, error: partError } = await supabase
+      .from('conversation_participants')
+      .select('user_id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+    throwIfDbError(partError);
+    if (!partRows || partRows.length === 0) {
+      throw new ForbiddenException('You are not a participant in this conversation');
+    }
+
+    const now = new Date().toISOString();
+    const { error: upsertError } = await supabase
+      .from('conversation_cleared')
+      .upsert(
+        { user_id: userId, conversation_id: conversationId, cleared_at: now },
+        { onConflict: 'user_id,conversation_id' },
+      );
+    throwIfDbError(upsertError);
   }
 }

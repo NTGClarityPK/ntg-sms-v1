@@ -19,7 +19,7 @@ export function WidgetContainer({
 }: WidgetContainerProps) {
   if (error) {
     return (
-      <Paper withBorder p="md" radius="md">
+      <Paper withBorder p="md" radius="md" style={{ minHeight: 160 }}>
         <Stack gap="sm">
           <Text size="sm" fw={600}>
             {widget.title}
@@ -34,7 +34,7 @@ export function WidgetContainer({
 
   if (isLoading) {
     return (
-      <Paper withBorder p="md" radius="md">
+      <Paper withBorder p="md" radius="md" style={{ minHeight: 160 }}>
         <Stack gap="md">
           <Skeleton height={20} width="60%" />
           <Skeleton height={80} />
@@ -44,7 +44,7 @@ export function WidgetContainer({
   }
 
   return (
-    <Paper withBorder p="md" radius="md">
+    <Paper withBorder p="md" radius="md" style={{ minHeight: 160 }}>
       <Stack gap="sm">
         <Text size="sm" fw={600}>
           {widget.title}

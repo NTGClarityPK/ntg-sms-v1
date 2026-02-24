@@ -10,12 +10,18 @@ function isApiRequest(url: URL): boolean {
   return url.pathname.includes('/api/');
 }
 
+interface FetchEventLike {
+  request: Request;
+  respondWith(r: Promise<Response> | Response): void;
+}
+
 self.addEventListener('fetch', (event: Event) => {
-  const req = (event as FetchEvent).request;
+  const ev = event as unknown as FetchEventLike;
+  const req = ev.request;
   try {
     const url = new URL(req.url);
     if (!isApiRequest(url)) return;
-    (event as FetchEvent).respondWith(fetch(req));
+    ev.respondWith(fetch(req));
   } catch {
     // Ignore URL parse errors; let other handlers deal with it
   }

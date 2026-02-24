@@ -285,3 +285,56 @@ export function useCreateConversation() {
     },
   });
 }
+
+/** Delete a conversation (removes it from the list and deletes all messages). */
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+  const notifyColors = useThemeColors();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      await apiClient.delete(`/api/v1/conversations/${conversationId}`);
+    },
+    onSuccess: (_, conversationId) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations', branchId] });
+      queryClient.removeQueries({ queryKey: ['conversation', conversationId] });
+      queryClient.removeQueries({ queryKey: ['conversation-messages', conversationId] });
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to delete conversation';
+      notifications.show({ title: 'Error', message, color: notifyColors.error });
+    },
+  });
+}
+
+/** Clear all messages in the current conversation. */
+export function useClearConversationMessages(conversationId: string | null) {
+  const queryClient = useQueryClient();
+  const notifyColors = useThemeColors();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!conversationId) throw new Error('No conversation selected');
+      await apiClient.delete(`/api/v1/conversations/${conversationId}/messages`);
+    },
+    onSuccess: () => {
+      if (!conversationId) return;
+      queryClient.setQueriesData(
+        {
+          predicate: (query) =>
+            Array.isArray(query.queryKey) &&
+            query.queryKey[0] === 'conversation-messages' &&
+            query.queryKey[1] === conversationId,
+        },
+        () => ({ data: [], meta: { total: 0, page: 1, limit: 50, totalPages: 0 } }),
+      );
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to clear messages';
+      notifications.show({ title: 'Error', message, color: notifyColors.error });
+    },
+  });
+}

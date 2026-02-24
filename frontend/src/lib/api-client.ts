@@ -3,13 +3,22 @@ import { ApiResponse } from '@/types/api';
 import { supabase } from './supabase/client';
 import { enqueue } from './offline/queue';
 
-/** When running on localhost, always use local API so old builds/cache don't keep hitting a previous API URL (e.g. Cloudflare tunnel). Export for use in pages that build API URLs manually (e.g. fetch, redirects). */
+const LOCAL_API = 'http://localhost:3001';
+
+/**
+ * Effective API base URL for this request. Use this so old builds/cache don't keep hitting a previous URL (e.g. Cloudflare tunnel).
+ * - On localhost/127.0.0.1 → always local API.
+ * - On trycloudflare.com (tunnel) → local API so tunnel frontend still talks to local backend when tunnel is down.
+ * Export for use in pages that build API URLs manually (e.g. fetch, redirects).
+ */
 export function getEffectiveApiBaseURL(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:3001';
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || LOCAL_API;
   }
-  return fromEnv;
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') return LOCAL_API;
+  if (host.endsWith('trycloudflare.com')) return LOCAL_API;
+  return process.env.NEXT_PUBLIC_API_URL || LOCAL_API;
 }
 
 class ApiClient {
@@ -31,9 +40,12 @@ class ApiClient {
 
   private setupInterceptors(): void {
     // Request interceptor - inject auth token and branch header.
+    // Set baseURL on every request so we always use current effective URL (avoids stale baked-in or cached env).
     // Never let getSession() fail the request: on refresh Supabase can be slow; proceed without token if it throws.
     this.client.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
+        config.baseURL = getEffectiveApiBaseURL();
+
         // Remove Content-Type header for FormData to let axios set it with boundary
         if (config.data instanceof FormData) {
           delete config.headers['Content-Type'];
@@ -73,7 +85,7 @@ class ApiClient {
         const isNetworkError =
           error.code === 'ERR_NETWORK' || error.message === 'Network Error';
         if (isNetworkError) {
-          const baseURL = this.client.defaults.baseURL ?? 'http://localhost:3001';
+          const baseURL = getEffectiveApiBaseURL();
           const friendly = new Error(
             `Unable to reach the API at ${baseURL}. Ensure the backend is running (e.g. \`npm run start:dev\` in the backend folder).`,
           ) as AxiosError<ApiResponse<unknown>>;

@@ -20,9 +20,10 @@ import {
   useMantineTheme,
   ActionIcon,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';
-import { IconMessage, IconPlus, IconSend } from '@tabler/icons-react';
-import { useConversations, useConversation, useConversationMessages, useSendMessage, useMarkConversationRead, useCreateConversation } from '@/hooks/api/useMessages';
+import { IconMessage, IconPlus, IconSend, IconArrowLeft, IconTrash, IconEraser } from '@tabler/icons-react';
+import { useConversations, useConversation, useConversationMessages, useSendMessage, useMarkConversationRead, useCreateConversation, useDeleteConversation, useClearConversationMessages } from '@/hooks/api/useMessages';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useUsers } from '@/hooks/useUsers';
 import { useSystemSetting } from '@/hooks/useSystemSettings';
@@ -44,6 +45,8 @@ export default function MessagesPage() {
   const [newType, setNewType] = useState<'one_to_one' | 'broadcast'>('one_to_one');
   const [newRecipientUserId, setNewRecipientUserId] = useState<string | null>(null);
   const [newClassSectionId, setNewClassSectionId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (conversationIdFromUrl) setSelectedId(conversationIdFromUrl);
@@ -55,7 +58,7 @@ export default function MessagesPage() {
 
   const { data: conversationsResponse, isLoading: loadingList } = useConversations({ limit: 50 });
   const conversations: ConversationListItem[] = conversationsResponse?.data ?? [];
-  const meta = (conversationsResponse as { meta?: { total: number } })?.meta;
+  const meta = (conversationsResponse as { meta?: { total?: number; allConversationIds?: string[] } })?.meta;
 
   const { data: conversation, isLoading: loadingConv } = useConversation(selectedId);
   const { data: messagesResponse, isLoading: loadingMessages } = useConversationMessages(
@@ -66,6 +69,8 @@ export default function MessagesPage() {
   const sendMessage = useSendMessage(selectedId);
   const markConversationRead = useMarkConversationRead(selectedId);
   const createConversation = useCreateConversation();
+  const deleteConversation = useDeleteConversation();
+  const clearMessages = useClearConversationMessages(selectedId);
 
   // Auto-mark conversation as read when user is viewing it
   useEffect(() => {
@@ -271,6 +276,50 @@ export default function MessagesPage() {
     };
   }, [selectedId, user?.id, queryClient]);
 
+  // Realtime: when a new message arrives in any of my conversations (including hidden), refetch list so it appears
+  const allConversationIds = useMemo(() => new Set(meta?.allConversationIds ?? []), [meta?.allConversationIds]);
+  useEffect(() => {
+    if (!user?.id || allConversationIds.size === 0) return;
+
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const setupSubscription = async () => {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) return;
+      try {
+        await supabase.realtime.setAuth(session.access_token);
+      } catch {
+        return;
+      }
+      if (cancelled) return;
+
+      channel = supabase
+        .channel('messages-list-invalidate')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+          },
+          (payload) => {
+            const convId = (payload.new as { conversation_id?: string })?.conversation_id;
+            if (convId && allConversationIds.has(convId)) {
+              queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            }
+          },
+        )
+        .subscribe();
+    };
+
+    setupSubscription();
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient, allConversationIds]);
+
   const { data: commSetting } = useSystemSetting<{ teacher_student?: string; teacher_parent?: string }>('communication_direction');
   const teacherStudentBoth = (commSetting?.data?.value?.teacher_student ?? 'both') === 'both';
   const teacherParentBoth = (commSetting?.data?.value?.teacher_parent ?? 'both') === 'both';
@@ -347,6 +396,12 @@ export default function MessagesPage() {
 
   const isOwnMessage = (m: Message) => m.senderId === user?.id;
 
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const handleBackToList = useCallback(() => {
+    setSelectedId(null);
+    window.history.replaceState(null, '', '/messages');
+  }, []);
+
   // Scroll to bottom when messages change (including new Realtime messages)
   useEffect(() => {
     if (messages.length > 0) {
@@ -357,30 +412,73 @@ export default function MessagesPage() {
     }
   }, [messages.length, messages.map((m) => m.id).join(',')]);
 
+  const chatHeight = isMobile ? 'calc(100vh - 120px)' : 480;
+  const listHeight = isMobile ? 'calc(100vh - 120px)' : 480;
+
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Messages</Title>
-          <Button
-            leftSection={<IconPlus size={18} />}
-            onClick={() => setNewConversationOpen(true)}
-          >
-            New conversation
-          </Button>
+          {isMobile && selectedId ? (
+            <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+              <ActionIcon
+                variant="subtle"
+                size="lg"
+                aria-label="Back to conversations"
+                onClick={handleBackToList}
+              >
+                <IconArrowLeft size={20} />
+              </ActionIcon>
+              <Title order={1} lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
+                {conversationTitle || 'Chat'}
+              </Title>
+              <ActionIcon
+                variant="subtle"
+                color="red"
+                size="lg"
+                aria-label="Clear chat"
+                onClick={() => setClearConfirmOpen(true)}
+              >
+                <IconEraser size={18} />
+              </ActionIcon>
+            </Group>
+          ) : (
+            <>
+              <Title order={1}>Messages</Title>
+              <Button
+                leftSection={<IconPlus size={18} />}
+                onClick={() => setNewConversationOpen(true)}
+              >
+                New conversation
+              </Button>
+            </>
+          )}
         </Group>
       </div>
 
       <div
         style={{
-          marginTop: '60px',
-          padding: 'var(--mantine-spacing-md)',
+          marginTop: isMobile ? '60px' : '60px',
+          padding: isMobile ? 'var(--mantine-spacing-xs)' : 'var(--mantine-spacing-md)',
         }}
       >
         <Paper withBorder p={0}>
-          <SimpleGrid cols={{ base: 1, md: 2 }} spacing={0} style={{ minHeight: 480 }}>
-            <Box style={{ borderRight: '1px solid var(--mantine-color-default-border)' }}>
-              <ScrollArea h={480} type="auto">
+          <SimpleGrid
+            cols={isMobile ? 1 : 2}
+            spacing={0}
+            style={{
+              minHeight: isMobile ? undefined : 480,
+              display: isMobile && selectedId ? 'block' : undefined,
+            }}
+          >
+            {/* Conversation list - hidden on mobile when a conversation is open */}
+            <Box
+              style={{
+                borderRight: isMobile ? 'none' : '1px solid var(--mantine-color-default-border)',
+                display: isMobile && selectedId ? 'none' : undefined,
+              }}
+            >
+              <ScrollArea h={isMobile && !selectedId ? listHeight : 480} type="auto">
                 {loadingList ? (
                   <Stack p="md" gap="sm">
                     {[1, 2, 3, 4].map((i) => (
@@ -410,17 +508,28 @@ export default function MessagesPage() {
                           window.history.replaceState(null, '', `/messages?conversation=${c.id}`);
                         }}
                       >
-                        <Group justify="space-between" wrap="nowrap">
-                          <Text fw={selectedId === c.id ? 600 : 400} size="sm" lineClamp={1}>
+                        <Group justify="space-between" wrap="nowrap" gap="xs">
+                          <Text fw={selectedId === c.id ? 600 : 400} size="sm" lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
                             {c.type === 'broadcast'
                               ? `${c.className ?? ''} ${c.sectionName ?? ''}`.trim() || 'Broadcast'
                               : c.participantNames?.join(', ') || 'Conversation'}
                           </Text>
-                          {c.unreadCount > 0 && (
-                            <Badge size="sm" color="blue" variant="filled">
-                              {c.unreadCount}
-                            </Badge>
-                          )}
+                          <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
+                            {c.unreadCount > 0 && (
+                              <Badge size="sm" color="blue" variant="filled">
+                                {c.unreadCount}
+                              </Badge>
+                            )}
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              size="sm"
+                              aria-label="Delete conversation"
+                              onClick={() => setDeleteConfirmId(c.id)}
+                            >
+                              <IconTrash size={16} />
+                            </ActionIcon>
+                          </Group>
                         </Group>
                         {c.lastMessagePreview && (
                           <Text size="xs" c="dimmed" lineClamp={1} mt={4}>
@@ -434,22 +543,37 @@ export default function MessagesPage() {
               </ScrollArea>
             </Box>
 
-            <Box>
+            {/* Chat pane - on mobile hidden when no conversation selected */}
+            <Box style={{ display: isMobile && !selectedId ? 'none' : undefined }}>
               {!selectedId ? (
                 <Stack align="center" justify="center" h={480} p="xl">
                   <IconMessage size={64} style={{ opacity: 0.2 }} />
                   <Text c="dimmed">Select a conversation or start a new one</Text>
                 </Stack>
               ) : (
-                <Stack gap={0} h={480} style={{ flex: 1 }}>
-                  <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
-                    {loadingConv ? (
-                      <Skeleton height={24} width="60%" />
-                    ) : (
-                      <Text fw={600}>{conversationTitle}</Text>
-                    )}
-                  </Box>
-                  <ScrollArea flex={1} type="auto" viewportProps={{ style: { maxHeight: 320 } }}>
+                <Stack gap={0} h={isMobile ? chatHeight : 480} style={{ flex: 1, minHeight: 0 }}>
+                  {/* Conversation title - hidden on mobile (shown in title bar with back button) */}
+                  {!isMobile && (
+                    <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+                      <Group justify="space-between" wrap="nowrap">
+                        {loadingConv ? (
+                          <Skeleton height={24} width="60%" />
+                        ) : (
+                          <Text fw={600}>{conversationTitle}</Text>
+                        )}
+                        <Button
+                          variant="subtle"
+                          color="red"
+                          size="xs"
+                          leftSection={<IconEraser size={14} />}
+                          onClick={() => setClearConfirmOpen(true)}
+                        >
+                          Clear chat
+                        </Button>
+                      </Group>
+                    </Box>
+                  )}
+                  <ScrollArea flex={1} type="auto" style={isMobile ? { flex: 1, minHeight: 0 } : undefined} viewportProps={{ style: { maxHeight: isMobile ? undefined : 320, minHeight: isMobile ? 200 : undefined } }}>
                     <Stack p="md" gap="xs">
                       {loadingMessages ? (
                         <Skeleton height={120} />
@@ -608,6 +732,66 @@ export default function MessagesPage() {
             </Button>
           </Group>
         </Stack>
+      </Modal>
+
+      <Modal
+        opened={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        title="Delete conversation"
+      >
+        <Text size="sm" c="dimmed" mb="md">
+          Remove this conversation from your list? All messages will be permanently deleted. This cannot be undone.
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="default" onClick={() => setDeleteConfirmId(null)}>
+            Cancel
+          </Button>
+          <Button
+            color="red"
+            loading={deleteConversation.isPending}
+            onClick={() => {
+              if (deleteConfirmId) {
+                deleteConversation.mutate(deleteConfirmId, {
+                  onSuccess: () => {
+                    setDeleteConfirmId(null);
+                    if (selectedId === deleteConfirmId) {
+                      setSelectedId(null);
+                      window.history.replaceState(null, '', '/messages');
+                    }
+                  },
+                });
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </Group>
+      </Modal>
+
+      <Modal
+        opened={clearConfirmOpen}
+        onClose={() => setClearConfirmOpen(false)}
+        title="Clear chat"
+      >
+        <Text size="sm" c="dimmed" mb="md">
+          Delete all messages in this conversation? This cannot be undone.
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="default" onClick={() => setClearConfirmOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            color="red"
+            loading={clearMessages.isPending}
+            onClick={() => {
+              clearMessages.mutate(undefined, {
+                onSuccess: () => setClearConfirmOpen(false),
+              });
+            }}
+          >
+            Clear all
+          </Button>
+        </Group>
       </Modal>
     </>
   );

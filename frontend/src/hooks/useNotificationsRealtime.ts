@@ -94,19 +94,23 @@ export function useNotificationsRealtime(
               },
             );
 
-            if (!notification.isRead) {
+            // When on messages page, don't bump unread count or refetch for message notifications.
+            const isOnMessagesPage = pathnameRef.current?.startsWith('/messages') === true;
+            const suppressMessageNotification = notification.type === 'message' && isOnMessagesPage;
+
+            if (!notification.isRead && !suppressMessageNotification) {
               queryClient.setQueriesData(
                 { queryKey: ['notifications', 'unread-count', userId] },
                 (prev: number | undefined) => (typeof prev === 'number' ? prev + 1 : 1),
               );
             }
             queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
-            queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count', userId] });
+            if (!suppressMessageNotification) {
+              queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count', userId] });
+            }
 
-            // Alerts = toast + sound only. Realtime list/unread count updates above always run.
-            // Do not show message toast/sound when user is on messages page (chat open).
-            const isOnMessagesPage = pathnameRef.current?.startsWith('/messages') === true;
-            const suppressMessageAlert = notification.type === 'message' && isOnMessagesPage;
+            // Alerts = toast + sound only. Do not show when user is on messages page (chat open).
+            const suppressMessageAlert = suppressMessageNotification;
             if (alertsEnabledRef.current && !notification.isRead && !suppressMessageAlert) {
               mantineNotifications.show({
                 title: notification.title,

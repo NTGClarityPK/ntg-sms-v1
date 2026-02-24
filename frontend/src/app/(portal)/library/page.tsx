@@ -153,7 +153,7 @@ export default function LibraryPage() {
                 <Group gap="xs" wrap="wrap" className="filter-chip-group">
                   <Chip.Group
                     value={viewMode}
-                    onChange={(v) => setViewMode((Array.isArray(v) ? v[0] : v) ?? 'grid')}
+                    onChange={(v) => setViewMode(((Array.isArray(v) ? v[0] : v) === 'list' ? 'list' : 'grid'))}
                   >
                     <Group gap="xs" wrap="wrap">
                       <Chip value="grid" variant="filled">

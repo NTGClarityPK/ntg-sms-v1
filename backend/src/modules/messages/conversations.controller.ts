@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -100,5 +101,24 @@ export class ConversationsController {
       roles,
     );
     return { data };
+  }
+
+  @Delete(':id/messages')
+  async clearMessages(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.messagesService.clearConversationMessages(id, user.id);
+    return { data: null };
+  }
+
+  @Delete(':id')
+  async deleteConversation(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ) {
+    await this.messagesService.deleteConversation(id, user.id, branch.branchId);
+    return { data: null };
   }
 }
