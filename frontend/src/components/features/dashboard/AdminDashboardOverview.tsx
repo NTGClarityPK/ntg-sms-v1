@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import {
   Stack,
   SimpleGrid,
@@ -59,6 +60,7 @@ interface AdminDashboardOverviewProps {
 }
 
 export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
+  const t = useTranslations('dashboard');
   const colors = useThemeColors();
   const studentsQuery = useStudents({ limit: 1, page: 1 });
   const staffQuery = useStaff({ limit: 1, page: 1 });
@@ -101,11 +103,11 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
 
   const roleLabel = user?.roles?.[0]?.roleName
     ? formatRoleName(user.roles[0].roleName)
-    : 'Admin';
+    : t('admin');
 
   const chartData = [
-    { name: 'Leave requests', count: pendingLeaves },
-    { name: 'Early departures', count: pendingEarly },
+    { name: t('leaveRequests'), count: pendingLeaves },
+    { name: t('earlyDepartures'), count: pendingEarly },
   ];
 
   return (
@@ -114,10 +116,10 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
       <Paper p="md" withBorder>
         <Stack gap="xs">
           <Text size="lg" fw={600}>
-            Welcome, {user?.fullName ?? user?.email ?? 'User'}
+            {t('welcome')}, {user?.fullName ?? user?.email ?? t('user')}
           </Text>
           <Text size="sm" c="dimmed">
-            Role: {roleLabel}
+            {t('role')}: {roleLabel}
           </Text>
         </Stack>
       </Paper>
@@ -132,27 +134,27 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 5 }} spacing="md">
           <DashboardStatCard
-            title="Students"
+            title={t('students')}
             value={studentsTotal}
             icon={IconSchool}
           />
           <DashboardStatCard
-            title="Staff"
+            title={t('staff')}
             value={staffTotal}
             icon={IconUsers}
           />
           <DashboardStatCard
-            title="Pending approvals"
+            title={t('pendingApprovals')}
             value={pendingTotal}
             icon={IconClock}
           />
           <DashboardStatCard
-            title="Unread"
+            title={t('unread')}
             value={unreadCount}
             icon={IconMessageCircle}
           />
           <DashboardStatCard
-            title="Conflicts"
+            title={t('conflicts')}
             value={conflictCount}
             icon={IconAlertTriangle}
           />
@@ -166,7 +168,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
             <Stack gap="md">
               <Group gap="xs">
                 <IconTrendingUp size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Pending requests</Title>
+                <Title order={3}>{t('pendingRequests')}</Title>
               </Group>
               {loading ? (
                 <Skeleton height={280} />
@@ -178,7 +180,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                       <XAxis dataKey="name" />
                       <YAxis allowDecimals={false} />
                       <Tooltip />
-                      <Bar dataKey="count" name="Count" fill={colors.primary} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="count" name={t('count')} fill={colors.primary} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </Box>
@@ -193,7 +195,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
             <Stack gap="md">
               <Group gap="xs">
                 <IconAlertTriangle size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Low stock alerts</Title>
+                <Title order={3}>{t('lowStockAlerts')}</Title>
               </Group>
               {lowStockQuery.isLoading ? (
                 <Skeleton height={200} />
@@ -208,7 +210,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                           {item.name}
                         </Text>
                         <Badge variant="light" color={colors.warning} size="sm" mt="xs">
-                          Stock: {totalQty}
+                          {t('stock')}: {totalQty}
                         </Badge>
                       </Card>
                     );
@@ -216,7 +218,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                 </Stack>
               ) : (
                 <Text c="dimmed" ta="center" py="xl" size="sm">
-                  No low stock alerts
+                  {t('noLowStockAlerts')}
                 </Text>
               )}
             </Stack>
@@ -229,7 +231,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendarEvent size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Upcoming events & conflicts</Title>
+                <Title order={3}>{t('upcomingEventsAndConflicts')}</Title>
               </Group>
               {upcomingConflictQuery.isLoading ? (
                 <Skeleton height={80} />
@@ -237,13 +239,13 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Metric</Table.Th>
-                      <Table.Th>Count</Table.Th>
+                      <Table.Th>{t('metric')}</Table.Th>
+                      <Table.Th>{t('count')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     <Table.Tr>
-                      <Table.Td>Upcoming events</Table.Td>
+                      <Table.Td>{t('upcomingEvents')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color={colors.primary}>
                           {upcomingEventsCount}
@@ -251,7 +253,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                       </Table.Td>
                     </Table.Tr>
                     <Table.Tr>
-                      <Table.Td>Events with conflicts</Table.Td>
+                      <Table.Td>{t('eventsWithConflicts')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color={eventsWithConflictsCount > 0 ? colors.error : 'gray'}>
                           {eventsWithConflictsCount}
@@ -269,13 +271,13 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Paper p="md" withBorder>
             <Stack gap="md">
-              <Title order={3}>Storage usage</Title>
+              <Title order={3}>{t('storageUsage')}</Title>
               {storageQuery.isLoading ? (
                 <Skeleton height={60} />
               ) : (
                 <>
                   <Text size="sm" c="dimmed">
-                    {usedGb} GB of {quotaGb} GB used ({Math.round(usedPct)}%)
+                    {usedGb} GB {t('of')} {quotaGb} GB {t('used')} ({Math.round(usedPct)}%)
                   </Text>
                   <Box
                     component="div"
@@ -308,10 +310,10 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
             <Stack gap="md">
               <Group gap="xs">
                 <IconUserCheck size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Attendance metrics</Title>
+                <Title order={3}>{t('attendanceMetrics')}</Title>
               </Group>
               <Text size="xs" c="dimmed">
-                Last 7 days
+                {t('last7Days')}
               </Text>
               {attendanceSummaryQuery.isLoading ? (
                 <Skeleton height={140} />
@@ -319,13 +321,13 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Metric</Table.Th>
-                      <Table.Th>Count</Table.Th>
+                      <Table.Th>{t('metric')}</Table.Th>
+                      <Table.Th>{t('count')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     <Table.Tr>
-                      <Table.Td>Present</Table.Td>
+                      <Table.Td>{t('present')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color="green">
                           {attendanceOverall.totalPresent}
@@ -333,7 +335,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                       </Table.Td>
                     </Table.Tr>
                     <Table.Tr>
-                      <Table.Td>Absent</Table.Td>
+                      <Table.Td>{t('absent')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color={colors.error}>
                           {attendanceOverall.totalAbsent}
@@ -341,7 +343,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                       </Table.Td>
                     </Table.Tr>
                     <Table.Tr>
-                      <Table.Td>Late</Table.Td>
+                      <Table.Td>{t('late')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color={colors.warning}>
                           {attendanceOverall.totalLate}
@@ -349,7 +351,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                       </Table.Td>
                     </Table.Tr>
                     <Table.Tr>
-                      <Table.Td>Excused</Table.Td>
+                      <Table.Td>{t('excused')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color="blue">
                           {attendanceOverall.totalExcused}
@@ -357,7 +359,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                       </Table.Td>
                     </Table.Tr>
                     <Table.Tr>
-                      <Table.Td>Average</Table.Td>
+                      <Table.Td>{t('average')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color={colors.primary}>
                           {attendanceOverall.averageAttendance}%
@@ -368,7 +370,7 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
                 </Table>
               ) : (
                 <Text c="dimmed" size="sm">
-                  No attendance data for this period
+                  {t('noAttendanceData')}
                 </Text>
               )}
             </Stack>

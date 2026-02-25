@@ -2,8 +2,11 @@ import { Providers } from './providers';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import { Rajdhani, Saira, JetBrains_Mono } from 'next/font/google';
+import { NextIntlClientProvider } from 'next-intl';
+import { getMessages } from 'next-intl/server';
+import { DirectionProvider } from '@mantine/core';
+import { cookies } from 'next/headers';
 
-// Primary font: Saira with weights 400, 500, 600, 700
 const primaryFont = Saira({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -11,7 +14,6 @@ const primaryFont = Saira({
   display: 'swap',
 });
 
-// Heading font: Rajdhani
 const headingFont = Rajdhani({
   subsets: ['latin'],
   weight: '700',
@@ -19,7 +21,6 @@ const headingFont = Rajdhani({
   display: 'swap',
 });
 
-// Monospace font: JetBrains Mono with weights 400, 500, 600, 700
 const monoFont = JetBrains_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -37,17 +38,25 @@ export const viewport = {
   themeColor: '#4caf50',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const locale = cookieStore.get('NEXT_LOCALE')?.value ?? 'ar';
+  const dir = locale === 'ar' ? 'rtl' : 'ltr';
+  const messages = await getMessages();
+
   return (
-    <html lang="en">
+    <html lang={locale} dir={dir}>
       <body className={`${primaryFont.variable} ${headingFont.variable} ${monoFont.variable}`}>
-        <Providers>{children}</Providers>
+        <NextIntlClientProvider messages={messages}>
+          <DirectionProvider initialDirection={dir} detectDirection={true}>
+            <Providers>{children}</Providers>
+          </DirectionProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
 }
-

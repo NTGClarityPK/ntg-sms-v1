@@ -101,6 +101,10 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
     root.style.setProperty('--theme-card-inactive-bg', config.components.statusInactive.cardBackground);
     root.style.setProperty('--theme-card-inactive-border', config.components.statusInactive.cardBorder);
 
+    // Header online/offline badge colours (green when online, gray when offline)
+    root.style.setProperty('--theme-status-online-badge', config.components.statusOnline.badgeColor);
+    root.style.setProperty('--theme-status-offline-badge', config.components.statusOffline.badgeColor);
+
     // Teacher mapping matrix: teacher name badge
     const matrixBadge = config.components.matrixTeacherBadge;
     if (matrixBadge) {
@@ -159,173 +163,101 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* RTL - Remove navbar border to match LTR */
       html[dir="rtl"] .mantine-AppShell-navbar,
       [dir="rtl"] .mantine-AppShell-navbar {
-        border-right: none !important;
-        border-left: none !important;
+        border-inline-end: none !important;
+        border-inline-start: none !important;
       }
       
-      /* Header */
+      /* Header - rounded corner at inline-start (next to navbar) */
       .mantine-AppShell-header {
         background-color: ${config.components.header.backgroundColor} !important;
         border-bottom-color: ${config.components.header.borderColor} !important;
         color: ${config.components.header.textColor} !important;
-        border-bottom-left-radius: 12px !important; /* Outer rounded corner where header meets navbar */
-        overflow: hidden !important; /* Ensure rounded corner is visible */
+        border-end-start-radius: 12px !important;
+        overflow: hidden !important;
       }
 
-      /* Ensure the header's immediate content wrapper doesn't visually square the corner */
       .mantine-AppShell-header > .mantine-Group-root {
         background-color: ${config.components.header.backgroundColor} !important;
-        border-bottom-left-radius: 12px !important;
+        border-end-start-radius: 12px !important;
         overflow: hidden !important;
       }
 
-      /*
-        Global rounded junction:
-        Some pages (e.g. Settings) appear rounded because the page title bar has a rounded corner.
-        Pages without a title bar need the main surface itself rounded so the junction looks consistent.
-      */
+      /* Main - rounded corner at inline-start (next to navbar); RTL uses inline-end corner */
       .mantine-AppShell-main {
         background-color: ${config.components.page.backgroundColor} !important;
-        border-top-left-radius: 12px !important;
+        border-start-start-radius: 12px !important;
         overflow: hidden !important;
       }
 
-      /* RTL - mirror the main rounded corner */
       html[dir="rtl"] .mantine-AppShell-main,
       [dir="rtl"] .mantine-AppShell-main {
-        border-top-left-radius: 0 !important;
-        border-top-right-radius: 12px !important;
+        border-start-start-radius: 0 !important;
+        border-start-end-radius: 12px !important;
       }
       
-      /* Page Title Bar */
+      /* Page Title Bar - logical inset so RTL flips automatically */
       .page-title-bar {
         position: fixed !important;
         top: 60px !important; /* Below header */
-        left: 300px !important; /* To the right of navbar (expanded) */
-        right: 0 !important;
+        inset-inline-start: 300px !important; /* After navbar (expanded) */
+        inset-inline-end: 0 !important;
         height: 60px !important; /* Same height as header */
         background-color: ${config.components.titleBar.backgroundColor} !important;
         z-index: 100 !important;
         display: flex !important;
         align-items: center !important;
         border-bottom: none !important;
-        transition: left 0.3s ease !important;
-        border-top-left-radius: 12px !important; /* Rounded top-left corner */
+        transition: inset-inline-start 0.3s ease !important;
+        border-start-end-radius: 12px !important; /* Rounded corner next to main content */
         overflow: hidden !important;
-        padding-left: var(--mantine-spacing-xs) !important; /* Reduced left padding */
-        padding-right: var(--mantine-spacing-sm) !important;
+        padding-inline-start: var(--mantine-spacing-xs) !important;
+        padding-inline-end: var(--mantine-spacing-sm) !important;
       }
       
       /* Page Sub Title Bar - Same position as title bar */
       .page-sub-title-bar {
         position: fixed !important;
-        top: 60px !important; /* Same position as title bar */
-        left: 300px !important; /* To the right of navbar (expanded) */
-        right: 0 !important;
-        height: 60px !important; /* Same height as title bar */
+        top: 60px !important;
+        inset-inline-start: 300px !important;
+        inset-inline-end: 0 !important;
+        height: 60px !important;
         background-color: ${config.components.subTitleBar.backgroundColor} !important;
-        z-index: 98 !important; /* Behind title bar */
-        transition: left 0.3s ease !important;
+        z-index: 98 !important;
+        transition: inset-inline-start 0.3s ease !important;
       }
       
-      /* Adjust for collapsed navbar (desktop) - use data attribute for reliable targeting */
-      /* Title bar positioned exactly at sidebar width - gap comes from AppShell padding */
+      /* Adjust for collapsed navbar (desktop) */
       @media (min-width: 768px) {
         body[data-navbar-collapsed="true"] .page-title-bar {
-          left: 100px !important;
+          inset-inline-start: 100px !important;
         }
         
         body[data-navbar-collapsed="true"] .page-sub-title-bar {
-          left: 100px !important;
+          inset-inline-start: 100px !important;
         }
       }
       
-      /* When navbar is hidden on mobile (below sm breakpoint), move to left edge */
+      /* When navbar is hidden on mobile, align to edge */
       @media (max-width: 767px) {
         .page-title-bar,
         .page-sub-title-bar {
-          left: 0 !important;
+          inset-inline-start: 0 !important;
         }
       }
       
-      /* RTL Support - Title and Subtitle Bars */
-      html[dir="rtl"] .page-title-bar,
-      [dir="rtl"] .page-title-bar {
-        left: 0 !important;
-        right: 300px !important;
-        width: calc(100% - 300px) !important;
-        border-top-left-radius: 0 !important;
-        border-top-right-radius: 12px !important;
-        padding-left: var(--mantine-spacing-sm) !important;
-        padding-right: var(--mantine-spacing-xs) !important; /* Reduced right padding for RTL */
-        transition: right 0.3s ease, width 0.3s ease !important;
-      }
-      
-      html[dir="rtl"] .page-sub-title-bar,
-      [dir="rtl"] .page-sub-title-bar {
-        left: 0 !important;
-        right: 300px !important;
-        width: calc(100% - 300px) !important;
-        transition: right 0.3s ease, width 0.3s ease !important;
-      }
-      
-      /* RTL - Collapsed navbar */
-      /* Title bar positioned exactly at sidebar width - gap comes from AppShell padding */
-      @media (min-width: 768px) {
-        html[dir="rtl"] body[data-navbar-collapsed="true"] .page-title-bar,
-        [dir="rtl"] body[data-navbar-collapsed="true"] .page-title-bar {
-          right: 100px !important;
-          width: calc(100% - 100px) !important;
-        }
-        
-        html[dir="rtl"] body[data-navbar-collapsed="true"] .page-sub-title-bar,
-        [dir="rtl"] body[data-navbar-collapsed="true"] .page-sub-title-bar {
-          right: 100px !important;
-          width: calc(100% - 100px) !important;
-        }
-      }
-      
-      /* RTL - Mobile */
-      @media (max-width: 767px) {
-        html[dir="rtl"] .page-title-bar,
-        [dir="rtl"] .page-title-bar,
-        html[dir="rtl"] .page-sub-title-bar,
-        [dir="rtl"] .page-sub-title-bar {
-          right: 0 !important;
-          width: 100% !important;
-        }
-      }
-      
-      /* Title bar content - left aligned with padding to match content div */
+      /* Title bar content - start aligned with padding to match content div */
       .page-title-bar .mantine-Title-root {
         margin: 0 !important;
-        text-align: left !important;
-        padding-left: 0 !important; /* Removed duplicate padding */
+        text-align: start !important;
+        padding-inline-start: 0 !important;
         padding-top: var(--mantine-spacing-sm) !important;
       }
       
-      /* RTL - Title bar content alignment */
-      html[dir="rtl"] .page-title-bar .mantine-Title-root,
-      [dir="rtl"] .page-title-bar .mantine-Title-root {
-        text-align: right !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important; /* Removed duplicate padding */
-      }
-      
-      /* Title bar button group alignment - align with content padding */
+      /* Title bar button group alignment */
       .page-title-bar .mantine-Group-root[data-justify="space-between"],
       .page-title-bar .mantine-Group-root[style*="justify-content: space-between"] {
-        padding-right: 0 !important;
-        padding-left: 0 !important;
-      }
-      
-      /* RTL - Title bar button group alignment */
-      html[dir="rtl"] .page-title-bar .mantine-Group-root[data-justify="space-between"],
-      [dir="rtl"] .page-title-bar .mantine-Group-root[data-justify="space-between"],
-      html[dir="rtl"] .page-title-bar .mantine-Group-root[style*="justify-content: space-between"],
-      [dir="rtl"] .page-title-bar .mantine-Group-root[style*="justify-content: space-between"] {
-        padding-right: 0 !important;
-        padding-left: 0 !important;
+        padding-inline-end: 0 !important;
+        padding-inline-start: 0 !important;
       }
       
       /* Add top margin to main content to account for title bar */
@@ -342,37 +274,24 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       
       /* Remove padding from tabs component to align with title bar text */
       .page-title-bar ~ * .mantine-Tabs-root {
-        padding-left: 0 !important;
+        padding-inline-start: 0 !important;
       }
       
       .page-title-bar ~ * .mantine-Tabs-list {
-        padding-left: 0 !important;
-        margin-left: 0 !important;
-      }
-      
-      /* RTL - Tabs padding */
-      html[dir="rtl"] .page-title-bar ~ * .mantine-Tabs-root,
-      [dir="rtl"] .page-title-bar ~ * .mantine-Tabs-root {
-        padding-right: 0 !important;
-      }
-      
-      html[dir="rtl"] .page-title-bar ~ * .mantine-Tabs-list,
-      [dir="rtl"] .page-title-bar ~ * .mantine-Tabs-list {
-        padding-right: 0 !important;
-        margin-right: 0 !important;
+        padding-inline-start: 0 !important;
+        margin-inline-start: 0 !important;
       }
       
       /* Form action buttons alignment - align with cards inside Tabs.Panel */
       div[style*="paddingLeft"] form .mantine-Tabs-root ~ .mantine-Group-root,
       div[style*="padding-left"] form .mantine-Tabs-root ~ .mantine-Group-root {
-        padding-right: var(--mantine-spacing-md) !important;
+        padding-inline-end: var(--mantine-spacing-md) !important;
       }
       
-      /* RTL - Form action buttons should align with cards' left edge */
       html[dir="rtl"] div[style*="paddingLeft"] form .mantine-Tabs-root ~ .mantine-Group-root,
       [dir="rtl"] div[style*="padding-left"] form .mantine-Tabs-root ~ .mantine-Group-root {
-        padding-right: 0 !important;
-        padding-left: var(--mantine-spacing-md) !important;
+        padding-inline-end: 0 !important;
+        padding-inline-start: var(--mantine-spacing-md) !important;
       }
       
       /* Navbar Navigation Buttons */
@@ -401,8 +320,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       
       /* Remove leftSection margin when collapsed */
       .nav-item-button[data-collapsed="true"] .mantine-Button-leftSection {
-        margin-right: 0 !important;
-        margin-left: 0 !important;
+        margin-inline-end: 0 !important;
+        margin-inline-start: 0 !important;
       }
       
       /* Expanded state */
@@ -431,11 +350,14 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         color: ${config.components.navbar.activeTextColor} !important;
       }
       
-      /* Active state in collapsed mode - more prominent */
+      /* Active state in collapsed mode - border on inline-start (flips in RTL) */
       .nav-item-button[data-active="true"][data-collapsed="true"] {
         background-color: ${config.components.navbar.activeBackground} !important;
-        border-left: 4px solid ${config.components.navbar.activeTextColor} !important;
-        border-radius: 0 8px 8px 0 !important;
+        border-inline-start: 4px solid ${config.components.navbar.activeTextColor} !important;
+        border-start-end-radius: 8px !important;
+        border-end-end-radius: 8px !important;
+        border-end-start-radius: 8px !important;
+        border-start-start-radius: 0 !important;
         position: relative !important;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
         font-weight: 700 !important;
@@ -444,14 +366,6 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* Make active icon stand out more in collapsed mode */
       .nav-item-button[data-active="true"][data-collapsed="true"] svg {
         filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) !important;
-      }
-      
-      /* RTL - Active state in collapsed mode uses right border */
-      html[dir="rtl"] .nav-item-button[data-active="true"][data-collapsed="true"],
-      [dir="rtl"] .nav-item-button[data-active="true"][data-collapsed="true"] {
-        border-left: none !important;
-        border-right: 4px solid ${config.components.navbar.activeTextColor} !important;
-        border-radius: 8px 0 0 8px !important;
       }
       
       /* Navbar Toggle Button */
@@ -467,14 +381,12 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       
       /* Ensure collapsed navbar buttons are centered */
       body[data-navbar-collapsed="true"] .mantine-AppShell-navbar .nav-item-button {
-        margin-left: auto !important;
-        margin-right: auto !important;
+        margin-inline: auto !important;
       }
       
       /* Center toggle button when collapsed */
       body[data-navbar-collapsed="true"] .mantine-AppShell-navbar .nav-toggle-button {
-        margin-left: auto !important;
-        margin-right: auto !important;
+        margin-inline: auto !important;
       }
       
       /* Input Components */

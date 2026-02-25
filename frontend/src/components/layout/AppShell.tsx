@@ -6,6 +6,7 @@ import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { StorageWarningBanner } from './StorageWarningBanner';
+import { ConnectionIndicator } from '@/components/common/ConnectionIndicator';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -69,6 +70,7 @@ export function AppShell({ children }: AppShellProps) {
       </MantineAppShell.Navbar>
 
       <MantineAppShell.Main>
+          <ConnectionIndicator />
           <StorageWarningBanner />
           {children}
         </MantineAppShell.Main>

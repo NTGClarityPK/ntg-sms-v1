@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import { notifications } from '@mantine/notifications';
 import { ApiResponse } from '@/types/api';
 import { supabase } from './supabase/client';
-import { enqueue } from './offline/queue';
 
 const LOCAL_API = 'http://localhost:3001';
 
@@ -44,6 +44,17 @@ class ApiClient {
     // Never let getSession() fail the request: on refresh Supabase can be slow; proceed without token if it throws.
     this.client.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
+        if (typeof window !== 'undefined' && !window.navigator.onLine) {
+          notifications.show({
+            title: 'No Internet Connection',
+            message: 'Please check your connection and try again.',
+            color: 'red',
+          });
+          const offlineError = new Error('No internet connection') as Error & { isOfflineError?: boolean };
+          offlineError.isOfflineError = true;
+          return Promise.reject(offlineError);
+        }
+
         config.baseURL = getEffectiveApiBaseURL();
 
         // Remove Content-Type header for FormData to let axios set it with boundary
@@ -80,11 +91,24 @@ class ApiClient {
     // Response interceptor - handle errors
     this.client.interceptors.response.use(
       (response) => response,
-      async (error: AxiosError<ApiResponse<unknown>>) => {
-        // Make network errors (backend unreachable) clearer
+      async (error: AxiosError<ApiResponse<unknown>> & { isOfflineError?: boolean }) => {
+        if (error.isOfflineError) {
+          return Promise.reject(error);
+        }
+
+        // Network/timeout errors - show connection message
         const isNetworkError =
-          error.code === 'ERR_NETWORK' || error.message === 'Network Error';
-        if (isNetworkError) {
+          error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED' || error.message === 'Network Error';
+        if (isNetworkError && typeof window !== 'undefined') {
+          notifications.show({
+            title: 'Connection Error',
+            message: 'Could not reach the server. Please check your internet connection.',
+            color: 'red',
+          });
+        }
+
+        const isUnreachable = error.code === 'ERR_NETWORK' || error.message === 'Network Error';
+        if (isUnreachable) {
           const baseURL = getEffectiveApiBaseURL();
           const friendly = new Error(
             `Unable to reach the API at ${baseURL}. Ensure the backend is running (e.g. \`npm run start:dev\` in the backend folder).`,
@@ -146,37 +170,21 @@ class ApiClient {
   }
 
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    if (typeof window !== 'undefined' && !window.navigator.onLine) {
-      await enqueue('POST', url, data ?? null);
-      return { data: { _queued: true } as T };
-    }
     const response = await this.client.post<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
   async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    if (typeof window !== 'undefined' && !window.navigator.onLine) {
-      await enqueue('PUT', url, data ?? null);
-      return { data: { _queued: true } as T };
-    }
     const response = await this.client.put<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
   async patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    if (typeof window !== 'undefined' && !window.navigator.onLine) {
-      await enqueue('PATCH', url, data ?? null);
-      return { data: { _queued: true } as T };
-    }
     const response = await this.client.patch<ApiResponse<T>>(url, data, config);
     return response.data;
   }
 
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    if (typeof window !== 'undefined' && !window.navigator.onLine) {
-      await enqueue('DELETE', url, null);
-      return { data: { _queued: true } as T };
-    }
     const response = await this.client.delete<ApiResponse<T>>(url, config);
     return response.data;
   }

@@ -2,10 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+  // Let Next.js serve every route; locale is read from NEXT_LOCALE cookie in i18n/request.ts
+  const response = NextResponse.next({
+    request: { headers: request.headers },
   });
 
   const supabase = createServerClient(
@@ -16,45 +15,18 @@ export async function middleware(request: NextRequest) {
         get(name: string) {
           return request.cookies.get(name)?.value;
         },
-        set(name: string, value: string, options: any) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          });
+        set(name: string, value: string, options: Record<string, unknown>) {
+          request.cookies.set({ name, value, ...options });
+          response.cookies.set({ name, value, ...options });
         },
-        remove(name: string, options: any) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
+        remove(name: string, options: Record<string, unknown>) {
+          request.cookies.set({ name, value: '', ...options });
+          response.cookies.set({ name, value: '', ...options });
         },
       },
     },
   );
 
-  // Refresh session on each request
   await supabase.auth.getUser();
 
   return response;
@@ -62,17 +34,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Run middleware for app routes only; exclude static assets so they are served from public/ or _next/
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|workbox-.*\\.js|manifest\\.json|worker-.*\\.js|\\.well-known|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|map)$).*)',
   ],
 };
-
-
-
-
-
-
-
-
-
-
-

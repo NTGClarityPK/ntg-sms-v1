@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   Stack,
   Button,
@@ -45,6 +46,7 @@ import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { getFeatureCodeForPath } from '@/lib/permission/navFeatureMap';
 
 interface NavItem {
+  key: string;
   label: string;
   href: string;
   icon: React.ComponentType<IconProps>;
@@ -53,138 +55,137 @@ interface NavItem {
 
 const NAV_ICON_SIZE = 22;
 
-// All navigation items
+// All navigation items (key used for next-intl navigation namespace)
 const allNavItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: IconHome },
-  { label: 'Student', href: '/students', icon: IconUsers },
-  { label: 'User', href: '/users', icon: IconUsers },
-  { label: 'Class', href: '/academic/class-sections', icon: IconSchool },
-  { label: 'Teacher', href: '/academic/teacher-mapping', icon: IconBook },
-  { label: 'Parent', href: '/parent-associations', icon: IconUsersGroup },
-  { label: 'My Child', href: '/my-children', icon: IconUsersGroup },
-  { label: 'Child Timetable', href: '/children-timetable', icon: IconCalendarClock },
-  { label: 'Attendance', href: '/attendance', icon: IconCalendar },
+  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: IconHome },
+  { key: 'students', label: 'Student', href: '/students', icon: IconUsers },
+  { key: 'users', label: 'User', href: '/users', icon: IconUsers },
+  { key: 'classSections', label: 'Class', href: '/academic/class-sections', icon: IconSchool },
+  { key: 'teacherMapping', label: 'Teacher', href: '/academic/teacher-mapping', icon: IconBook },
+  { key: 'parentAssociations', label: 'Parent', href: '/parent-associations', icon: IconUsersGroup },
+  { key: 'myChildren', label: 'My Child', href: '/my-children', icon: IconUsersGroup },
+  { key: 'childrenTimetable', label: 'Child Timetable', href: '/children-timetable', icon: IconCalendarClock },
+  { key: 'attendance', label: 'Attendance', href: '/attendance', icon: IconCalendar },
   {
+    key: 'assessments',
     label: 'Assessment',
     href: '/assessments',
     icon: IconFileText,
     showCondition: () => {
-      // Management view - hidden for students (checked in filter)
       if (typeof window === 'undefined') return false;
       return true;
     },
   },
   {
+    key: 'myAssessments',
     label: 'My Assessment',
     href: '/my-assessments',
     icon: IconFileText,
     showCondition: () => {
-      // Student-only view (checked in filter)
       if (typeof window === 'undefined') return false;
       return true;
     },
   },
   {
+    key: 'behavioral',
     label: 'Behavioral',
     href: '/behavioral',
     icon: IconStar,
     showCondition: () => {
       if (typeof window === 'undefined') return false;
-      return true; // Filtered in render for assessor roles
+      return true;
     },
   },
-  { label: 'Leave', href: '/leaves', icon: IconPlaneDeparture },
-  { label: 'Early Departure', href: '/early-departure', icon: IconWalk },
-  { label: 'Notification', href: '/notifications', icon: IconBell },
-  { label: 'Messages', href: '/messages', icon: IconMessage },
-  { label: 'Library', href: '/library', icon: IconBook },
-  { label: 'Offline documents', href: '/offline-documents', icon: IconFolderOff },
-  { label: 'Inventory', href: '/inventory', icon: IconPackage },
-  { label: 'Request uniform', href: '/uniform-request', icon: IconClipboardList },
-  { 
-    label: 'My Event', 
-    href: '/my-events', 
+  { key: 'leaves', label: 'Leave', href: '/leaves', icon: IconPlaneDeparture },
+  { key: 'earlyDeparture', label: 'Early Departure', href: '/early-departure', icon: IconWalk },
+  { key: 'notifications', label: 'Notification', href: '/notifications', icon: IconBell },
+  { key: 'messages', label: 'Messages', href: '/messages', icon: IconMessage },
+  { key: 'library', label: 'Library', href: '/library', icon: IconBook },
+  { key: 'offlineDocuments', label: 'Offline documents', href: '/offline-documents', icon: IconFolderOff },
+  { key: 'inventory', label: 'Inventory', href: '/inventory', icon: IconPackage },
+  { key: 'uniformRequest', label: 'Request uniform', href: '/uniform-request', icon: IconClipboardList },
+  {
+    key: 'myEvents',
+    label: 'My Event',
+    href: '/my-events',
     icon: IconCalendarEvent,
     showCondition: () => {
-      // Show for parents, students, and teachers
       if (typeof window === 'undefined') return false;
-      return true; // Will be filtered in render
-    }
+      return true;
+    },
   },
   {
+    key: 'events',
     label: 'Event',
     href: '/events',
     icon: IconCalendarEvent,
     showCondition: () => {
-      // Show for school_admin, principal, and academic_coordinator
       if (typeof window === 'undefined') return false;
-      return true; // Will be filtered in render
-    }
-  },
-  { 
-    label: 'My Schedule', 
-    href: '/my-schedule', 
-    icon: IconClock,
-    showCondition: () => {
-      // Show only for teachers - check if user has teacher role
-      if (typeof window === 'undefined') return false;
-      // This will be checked in the component using useAuth
-      return true; // Will be filtered in render
-    }
-  },
-  { 
-    label: 'My Timetable', 
-    href: '/my-timetable', 
-    icon: IconCalendarClock,
-    showCondition: () => {
-      // Show only for students - check if user has student role
-      if (typeof window === 'undefined') return false;
-      // This will be checked in the component using useAuth
-      return true; // Will be filtered in render
-    }
+      return true;
+    },
   },
   {
+    key: 'mySchedule',
+    label: 'My Schedule',
+    href: '/my-schedule',
+    icon: IconClock,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true;
+    },
+  },
+  {
+    key: 'myTimetable',
+    label: 'My Timetable',
+    href: '/my-timetable',
+    icon: IconCalendarClock,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true;
+    },
+  },
+  {
+    key: 'timetable',
     label: 'Timetable',
     href: '/timetable',
     icon: IconCalendarClock,
     showCondition: () => {
-      // Show for school_admin, principal, and academic_coordinator
       if (typeof window === 'undefined') return false;
-      // This will be checked in the component using useAuth
-      return true; // Will be filtered in render
-    }
+      return true;
+    },
   },
   {
+    key: 'conflictManagement',
     label: 'Conflict',
     href: '/conflict-management',
     icon: IconAlertTriangle,
     showCondition: () => {
-      // Show for school_admin, principal, and academic_coordinator
       if (typeof window === 'undefined') return false;
-      // This will be checked in the component using useAuth
-      return true; // Will be filtered in render
-    }
+      return true;
+    },
   },
-  { label: 'Report', href: '/reports', icon: IconChartBar },
+  { key: 'reports', label: 'Report', href: '/reports', icon: IconChartBar },
   {
+    key: 'administrativeReports',
     label: 'Administrative Reports',
     href: '/reports/administrative',
     icon: IconChartBar,
     showCondition: () => {
       if (typeof window === 'undefined') return false;
-      return true; // Filtered by permission (reports) and role in render
+      return true;
     },
   },
   {
+    key: 'storage',
     label: 'Storage',
     href: '/admin/storage',
     icon: IconDatabase,
     showCondition: () => {
       if (typeof window === 'undefined') return false;
-      return true; // Filtered by role (school_admin, principal) in render
+      return true;
     },
   },
-  { label: 'Settings', href: '/settings', icon: IconSettings },
+  { key: 'settings', label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 
 interface SidebarProps {
@@ -206,6 +207,7 @@ export function Sidebar({
   const router = useRouter();
   const pathname = usePathname();
   const theme = useMantineTheme();
+  const tNav = useTranslations('navigation');
   const { user } = useAuth();
   const { canView } = usePermissions();
 
@@ -435,13 +437,13 @@ export function Sidebar({
           },
         }}
       >
-        {effectiveCollapsed ? <item.icon size={NAV_ICON_SIZE} /> : item.label}
+        {effectiveCollapsed ? <item.icon size={NAV_ICON_SIZE} /> : tNav(item.key)}
       </Button>
     );
 
     if (effectiveCollapsed) {
       return (
-        <Tooltip key={item.href} label={item.label} position="right" withArrow>
+        <Tooltip key={item.href} label={tNav(item.key)} position="right" withArrow>
           <Box style={{ display: 'inline-block', width: '100%' }}>{content}</Box>
         </Tooltip>
       );

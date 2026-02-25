@@ -19,7 +19,7 @@ import { useTemplatesForClass, useClassesWithTemplates } from '@/hooks/useSubjec
 import { useMyStaff } from '@/hooks/useStaff';
 import { useAssignmentsByTeacher } from '@/hooks/useTeacherAssignments';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { FileUpload } from './FileUpload';
 import { FileUploadForCreate } from './FileUploadForCreate';
@@ -191,6 +191,41 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
 
   const form = isEditMode ? updateForm : createForm;
 
+  // Subject IDs the teacher teaches in the selected class section(s) — used to filter subject dropdown (create mode only)
+  const subjectIdsForSelectedClassSections = useMemo(() => {
+    if (isEditMode || !isTeacherWithAssignments) return null;
+    const createValues = createForm.values;
+    if (createValues.mode === 'single' && createValues.classSectionId) {
+      return new Set(
+        assignmentsList
+          .filter((a) => a.classSectionId === createValues.classSectionId)
+          .map((a) => a.subjectId),
+      );
+    }
+    if (createValues.mode === 'class-sections' && createValues.classSectionIds?.length) {
+      const sectionSet = new Set(createValues.classSectionIds);
+      return new Set(
+        assignmentsList
+          .filter((a) => sectionSet.has(a.classSectionId))
+          .map((a) => a.subjectId),
+      );
+    }
+    return null;
+  }, [assignmentsList, isTeacherWithAssignments, isEditMode, createForm.values]);
+
+  // Stable key for class section(s) so effect deps don't change on every render
+  const classSectionKey = createForm.values.mode === 'single'
+    ? createForm.values.classSectionId ?? ''
+    : (createForm.values.classSectionIds ?? []).join(',');
+
+  // Clear subject whenever class section(s) change so the dropdown never shows a stale selection
+  useEffect(() => {
+    if (isEditMode) return;
+    if (createForm.values.mode === 'single' || createForm.values.mode === 'class-sections') {
+      createForm.setFieldValue('subjectId', '');
+    }
+  }, [isEditMode, createForm.values.mode, classSectionKey]);
+
   // For class-level creation - must be after form declaration
   const selectedClassId = isEditMode ? undefined : (form.values as CreateFormValues).classId;
   const { data: templatesData, isLoading: templatesLoading } = useTemplatesForClass(
@@ -276,12 +311,26 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
     return list;
   }, [subjectsData, isTeacherWithAssignments, allowedSubjectIds]);
 
-  // Filter subjects based on selected subject template
+  // Filter subjects based on mode and (for teachers) selected class section(s)
   const subjects = useMemo(() => {
     let filteredSubjects = allSubjects;
     if (!isEditMode) {
       const createValues = form.values as CreateFormValues;
-      if (createValues.mode === 'class-template' && createValues.subjectTemplateId) {
+      // Single class section: for teachers, only show subjects assigned to that class section; require class section selected first
+      if (createValues.mode === 'single' && isTeacherWithAssignments) {
+        if (createValues.classSectionId && subjectIdsForSelectedClassSections) {
+          filteredSubjects = allSubjects.filter((s) => subjectIdsForSelectedClassSections.has(s.value));
+        } else {
+          filteredSubjects = [];
+        }
+      } else if (createValues.mode === 'class-sections' && isTeacherWithAssignments) {
+        // Class + specific sections: for teachers, only show subjects assigned to any selected section
+        if (createValues.classSectionIds?.length && subjectIdsForSelectedClassSections) {
+          filteredSubjects = allSubjects.filter((s) => subjectIdsForSelectedClassSections.has(s.value));
+        } else {
+          filteredSubjects = [];
+        }
+      } else if (createValues.mode === 'class-template' && createValues.subjectTemplateId) {
         const selectedTemplate = templatesData?.data?.find(
           (t) => t.id === createValues.subjectTemplateId,
         );
@@ -291,7 +340,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
       }
     }
     return filteredSubjects.sort((a, b) => a.label.localeCompare(b.label));
-  }, [allSubjects, templatesData, form.values, isEditMode]);
+  }, [allSubjects, templatesData, form.values, isEditMode, isTeacherWithAssignments, subjectIdsForSelectedClassSections]);
 
   const classes = useMemo(() => {
     let list = (classesData?.data || []).map((cls) => ({
@@ -504,12 +553,18 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
                   data={classSections}
                   required
                   {...getInputProps('classSectionId')}
+                  onChange={(value) => {
+                    createForm.setFieldValue('classSectionId', value || '');
+                    createForm.setFieldValue('subjectId', '');
+                  }}
                 />
                 <Select
+                  key={`subject-single-${createForm.values.classSectionId || 'none'}`}
                   label="Subject"
-                  placeholder="Select subject"
+                  placeholder={createForm.values.classSectionId ? 'Select subject' : 'Select class section first'}
                   data={subjects}
                   required
+                  disabled={!createForm.values.classSectionId}
                   {...getInputProps('subjectId')}
                 />
               </>
@@ -588,13 +643,16 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
                   value={createForm.values.classSectionIds || []}
                   onChange={(value) => {
                     createForm.setFieldValue('classSectionIds', value);
+                    createForm.setFieldValue('subjectId', '');
                   }}
                 />
                 <Select
+                  key={`subject-sections-${(createForm.values.classSectionIds || []).join(',') || 'none'}`}
                   label="Subject"
-                  placeholder="Select subject"
+                  placeholder={(createForm.values.classSectionIds?.length ?? 0) > 0 ? 'Select subject' : 'Select class sections first'}
                   data={subjects}
                   required
+                  disabled={!(createForm.values.classSectionIds?.length)}
                   {...getInputProps('subjectId')}
                 />
               </>

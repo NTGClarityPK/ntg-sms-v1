@@ -206,7 +206,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
 
   const stickyHeaderStyle = {
     position: 'sticky' as const,
-    left: 0,
+    insetInlineStart: 0,
     zIndex: 12,
     backgroundColor: 'var(--mantine-color-default)',
     boxShadow: '2px 0 4px rgba(0,0,0,0.06)',
@@ -214,7 +214,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
   };
   const stickyCellStyle = (isStriped: boolean) => ({
     position: 'sticky' as const,
-    left: 0,
+    insetInlineStart: 0,
     zIndex: 11,
     backgroundColor: isStriped ? 'var(--mantine-color-default-hover)' : 'var(--mantine-color-body)',
     boxShadow: '2px 0 4px rgba(0,0,0,0.06)',

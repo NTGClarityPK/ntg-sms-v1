@@ -6,6 +6,7 @@ import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { StudentTable } from '@/components/features/students/StudentTable';
 import { StudentForm } from '@/components/features/students/StudentForm';
 import { useStudents } from '@/hooks/useStudents';
@@ -18,6 +19,7 @@ import type { Student } from '@/types/students';
 export default function StudentsPage() {
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const tStudents = useTranslations('students');
   const { canEdit } = useFeaturePermission('students');
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
@@ -172,9 +174,13 @@ export default function StudentsPage() {
             </Text>
           </Alert>
         ) : (
-          <StudentTable
-            canEdit={canEdit}
-            students={studentsResponse.data}
+          <>
+            <Text size="sm" c="dimmed">
+              {tStudents('studentCount', { count: studentsResponse.meta?.total ?? studentsResponse.data.length })}
+            </Text>
+            <StudentTable
+              canEdit={canEdit}
+              students={studentsResponse.data}
             meta={studentsResponse.meta}
             onPageChange={setPage}
             sortBy={sortBy}
@@ -189,6 +195,7 @@ export default function StudentsPage() {
               setPage(1); // Reset to first page when sorting changes
             }}
           />
+          </>
         )}
       </Stack>
 

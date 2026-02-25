@@ -1,0 +1,41 @@
+{
+  "dashboard": "Dashboard",
+  "save": "Save",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "edit": "Edit",
+  "submit": "Submit",
+  "search": "Search",
+  "loading": "Loading...",
+  "back": "Back",
+  "next": "Next",
+  "close": "Close",
+  "confirm": "Are you sure?",
+  "yes": "Yes",
+  "no": "No",
+  "error": "An error occurred",
+  "success": "Success",
+  "create": "Create",
+  "update": "Update",
+  "add": "Add",
+  "remove": "Remove",
+  "name": "Name",
+  "actions": "Actions",
+  "select": "Select",
+  "optional": "Optional",
+  "required": "Required",
+  "retry": "Retry",
+  "noData": "No data yet",
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "pending": "Pending",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "errors": {
+    "generic": "An error occurred. Please try again.",
+    "notFound": "Not found",
+    "studentNotFound": "Student not found"
+  }
+}

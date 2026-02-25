@@ -86,6 +86,11 @@ export function TimetableSlotComponent({
           <Text size="xs" fw={500} lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
             {periodName}
           </Text>
+          {slot.slotType === 'class' && (slot.className || slot.sectionName) && (
+            <Text size="xs" c="dimmed" lineClamp={1} style={{ whiteSpace: 'nowrap' }}>
+              {[slot.className, slot.sectionName].filter(Boolean).join(' ')}
+            </Text>
+          )}
           {slot.staffName && (
             <Text 
               size="xs" 
@@ -139,22 +144,23 @@ export function TimetableSlotComponent({
       onClick={onClick}
       withBorder={!showConflict}
     >
-      <Badge 
-        size="xs" 
-        variant="light" 
-        color={slotTypeColors[slot.slotType]}
-        style={{ 
-          position: 'absolute', 
-          top: 4, 
-          right: slot.periodNumber ? 70 : 4,
-          zIndex: 1
-        }}
-      >
-        {slot.slotType === 'class' 
-          ? 'class' 
-          : 'others'}
-      </Badge>
       <Stack gap={4}>
+        <Group gap={6} wrap="nowrap" justify="flex-end" style={{ minHeight: 22 }}>
+          <Badge 
+            size="xs" 
+            variant="light" 
+            color={slotTypeColors[slot.slotType]}
+          >
+            {slot.slotType === 'class' 
+              ? 'class' 
+              : 'others'}
+          </Badge>
+          {slot.slotType === 'class' && (slot.className || slot.sectionName) && (
+            <Text size="xs" c="dimmed" lineClamp={1} style={{ maxWidth: '100%' }}>
+              {[slot.className, slot.sectionName].filter(Boolean).join(' ')}
+            </Text>
+          )}
+        </Group>
         {(slot.staffName || slot.room) && (
           <Group gap={6} wrap="nowrap" style={{ marginBottom: 0 }}>
             {slot.staffName && (

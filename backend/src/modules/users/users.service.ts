@@ -12,6 +12,7 @@ import { QueryUsersDto } from './dto/query-users.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 
 type ProfileRow = {
   id: string;
@@ -670,6 +671,16 @@ export class UsersService {
         { branchId, tenantId },
       )
       .catch(() => {});
+  }
+
+  async updatePreferences(userId: string, dto: UpdatePreferencesDto): Promise<void> {
+    if (dto.preferred_locale === undefined) return;
+    const supabase = this.supabaseConfig.getClient();
+    const { error } = await supabase
+      .from('profiles')
+      .update({ preferred_locale: dto.preferred_locale })
+      .eq('id', userId);
+    throwIfDbError(error);
   }
 }
 

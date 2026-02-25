@@ -1,14 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { enqueue } from '@/lib/offline/queue';
 import type { LeaveRequest, LeaveQuota, LeaveStatus } from '@/types/leaves';
 import { useAuth } from './useAuth';
 import { notifications } from '@mantine/notifications';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-function isQueuedResponse(data: unknown): data is { _queued: true } {
-  return typeof data === 'object' && data !== null && '_queued' in data && (data as { _queued?: boolean })._queued === true;
-}
 
 interface QueryLeaveParams {
   page?: number;
@@ -88,25 +83,13 @@ export function useCreateLeaveRequest() {
 
   return useMutation({
     mutationFn: async (input: CreateLeaveInput) => {
-      if (typeof window !== 'undefined' && !window.navigator.onLine) {
-        await enqueue('POST', '/api/v1/leave-requests', input);
-        return { _queued: true } as { _queued: true };
-      }
       const response = await apiClient.post<LeaveRequest>(
         '/api/v1/leave-requests',
         input,
       );
-      return response.data as LeaveRequest | { _queued: true };
+      return response.data;
     },
-    onSuccess: (data) => {
-      if (isQueuedResponse(data)) {
-        notifications.show({
-          title: 'Saved for later',
-          message: "You're offline. Your submission has been queued and will be synced when you're back online.",
-          color: notifyColors.success,
-        });
-        return;
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leaves'], exact: false });
       queryClient.refetchQueries({
         predicate: (query) => query.queryKey[0] === 'leaves' && query.queryKey[1] === branchId,
@@ -117,7 +100,8 @@ export function useCreateLeaveRequest() {
         color: notifyColors.success,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown & { isOfflineError?: boolean }) => {
+      if (error.isOfflineError) return;
       let message = 'Failed to submit leave request';
       if (typeof error === 'object' && error !== null && 'response' in error) {
         const res = (error as { response?: { data?: { error?: { message?: string | string[] }; message?: string | string[] } } }).response?.data;
@@ -146,25 +130,13 @@ export function useUpdateLeaveStatus() {
       reviewNotes?: string;
     }) => {
       const { id, action, reviewNotes } = params;
-      if (typeof window !== 'undefined' && !window.navigator.onLine) {
-        await enqueue('PUT', `/api/v1/leave-requests/${id}/${action}`, reviewNotes ? { reviewNotes } : {});
-        return { _queued: true } as { _queued: true };
-      }
       const response = await apiClient.put<LeaveRequest>(
         `/api/v1/leave-requests/${id}/${action}`,
         reviewNotes ? { reviewNotes } : {},
       );
-      return response.data as LeaveRequest | { _queued: true };
+      return response.data;
     },
-    onSuccess: (data) => {
-      if (isQueuedResponse(data)) {
-        notifications.show({
-          title: 'Saved for later',
-          message: "You're offline. Your update has been queued and will be synced when you're back online.",
-          color: notifyColors.success,
-        });
-        return;
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leaves'] });
       notifications.show({
         title: 'Success',
@@ -172,7 +144,8 @@ export function useUpdateLeaveStatus() {
         color: notifyColors.success,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown & { isOfflineError?: boolean }) => {
+      if (error.isOfflineError) return;
       const message =
         error instanceof Error ? error.message : 'Unknown error occurred';
       notifications.show({
@@ -206,5 +179,3 @@ export function useStudentLeaveStats(studentId: string | null) {
     staleTime: 2 * 60 * 1000,
   });
 }
-
-

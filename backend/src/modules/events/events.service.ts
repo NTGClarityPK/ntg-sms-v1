@@ -27,6 +27,8 @@ type EventRow = {
   id: string;
   title: string;
   description: string | null;
+  title_translations?: Record<string, string> | null;
+  description_translations?: Record<string, string> | null;
   start_date: string;
   end_date: string;
   requires_consent: boolean;
@@ -66,11 +68,28 @@ function throwIfDbError(error: PostgrestError | null): void {
   throw new BadRequestException(error.message);
 }
 
-function mapEvent(row: EventRow): EventDto {
+function resolveEventTitle(
+  row: { title: string; title_translations?: Record<string, string> | null },
+  language: string,
+): string {
+  const t = row.title_translations;
+  return (t?.[language] ?? t?.en ?? row.title) || row.title;
+}
+
+function resolveEventDescription(
+  row: { description: string | null; description_translations?: Record<string, string> | null },
+  language: string,
+): string | undefined {
+  const t = row.description_translations;
+  const resolved = t?.[language] ?? t?.en ?? row.description;
+  return resolved ?? undefined;
+}
+
+function mapEvent(row: EventRow, language: string = 'ar'): EventDto {
   return new EventDto({
     id: row.id,
-    title: row.title,
-    description: row.description ?? undefined,
+    title: resolveEventTitle(row, language),
+    description: resolveEventDescription(row, language),
     startDate: row.start_date,
     endDate: row.end_date,
     requiresConsent: row.requires_consent,
@@ -132,6 +151,7 @@ export class EventsService {
     academicYearId?: string,
   ): Promise<{ data: EventDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
+    const language = query.language ?? 'ar';
 
     let activeYearId = academicYearId;
     if (!activeYearId) {
@@ -188,7 +208,7 @@ export class EventsService {
       };
     }
 
-    const events = (data as EventRow[]).map(mapEvent);
+    const events = (data as EventRow[]).map((row) => mapEvent(row, language));
     const eventIds = events.map((e) => e.id);
 
     // Fetch participants with class section details for all events
@@ -272,7 +292,7 @@ export class EventsService {
     };
   }
 
-  async getEvent(id: string, branchId: string): Promise<EventDto> {
+  async getEvent(id: string, branchId: string, language: string = 'ar'): Promise<EventDto> {
     const supabase = this.supabaseConfig.getClient();
 
     const { data, error } = await supabase
@@ -287,7 +307,7 @@ export class EventsService {
       throw new NotFoundException('Event not found');
     }
 
-    const event = mapEvent(data as EventRow);
+    const event = mapEvent(data as EventRow, language);
 
     // Fetch participants for this event with class section details
     const { data: participantsData, error: participantsError } = await supabase
@@ -372,12 +392,18 @@ export class EventsService {
       }
     }
 
-    // Create event
+    const titleTranslations = input.title_translations ?? { en: input.title, ar: input.title };
+    const descriptionTranslations = input.description_translations ?? {
+      en: input.description ?? '',
+      ar: input.description ?? '',
+    };
     const { data: eventData, error: eventError } = await supabase
       .from('events')
       .insert({
         title: input.title,
         description: input.description ?? null,
+        title_translations: titleTranslations,
+        description_translations: descriptionTranslations,
         start_date: input.startDate,
         end_date: input.endDate,
         requires_consent: input.requiresConsent ?? false,
@@ -404,7 +430,7 @@ export class EventsService {
       )
       .catch(() => {});
 
-    const event = mapEvent(eventData as EventRow);
+    const event = mapEvent(eventData as EventRow, 'ar');
 
     // Create participants
     const participants: Array<{
@@ -492,6 +518,8 @@ export class EventsService {
     const payload: Record<string, unknown> = {};
     if (input.title !== undefined) payload.title = input.title;
     if (input.description !== undefined) payload.description = input.description ?? null;
+    if (input.title_translations !== undefined) payload.title_translations = input.title_translations;
+    if (input.description_translations !== undefined) payload.description_translations = input.description_translations;
     if (input.startDate !== undefined) payload.start_date = input.startDate;
     if (input.endDate !== undefined) payload.end_date = input.endDate;
     if (input.requiresConsent !== undefined) payload.requires_consent = input.requiresConsent;
@@ -576,7 +604,7 @@ export class EventsService {
     // Send update notifications
     await this.notifyEventUpdated(id, branchId);
 
-    return mapEvent(newRow);
+    return mapEvent(newRow, 'ar');
   }
 
   async deleteEvent(
@@ -1281,7 +1309,7 @@ export class EventsService {
 
     throwIfDbError(error);
 
-    const events = (data || []).map(mapEvent);
+    const events = (data || []).map((row) => mapEvent(row, 'ar'));
 
     // For parents, populate student names for each event
     if (userRoles.includes('parent')) {

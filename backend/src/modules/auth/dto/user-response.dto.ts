@@ -11,6 +11,7 @@ export class UserResponseDto {
   email!: string;
   fullName!: string;
   avatarUrl?: string;
+  preferredLocale?: string;
   roles?: UserRoleDto[];
   branches?: BranchSummaryDto[];
   currentBranch?: BranchSummaryDto | null;

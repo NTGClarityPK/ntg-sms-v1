@@ -5,6 +5,10 @@ export class QueryAssessmentTypesDto extends BasePaginationDto {
   @IsOptional()
   @IsIn(['name', 'sort_order', 'created_at'])
   sortBy?: 'name' | 'sort_order' | 'created_at';
+
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  language?: 'en' | 'ar';
 }
 
 

@@ -3,6 +3,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 import type {
   Event,
@@ -22,11 +23,12 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * Hook to list events with filters and pagination
  */
 export function useEvents(params: QueryEventsInput = {}) {
+  const locale = useLocale();
   return useQuery({
-    queryKey: ['events', params],
+    queryKey: ['events', params, locale],
     queryFn: async () => {
       const response = await apiClient.get<Event[]>('/api/v1/events', {
-        params,
+        params: { ...params, language: locale },
       });
       // apiClient.get() returns ApiResponse<Event[]> = { data: Event[], meta: {...} }
       return response;
@@ -72,10 +74,13 @@ export function useMyEvents() {
  * Hook to get a single event by ID
  */
 export function useEvent(id: string | undefined) {
+  const locale = useLocale();
   return useQuery({
-    queryKey: ['events', id],
+    queryKey: ['events', id, locale],
     queryFn: async () => {
-      const response = await apiClient.get<Event>(`/api/v1/events/${id}`);
+      const response = await apiClient.get<Event>(`/api/v1/events/${id}`, {
+        params: { language: locale },
+      });
       // apiClient.get() returns ApiResponse<Event> = { data: Event }
       return response;
     },

@@ -22,6 +22,15 @@ export function CurrentBranchBadge() {
 
   const branchName = currentBranch.name || currentBranch.code || 'Unknown Branch';
 
+  const badgeStyle = {
+    cursor: 'default' as const,
+    fontWeight: 500,
+    height: '28px',
+    display: 'flex' as const,
+    alignItems: 'center' as const,
+    padding: '0 10px',
+  };
+
   return (
     <Tooltip
       label={`Currently viewing ${branchName}`}
@@ -29,17 +38,10 @@ export function CurrentBranchBadge() {
       withArrow
     >
       <Badge
-        leftSection={<IconMapPin size={14} />}
+        leftSection={<IconMapPin size={12} />}
         variant="light"
-        size="lg"
-        style={{
-          cursor: 'default',
-          fontWeight: 500,
-          height: '32px',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 12px',
-        }}
+        size="md"
+        style={badgeStyle}
       >
         {branchName}
       </Badge>

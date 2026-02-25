@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useForm } from '@mantine/form';
 import {
   Box,
@@ -37,6 +38,8 @@ interface Branch {
 }
 
 export default function LoginPage() {
+  const t = useTranslations('auth');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const errorColor = useErrorColor();
   const { isDark } = useTheme();
@@ -87,20 +90,25 @@ export default function LoginPage() {
       if (!result.session) {
         throw new Error('Session not created');
       }
-      
-      // Check if user is super admin first
+
+      // Get user (for locale sync and super admin check)
       try {
-        const userResponse = await apiClient.get<{ roles?: Array<{ roleName?: string }> }>('/api/v1/auth/me');
+        const userResponse = await apiClient.get<{
+          preferredLocale?: string;
+          roles?: Array<{ roleName?: string }>;
+        }>('/api/v1/auth/me');
+        const locale = userResponse.data?.preferredLocale ?? 'ar';
+        document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000; SameSite=Lax`;
+        localStorage.setItem('locale', locale);
+
         const isSuperAdmin = userResponse.data?.roles?.some(
           (r) => r.roleName?.toLowerCase() === 'super_admin'
         );
-
         if (isSuperAdmin) {
-          // Super admin goes directly to admin portal (no branch needed)
           window.location.href = '/adminportal';
           return;
         }
-      } catch (userError: any) {
+      } catch (userError: unknown) {
         console.error('Failed to check user role:', userError);
         // Continue with normal flow if check fails
       }
@@ -213,10 +221,10 @@ export default function LoginPage() {
       <Stack gap="lg">
         <Box>
           <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
-            Sign In
+            {t('signInTitle')}
           </Title>
           <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
-            Sign in to your account to continue
+            {t('signInSubtitle')}
           </Text>
         </Box>
 
@@ -237,8 +245,8 @@ export default function LoginPage() {
 
         <TextInput
           id="login-email"
-          label="Email"
-          placeholder="your@email.com"
+          label={t('email')}
+          placeholder={t('emailPlaceholder')}
           required
           leftSection={<IconMail size={18} />}
           size="lg"
@@ -250,8 +258,8 @@ export default function LoginPage() {
 
         <PasswordInput
           id="login-password"
-          label="Password"
-          placeholder="Enter your password"
+          label={t('password')}
+          placeholder={t('passwordPlaceholder')}
           required
           leftSection={<IconLock size={18} />}
           size="lg"
@@ -269,7 +277,7 @@ export default function LoginPage() {
           onClick={() => setForgotPasswordOpened(true)}
           style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}
         >
-          Forgot password?
+          {t('forgotPassword')}
         </Anchor>
 
         <Button
@@ -284,7 +292,7 @@ export default function LoginPage() {
             color: 'white',
           }}
         >
-          Sign In
+          {t('signIn')}
         </Button>
 
         <Divider label="OR" labelPosition="center" />
@@ -302,13 +310,13 @@ export default function LoginPage() {
             color: DEFAULT_THEME_COLOR,
           }}
         >
-          Sign in with Google
+          {t('signInWithGoogle')}
         </Button>
 
         <Text ta="center" size="sm" style={{ color: themeColors.colorTextMedium }}>
-          Don't have an account?{' '}
+          {t('noAccount')}{' '}
           <Anchor id="login-signup-link" href="/signup" size="sm" style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}>
-            Sign up
+            {t('signUp')}
           </Anchor>
         </Text>
       </Stack>
@@ -316,7 +324,7 @@ export default function LoginPage() {
       <Modal
         opened={forgotPasswordOpened}
         onClose={handleCloseForgotPassword}
-        title="Reset Password"
+        title={t('resetPassword')}
         centered
       >
         {resetEmailSent ? (
@@ -328,8 +336,7 @@ export default function LoginPage() {
               radius="md"
             >
               <Text size="sm">
-                Password reset email has been sent to <strong>{forgotPasswordForm.values.email}</strong>.
-                Please check your inbox and click the link to reset your password.
+                {t('resetEmailSent', { email: forgotPasswordForm.values.email })}
               </Text>
             </Alert>
             <Button
@@ -340,14 +347,14 @@ export default function LoginPage() {
                 color: 'white',
               }}
             >
-              Close
+              {tCommon('close')}
             </Button>
           </Stack>
         ) : (
           <form onSubmit={forgotPasswordForm.onSubmit(handleForgotPassword)}>
             <Stack gap="md">
               <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
-                Enter your email address and we'll send you a link to reset your password.
+                {t('resetEmailPrompt')}
               </Text>
 
               {resetError && (
@@ -367,8 +374,8 @@ export default function LoginPage() {
 
               <TextInput
                 id="login-reset-email"
-                label="Email"
-                placeholder="your@email.com"
+                label={t('email')}
+                placeholder={t('emailPlaceholder')}
                 required
                 leftSection={<IconMail size={18} />}
                 size="lg"
@@ -384,7 +391,7 @@ export default function LoginPage() {
                   onClick={handleCloseForgotPassword}
                   disabled={resetLoading}
                 >
-                  Cancel
+                  {tCommon('cancel')}
                 </Button>
                 <Button
                   id="login-reset-submit"
@@ -395,7 +402,7 @@ export default function LoginPage() {
                     color: 'white',
                   }}
                 >
-                  Send Reset Link
+                  {t('sendResetLink')}
                 </Button>
               </Group>
             </Stack>

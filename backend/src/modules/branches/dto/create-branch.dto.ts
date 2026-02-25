@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateBranchDto {
   @IsString()
@@ -11,6 +11,10 @@ export class CreateBranchDto {
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   nameAr?: string;
+
+  @IsOptional()
+  @IsObject()
+  name_translations?: { en?: string; ar?: string };
 
   @IsOptional()
   @IsString()

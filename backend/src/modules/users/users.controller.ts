@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -25,10 +26,10 @@ import { QueryUsersDto } from './dto/query-users.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @Controller('api/v1/users')
-@UseGuards(JwtAuthGuard, BranchGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -83,6 +84,7 @@ export class UsersController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, BranchGuard)
   async listUsers(
     @Query() query: QueryUsersDto,
     @CurrentBranch() branch: { branchId: string },
@@ -90,7 +92,18 @@ export class UsersController {
     return this.usersService.listUsers(query, branch.branchId);
   }
 
+  @Patch('me/preferences')
+  @UseGuards(JwtAuthGuard)
+  async updatePreferences(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: UpdatePreferencesDto,
+  ) {
+    await this.usersService.updatePreferences(user.id, dto);
+    return { data: { success: true } };
+  }
+
   @Get(':id')
+  @UseGuards(JwtAuthGuard, BranchGuard)
   async getUserById(
     @Param('id') id: string,
     @CurrentBranch() branch: { branchId: string },
@@ -100,6 +113,7 @@ export class UsersController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard, BranchGuard)
   async createUser(
     @Body() input: CreateUserDto,
     @CurrentBranch() branch: CurrentBranchContext,
@@ -116,6 +130,7 @@ export class UsersController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, BranchGuard)
   async updateUser(
     @Param('id') id: string,
     @Body() input: UpdateUserDto,
@@ -134,6 +149,7 @@ export class UsersController {
   }
 
   @Put(':id/roles')
+  @UseGuards(JwtAuthGuard, BranchGuard)
   async updateUserRoles(
     @Param('id') id: string,
     @Body() input: UpdateUserRolesDto,
@@ -152,6 +168,7 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, BranchGuard)
   async deleteUser(
     @Param('id') id: string,
     @CurrentBranch() branch: CurrentBranchContext,

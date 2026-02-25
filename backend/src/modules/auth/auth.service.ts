@@ -81,7 +81,7 @@ export class AuthService {
       // Get profile from public.profiles (only needed fields)
       supabase
         .from('profiles')
-        .select('full_name, avatar_url, current_branch_id')
+        .select('full_name, avatar_url, current_branch_id, preferred_locale')
         .eq('id', userId)
         .maybeSingle(),
       // Get user branch mappings
@@ -161,11 +161,13 @@ export class AuthService {
       ? branches.find((b) => b.id === currentBranchId) ?? null
       : null;
 
+    const profileRow = profile as { preferred_locale?: string | null } | null;
     const userResponse = new UserResponseDto({
       id: user.id,
       email: user.email || '',
       fullName: profile?.full_name || user.email || 'User',
       avatarUrl: profile?.avatar_url || undefined,
+      preferredLocale: profileRow?.preferred_locale ?? 'ar',
       roles,
       branches,
       currentBranch,

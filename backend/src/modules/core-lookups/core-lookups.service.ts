@@ -27,6 +27,7 @@ type SubjectRow = {
   id: string;
   name: string;
   name_ar: string | null;
+  name_translations?: Record<string, string> | null;
   code: string | null;
   is_active: boolean;
   sort_order: number;
@@ -83,10 +84,19 @@ type LevelClassRow = {
   class_id: string;
 };
 
-function mapSubject(row: SubjectRow): SubjectDto {
+function resolveTranslatedName(
+  row: { name: string; name_translations?: Record<string, string> | null },
+  language: string,
+): string {
+  const t = row.name_translations;
+  return (t?.[language] ?? t?.en ?? row.name) || row.name;
+}
+
+function mapSubject(row: SubjectRow, language: string = 'ar'): SubjectDto {
+  const name = resolveTranslatedName(row, language);
   return new SubjectDto({
     id: row.id,
-    name: row.name,
+    name,
     nameAr: row.name_ar ?? undefined,
     code: row.code ?? undefined,
     isActive: row.is_active,
@@ -140,6 +150,7 @@ export class CoreLookupsService {
 
   async listSubjects(query: QuerySubjectsDto, branchId: string): Promise<{ data: SubjectDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
+    const language = query.language ?? 'ar';
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const from = (page - 1) * limit;
@@ -164,7 +175,7 @@ export class CoreLookupsService {
     const total = count ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / limit));
     return {
-      data: (data as SubjectRow[]).map(mapSubject),
+      data: (data as SubjectRow[]).map((row) => mapSubject(row, language)),
       meta: { total, page, limit, totalPages },
     };
   }
@@ -194,22 +205,25 @@ export class CoreLookupsService {
         .eq('code', code)
         .maybeSingle();
       throwIfDbError(existingError);
-      if (existing) return mapSubject(existing as SubjectRow);
+      if (existing) return mapSubject(existing as SubjectRow, 'ar');
     }
 
+    const nameTranslations = (input as { name_translations?: Record<string, string> }).name_translations;
+    const insertPayload = {
+      name: input.name,
+      name_ar: input.nameAr ?? null,
+      name_translations: nameTranslations ?? { en: input.name, ar: input.nameAr ?? input.name },
+      code: code || null,
+      is_active: input.isActive ?? true,
+      sort_order: input.sortOrder ?? 0,
+      branch_id: branchId,
+      tenant_id: tenantId,
+      created_by: username,
+      updated_by: username,
+    };
     const { data, error } = await supabase
       .from('subjects')
-      .insert({
-        name: input.name,
-        name_ar: input.nameAr ?? null,
-        code: code || null,
-        is_active: input.isActive ?? true,
-        sort_order: input.sortOrder ?? 0,
-        branch_id: branchId,
-        tenant_id: tenantId,
-        created_by: username,
-        updated_by: username,
-      })
+      .insert(insertPayload)
       .select('*')
       .single();
     throwIfDbError(error);
@@ -220,7 +234,7 @@ export class CoreLookupsService {
         tenantId,
       })
       .catch(() => {});
-    return mapSubject(row);
+    return mapSubject(row, 'ar');
   }
 
   async updateSubject(
@@ -242,12 +256,13 @@ export class CoreLookupsService {
     const updates: Partial<SubjectRow> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
+    if (input.name_translations !== undefined) updates.name_translations = input.name_translations;
     if (input.code !== undefined) updates.code = input.code || null;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
     updates.updated_by = username;
     if (Object.keys(updates).length === 1 && updates.updated_by) {
-      return mapSubject(oldRow as SubjectRow);
+      return mapSubject(oldRow as SubjectRow, 'ar');
     }
     const { data, error } = await supabase
       .from('subjects')
@@ -270,7 +285,7 @@ export class CoreLookupsService {
         { branchId },
       )
       .catch(() => {});
-    return mapSubject(newRow);
+    return mapSubject(newRow, 'ar');
   }
 
   async listClasses(query: QueryClassesDto, branchId: string): Promise<{ data: ClassDto[]; meta: Meta }> {

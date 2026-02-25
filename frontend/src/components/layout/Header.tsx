@@ -6,22 +6,36 @@ import { IconCircle, IconSchool, IconCrown } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { UserMenu } from './UserMenu';
 import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranchBadge';
+import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
-import { useThemeColors, useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import type { ThemeConfig } from '@/lib/theme/themeConfig';
+import { useMantineTheme } from '@mantine/core';
 import { useTenantMe } from '@/hooks/useTenant';
 import { useAuth } from '@/hooks/useAuth';
-import { useOfflineSync } from '@/hooks/useOfflineSync';
-import { SyncStatus } from '@/components/common/SyncStatus';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useMyStudent } from '@/hooks/useStudents';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 
+const headerBadgeStyle = {
+  cursor: 'default' as const,
+  fontWeight: 500,
+  height: '28px',
+  display: 'flex' as const,
+  alignItems: 'center' as const,
+  padding: '0 10px',
+};
+
 export function Header() {
+  const theme = useMantineTheme();
+  const themeConfig = (theme.other ?? {}) as ThemeConfig | undefined;
+  const onlineBadgeColor = themeConfig?.components?.statusOnline?.badgeColor ?? '#22c55e';
+  const offlineBadgeColor = themeConfig?.components?.statusOffline?.badgeColor ?? '#868e96';
+
   const colors = useThemeColors();
-  const successColor = useSuccessColor();
-  const errorColor = useErrorColor();
-  const { isOnline, pendingCount } = useOfflineSync();
+  const isOnline = useOnlineStatus();
   const tenantQuery = useTenantMe();
   const { name: tenantName, logoUrl: tenantLogo, setBranding } = useTenantBrandingStore();
   const { setPrimaryColor } = useThemeStore();
@@ -160,49 +174,35 @@ export function Header() {
           />
         </Box>
 
-        {/* Online/Offline Status Badge - desktop only */}
-        <Tooltip
-          label={
-            isOnline
-              ? pendingCount > 0
-                ? `${pendingCount} change(s) pending sync`
-                : 'Connected to server'
-              : 'No internet connection'
-          }
-          position="bottom"
-          withArrow
-        >
-          <Badge
-            visibleFrom="sm"
-            variant="light"
-            color={isOnline ? successColor : errorColor}
-            size="sm"
-            leftSection={
-              <IconCircle
-                size={8}
-                fill="currentColor"
-                style={{ marginRight: 4 }}
-              />
-            }
-            style={{
-              cursor: 'default',
-              fontWeight: 500,
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              padding: '0 12px',
-            }}
+        <LanguageSwitcher />
+        <Group gap="xs" align="center" wrap="nowrap" visibleFrom="sm">
+          {/* Online/Offline Status Badge (green when online, gray when offline) */}
+          <Tooltip
+            label={isOnline ? 'Connected to server' : 'No internet connection'}
+            position="bottom"
+            withArrow
           >
-            {isOnline ? 'Online' : 'Offline'}
-          </Badge>
-        </Tooltip>
-
-        <Box visibleFrom="sm">
-          <SyncStatus />
-        </Box>
-        <Box visibleFrom="sm">
+            <Badge
+              variant="light"
+              size="md"
+              leftSection={
+                <IconCircle
+                  size={8}
+                  fill="currentColor"
+                  style={{ marginRight: 4 }}
+                />
+              }
+              style={{
+                ...headerBadgeStyle,
+                backgroundColor: isOnline ? `${onlineBadgeColor}20` : `${offlineBadgeColor}20`,
+                color: isOnline ? onlineBadgeColor : offlineBadgeColor,
+              }}
+            >
+              {isOnline ? 'Online' : 'Offline'}
+            </Badge>
+          </Tooltip>
           <CurrentBranchBadge />
-        </Box>
+        </Group>
         <NotificationBell />
         <UserMenu />
       </Group>

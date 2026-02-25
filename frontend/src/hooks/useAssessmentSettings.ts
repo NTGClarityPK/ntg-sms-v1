@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 import type { AssessmentType, ClassGradeAssignment, GradeTemplate } from '@/types/settings';
 
@@ -10,10 +11,13 @@ const assessmentKeys = {
 };
 
 export function useAssessmentTypes() {
+  const locale = useLocale();
   return useQuery({
-    queryKey: assessmentKeys.types,
+    queryKey: [...assessmentKeys.types, locale],
     queryFn: async () =>
-      apiClient.get<AssessmentType[]>('/api/v1/assessment-types', { params: { page: 1, limit: 100 } }),
+      apiClient.get<AssessmentType[]>('/api/v1/assessment-types', {
+        params: { page: 1, limit: 100, language: locale },
+      }),
     staleTime: 5 * 60 * 1000, // 5 minutes - types rarely change
   });
 }
@@ -21,8 +25,13 @@ export function useAssessmentTypes() {
 export function useCreateAssessmentType() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; nameAr?: string; sortOrder?: number; isActive?: boolean }) =>
-      apiClient.post<AssessmentType>('/api/v1/assessment-types', payload),
+    mutationFn: async (payload: {
+      name: string;
+      nameAr?: string;
+      name_translations?: { en?: string; ar?: string };
+      sortOrder?: number;
+      isActive?: boolean;
+    }) => apiClient.post<AssessmentType>('/api/v1/assessment-types', payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: assessmentKeys.types });
     },
@@ -36,6 +45,7 @@ export function useUpdateAssessmentType() {
       id: string;
       name?: string;
       nameAr?: string;
+      name_translations?: { en?: string; ar?: string };
       isActive?: boolean;
       sortOrder?: number;
     }) => {

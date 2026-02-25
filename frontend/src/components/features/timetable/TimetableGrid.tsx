@@ -231,8 +231,8 @@ export function TimetableGrid({
                       style={{
                         position: 'absolute',
                         top,
-                        left: 4,
-                        right: 4,
+                        insetInlineStart: 4,
+                        insetInlineEnd: 4,
                         height,
                       }}
                       onClick={(e) => {
@@ -253,7 +253,7 @@ export function TimetableGrid({
                           size="xs"
                           variant="light"
                           color="gray"
-                          style={{ position: 'absolute', top: 4, right: 4 }}
+                          style={{ position: 'absolute', top: 4, insetInlineEnd: 4 }}
                         >
                           Period {slot.periodNumber}
                         </Badge>

@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEnum, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsIn, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
 export enum EventStatus {
   UPCOMING = 'upcoming',
@@ -43,6 +43,10 @@ export class QueryEventsDto {
   @Min(1)
   @Max(100)
   limit?: number;
+
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  language?: 'en' | 'ar';
 }
 
 

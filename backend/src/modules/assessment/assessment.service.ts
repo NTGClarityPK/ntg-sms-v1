@@ -18,6 +18,7 @@ type AssessmentTypeRow = {
   id: string;
   name: string;
   name_ar: string | null;
+  name_translations?: Record<string, string> | null;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -69,10 +70,19 @@ type GradeTemplateLiteRow = {
   name: string;
 };
 
-function mapAssessmentType(row: AssessmentTypeRow): AssessmentTypeDto {
+function resolveAssessmentTypeName(
+  row: { name: string; name_translations?: Record<string, string> | null },
+  language: string,
+): string {
+  const t = row.name_translations;
+  return (t?.[language] ?? t?.en ?? row.name) || row.name;
+}
+
+function mapAssessmentType(row: AssessmentTypeRow, language: string = 'ar'): AssessmentTypeDto {
+  const name = resolveAssessmentTypeName(row, language);
   return new AssessmentTypeDto({
     id: row.id,
-    name: row.name,
+    name,
     nameAr: row.name_ar ?? undefined,
     isActive: row.is_active,
     sortOrder: row.sort_order,
@@ -150,6 +160,7 @@ export class AssessmentService {
     branchId: string,
   ): Promise<{ data: AssessmentTypeDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
+    const language = query.language ?? 'ar';
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const from = (page - 1) * limit;
@@ -173,21 +184,26 @@ export class AssessmentService {
 
     const total = count ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / limit));
-    return { data: ((data as AssessmentTypeRow[]) ?? []).map(mapAssessmentType), meta: { total, page, limit, totalPages } };
+    return {
+      data: ((data as AssessmentTypeRow[]) ?? []).map((row) => mapAssessmentType(row, language)),
+      meta: { total, page, limit, totalPages },
+    };
   }
 
   async createAssessmentType(
-    input: { name: string; nameAr?: string; isActive?: boolean; sortOrder?: number },
+    input: { name: string; nameAr?: string; name_translations?: { en?: string; ar?: string }; isActive?: boolean; sortOrder?: number },
     branchId: string,
     tenantId: string | null,
     userEmail: string,
   ): Promise<AssessmentTypeDto> {
     const supabase = this.supabaseConfig.getClient();
+    const nameTranslations = input.name_translations ?? { en: input.name, ar: input.nameAr ?? input.name };
     const { data, error } = await supabase
       .from('assessment_types')
       .insert({
         name: input.name,
         name_ar: input.nameAr ?? null,
+        name_translations: nameTranslations,
         is_active: input.isActive ?? true,
         sort_order: input.sortOrder ?? 0,
         branch_id: branchId,
@@ -203,12 +219,12 @@ export class AssessmentService {
         tenantId,
       })
       .catch(() => {});
-    return mapAssessmentType(row);
+    return mapAssessmentType(row, 'ar');
   }
 
   async updateAssessmentType(
     id: string,
-    input: { name?: string; nameAr?: string; isActive?: boolean; sortOrder?: number },
+    input: { name?: string; nameAr?: string; name_translations?: { en?: string; ar?: string }; isActive?: boolean; sortOrder?: number },
     branchId: string,
     userEmail: string,
     tenantId?: string | null,
@@ -217,6 +233,7 @@ export class AssessmentService {
     const updates: Partial<AssessmentTypeRow> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
+    if (input.name_translations !== undefined) updates.name_translations = input.name_translations;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
     const { data: oldRow, error: fetchError } = await supabase
@@ -228,7 +245,7 @@ export class AssessmentService {
     throwIfDbError(fetchError);
     if (!oldRow) throw new NotFoundException('Assessment type not found');
     if (Object.keys(updates).length === 0) {
-      return mapAssessmentType(oldRow as AssessmentTypeRow);
+      return mapAssessmentType(oldRow as AssessmentTypeRow, 'ar');
     }
     const { data, error } = await supabase
       .from('assessment_types')
@@ -251,7 +268,7 @@ export class AssessmentService {
         { branchId, tenantId },
       )
       .catch(() => {});
-    return mapAssessmentType(data as AssessmentTypeRow);
+    return mapAssessmentType(data as AssessmentTypeRow, 'ar');
   }
 
   async listGradeTemplates(branchId: string): Promise<{ data: GradeTemplateDto[] }> {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { Group, Title, Stack, Skeleton, SimpleGrid } from '@mantine/core';
 import {
   useDashboardWidgets,
@@ -51,6 +52,7 @@ function DashboardGridSkeleton() {
 }
 
 export default function DashboardPage() {
+  const t = useTranslations('common');
   const { user } = useAuth();
   const userTyped = user as User | undefined;
   const { data: preferences, isFetched: preferencesFetched } = useDashboardPreferencesQuery();
@@ -107,7 +109,7 @@ export default function DashboardPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Dashboard</Title>
+          <Title order={1}>{t('dashboard')}</Title>
           <RoleSwitcher
             user={userTyped}
             selectedRoleId={preferences?.selectedRoleId}

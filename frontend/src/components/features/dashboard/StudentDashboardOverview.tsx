@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import {
   Stack,
   SimpleGrid,
@@ -50,6 +51,7 @@ interface StudentDashboardOverviewProps {
 }
 
 export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps) {
+  const t = useTranslations('dashboard');
   const colors = useThemeColors();
   const { data: myStudentData } = useMyStudent();
   const studentId = myStudentData?.data?.id ?? undefined;
@@ -75,12 +77,12 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
 
   const roleLabel = user?.roles?.[0]?.roleName
     ? formatRoleName(user.roles[0].roleName)
-    : 'Student';
+    : t('student');
 
   const chartData = [
-    { name: 'Upcoming assessments', count: upcomingAssessments.length },
-    { name: "Today's classes", count: todaySlots.length },
-    { name: 'Grades recorded', count: grades.length },
+    { name: t('upcomingAssessments'), count: upcomingAssessments.length },
+    { name: t('todayClasses'), count: todaySlots.length },
+    { name: t('gradesRecorded'), count: grades.length },
   ];
 
   if (!studentId) {
@@ -88,10 +90,10 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
       <Stack gap="md">
         <Paper p="md" withBorder>
           <Text size="lg" fw={600}>
-            Welcome, {user?.fullName ?? user?.email ?? 'User'}
+            {t('welcome')}, {user?.fullName ?? user?.email ?? t('user')}
           </Text>
           <Text size="sm" c="dimmed" mt="xs">
-            Select a student profile to see your dashboard.
+            {t('selectStudentProfile')}
           </Text>
         </Paper>
       </Stack>
@@ -103,10 +105,10 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
       <Paper p="md" withBorder>
         <Stack gap="xs">
           <Text size="lg" fw={600}>
-            Welcome, {user?.fullName ?? user?.email ?? 'User'}
+            {t('welcome')}, {user?.fullName ?? user?.email ?? t('user')}
           </Text>
           <Text size="sm" c="dimmed">
-            Role: {roleLabel}
+            {t('role')}: {roleLabel}
           </Text>
         </Stack>
       </Paper>
@@ -120,17 +122,17 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
           <DashboardStatCard
-            title="Upcoming assessments"
+            title={t('upcomingAssessments')}
             value={upcomingAssessments.length}
             icon={IconClipboardList}
           />
           <DashboardStatCard
-            title="Grades recorded"
+            title={t('gradesRecorded')}
             value={grades.length}
             icon={IconReport}
           />
           <DashboardStatCard
-            title="Today's classes"
+            title={t('todayClasses')}
             value={todaySlots.length}
             icon={IconCalendar}
           />
@@ -143,7 +145,7 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
             <Stack gap="md">
               <Group gap="xs">
                 <IconTrendingUp size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Overview</Title>
+                <Title order={3}>{t('overview')}</Title>
               </Group>
               {loading ? (
                 <Skeleton height={280} />
@@ -155,7 +157,7 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
                       <XAxis dataKey="name" />
                       <YAxis allowDecimals={false} />
                       <Tooltip />
-                      <Bar dataKey="count" name="Count" fill={colors.primary} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="count" name={t('count')} fill={colors.primary} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </Box>
@@ -169,13 +171,13 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendar size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Today&apos;s schedule</Title>
+                <Title order={3}>{t('todaySchedule')}</Title>
               </Group>
               {timetableLoading ? (
                 <Skeleton height={200} />
               ) : todaySlots.length === 0 ? (
                 <Text c="dimmed" size="sm">
-                  No classes today
+                  {t('noClassesToday')}
                 </Text>
               ) : (
                 <Stack gap="xs">
@@ -185,7 +187,7 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
                         {slot.startTime}–{slot.endTime}
                       </Text>
                       <Text size="xs" c="dimmed">
-                        {slot.subjectName ?? 'Period'}
+                        {slot.subjectName ?? t('period')}
                       </Text>
                     </Card>
                   ))}
@@ -200,11 +202,11 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
             <Stack gap="md">
               <Group gap="xs">
                 <IconClipboardList size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Upcoming assessments</Title>
+                <Title order={3}>{t('upcomingAssessments')}</Title>
               </Group>
               {upcomingAssessments.length === 0 ? (
                 <Text c="dimmed" size="sm">
-                  No upcoming assessments
+                  {t('noUpcomingAssessments')}
                 </Text>
               ) : (
                 <Stack gap="xs">
@@ -214,7 +216,7 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
                         {a.assessment.title}
                       </Text>
                       <Badge variant="light" size="sm" mt="xs">
-                        Due: {a.assessment.dueDate ?? '—'}
+                        {t('due')}: {a.assessment.dueDate ?? '—'}
                       </Badge>
                     </Card>
                   ))}
@@ -229,31 +231,31 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
             <Stack gap="md">
               <Group gap="xs">
                 <IconReport size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Recent grades</Title>
+                <Title order={3}>{t('recentGrades')}</Title>
               </Group>
               {gradesLoading ? (
                 <Skeleton height={80} />
               ) : grades.length === 0 ? (
                 <Text c="dimmed" size="sm">
-                  No grades recorded yet
+                  {t('noGradesRecordedYet')}
                 </Text>
               ) : (
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Assessment</Table.Th>
-                      <Table.Th>Marks</Table.Th>
+                      <Table.Th>{t('assessment')}</Table.Th>
+                      <Table.Th>{t('marks')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     {grades.slice(0, 5).map((g) => (
                       <Table.Tr key={g.id}>
                         <Table.Td>
-                          <Text size="sm">Assessment</Text>
+                          <Text size="sm">{t('assessment')}</Text>
                         </Table.Td>
                         <Table.Td>
                           <Badge variant="light" color={colors.primary}>
-                            {g.marksObtained} marks
+                            {g.marksObtained} {t('marks')}
                           </Badge>
                         </Table.Td>
                       </Table.Tr>

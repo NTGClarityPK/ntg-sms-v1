@@ -13,6 +13,7 @@ type BranchRow = {
   tenant_id: string | null;
   name: string;
   name_ar: string | null;
+  name_translations?: Record<string, string> | null;
   code: string | null;
   address: string | null;
   phone: string | null;
@@ -26,11 +27,20 @@ type BranchRow = {
   public_stats_password?: string | null;
 };
 
-function mapBranch(row: BranchRow): BranchDto {
+function resolveBranchName(
+  row: { name: string; name_translations?: Record<string, string> | null },
+  language: string,
+): string {
+  const t = row.name_translations;
+  return (t?.[language] ?? t?.en ?? row.name) || row.name;
+}
+
+function mapBranch(row: BranchRow, language: string = 'ar'): BranchDto {
+  const name = resolveBranchName(row, language);
   return new BranchDto({
     id: row.id,
     tenantId: row.tenant_id,
-    name: row.name,
+    name,
     nameAr: row.name_ar,
     code: row.code,
     address: row.address,
@@ -62,6 +72,7 @@ export class BranchesService {
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
     const supabase = this.supabaseConfig.getClient();
+    const language = query.language ?? 'ar';
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -90,19 +101,19 @@ export class BranchesService {
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     return {
-      data: (data as BranchRow[]).map(mapBranch),
+      data: (data as BranchRow[]).map((row) => mapBranch(row, language)),
       meta: { total, page, limit, totalPages },
     };
   }
 
-  async getById(id: string): Promise<BranchDto> {
+  async getById(id: string, language: string = 'ar'): Promise<BranchDto> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase.from('branches').select('*').eq('id', id).maybeSingle();
     throwIfDbError(error);
     if (!data) {
       throw new NotFoundException('Branch not found');
     }
-    return mapBranch(data as BranchRow);
+    return mapBranch(data as BranchRow, language);
   }
 
   async getByCode(code: string): Promise<{
@@ -154,11 +165,13 @@ export class BranchesService {
 
   async create(input: CreateBranchDto, userEmail: string): Promise<BranchDto> {
     const supabase = this.supabaseConfig.getClient();
+    const nameTranslations = input.name_translations ?? { en: input.name, ar: input.nameAr ?? input.name };
     const { data, error } = await supabase
       .from('branches')
       .insert({
         name: input.name,
         name_ar: input.nameAr ?? null,
+        name_translations: nameTranslations,
         code: input.code ?? null,
         address: input.address ?? null,
         phone: input.phone ?? null,
@@ -177,7 +190,7 @@ export class BranchesService {
         tenantId: row.tenant_id,
       })
       .catch(() => {});
-    return mapBranch(row);
+    return mapBranch(row, 'ar');
   }
 
   async update(
@@ -197,18 +210,21 @@ export class BranchesService {
       throw new NotFoundException('Branch not found');
     }
 
+    const updates: Record<string, unknown> = {
+      code: input.code ?? undefined,
+      address: input.address ?? undefined,
+      phone: input.phone ?? undefined,
+      email: input.email ?? undefined,
+      storage_quota_gb: input.storageQuotaGb ?? undefined,
+      is_active: input.isActive ?? undefined,
+    };
+    if (input.name !== undefined) updates.name = input.name;
+    if (input.nameAr !== undefined) updates.name_ar = input.nameAr;
+    if (input.name_translations !== undefined) updates.name_translations = input.name_translations;
+
     const { data, error } = await supabase
       .from('branches')
-      .update({
-        name: input.name ?? undefined,
-        name_ar: input.nameAr ?? undefined,
-        code: input.code ?? undefined,
-        address: input.address ?? undefined,
-        phone: input.phone ?? undefined,
-        email: input.email ?? undefined,
-        storage_quota_gb: input.storageQuotaGb ?? undefined,
-        is_active: input.isActive ?? undefined,
-      })
+      .update(updates)
       .eq('id', id)
       .select('*')
       .single();
@@ -229,7 +245,7 @@ export class BranchesService {
         { branchId: id, tenantId: (existing as BranchRow).tenant_id },
       )
       .catch(() => {});
-    return mapBranch(newRow);
+    return mapBranch(newRow, 'ar');
   }
 
   async getStorage(id: string): Promise<{
@@ -293,7 +309,7 @@ export class BranchesService {
     throwIfDbError(branchesError);
 
     return {
-      data: ((branches as BranchRow[]) ?? []).map(mapBranch),
+      data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, 'ar')),
     };
   }
 
@@ -310,7 +326,7 @@ export class BranchesService {
     throwIfDbError(branchesError);
 
     return {
-      data: ((branches as BranchRow[]) ?? []).map(mapBranch),
+      data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, 'ar')),
     };
   }
 

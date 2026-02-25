@@ -13,10 +13,11 @@ import {
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconCalendar, IconClock, IconPhone, IconMail, IconUser } from '@tabler/icons-react';
+import { IconCalendar, IconClock, IconPhone, IconMail, IconUser, IconWifiOff } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useAuthorizeEarlyDeparture, useCheckEarlyDepartureConflict } from '@/hooks/useEarlyDepartures';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useTimingTemplates } from '@/hooks/useScheduleSettings';
 import { useStudents } from '@/hooks/useStudents';
 import { useStudentGuardians } from '@/hooks/useParentAssociations';
@@ -40,6 +41,7 @@ function buildTimeOptions(startMinutes: number, endMinutes: number): { value: st
 
 export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartureFormProps) {
   const colors = useThemeColors();
+  const isOnline = useOnlineStatus();
   const authorizeRequest = useAuthorizeEarlyDeparture();
   const { data: timingTemplatesData } = useTimingTemplates();
   const { data: studentsData } = useStudents({ page: 1, limit: 100 });
@@ -178,6 +180,11 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
           <Text size="sm" c="dimmed">
             Authorize a student's early departure. This will immediately notify the parent(s) and mark the request as excused.
           </Text>
+          {!isOnline && (
+            <Alert color="red" icon={<IconWifiOff size={16} />}>
+              No internet connection. Please connect to submit.
+            </Alert>
+          )}
           <Select
             id="authorize-early-departure-student"
             label="Student"
@@ -343,13 +350,14 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
               variant="light"
               loading={authorizeRequest.isPending}
               disabled={
+                !isOnline ||
                 !form.values.studentId ||
                 !form.values.departureTime ||
                 !!form.errors.departureTime ||
                 !!form.errors.studentId
               }
             >
-              Authorize Early Departure
+              {isOnline ? 'Authorize Early Departure' : 'No Internet Connection'}
             </Button>
           </Group>
         </Stack>

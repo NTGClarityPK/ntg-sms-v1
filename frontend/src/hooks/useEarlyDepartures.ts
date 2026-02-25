@@ -105,7 +105,8 @@ export function useCreateEarlyDeparture() {
         color: notifyColors.success,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown & { isOfflineError?: boolean }) => {
+      if (error.isOfflineError) return;
       const message = getApiErrorMessage(
         error,
         'Failed to submit early departure request',
@@ -140,7 +141,8 @@ export function useAuthorizeEarlyDeparture() {
         color: notifyColors.success,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown & { isOfflineError?: boolean }) => {
+      if (error.isOfflineError) return;
       const message = getApiErrorMessage(
         error,
         'Failed to authorize early departure',
@@ -193,7 +195,8 @@ export function useUpdateEarlyDepartureStatus() {
         color: notifyColors.success,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown & { isOfflineError?: boolean }) => {
+      if (error.isOfflineError) return;
       const message = getApiErrorMessage(
         error,
         'Failed to update early departure request',

@@ -13,11 +13,12 @@ import {
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconCalendar, IconClock } from '@tabler/icons-react';
+import { IconCalendar, IconClock, IconWifiOff } from '@tabler/icons-react';
 import { useForm, zodResolver } from '@mantine/form';
 import { z } from 'zod';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCreateEarlyDeparture, useCheckEarlyDepartureConflict } from '@/hooks/useEarlyDepartures';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useTimingTemplates } from '@/hooks/useScheduleSettings';
 import { useStudent } from '@/hooks/useStudents';
 import type { Student } from '@/types/students';
@@ -49,6 +50,7 @@ function buildTimeOptions(startMinutes: number, endMinutes: number): { value: st
 
 export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormProps) {
   const colors = useThemeColors();
+  const isOnline = useOnlineStatus();
   const createRequest = useCreateEarlyDeparture();
   const { data: timingTemplatesData } = useTimingTemplates();
 
@@ -202,6 +204,11 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
       <form id="early-departure-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Text fw={600}>Request early departure</Text>
+          {!isOnline && (
+            <Alert color="red" icon={<IconWifiOff size={16} />}>
+              No internet connection. Please connect to submit your request.
+            </Alert>
+          )}
           <DatePickerInput
             id="early-departure-date"
             label="Date"
@@ -266,12 +273,13 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
               variant="light"
               loading={createRequest.isPending}
               disabled={
+                !isOnline ||
                 !student ||
                 !form.values.departureTime ||
                 !!form.errors.departureTime
               }
             >
-              Submit request
+              {isOnline ? 'Submit request' : 'No Internet Connection'}
             </Button>
           </Group>
         </Stack>

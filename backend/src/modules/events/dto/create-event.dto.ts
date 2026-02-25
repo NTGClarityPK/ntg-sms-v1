@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsDateString,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -22,6 +23,14 @@ export class CreateEventDto {
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   description?: string;
+
+  @IsOptional()
+  @IsObject()
+  title_translations?: { en?: string; ar?: string };
+
+  @IsOptional()
+  @IsObject()
+  description_translations?: { en?: string; ar?: string };
 
   @IsDateString()
   startDate!: string;

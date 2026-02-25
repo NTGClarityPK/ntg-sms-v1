@@ -42,7 +42,7 @@ export function NotificationBell() {
               style={{
                 position: 'absolute',
                 top: 0,
-                right: 0,
+                insetInlineEnd: 0,
                 minWidth: '18px',
                 height: '18px',
                 padding: 0,

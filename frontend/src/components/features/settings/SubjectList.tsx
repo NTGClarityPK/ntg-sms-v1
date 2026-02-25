@@ -9,6 +9,9 @@ import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { useState } from 'react';
 import type { Subject } from '@/types/settings';
+import { TranslatableInput, type TranslatableValue } from '@/components/common/TranslatableInput';
+
+const emptyTranslations: TranslatableValue = { en: '', ar: '' };
 
 export function SubjectList() {
   const colors = useThemeColors();
@@ -19,23 +22,30 @@ export function SubjectList() {
   const createMutation = useCreateSubject();
   const updateMutation = useUpdateSubject();
 
-  const form = useForm<{ name: string; code: string }>({
-    initialValues: { name: '', code: '' },
+  const form = useForm<{ nameTranslations: TranslatableValue; code: string }>({
+    initialValues: { nameTranslations: { ...emptyTranslations }, code: '' },
     validate: {
-      name: (v) => (v.trim().length === 0 ? 'Name is required' : null),
+      nameTranslations: (v) =>
+        (!(v.en ?? '').trim() && !(v.ar ?? '').trim()) ? 'Name (EN or AR) is required' : null,
     },
-    transformValues: (v) => ({ name: v.name.trim(), code: v.code.trim() }),
+    transformValues: (v) => ({
+      nameTranslations: { en: (v.nameTranslations.en ?? '').trim(), ar: (v.nameTranslations.ar ?? '').trim() },
+      code: v.code.trim(),
+    }),
   });
 
   const openCreate = () => {
     setEditSubject(null);
-    form.setValues({ name: '', code: '' });
+    form.setValues({ nameTranslations: { ...emptyTranslations }, code: '' });
     open();
   };
 
   const openEdit = (s: Subject) => {
     setEditSubject(s);
-    form.setValues({ name: s.name, code: s.code ?? '' });
+    form.setValues({
+      nameTranslations: { en: s.name ?? '', ar: s.name ?? '' },
+      code: s.code ?? '',
+    });
     open();
   };
 
@@ -46,15 +56,21 @@ export function SubjectList() {
   };
 
   const onSubmit = form.onSubmit(async (values) => {
+    const name = values.nameTranslations.en || values.nameTranslations.ar || '';
+    const payload = {
+      name,
+      name_translations: values.nameTranslations,
+      code: values.code || undefined,
+    };
     try {
       if (editSubject) {
         await updateMutation.mutateAsync({
           id: editSubject.id,
-          payload: { name: values.name, code: values.code || undefined },
+          payload: { ...payload, nameAr: values.nameTranslations.ar || undefined },
         });
         notifications.show({ title: 'Success', message: 'Subject updated', color: notifyColors.success });
       } else {
-        await createMutation.mutateAsync({ name: values.name, code: values.code || undefined });
+        await createMutation.mutateAsync(payload);
         notifications.show({ title: 'Success', message: 'Subject created', color: notifyColors.success });
       }
       handleClose();
@@ -131,7 +147,14 @@ export function SubjectList() {
       <Modal opened={opened} onClose={handleClose} title={editSubject ? 'Edit subject' : 'Add subject'} size="md">
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput id="subject-form-name" label="Name" placeholder="Mathematics" {...form.getInputProps('name')} />
+            <TranslatableInput
+              id="subject-form-name"
+              label="Name"
+              value={form.values.nameTranslations}
+              onChange={(v) => form.setFieldValue('nameTranslations', v)}
+              required
+              placeholder={{ en: 'Mathematics', ar: 'الرياضيات' }}
+            />
             <TextInput id="subject-form-code" label="Code" placeholder="MATH" {...form.getInputProps('code')} />
             <Group justify="flex-end" mt="md">
               <Button id="subject-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>

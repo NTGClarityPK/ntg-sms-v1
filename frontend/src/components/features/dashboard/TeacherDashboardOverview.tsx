@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import {
   Stack,
   SimpleGrid,
@@ -53,6 +54,7 @@ interface TeacherDashboardOverviewProps {
 }
 
 export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps) {
+  const t = useTranslations('dashboard');
   const colors = useThemeColors();
   const { data: myStaffData } = useMyStaff();
   const staffId = myStaffData?.data?.id;
@@ -81,11 +83,11 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
 
   const roleLabel = user?.roles?.[0]?.roleName
     ? formatRoleName(user.roles[0].roleName)
-    : 'Teacher';
+    : t('teacher');
 
   const chartData = [
-    { name: 'Assessments', count: pendingGradingTotal },
-    { name: "Today's classes", count: todaySlotsCount },
+    { name: t('assessment'), count: pendingGradingTotal },
+    { name: t('todayClasses'), count: todaySlotsCount },
   ];
 
   return (
@@ -93,10 +95,10 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
       <Paper p="md" withBorder>
         <Stack gap="xs">
           <Text size="lg" fw={600}>
-            Welcome, {user?.fullName ?? user?.email ?? 'User'}
+            {t('welcome')}, {user?.fullName ?? user?.email ?? t('user')}
           </Text>
           <Text size="sm" c="dimmed">
-            Role: {roleLabel}
+            {t('role')}: {roleLabel}
           </Text>
         </Stack>
       </Paper>
@@ -110,22 +112,22 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <DashboardStatCard
-            title="My classes"
+            title={t('myClasses')}
             value={myClassesCount}
             icon={IconSchool}
           />
           <DashboardStatCard
-            title="Pending grading"
+            title={t('pendingGrading')}
             value={pendingGradingTotal}
             icon={IconClipboardList}
           />
           <DashboardStatCard
-            title="Today's slots"
+            title={t('todaySlots')}
             value={todaySlotsCount}
             icon={IconCalendar}
           />
           <DashboardStatCard
-            title="Unread"
+            title={t('unread')}
             value={unreadCount}
             icon={IconMessageCircle}
           />
@@ -138,7 +140,7 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
             <Stack gap="md">
               <Group gap="xs">
                 <IconTrendingUp size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Workload overview</Title>
+                <Title order={3}>{t('workloadOverview')}</Title>
               </Group>
               {loading ? (
                 <Skeleton height={280} />
@@ -150,7 +152,7 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
                       <XAxis dataKey="name" />
                       <YAxis allowDecimals={false} />
                       <Tooltip />
-                      <Bar dataKey="count" name="Count" fill={colors.primary} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="count" name={t('count')} fill={colors.primary} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </Box>
@@ -164,13 +166,13 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendar size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Today&apos;s schedule</Title>
+                <Title order={3}>{t('todaySchedule')}</Title>
               </Group>
               {timetableQuery.isLoading ? (
                 <Skeleton height={200} />
               ) : todaySlots.length === 0 ? (
                 <Text c="dimmed" size="sm">
-                  No classes scheduled today
+                  {t('noClassesScheduledToday')}
                 </Text>
               ) : (
                 <Stack gap="xs">
@@ -180,7 +182,7 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
                         {slot.startTime}–{slot.endTime}
                       </Text>
                       <Text size="xs" c="dimmed">
-                        {slot.subjectName ?? 'Period'}
+                        {slot.subjectName ?? t('period')}
                         {slot.className || slot.sectionName
                           ? ` · ${[slot.className, slot.sectionName].filter(Boolean).join(' ')}`
                           : ''}
@@ -198,7 +200,7 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendarEvent size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Upcoming events</Title>
+                <Title order={3}>{t('upcomingEvents')}</Title>
               </Group>
               {upcomingEvents.length === 0 ? (
                 <Text c="dimmed" size="sm">

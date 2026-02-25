@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import {
   Stack,
   SimpleGrid,
@@ -51,6 +52,7 @@ interface ParentDashboardOverviewProps {
 }
 
 export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) {
+  const t = useTranslations('dashboard');
   const colors = useThemeColors();
   const { data: associationsResponse } = useParentAssociations({
     parentId: user?.id,
@@ -74,11 +76,11 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
 
   const roleLabel = user?.roles?.[0]?.roleName
     ? formatRoleName(user.roles[0].roleName)
-    : 'Parent';
+    : t('parent');
 
   const chartData = [
-    { name: 'Leave requests', count: pendingLeaves },
-    { name: 'Early departures', count: pendingEarly },
+    { name: t('leaveRequests'), count: pendingLeaves },
+    { name: t('earlyDepartures'), count: pendingEarly },
   ];
 
   return (
@@ -86,10 +88,10 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
       <Paper p="md" withBorder>
         <Stack gap="xs">
           <Text size="lg" fw={600}>
-            Welcome, {user?.fullName ?? user?.email ?? 'User'}
+            {t('welcome')}, {user?.fullName ?? user?.email ?? t('user')}
           </Text>
           <Text size="sm" c="dimmed">
-            Role: {roleLabel}
+            {t('role')}: {roleLabel}
           </Text>
         </Stack>
       </Paper>
@@ -103,22 +105,22 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <DashboardStatCard
-            title="Children"
+            title={t('children')}
             value={childrenCount}
             icon={IconUsers}
           />
           <DashboardStatCard
-            title="Pending tasks"
+            title={t('pendingTasks')}
             value={pendingTotal}
             icon={IconClock}
           />
           <DashboardStatCard
-            title="Upcoming events"
+            title={t('upcomingEventsList')}
             value={upcomingEvents.length}
             icon={IconCalendarEvent}
           />
           <DashboardStatCard
-            title="Unread"
+            title={t('unread')}
             value={unreadCount}
             icon={IconMessageCircle}
           />
@@ -131,7 +133,7 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
             <Stack gap="md">
               <Group gap="xs">
                 <IconTrendingUp size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Pending requests</Title>
+                <Title order={3}>{t('pendingRequests')}</Title>
               </Group>
               {loading ? (
                 <Skeleton height={280} />
@@ -143,7 +145,7 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
                       <XAxis dataKey="name" />
                       <YAxis allowDecimals={false} />
                       <Tooltip />
-                      <Bar dataKey="count" name="Count" fill={colors.primary} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="count" name={t('count')} fill={colors.primary} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </Box>
@@ -157,7 +159,7 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
             <Stack gap="md">
               <Group gap="xs">
                 <IconClock size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Tasks summary</Title>
+                <Title order={3}>{t('tasksSummary')}</Title>
               </Group>
               {loading ? (
                 <Skeleton height={120} />
@@ -165,13 +167,13 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Type</Table.Th>
-                      <Table.Th>Pending</Table.Th>
+                      <Table.Th>{t('type')}</Table.Th>
+                      <Table.Th>{t('pending')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     <Table.Tr>
-                      <Table.Td>Leave requests</Table.Td>
+                      <Table.Td>{t('leaveRequests')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color={colors.info}>
                           {pendingLeaves}
@@ -179,7 +181,7 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
                       </Table.Td>
                     </Table.Tr>
                     <Table.Tr>
-                      <Table.Td>Early departures</Table.Td>
+                      <Table.Td>{t('earlyDepartures')}</Table.Td>
                       <Table.Td>
                         <Badge variant="light" color={colors.warning}>
                           {pendingEarly}
@@ -198,11 +200,11 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendarEvent size={24} style={{ color: colors.primary }} />
-                <Title order={3}>Upcoming events</Title>
+                <Title order={3}>{t('upcomingEvents')}</Title>
               </Group>
               {upcomingEvents.length === 0 ? (
                 <Text c="dimmed" size="sm">
-                  No upcoming events
+                  {t('noUpcomingEvents')}
                 </Text>
               ) : (
                 <Stack gap="xs">

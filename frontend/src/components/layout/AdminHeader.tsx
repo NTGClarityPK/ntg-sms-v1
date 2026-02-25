@@ -1,15 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Group, Badge, Tooltip, Box, Image, Text, Stack } from '@mantine/core';
+import { Group, Badge, Tooltip, Box, Image, Text, Stack, useMantineTheme } from '@mantine/core';
 import { IconCircle, IconCrown } from '@tabler/icons-react';
 import { UserMenu } from './UserMenu';
-import { useSuccessColor, useErrorColor } from '@/lib/hooks/use-theme-colors';
+import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
+import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { useAuth } from '@/hooks/useAuth';
 
+const headerBadgeStyle = {
+  cursor: 'default' as const,
+  fontWeight: 500,
+  height: '28px',
+  display: 'flex' as const,
+  alignItems: 'center' as const,
+  padding: '0 10px',
+};
+
 export function AdminHeader() {
-  const successColor = useSuccessColor();
-  const errorColor = useErrorColor();
+  const theme = useMantineTheme();
+  const themeConfig = (theme.other ?? {}) as ThemeConfig | undefined;
+  const onlineBadgeColor = themeConfig?.components?.statusOnline?.badgeColor ?? '#22c55e';
+  const offlineBadgeColor = themeConfig?.components?.statusOffline?.badgeColor ?? '#868e96';
+
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const { user } = useAuth();
 
@@ -50,6 +63,7 @@ export function AdminHeader() {
       </Stack>
 
       <Group gap="md" align="center">
+        <LanguageSwitcher />
         {/* Super Admin Badge */}
         <Badge
           variant="filled"
@@ -99,7 +113,7 @@ export function AdminHeader() {
           />
         </Box>
 
-        {/* Online/Offline Status Badge */}
+        {/* Online/Offline Status Badge (green when online, gray when offline) */}
         <Tooltip
           label={isOnline ? 'Connected to server' : 'No internet connection'}
           position="bottom"
@@ -107,8 +121,7 @@ export function AdminHeader() {
         >
           <Badge
             variant="light"
-            color={isOnline ? successColor : errorColor}
-            size="sm"
+            size="md"
             leftSection={
               <IconCircle
                 size={8}
@@ -117,12 +130,9 @@ export function AdminHeader() {
               />
             }
             style={{
-              cursor: 'default',
-              fontWeight: 500,
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              padding: '0 12px',
+              ...headerBadgeStyle,
+              backgroundColor: isOnline ? `${onlineBadgeColor}20` : `${offlineBadgeColor}20`,
+              color: isOnline ? onlineBadgeColor : offlineBadgeColor,
             }}
           >
             {isOnline ? 'Online' : 'Offline'}

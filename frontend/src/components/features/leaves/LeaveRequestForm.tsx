@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Alert,
   Button,
   Group,
   Paper,
@@ -10,12 +11,11 @@ import {
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconCalendar } from '@tabler/icons-react';
+import { IconCalendar, IconWifiOff } from '@tabler/icons-react';
 import { useForm, zodResolver } from '@mantine/form';
 import { z } from 'zod';
-import { notifications } from '@mantine/notifications';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCreateLeaveRequest, useLeaveQuota } from '@/hooks/useLeaveRequests';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import type { Student } from '@/types/students';
 
 const schema = z
@@ -37,7 +37,7 @@ interface LeaveRequestFormProps {
 }
 
 export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) {
-  const colors = useThemeColors();
+  const isOnline = useOnlineStatus();
   const createLeave = useCreateLeaveRequest();
   const quotaQuery = useLeaveQuota(student?.id ?? null);
 
@@ -82,6 +82,11 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
       <form id="leave-request-form" key={student?.id || 'no-student'} onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Text fw={600}>Request leave</Text>
+          {!isOnline && (
+            <Alert color="red" icon={<IconWifiOff size={16} />}>
+              No internet connection. Please connect to submit your request.
+            </Alert>
+          )}
           {quota && (
             <Stack gap={4}>
               <Text
@@ -127,9 +132,9 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
               type="submit"
               variant="light"
               loading={createLeave.isPending}
-              disabled={!student}
+              disabled={!isOnline || !student}
             >
-              Submit request
+              {isOnline ? 'Submit request' : 'No Internet Connection'}
             </Button>
           </Group>
         </Stack>

@@ -5,6 +5,7 @@ import { AppShell as MantineAppShell, Burger, Group } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
+import { ConnectionIndicator } from '@/components/common/ConnectionIndicator';
 
 interface AdminAppShellProps {
   children: React.ReactNode;
@@ -60,7 +61,10 @@ export function AdminAppShell({ children }: AdminAppShellProps) {
         />
       </MantineAppShell.Navbar>
 
-      <MantineAppShell.Main>{children}</MantineAppShell.Main>
+      <MantineAppShell.Main>
+        <ConnectionIndicator />
+        {children}
+      </MantineAppShell.Main>
     </MantineAppShell>
   );
 }

@@ -1,0 +1,4 @@
+{
+  "studentCount": "{count, plural, =0 {No students} one {1 student} other {# students}}",
+  "studentsAvailable": "{count, plural, =0 {No students available from selected classes} one {1 student available from selected classes} other {# students available from selected classes}}"
+}

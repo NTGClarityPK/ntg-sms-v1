@@ -84,6 +84,8 @@ export interface EventConflict {
 export interface CreateEventInput {
   title: string;
   description?: string;
+  title_translations?: { en?: string; ar?: string };
+  description_translations?: { en?: string; ar?: string };
   startDate: string;
   endDate: string;
   requiresConsent?: boolean;
@@ -95,6 +97,8 @@ export interface CreateEventInput {
 export interface UpdateEventInput {
   title?: string;
   description?: string;
+  title_translations?: { en?: string; ar?: string };
+  description_translations?: { en?: string; ar?: string };
   startDate?: string;
   endDate?: string;
   requiresConsent?: boolean;

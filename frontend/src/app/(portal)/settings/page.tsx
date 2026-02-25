@@ -62,6 +62,7 @@ import { InventorySizeEditor } from '@/components/features/settings/InventorySiz
 import { BehaviorSettings } from '@/components/features/settings/BehaviorSettings';
 import { useTenantMe, useUpdateTenantMe } from '@/hooks/useTenant';
 import { useBranchById, useUpdateBranch } from '@/hooks/useBranches';
+import { TranslatableInput, type TranslatableValue } from '@/components/common/TranslatableInput';
 import { SubjectTemplatesTabContent } from '@/components/features/settings/SubjectTemplatesTabContent';
 import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettingsPanel';
 import { PublicStatsSettings } from '@/components/features/settings/PublicStatsSettings';
@@ -618,7 +619,7 @@ function BusinessInformationTabContent() {
   const [vatNumber, setVatNumber] = useState<string>('');
 
   // Branch fields
-  const [branchName, setBranchName] = useState<string>('');
+  const [branchNameTranslations, setBranchNameTranslations] = useState<TranslatableValue>({ en: '', ar: '' });
   const [branchCode, setBranchCode] = useState<string>('');
   const [branchAddress, setBranchAddress] = useState<string>('');
   const [branchPhone, setBranchPhone] = useState<string>('');
@@ -648,7 +649,7 @@ function BusinessInformationTabContent() {
     // Branch fields - only initialize if we have branch data
     // Don't wait for branch to initialize tenant fields
     if (branch) {
-      setBranchName(branch.name || '');
+      setBranchNameTranslations({ en: branch.name || '', ar: '' });
       setBranchCode(branch.code || '');
       setBranchAddress(branch.address || '');
       setBranchPhone(branch.phone || '');
@@ -662,7 +663,7 @@ function BusinessInformationTabContent() {
   useEffect(() => {
     const branch = branchQuery.data?.data;
     if (branch && hasInitialised) {
-      setBranchName(branch.name || '');
+      setBranchNameTranslations({ en: branch.name || '', ar: '' });
       setBranchCode(branch.code || '');
       setBranchAddress(branch.address || '');
       setBranchPhone(branch.phone || '');
@@ -704,6 +705,19 @@ function BusinessInformationTabContent() {
       return;
     }
 
+    if (currentBranchId) {
+      const branchNamePrimary =
+        (branchNameTranslations.en ?? '').trim() || (branchNameTranslations.ar ?? '').trim();
+      if (!branchNamePrimary) {
+        notifications.show({
+          title: 'Validation error',
+          message: 'Branch name (EN or AR) is required.',
+          color: notifyColors.error,
+        });
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       
@@ -720,10 +734,13 @@ function BusinessInformationTabContent() {
 
       // Update branch if we have a current branch
       if (currentBranchId) {
+        const branchNamePrimary =
+          (branchNameTranslations.en ?? '').trim() || (branchNameTranslations.ar ?? '').trim();
         await updateBranch.mutateAsync({
           id: currentBranchId,
           payload: {
-            name: branchName.trim() || undefined,
+            name: branchNamePrimary || undefined,
+            name_translations: branchNameTranslations,
             address: branchAddress.trim() || undefined,
             phone: branchPhone.trim() || undefined,
             email: branchEmail.trim() || undefined,
@@ -857,12 +874,13 @@ function BusinessInformationTabContent() {
             ) : (
               <Grid>
                 <Grid.Col span={{ base: 12, md: 6 }}>
-                  <TextInput
+                  <TranslatableInput
+                    id="settings-branch-name"
                     label="Branch Name"
-                    placeholder="Enter branch name"
+                    value={branchNameTranslations}
+                    onChange={setBranchNameTranslations}
                     required
-                    value={branchName}
-                    onChange={(e) => setBranchName(e.currentTarget.value)}
+                    placeholder={{ en: 'Enter branch name', ar: 'أدخل اسم الفرع' }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>

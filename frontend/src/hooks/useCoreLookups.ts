@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 import type { ClassEntity, Level, Section, Subject } from '@/types/settings';
 
@@ -10,9 +11,13 @@ const coreKeys = {
 };
 
 export function useSubjects() {
+  const locale = useLocale();
   return useQuery({
-    queryKey: coreKeys.subjects,
-    queryFn: async () => apiClient.get<Subject[]>('/api/v1/subjects', { params: { page: 1, limit: 100 } }),
+    queryKey: [...coreKeys.subjects, locale],
+    queryFn: async () =>
+      apiClient.get<Subject[]>('/api/v1/subjects', {
+        params: { page: 1, limit: 100, language: locale },
+      }),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -20,8 +25,14 @@ export function useSubjects() {
 export function useCreateSubject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; nameAr?: string; code?: string; sortOrder?: number; isActive?: boolean }) =>
-      apiClient.post<Subject>('/api/v1/subjects', payload),
+    mutationFn: async (payload: {
+      name: string;
+      nameAr?: string;
+      name_translations?: { en?: string; ar?: string };
+      code?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    }) => apiClient.post<Subject>('/api/v1/subjects', payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: coreKeys.subjects });
     },
@@ -31,8 +42,20 @@ export function useCreateSubject() {
 export function useUpdateSubject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, payload }: { id: string; payload: { name?: string; nameAr?: string; code?: string; sortOrder?: number; isActive?: boolean } }) =>
-      apiClient.patch<Subject>(`/api/v1/subjects/${id}`, payload),
+    mutationFn: async ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: {
+        name?: string;
+        nameAr?: string;
+        name_translations?: { en?: string; ar?: string };
+        code?: string;
+        sortOrder?: number;
+        isActive?: boolean;
+      };
+    }) => apiClient.patch<Subject>(`/api/v1/subjects/${id}`, payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: coreKeys.subjects });
     },

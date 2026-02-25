@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/types/api';
 import type { Branch } from '@/types/auth';
 
 const branchesKeys = {
   all: ['branches'] as const,
-  byTenant: () => [...branchesKeys.all, 'byTenant'] as const,
-  byId: (id: string) => [...branchesKeys.all, 'byId', id] as const,
+  byTenant: (locale?: string) => [...branchesKeys.all, 'byTenant', locale ?? ''] as const,
+  byId: (id: string, locale?: string) => [...branchesKeys.all, 'byId', id, locale ?? ''] as const,
 };
 
 export interface BranchDetails {
@@ -27,14 +28,16 @@ export interface BranchDetails {
 
 export interface UpdateBranchPayload {
   name?: string;
+  name_translations?: { en?: string; ar?: string };
   address?: string;
   phone?: string;
   email?: string;
 }
 
 export function useTenantBranches() {
+  const locale = useLocale();
   return useQuery({
-    queryKey: branchesKeys.byTenant(),
+    queryKey: branchesKeys.byTenant(locale),
     queryFn: async () => {
       const res = await apiClient.get<Branch[]>('/api/v1/branches/by-tenant');
       return res;
@@ -44,11 +47,14 @@ export function useTenantBranches() {
 }
 
 export function useBranchById(id: string | null | undefined) {
+  const locale = useLocale();
   return useQuery({
-    queryKey: branchesKeys.byId(id || ''),
+    queryKey: branchesKeys.byId(id || '', locale),
     queryFn: async () => {
       if (!id) throw new Error('Branch ID is required');
-      const res = await apiClient.get<BranchDetails>(`/api/v1/branches/${id}`);
+      const res = await apiClient.get<BranchDetails>(`/api/v1/branches/${id}`, {
+        params: { language: locale },
+      });
       return res;
     },
     enabled: !!id,
@@ -65,7 +71,7 @@ export function useUpdateBranch() {
       return res;
     },
     onSuccess: async (_, variables) => {
-      await qc.invalidateQueries({ queryKey: branchesKeys.byId(variables.id) });
+      await qc.invalidateQueries({ queryKey: ['branches', 'byId', variables.id] });
       await qc.invalidateQueries({ queryKey: branchesKeys.byTenant() });
       await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
     },

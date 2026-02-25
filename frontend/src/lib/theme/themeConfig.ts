@@ -152,6 +152,13 @@ export interface ThemeConfig {
       cardBackground: string; // Optional: whole card background when inactive
       cardBorder: string; // Optional: whole card border when inactive
     };
+    /** Online/offline status in header: green when online, gray when offline */
+    statusOnline: {
+      badgeColor: string; // Green for "Online" badge
+    };
+    statusOffline: {
+      badgeColor: string; // Gray for "Offline" badge (same as statusInactive)
+    };
     avatar: {
       backgroundColor: string; // Background color of the avatar circle
       textColor: string; // Color of the initials text
@@ -355,6 +362,12 @@ export function generateThemeConfig(
         badgeColor: themeColors.textMuted,
         cardBackground: themeColors.colorMedium,
         cardBorder: themeColors.borderLight,
+      },
+      statusOnline: {
+        badgeColor: isDark ? '#4ade80' : '#22c55e', // Green when online (theme-aware)
+      },
+      statusOffline: {
+        badgeColor: themeColors.textMuted, // Gray when offline (same as inactive)
       },
       avatar: {
         backgroundColor: themeColors.primary,

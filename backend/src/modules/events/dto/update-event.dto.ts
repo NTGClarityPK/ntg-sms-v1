@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -20,6 +21,14 @@ export class UpdateEventDto {
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   description?: string;
+
+  @IsOptional()
+  @IsObject()
+  title_translations?: { en?: string; ar?: string };
+
+  @IsOptional()
+  @IsObject()
+  description_translations?: { en?: string; ar?: string };
 
   @IsOptional()
   @IsDateString()

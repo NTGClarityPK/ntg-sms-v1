@@ -5,6 +5,10 @@ export class QueryBranchesDto extends BasePaginationDto {
   @IsOptional()
   @IsIn(['name', 'code', 'created_at'])
   sortBy?: 'name' | 'code' | 'created_at';
+
+  @IsOptional()
+  @IsIn(['en', 'ar'])
+  language?: 'en' | 'ar';
 }
 
 

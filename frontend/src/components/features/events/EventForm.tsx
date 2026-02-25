@@ -10,9 +10,6 @@ import { useForm, zodResolver } from '@mantine/form';
 import {
   Button,
   Stack,
-  TextInput,
-  Textarea,
-  Select,
   Switch,
   Group,
   Skeleton,
@@ -24,6 +21,8 @@ import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { z } from 'zod';
 import type { Event, CreateEventInput, UpdateEventInput } from '@/types/events';
+import { TranslatableInput, type TranslatableValue } from '@/components/common/TranslatableInput';
+import { useTranslations } from 'next-intl';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStudents } from '@/hooks/useStudents';
 import { useCheckEventConflicts } from '@/hooks/api/useEvents';
@@ -31,14 +30,18 @@ import dayjs from 'dayjs';
 
 const eventSchema = z
   .object({
-    title: z.string().min(1, 'Title is required'),
-    description: z.string().optional(),
+    titleTranslations: z.object({ en: z.string(), ar: z.string() }),
+    descriptionTranslations: z.object({ en: z.string(), ar: z.string() }).optional(),
     startDate: z.date({ required_error: 'Start date is required' }),
     endDate: z.date({ required_error: 'End date is required' }),
     requiresConsent: z.boolean().optional(),
     consentDeadline: z.date().nullable().optional(),
     classSectionIds: z.array(z.string().uuid()).optional(),
     studentIds: z.array(z.string().uuid()).optional(),
+  })
+  .refine((data) => (data.titleTranslations?.en ?? '').trim() !== '' || (data.titleTranslations?.ar ?? '').trim() !== '', {
+    message: 'Title (EN or AR) is required',
+    path: ['titleTranslations'],
   })
   .refine((data) => data.endDate >= data.startDate, {
     message: 'End date must be greater than or equal to start date',
@@ -69,9 +72,11 @@ const eventSchema = z
     },
   );
 
+const emptyTranslations: TranslatableValue = { en: '', ar: '' };
+
 type FormValues = {
-  title: string;
-  description?: string;
+  titleTranslations: TranslatableValue;
+  descriptionTranslations: TranslatableValue;
   startDate: Date | null;
   endDate: Date | null;
   requiresConsent: boolean;
@@ -87,6 +92,7 @@ interface EventFormProps {
 }
 
 export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
+  const tStudents = useTranslations('students');
   // Track selected class sections to conditionally load students
   const [selectedClassSectionIds, setSelectedClassSectionIds] = useState<string[]>([]);
 
@@ -123,8 +129,8 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
   const form = useForm<FormValues>({
     validate: zodResolver(eventSchema),
     initialValues: {
-      title: event?.title ?? '',
-      description: event?.description ?? '',
+      titleTranslations: event ? { en: event.title ?? '', ar: '' } : { ...emptyTranslations },
+      descriptionTranslations: event ? { en: event.description ?? '', ar: '' } : { ...emptyTranslations },
       startDate: event?.startDate ? new Date(event.startDate) : null,
       endDate: event?.endDate ? new Date(event.endDate) : null,
       requiresConsent: event?.requiresConsent ?? false,
@@ -178,8 +184,8 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
         .filter((id): id is string => !!id);
 
       form.setValues({
-        title: event.title,
-        description: event.description ?? '',
+        titleTranslations: { en: event.title ?? '', ar: '' },
+        descriptionTranslations: { en: event.description ?? '', ar: '' },
         startDate: event.startDate ? new Date(event.startDate) : null,
         endDate: event.endDate ? new Date(event.endDate) : null,
         requiresConsent: event.requiresConsent,
@@ -199,9 +205,17 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
   }, [event?.id]); // Only depend on event.id, not the entire event object or form
 
   const handleSubmit = (values: FormValues) => {
+    const title = (values.titleTranslations.en ?? '').trim() || (values.titleTranslations.ar ?? '').trim();
+    const description =
+      (values.descriptionTranslations.en ?? '').trim() || (values.descriptionTranslations.ar ?? '').trim() || undefined;
     const payload: CreateEventInput | UpdateEventInput = {
-      title: values.title,
-      description: values.description || undefined,
+      title,
+      description,
+      title_translations: values.titleTranslations,
+      description_translations:
+        (values.descriptionTranslations.en ?? '').trim() || (values.descriptionTranslations.ar ?? '').trim()
+          ? values.descriptionTranslations
+          : undefined,
       startDate: values.startDate ? toLocalDateString(values.startDate) : '',
       endDate: values.endDate ? toLocalDateString(values.endDate) : '',
       requiresConsent: values.requiresConsent,
@@ -246,8 +260,8 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
     if (students.length === 0) {
       return 'No students found in selected classes';
     }
-    return `${students.length} students available from selected classes`;
-  }, [selectedClassSectionIds, studentsLoading, students.length]);
+    return tStudents('studentsAvailable', { count: students.length });
+  }, [selectedClassSectionIds, studentsLoading, students.length, tStudents]);
 
   if (dataLoading) {
     return (
@@ -263,20 +277,21 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
   return (
     <form id="event-form" onSubmit={form.onSubmit(handleSubmit)}>
       <Stack gap="md">
-        <TextInput
+        <TranslatableInput
           id="event-form-title"
           label="Title"
-          placeholder="Enter event title"
+          value={form.values.titleTranslations}
+          onChange={(v) => form.setFieldValue('titleTranslations', v)}
           required
-          {...form.getInputProps('title')}
+          placeholder={{ en: 'Enter event title', ar: 'أدخل عنوان الحدث' }}
         />
 
-        <Textarea
+        <TranslatableInput
           id="event-form-description"
           label="Description"
-          placeholder="Enter event description"
-          minRows={3}
-          {...form.getInputProps('description')}
+          value={form.values.descriptionTranslations}
+          onChange={(v) => form.setFieldValue('descriptionTranslations', v)}
+          placeholder={{ en: 'Enter event description', ar: 'أدخل وصف الحدث' }}
         />
 
         <Group grow>

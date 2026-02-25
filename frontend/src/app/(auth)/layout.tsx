@@ -4,7 +4,7 @@ import { ReactNode, useMemo } from 'react';
 import { Box, Title, Text, Card, Group } from '@mantine/core';
 import { IconSchool } from '@tabler/icons-react';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
-import { LanguageSelector } from '@/components/layout/LanguageSelector';
+import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -139,7 +139,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
 
           {/* Language Switcher */}
           <Group justify="flex-end" mb="md">
-            <LanguageSelector size="sm" />
+            <LanguageSwitcher />
           </Group>
 
           {children}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, ActionIcon, Button, Group, Skeleton, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, ActionIcon, Button, Group, Skeleton, Modal, Paper, Stack, Table, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconRefresh, IconPencil } from '@tabler/icons-react';
 import { useCreateAssessmentType, useAssessmentTypes, useUpdateAssessmentType } from '@/hooks/useAssessmentSettings';
@@ -9,6 +9,9 @@ import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { useState } from 'react';
 import type { AssessmentType } from '@/types/settings';
+import { TranslatableInput, type TranslatableValue } from '@/components/common/TranslatableInput';
+
+const emptyTranslations: TranslatableValue = { en: '', ar: '' };
 
 export function AssessmentTypeList() {
   const colors = useThemeColors();
@@ -19,21 +22,26 @@ export function AssessmentTypeList() {
   const createMutation = useCreateAssessmentType();
   const updateMutation = useUpdateAssessmentType();
 
-  const form = useForm<{ name: string }>({
-    initialValues: { name: '' },
-    validate: { name: (v) => (v.trim().length === 0 ? 'Name is required' : null) },
-    transformValues: (v) => ({ name: v.name.trim() }),
+  const form = useForm<{ nameTranslations: TranslatableValue }>({
+    initialValues: { nameTranslations: { ...emptyTranslations } },
+    validate: {
+      nameTranslations: (v) =>
+        (!(v.en ?? '').trim() && !(v.ar ?? '').trim()) ? 'Name (EN or AR) is required' : null,
+    },
+    transformValues: (v) => ({
+      nameTranslations: { en: (v.nameTranslations.en ?? '').trim(), ar: (v.nameTranslations.ar ?? '').trim() },
+    }),
   });
 
   const openCreate = () => {
     setEditType(null);
-    form.setValues({ name: '' });
+    form.setValues({ nameTranslations: { ...emptyTranslations } });
     open();
   };
 
   const openEdit = (t: AssessmentType) => {
     setEditType(t);
-    form.setValues({ name: t.name });
+    form.setValues({ nameTranslations: { en: t.name ?? '', ar: t.name ?? '' } });
     open();
   };
 
@@ -44,12 +52,14 @@ export function AssessmentTypeList() {
   };
 
   const onSubmit = form.onSubmit(async (values) => {
+    const name = values.nameTranslations.en || values.nameTranslations.ar || '';
+    const payload = { name, name_translations: values.nameTranslations };
     try {
       if (editType) {
-        await updateMutation.mutateAsync({ id: editType.id, name: values.name });
+        await updateMutation.mutateAsync({ id: editType.id, ...payload });
         notifications.show({ title: 'Success', message: 'Assessment type updated', color: notifyColors.success });
       } else {
-        await createMutation.mutateAsync(values);
+        await createMutation.mutateAsync(payload);
         notifications.show({ title: 'Success', message: 'Assessment type created', color: notifyColors.success });
       }
       handleClose();
@@ -134,7 +144,14 @@ export function AssessmentTypeList() {
       >
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput id="assessment-type-form-name" label="Name" placeholder="Quiz" {...form.getInputProps('name')} />
+            <TranslatableInput
+              id="assessment-type-form-name"
+              label="Name"
+              value={form.values.nameTranslations}
+              onChange={(v) => form.setFieldValue('nameTranslations', v)}
+              required
+              placeholder={{ en: 'Quiz', ar: 'اختبار قصير' }}
+            />
             <Group justify="flex-end" mt="md">
               <Button id="assessment-type-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
