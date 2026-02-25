@@ -165,6 +165,7 @@ export default function InventoryRequestsPage() {
         <Stack gap="md">
           <Paper p="md" withBorder>
             <Select
+              id="inventory-requests-filter-status"
               label="Status"
               placeholder="All statuses"
               data={STATUS_OPTIONS}

@@ -75,10 +75,10 @@ export function EditParentAssociationModal({
           />
 
           <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={onClose}>
+            <Button id="edit-parent-association-cancel" variant="subtle" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={updateAssociation.isPending}>
+            <Button id="edit-parent-association-submit" type="submit" loading={updateAssociation.isPending}>
               Save Changes
             </Button>
           </Group>

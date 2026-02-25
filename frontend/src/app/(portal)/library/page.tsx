@@ -84,7 +84,7 @@ export default function LibraryPage() {
         <Group justify="space-between" w="100%">
           <Title order={1}>Library</Title>
           {canEdit && (
-            <Button leftSection={<IconPlus size={16} />} onClick={open}>
+            <Button id="library-btn-upload" leftSection={<IconPlus size={16} />} onClick={open}>
               Upload Item
             </Button>
           )}
@@ -106,6 +106,7 @@ export default function LibraryPage() {
             <Stack gap="md">
               <Group grow>
                 <TextInput
+                  id="library-search"
                   placeholder="Search library items..."
                   leftSection={<IconSearch size={16} />}
                   value={search}
@@ -115,6 +116,7 @@ export default function LibraryPage() {
                   }}
                 />
                 <Select
+                  id="library-filter-category"
                   placeholder="Filter by category"
                   data={categories.map((cat) => ({ value: cat, label: cat }))}
                   value={categoryFilter}
@@ -126,6 +128,7 @@ export default function LibraryPage() {
                   searchable
                 />
                 <Select
+                  id="library-filter-subject"
                   placeholder="Filter by subject"
                   data={subjects.map((s) => ({ value: s.id, label: s.name }))}
                   value={subjectFilter}
@@ -137,6 +140,7 @@ export default function LibraryPage() {
                   searchable
                 />
                 <Select
+                  id="library-filter-class"
                   placeholder="Filter by class"
                   data={classes.map((c) => {
                     const classEntity = c as ClassEntity;
@@ -180,7 +184,7 @@ export default function LibraryPage() {
             <Alert color={colors.error} title="Failed to load library items">
               <Group justify="space-between" mt="sm">
                 <Text size="sm">Please try again.</Text>
-                <Button variant="light" onClick={() => libraryQuery.refetch()}>
+                <Button id="library-retry" variant="light" onClick={() => libraryQuery.refetch()}>
                   Retry
                 </Button>
               </Group>

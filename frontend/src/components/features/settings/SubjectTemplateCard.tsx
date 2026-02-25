@@ -60,6 +60,7 @@ export function SubjectTemplateCard({
           </Stack>
           <Group gap="xs">
             <Button
+              id={`subject-template-card-${template.id}-edit`}
               variant="light"
               size="compact-sm"
               leftSection={<IconEdit size={16} />}
@@ -68,6 +69,7 @@ export function SubjectTemplateCard({
               Edit
             </Button>
             <Button
+              id={`subject-template-card-${template.id}-delete`}
               variant="light"
               color={colors.error}
               size="compact-sm"

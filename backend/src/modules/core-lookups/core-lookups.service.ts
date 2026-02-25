@@ -364,6 +364,14 @@ export class CoreLookupsService {
   ): Promise<ClassDto> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
+
+    // Shift existing classes so that the new position is free: all with sort_order >= position get +1
+    const { error: shiftError } = await supabase.rpc('shift_class_sort_orders', {
+      p_branch_id: branchId,
+      p_from_position: input.sortOrder,
+    });
+    throwIfDbError(shiftError);
+
     const { data, error } = await supabase
       .from('classes')
       .insert({

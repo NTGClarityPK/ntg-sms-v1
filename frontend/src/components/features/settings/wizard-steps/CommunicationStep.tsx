@@ -49,6 +49,7 @@ export function CommunicationStep({ data, onChange, onNext, onBack }: Communicat
             Teacher ↔ Student Messaging
           </Text>
           <SegmentedControl
+            id="communication-step-teacher-student"
             value={formData.teacherStudent}
             onChange={handleTeacherStudentChange}
             data={[
@@ -64,6 +65,7 @@ export function CommunicationStep({ data, onChange, onNext, onBack }: Communicat
             Teacher ↔ Parent Messaging
           </Text>
           <SegmentedControl
+            id="communication-step-teacher-parent"
             value={formData.teacherParent}
             onChange={handleTeacherParentChange}
             data={[
@@ -76,10 +78,10 @@ export function CommunicationStep({ data, onChange, onNext, onBack }: Communicat
       </Stack>
 
       <Group justify="space-between" mt="xl">
-        <Button variant="light" onClick={onBack}>
+        <Button id="communication-step-back" variant="light" onClick={onBack}>
           Back
         </Button>
-        <Button onClick={handleNext} color={colors.primary}>
+        <Button id="communication-step-next" onClick={handleNext} color={colors.primary}>
           Next
         </Button>
       </Group>

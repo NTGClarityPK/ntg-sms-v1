@@ -152,7 +152,7 @@ export function GradeTemplateBuilder() {
       <Alert color={colors.error} title="Failed to load grade templates">
         <Group justify="space-between" mt="sm">
           <Text size="sm">Please try again.</Text>
-          <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
+          <Button id="grade-template-retry" variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
             Retry
           </Button>
         </Group>
@@ -166,7 +166,7 @@ export function GradeTemplateBuilder() {
     <>
       <Group justify="space-between" mb="xs">
         <Text size="lg" fw={500}>Grade Templates</Text>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+        <Button id="grade-template-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add template
         </Button>
       </Group>
@@ -246,24 +246,25 @@ export function GradeTemplateBuilder() {
       <Modal opened={opened} onClose={close} title={editingTemplate ? 'Edit grade template' : 'Create grade template'} size="lg">
         <form onSubmit={handleSubmit}>
           <Stack gap="md">
-            <TextInput label="Template name" placeholder="Primary grading" {...form.getInputProps('name')} />
+            <TextInput id="grade-template-form-name" label="Template name" placeholder="Primary grading" {...form.getInputProps('name')} />
 
             <Paper withBorder p="md">
               <Stack gap="md">
                 <Group justify="space-between">
                   <Text fw={600}>Ranges</Text>
-                  <Button variant="light" leftSection={<IconPlus size={16} />} onClick={addRange}>
+                  <Button id="grade-template-form-add-range" variant="light" leftSection={<IconPlus size={16} />} onClick={addRange}>
                     Add range
                   </Button>
                 </Group>
 
                 {form.values.ranges.map((_, idx) => (
                   <Group key={idx} align="flex-end" grow>
-                    <TextInput label="Letter" {...form.getInputProps(`ranges.${idx}.letter`)} />
-                    <NumberInput label="Min %" min={0} max={100} {...form.getInputProps(`ranges.${idx}.minPercentage`)} />
-                    <NumberInput label="Max %" min={0} max={100} {...form.getInputProps(`ranges.${idx}.maxPercentage`)} />
-                    <NumberInput label="Sort" min={0} {...form.getInputProps(`ranges.${idx}.sortOrder`)} />
+                    <TextInput id={`grade-template-range-${idx}-letter`} label="Letter" {...form.getInputProps(`ranges.${idx}.letter`)} />
+                    <NumberInput id={`grade-template-range-${idx}-min`} label="Min %" min={0} max={100} {...form.getInputProps(`ranges.${idx}.minPercentage`)} />
+                    <NumberInput id={`grade-template-range-${idx}-max`} label="Max %" min={0} max={100} {...form.getInputProps(`ranges.${idx}.maxPercentage`)} />
+                    <NumberInput id={`grade-template-range-${idx}-sort`} label="Sort" min={0} {...form.getInputProps(`ranges.${idx}.sortOrder`)} />
                     <Button
+                      id={`grade-template-range-${idx}-remove`}
                       variant="light"
                       onClick={() => removeRange(idx)}
                       disabled={form.values.ranges.length <= 1}
@@ -277,10 +278,10 @@ export function GradeTemplateBuilder() {
             </Paper>
 
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={close} disabled={createMutation.isPending}>
+              <Button id="grade-template-form-cancel" variant="light" onClick={close} disabled={createMutation.isPending}>
                 Cancel
               </Button>
-              <Button type="submit" loading={createMutation.isPending}>
+              <Button id="grade-template-form-submit" type="submit" loading={createMutation.isPending}>
                 Save
               </Button>
             </Group>

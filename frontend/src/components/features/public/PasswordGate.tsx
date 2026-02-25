@@ -19,7 +19,7 @@ export function PasswordGate({ onSubmit, error, loading }: PasswordGateProps) {
 
   return (
     <Paper p="xl" withBorder shadow="sm" maw={400} mx="auto" mt="xl">
-      <form onSubmit={handleSubmit}>
+      <form id="password-gate-form" onSubmit={handleSubmit}>
         <Stack gap="md">
           <Text fw={600} size="lg">
             Enter password to view statistics
@@ -33,6 +33,7 @@ export function PasswordGate({ onSubmit, error, loading }: PasswordGateProps) {
             </Alert>
           )}
           <TextInput
+            id="password-gate-password"
             label="Password"
             type="password"
             placeholder="Enter branch password"
@@ -41,7 +42,7 @@ export function PasswordGate({ onSubmit, error, loading }: PasswordGateProps) {
             required
             autoComplete="current-password"
           />
-          <Button type="submit" loading={loading} fullWidth>
+          <Button id="password-gate-submit" type="submit" loading={loading} fullWidth>
             View statistics
           </Button>
         </Stack>

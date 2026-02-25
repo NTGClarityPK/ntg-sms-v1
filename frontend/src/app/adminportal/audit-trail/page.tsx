@@ -118,6 +118,7 @@ export default function AuditTrailPage() {
               <Title order={3}>Filters</Title>
               <Group grow>
                 <TextInput
+                  id="audit-trail-username"
                   label="Username"
                   placeholder="Search by username"
                   leftSection={<IconSearch size={16} />}
@@ -125,6 +126,7 @@ export default function AuditTrailPage() {
                   onChange={(e) => setUsername(e.target.value)}
                 />
                 <Select
+                  id="audit-trail-table"
                   label="Table"
                   placeholder="All tables"
                   clearable
@@ -169,6 +171,7 @@ export default function AuditTrailPage() {
                   onChange={(value) => setTableName(value || undefined)}
                 />
                 <Select
+                  id="audit-trail-action"
                   label="Action"
                   placeholder="All actions"
                   clearable
@@ -181,6 +184,7 @@ export default function AuditTrailPage() {
                   onChange={(value) => setAction(value as typeof action)}
                 />
                 <DatePickerInput
+                  id="audit-trail-start-date"
                   label="Start Date"
                   placeholder="Select start date"
                   value={startDate}
@@ -188,6 +192,7 @@ export default function AuditTrailPage() {
                   clearable
                 />
                 <DatePickerInput
+                  id="audit-trail-end-date"
                   label="End Date"
                   placeholder="Select end date"
                   value={endDate}

@@ -186,6 +186,7 @@ export default function BulkImportStudentsPage() {
         <Group justify="space-between" w="100%">
           <Title order={1}>Bulk Import Students</Title>
           <Button
+            id="bulk-import-download-template"
             leftSection={<IconDownload size={16} />}
             variant="light"
             onClick={handleDownloadTemplate}
@@ -262,6 +263,7 @@ export default function BulkImportStudentsPage() {
           <Paper p="md" withBorder>
             <Stack gap="md">
               <FileInput
+                id="bulk-import-file"
                 label="Upload Excel or CSV file"
                 placeholder="Click to select file"
                 accept=".xlsx,.xls,.csv"
@@ -275,6 +277,7 @@ export default function BulkImportStudentsPage() {
               )}
               {preview && (
                 <Select
+                  id="bulk-import-academic-year"
                   label="Academic year"
                   placeholder="Select academic year"
                   value={selectedYear}
@@ -297,6 +300,7 @@ export default function BulkImportStudentsPage() {
                     </Text>
                   </div>
                   <Button
+                    id="bulk-import-submit"
                     onClick={handleImport}
                     disabled={
                       editableValidCount === 0 ||
@@ -349,6 +353,7 @@ export default function BulkImportStudentsPage() {
                             </Table.Td>
                             <Table.Td>
                               <TextInput
+                                id={`bulk-import-row-${rowIndex}-first-name`}
                                 size="xs"
                                 value={row.data.first_name ?? ''}
                                 onChange={(e) =>
@@ -359,6 +364,7 @@ export default function BulkImportStudentsPage() {
                             </Table.Td>
                             <Table.Td>
                               <TextInput
+                                id={`bulk-import-row-${rowIndex}-last-name`}
                                 size="xs"
                                 value={row.data.last_name ?? ''}
                                 onChange={(e) =>
@@ -369,6 +375,7 @@ export default function BulkImportStudentsPage() {
                             </Table.Td>
                             <Table.Td>
                               <TextInput
+                                id={`bulk-import-row-${rowIndex}-email`}
                                 size="xs"
                                 value={row.data.email ?? ''}
                                 onChange={(e) =>
@@ -379,6 +386,7 @@ export default function BulkImportStudentsPage() {
                             </Table.Td>
                             <Table.Td>
                               <Select
+                                id={`bulk-import-row-${rowIndex}-gender`}
                                 size="xs"
                                 value={row.data.gender ?? ''}
                                 onChange={(v) =>
@@ -394,6 +402,7 @@ export default function BulkImportStudentsPage() {
                             </Table.Td>
                             <Table.Td>
                               <TextInput
+                                id={`bulk-import-row-${rowIndex}-class`}
                                 size="xs"
                                 value={row.data.class_name_or_id ?? ''}
                                 onChange={(e) =>
@@ -404,6 +413,7 @@ export default function BulkImportStudentsPage() {
                             </Table.Td>
                             <Table.Td>
                               <TextInput
+                                id={`bulk-import-row-${rowIndex}-section`}
                                 size="xs"
                                 value={row.data.section_name_or_id ?? ''}
                                 onChange={(e) =>
@@ -414,6 +424,7 @@ export default function BulkImportStudentsPage() {
                             </Table.Td>
                             <Table.Td>
                               <TextInput
+                                id={`bulk-import-row-${rowIndex}-subject-template`}
                                 size="xs"
                                 value={row.data.subject_template_name_or_id ?? ''}
                                 onChange={(e) =>

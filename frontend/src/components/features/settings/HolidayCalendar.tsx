@@ -78,7 +78,7 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, 
   return (
     <>
       <Group justify="flex-end" mb="md">
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+        <Button id="holiday-calendar-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add holiday
         </Button>
       </Group>
@@ -133,18 +133,18 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, 
       </Paper>
 
       <Modal opened={opened} onClose={close} title={editingId ? 'Edit holiday' : 'Add holiday'} size="md">
-        <form onSubmit={submit}>
+        <form id="holiday-form" onSubmit={submit}>
           <Stack gap="md">
-            <TextInput label="Name" placeholder="National Day" {...form.getInputProps('name')} />
+            <TextInput id="holiday-form-name" label="Name" placeholder="National Day" {...form.getInputProps('name')} />
             <Group grow>
-              <TextInput label="Start date" type="date" {...form.getInputProps('startDate')} />
-              <TextInput label="End date" type="date" {...form.getInputProps('endDate')} />
+              <TextInput id="holiday-form-start" label="Start date" type="date" {...form.getInputProps('startDate')} />
+              <TextInput id="holiday-form-end" label="End date" type="date" {...form.getInputProps('endDate')} />
             </Group>
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={close} disabled={isCreating}>
+              <Button id="holiday-form-cancel" variant="light" onClick={close} disabled={isCreating}>
                 Cancel
               </Button>
-              <Button type="submit" loading={isCreating}>
+              <Button id="holiday-form-submit" type="submit" loading={isCreating}>
                 Save
               </Button>
             </Group>

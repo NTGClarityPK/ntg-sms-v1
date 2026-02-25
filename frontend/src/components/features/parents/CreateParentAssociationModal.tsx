@@ -94,9 +94,10 @@ export function CreateParentAssociationModal({
       title="Create Parent-Student Association"
       size="md"
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="create-parent-association-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Select
+            id="create-parent-association-parent"
             label="Parent"
             placeholder="Select a parent"
             data={parents.map((p) => ({
@@ -109,6 +110,7 @@ export function CreateParentAssociationModal({
           />
 
           <Select
+            id="create-parent-association-student"
             label="Student"
             placeholder="Select a student"
             data={students.map((s) => ({
@@ -121,6 +123,7 @@ export function CreateParentAssociationModal({
           />
 
           <Select
+            id="create-parent-association-relationship"
             label="Relationship"
             placeholder="Select relationship"
             data={[
@@ -151,6 +154,7 @@ export function CreateParentAssociationModal({
           )}
 
           <Switch
+            id="create-parent-association-can-approve"
             label="Can approve requests"
             description="Allow this parent to approve child-related requests (e.g., leave requests, early departure, consent forms)"
             checked={form.values.canApprove}
@@ -159,10 +163,10 @@ export function CreateParentAssociationModal({
           />
 
           <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={onClose}>
+            <Button id="create-parent-association-cancel" variant="subtle" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={createAssociation.isPending} disabled={!canCreate}>
+            <Button id="create-parent-association-submit" type="submit" loading={createAssociation.isPending} disabled={!canCreate}>
               Create Association
             </Button>
           </Group>

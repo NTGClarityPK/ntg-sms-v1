@@ -109,12 +109,13 @@ export function StaffForm({ opened, onClose, staff, roles }: StaffFormProps) {
 
   return (
     <Modal opened={opened} onClose={onClose} title={isEdit ? 'Edit Staff' : 'Create Staff'} size="lg">
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="staff-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           {!isEdit && (
             <>
-              <TextInput label="Email" placeholder="staff@example.com" required {...form.getInputProps('email')} />
+              <TextInput id="staff-form-email" label="Email" placeholder="staff@example.com" required {...form.getInputProps('email')} />
               <TextInput
+                id="staff-form-password"
                 label="Password"
                 type="password"
                 placeholder="Minimum 6 characters"
@@ -124,15 +125,16 @@ export function StaffForm({ opened, onClose, staff, roles }: StaffFormProps) {
             </>
           )}
 
-          <TextInput label="Full Name" placeholder="John Doe" required {...form.getInputProps('fullName')} />
-          <TextInput label="Employee ID" placeholder="EMP001" {...form.getInputProps('employeeId')} />
-          <TextInput label="Department" placeholder="Academic" {...form.getInputProps('department')} />
-          <TextInput label="Phone" placeholder="+1234567890" {...form.getInputProps('phone')} />
-          <TextInput label="Address" placeholder="123 Main St" {...form.getInputProps('address')} />
-          <TextInput label="Date of Birth" type="date" {...form.getInputProps('dateOfBirth')} />
-          <TextInput label="Join Date" type="date" {...form.getInputProps('joinDate')} />
+          <TextInput id="staff-form-full-name" label="Full Name" placeholder="John Doe" required {...form.getInputProps('fullName')} />
+          <TextInput id="staff-form-employee-id" label="Employee ID" placeholder="EMP001" {...form.getInputProps('employeeId')} />
+          <TextInput id="staff-form-department" label="Department" placeholder="Academic" {...form.getInputProps('department')} />
+          <TextInput id="staff-form-phone" label="Phone" placeholder="+1234567890" {...form.getInputProps('phone')} />
+          <TextInput id="staff-form-address" label="Address" placeholder="123 Main St" {...form.getInputProps('address')} />
+          <TextInput id="staff-form-date-of-birth" label="Date of Birth" type="date" {...form.getInputProps('dateOfBirth')} />
+          <TextInput id="staff-form-join-date" label="Join Date" type="date" {...form.getInputProps('joinDate')} />
 
           <Select
+            id="staff-form-gender"
             label="Gender"
             data={[
               { value: 'male', label: 'Male' },
@@ -142,12 +144,14 @@ export function StaffForm({ opened, onClose, staff, roles }: StaffFormProps) {
           />
 
           <MultiSelect
+            id="staff-form-roles"
             label="Roles"
             data={roles.map((r) => ({ value: r.id, label: r.displayName }))}
             {...form.getInputProps('roleIds')}
           />
 
           <Select
+            id="staff-form-status"
             label="Status"
             data={[
               { value: 'true', label: 'Active' },
@@ -158,10 +162,10 @@ export function StaffForm({ opened, onClose, staff, roles }: StaffFormProps) {
           />
 
           <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={onClose}>
+            <Button id="staff-form-cancel" variant="subtle" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={createStaff.isPending || updateStaff.isPending}>
+            <Button id="staff-form-submit" type="submit" loading={createStaff.isPending || updateStaff.isPending}>
               {isEdit ? 'Update' : 'Create'}
             </Button>
           </Group>

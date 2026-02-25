@@ -61,6 +61,7 @@ export function BranchSelectionModal({
         </Text>
 
         <Select
+          id="branch-selection-select"
           label="Branch"
           placeholder="Select a branch"
           data={branches.map((b) => ({
@@ -75,6 +76,7 @@ export function BranchSelectionModal({
         />
 
         <Button
+          id="branch-selection-continue"
           fullWidth
           onClick={handleContinue}
           disabled={!selectedBranchId}

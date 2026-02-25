@@ -57,9 +57,9 @@ export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
       <Paper withBorder p="md">
         <Stack gap="md">
           <Text fw={600}>Annual leave quota</Text>
-        <NumberInput label="Quota" min={0} value={value} onChange={(v) => setValue(Number(v) || 0)} />
+        <NumberInput id="leave-quota-value" label="Quota" min={0} value={value} onChange={(v) => setValue(Number(v) || 0)} />
         <Group justify="flex-end">
-          <Button variant="light" onClick={onSave} loading={setQuota.isPending || quotaQuery.isLoading}>
+          <Button id="leave-quota-save" variant="light" onClick={onSave} loading={setQuota.isPending || quotaQuery.isLoading}>
             Save
           </Button>
         </Group>

@@ -125,7 +125,7 @@ export default function UsersPage() {
               </ActionIcon>
             </Tooltip>
             {canEdit && (
-              <Button leftSection={<IconPlus size={16} />} onClick={open}>
+              <Button id="users-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
                 Create User
               </Button>
             )}
@@ -144,6 +144,7 @@ export default function UsersPage() {
 
         <Group>
           <TextInput
+            id="users-search"
             placeholder="Search users..."
             leftSection={<IconSearch size={16} />}
             value={search}
@@ -155,6 +156,7 @@ export default function UsersPage() {
           />
           <div style={{ width: 200, flexShrink: 0 }}>
             <MultiSelect
+              id="users-filter-role"
               placeholder="Filter by role"
               data={staffRoles.map((r) => ({ value: r.id, label: r.displayName }))}
               value={roleFilter}

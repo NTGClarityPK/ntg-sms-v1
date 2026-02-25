@@ -66,9 +66,10 @@ export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
 
   return (
     <Modal opened={opened} onClose={onClose} title="Direct issuance">
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="direct-issue-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Select
+            id="direct-issue-student"
             label="Student"
             placeholder="Select student"
             data={students.map((s) => ({
@@ -79,6 +80,7 @@ export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
             {...form.getInputProps('studentId')}
           />
           <Select
+            id="direct-issue-item"
             label="Item"
             placeholder="Select item"
             data={uniforms.map((u) => ({ value: u.id, label: u.name }))}
@@ -89,21 +91,25 @@ export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
             }}
           />
           <Select
+            id="direct-issue-size"
             label="Size"
             placeholder="Select size"
             data={sizes.map((s) => ({ value: s, label: s }))}
             {...form.getInputProps('size')}
           />
           <NumberInput
+            id="direct-issue-quantity"
             label="Quantity"
             min={1}
             {...form.getInputProps('quantity')}
           />
           <Textarea
+            id="direct-issue-notes"
             label="Notes (optional)"
             {...form.getInputProps('notes')}
           />
           <Button
+            id="direct-issue-submit"
             type="submit"
             loading={directIssueMutation.isPending}
           >

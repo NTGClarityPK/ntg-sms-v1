@@ -84,6 +84,7 @@ export function CommunicationSettings() {
           <Text fw={500}>Teacher ↔ Student</Text>
           <Group gap="md" wrap="wrap">
             <Checkbox
+              id="communication-settings-teacher-student-both"
               label="Both ways"
               checked={value.teacher_student === 'both'}
               onChange={() =>
@@ -94,6 +95,7 @@ export function CommunicationSettings() {
               }
             />
             <Checkbox
+              id="communication-settings-teacher-student-teacher-only"
               label="Teacher can send only"
               checked={value.teacher_student === 'teacher_only'}
               onChange={() =>
@@ -110,6 +112,7 @@ export function CommunicationSettings() {
           <Text fw={500}>Teacher ↔ Parent</Text>
           <Group gap="md" wrap="wrap">
             <Checkbox
+              id="communication-settings-teacher-parent-both"
               label="Both ways"
               checked={value.teacher_parent === 'both'}
               onChange={() =>
@@ -120,6 +123,7 @@ export function CommunicationSettings() {
               }
             />
             <Checkbox
+              id="communication-settings-teacher-parent-teacher-only"
               label="Teacher can send only"
               checked={value.teacher_parent === 'teacher_only'}
               onChange={() =>
@@ -133,7 +137,7 @@ export function CommunicationSettings() {
         </Stack>
 
         <Group justify="flex-end">
-          <Button variant="light" onClick={onSave} loading={updateMutation.isPending || settingQuery.isLoading}>
+          <Button id="communication-settings-save" variant="light" onClick={onSave} loading={updateMutation.isPending || settingQuery.isLoading}>
             Save
           </Button>
         </Group>

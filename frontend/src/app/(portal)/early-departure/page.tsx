@@ -176,10 +176,10 @@ export default function EarlyDeparturePage() {
           }}
         >
           <Tabs.List>
-            {isParent && <Tabs.Tab value="my-requests">Raise a request</Tabs.Tab>}
-            {!isParent && <Tabs.Tab value="authorize">Authorize Early Departure</Tabs.Tab>}
-            <Tabs.Tab value="all-requests">All requests</Tabs.Tab>
-            <Tabs.Tab value="statistics">Past Statistics</Tabs.Tab>
+            {isParent && <Tabs.Tab id="early-departure-tab-my-requests" value="my-requests">Raise a request</Tabs.Tab>}
+            {!isParent && <Tabs.Tab id="early-departure-tab-authorize" value="authorize">Authorize Early Departure</Tabs.Tab>}
+            <Tabs.Tab id="early-departure-tab-all-requests" value="all-requests">All requests</Tabs.Tab>
+            <Tabs.Tab id="early-departure-tab-statistics" value="statistics">Past Statistics</Tabs.Tab>
           </Tabs.List>
 
           {isParent && (
@@ -207,6 +207,7 @@ export default function EarlyDeparturePage() {
                       <Paper withBorder p="md">
                         <Stack gap="sm">
                           <Select
+                            id="early-departure-select-student"
                             label="Select Student"
                             placeholder="Choose a student"
                             data={availableStudents.map((s) => ({

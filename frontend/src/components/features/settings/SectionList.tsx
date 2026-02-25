@@ -76,7 +76,7 @@ export function SectionList() {
       <Alert color={colors.error} title="Failed to load sections">
         <Group justify="space-between" mt="sm">
           <Text size="sm">Please try again.</Text>
-          <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
+          <Button id="section-list-retry" variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
             Retry
           </Button>
         </Group>
@@ -89,7 +89,7 @@ export function SectionList() {
   return (
     <>
       <Group justify="flex-end" mb="md">
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+        <Button id="section-list-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add section
         </Button>
       </Group>
@@ -126,12 +126,12 @@ export function SectionList() {
       <Modal opened={opened} onClose={handleClose} title={editSection ? 'Edit section' : 'Add section'} size="md">
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput label="Name" placeholder="A" {...form.getInputProps('name')} />
+            <TextInput id="section-form-name" label="Name" placeholder="A" {...form.getInputProps('name')} />
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button id="section-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
-              <Button type="submit" loading={createMutation.isPending || updateMutation.isPending}>
+              <Button id="section-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
                 Save
               </Button>
             </Group>

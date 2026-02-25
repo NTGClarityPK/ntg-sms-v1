@@ -84,6 +84,7 @@ export function AdminHeader() {
           }}
           component="a"
           href="https://ntgclarity.com/"
+          id="admin-header-link-ntg"
           target="_blank"
           rel="noopener noreferrer"
           title="NTG Clarity"

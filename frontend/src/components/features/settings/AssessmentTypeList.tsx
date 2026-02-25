@@ -74,7 +74,7 @@ export function AssessmentTypeList() {
       <Alert color={colors.error} title="Failed to load assessment types">
         <Group justify="space-between" mt="sm">
           <Text size="sm">Please try again.</Text>
-          <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
+          <Button id="assessment-type-list-retry" variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
             Retry
           </Button>
         </Group>
@@ -88,7 +88,7 @@ export function AssessmentTypeList() {
     <>
       <Group justify="space-between" mb="xs">
         <Text size="lg" fw={500}>Assessment Types</Text>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+        <Button id="assessment-type-list-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add type
         </Button>
       </Group>
@@ -134,12 +134,12 @@ export function AssessmentTypeList() {
       >
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput label="Name" placeholder="Quiz" {...form.getInputProps('name')} />
+            <TextInput id="assessment-type-form-name" label="Name" placeholder="Quiz" {...form.getInputProps('name')} />
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button id="assessment-type-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
-              <Button type="submit" loading={createMutation.isPending || updateMutation.isPending}>
+              <Button id="assessment-type-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
                 Save
               </Button>
             </Group>

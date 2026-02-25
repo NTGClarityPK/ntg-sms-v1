@@ -119,6 +119,7 @@ export default function AssignBranchPage() {
               ) : (
                 <>
                   <Select
+                    id="admin-assign-branch-tenant"
                     label="Tenant"
                     placeholder="Select a tenant"
                     required
@@ -135,6 +136,7 @@ export default function AssignBranchPage() {
                   <Grid>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <TextInput
+                        id="admin-assign-branch-name"
                         label="Branch Name"
                         placeholder="Enter branch name"
                         required
@@ -143,6 +145,7 @@ export default function AssignBranchPage() {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <TextInput
+                        id="admin-assign-branch-name-ar"
                         label="Branch Name (Arabic)"
                         placeholder="Enter branch name in Arabic"
                         {...form.getInputProps('nameAr')}
@@ -150,6 +153,7 @@ export default function AssignBranchPage() {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <TextInput
+                        id="admin-assign-branch-code"
                         label="Branch Code"
                         placeholder="Enter branch code (optional)"
                         {...form.getInputProps('code')}
@@ -157,6 +161,7 @@ export default function AssignBranchPage() {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <TextInput
+                        id="admin-assign-branch-address"
                         label="Address"
                         placeholder="Enter branch address"
                         {...form.getInputProps('address')}
@@ -164,6 +169,7 @@ export default function AssignBranchPage() {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <TextInput
+                        id="admin-assign-branch-phone"
                         label="Phone"
                         placeholder="Enter branch phone"
                         {...form.getInputProps('phone')}
@@ -171,6 +177,7 @@ export default function AssignBranchPage() {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <TextInput
+                        id="admin-assign-branch-email"
                         label="Email"
                         type="email"
                         placeholder="Enter branch email"
@@ -179,6 +186,7 @@ export default function AssignBranchPage() {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <NumberInput
+                        id="admin-assign-branch-storage-quota"
                         label="Storage Quota (GB)"
                         placeholder="Enter storage quota"
                         min={1}
@@ -187,6 +195,7 @@ export default function AssignBranchPage() {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Switch
+                        id="admin-assign-branch-active"
                         label="Active"
                         {...form.getInputProps('isActive', { type: 'checkbox' })}
                       />
@@ -194,7 +203,7 @@ export default function AssignBranchPage() {
                   </Grid>
 
                   <Group justify="flex-end" mt="xl">
-                    <Button type="submit" loading={assignBranch.isPending}>
+                    <Button id="admin-assign-branch-submit" type="submit" loading={assignBranch.isPending}>
                       Assign Branch
                     </Button>
                   </Group>

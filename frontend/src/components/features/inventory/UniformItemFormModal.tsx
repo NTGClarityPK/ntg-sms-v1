@@ -159,20 +159,23 @@ export function UniformItemFormModal({
       title={isEdit ? 'Edit uniform item' : 'Create uniform item'}
       size="md"
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="uniform-item-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <TextInput
+            id="uniform-item-form-name"
             label="Name"
             placeholder="e.g. Boys Shirt, Girls Skirt"
             required
             {...form.getInputProps('name')}
           />
           <TextInput
+            id="uniform-item-form-code"
             label="Item code"
             placeholder="Optional code"
             {...form.getInputProps('itemCode')}
           />
           <Select
+            id="uniform-item-form-category"
             label="Category"
             data={categoryOptions}
             placeholder={
@@ -184,12 +187,14 @@ export function UniformItemFormModal({
             {...form.getInputProps('category')}
           />
           <Select
+            id="uniform-item-form-gender"
             label="Gender"
             data={GENDERS}
             clearable
             {...form.getInputProps('gender')}
           />
           <Textarea
+            id="uniform-item-form-description"
             label="Description"
             placeholder="Optional description"
             {...form.getInputProps('description')}
@@ -248,14 +253,16 @@ export function UniformItemFormModal({
             disabled={!!imageFile}
           />
           <Switch
+            id="uniform-item-form-active"
             label="Active"
             {...form.getInputProps('isActive', { type: 'checkbox' })}
           />
           <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={onClose}>
+            <Button id="uniform-item-form-cancel" variant="default" onClick={onClose}>
               Cancel
             </Button>
             <Button
+              id="uniform-item-form-submit"
               type="submit"
               loading={
                 createMutation.isPending ||

@@ -104,6 +104,7 @@ export function ReportPeriodSelector({
   return (
     <Stack gap="sm">
       <Select
+        id="report-period-select"
         label="Report Period"
         placeholder="Select period"
         value={value || 'year'}
@@ -120,6 +121,7 @@ export function ReportPeriodSelector({
       {value === ReportPeriodType.CUSTOM && (
         <Group gap="md">
           <DatePickerInput
+            id="report-period-start-date"
             label="Start Date"
             placeholder="Select start date"
             value={customStartDate}
@@ -128,6 +130,7 @@ export function ReportPeriodSelector({
             style={{ maxWidth: 200 }}
           />
           <DatePickerInput
+            id="report-period-end-date"
             label="End Date"
             placeholder="Select end date"
             value={customEndDate}

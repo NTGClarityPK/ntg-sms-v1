@@ -402,6 +402,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
 
   return (
     <form
+      id="assessment-form"
       onSubmit={form.onSubmit(handleSubmit)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
@@ -415,9 +416,10 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
             {firstCreateError}
           </Alert>
         )}
-        <TextInput label="Title" placeholder="Enter assessment title" required {...getInputProps('title')} />
+        <TextInput id="assessment-form-title" label="Title" placeholder="Enter assessment title" required {...getInputProps('title')} />
 
         <Textarea
+          id="assessment-form-description"
           label="Description"
           placeholder="Enter assessment description"
           minRows={3}
@@ -425,6 +427,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         />
 
         <Select
+          id="assessment-form-type"
           label="Assessment Type"
           placeholder="Select type"
           data={assessmentTypes}
@@ -601,6 +604,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
 
         <Group grow>
           <NumberInput
+            id="assessment-form-total-marks"
             label="Total Marks"
             placeholder="Enter total marks"
             min={0}
@@ -609,6 +613,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
           />
 
           <DatePickerInput
+            id="assessment-form-due-date"
             label="Due Date"
             placeholder="Select due date"
             leftSection={<IconCalendar size={16} />}
@@ -617,6 +622,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         </Group>
 
         <DatePickerInput
+          id="assessment-form-publish-date"
           label="Publish Date"
           placeholder="Select publish date"
           leftSection={<IconCalendar size={16} />}
@@ -624,9 +630,10 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         />
 
         <Group>
-          <Switch label="Published" {...getInputProps('isPublished')} />
+          <Switch id="assessment-form-published" label="Published" {...getInputProps('isPublished')} />
 
           <Switch
+            id="assessment-form-allow-late"
             label="Allow Late Submission"
             {...getInputProps('allowLateSubmission')}
           />
@@ -660,6 +667,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
 
         <Group justify="flex-end" mt="md">
           <Button
+            id="assessment-form-submit"
             type="submit"
             loading={isLoading}
             disabled={compressionProgress !== null && compressionProgress !== undefined}

@@ -60,6 +60,7 @@ export function GradeTemplateAssignment() {
           <Text fw={600}>Assign Grade template to class</Text>
 
           <Select
+            id="grade-template-assign-template"
             label="Grade template"
             placeholder="Select template"
             data={templateOptions}
@@ -71,6 +72,7 @@ export function GradeTemplateAssignment() {
           />
 
           <Select
+            id="grade-template-assign-class"
             label="Class"
             placeholder="Select class"
             data={classOptions}
@@ -79,6 +81,7 @@ export function GradeTemplateAssignment() {
           />
 
           <Select
+            id="grade-template-assign-passing-grade"
             label="Minimum passing grade"
             placeholder="Select grade"
             data={gradeOptions}
@@ -88,7 +91,7 @@ export function GradeTemplateAssignment() {
           />
 
           <Group justify="flex-end">
-            <Button variant="light" onClick={onAssign} disabled={!canSubmit} loading={assignMutation.isPending}>
+            <Button id="grade-template-assign-submit" variant="light" onClick={onAssign} disabled={!canSubmit} loading={assignMutation.isPending}>
               Save
             </Button>
           </Group>

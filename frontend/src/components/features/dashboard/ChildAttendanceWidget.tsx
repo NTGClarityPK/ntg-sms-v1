@@ -150,6 +150,7 @@ export function ChildAttendanceWidget({ embedded }: ChildAttendanceWidgetProps =
 
       {!embedded && (
         <Button
+          id="dashboard-link-attendance-child"
           component={Link}
           href="/attendance/child"
           leftSection={<IconEye size={18} />}

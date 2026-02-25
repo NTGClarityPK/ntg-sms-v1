@@ -39,6 +39,7 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
       <Stack gap="md">
         <div>
           <Button
+            id="setup-review-toggle-academic-year"
             variant="subtle"
             onClick={() => toggleSection('academicYear')}
             style={{ padding: 0, height: 'auto' }}
@@ -64,6 +65,7 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
 
         <div>
           <Button
+            id="setup-review-toggle-academic"
             variant="subtle"
             onClick={() => toggleSection('academic')}
             style={{ padding: 0, height: 'auto' }}
@@ -136,6 +138,7 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
 
         <div>
           <Button
+            id="setup-review-toggle-schedule"
             variant="subtle"
             onClick={() => toggleSection('schedule')}
             style={{ padding: 0, height: 'auto' }}
@@ -179,6 +182,7 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
 
         <div>
           <Button
+            id="setup-review-toggle-assessment"
             variant="subtle"
             onClick={() => toggleSection('assessment')}
             style={{ padding: 0, height: 'auto' }}
@@ -242,6 +246,7 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
 
         <div>
           <Button
+            id="setup-review-toggle-communication"
             variant="subtle"
             onClick={() => toggleSection('communication')}
             style={{ padding: 0, height: 'auto' }}
@@ -270,6 +275,7 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
 
         <div>
           <Button
+            id="setup-review-toggle-behavior"
             variant="subtle"
             onClick={() => toggleSection('behavior')}
             style={{ padding: 0, height: 'auto' }}
@@ -308,6 +314,7 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
 
         <div>
           <Button
+            id="setup-review-toggle-permissions"
             variant="subtle"
             onClick={() => toggleSection('permissions')}
             style={{ padding: 0, height: 'auto' }}
@@ -326,6 +333,7 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
 
       <Stack gap="md" mt="xl">
         <Checkbox
+          id="setup-review-consent"
           label="I have reviewed all settings above and confirm they are correct. I understand that these settings will be saved and can be modified later."
           checked={consentChecked}
           onChange={(e) => setConsentChecked(e.currentTarget.checked)}
@@ -333,10 +341,11 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
       </Stack>
 
       <Group justify="space-between" mt="xl">
-        <Button variant="light" onClick={onBack}>
+        <Button id="setup-review-back" variant="light" onClick={onBack}>
           Go Back
         </Button>
         <Button
+          id="setup-review-confirm"
           onClick={onConfirm}
           color={colors.primary}
           disabled={!consentChecked || isSaving}

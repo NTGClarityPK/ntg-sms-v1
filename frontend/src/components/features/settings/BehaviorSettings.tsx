@@ -107,6 +107,7 @@ export function BehaviorSettings() {
         <Text fw={600}>Behavioral assessment</Text>
 
         <Switch
+          id="behavior-settings-enabled"
           label="Enable behavioral assessment"
           checked={value.enabled}
           onChange={() =>
@@ -119,6 +120,7 @@ export function BehaviorSettings() {
         />
 
         <Checkbox
+          id="behavior-settings-mandatory"
           label="Mandatory"
           checked={value.mandatory}
           disabled={!value.enabled}
@@ -132,13 +134,14 @@ export function BehaviorSettings() {
 
         <Group align="flex-end">
           <TextInput
+            id="behavior-settings-attribute-input"
             label="Add attribute"
             placeholder="Discipline"
             value={newAttr}
             onChange={(e) => setNewAttr(e.currentTarget.value)}
             disabled={!value.enabled}
           />
-          <Button variant="light" onClick={addAttr} disabled={!value.enabled}>
+          <Button id="behavior-settings-add-attribute" variant="light" onClick={addAttr} disabled={!value.enabled}>
             Add
           </Button>
         </Group>
@@ -152,7 +155,7 @@ export function BehaviorSettings() {
             attrs.map((a) => (
               <Group key={a} justify="space-between">
                 <Text size="sm">{a}</Text>
-                <Button variant="light" onClick={() => removeAttr(a)} disabled={!value.enabled}>
+                <Button id={`behavior-settings-remove-${a.replace(/\s+/g, '-').toLowerCase()}`} variant="light" onClick={() => removeAttr(a)} disabled={!value.enabled}>
                   Remove
                 </Button>
               </Group>
@@ -161,7 +164,7 @@ export function BehaviorSettings() {
         </Stack>
 
         <Group justify="flex-end">
-          <Button variant="light" onClick={onSave} loading={updateMutation.isPending || settingQuery.isLoading}>
+          <Button id="behavior-settings-save" variant="light" onClick={onSave} loading={updateMutation.isPending || settingQuery.isLoading}>
             Save
           </Button>
         </Group>

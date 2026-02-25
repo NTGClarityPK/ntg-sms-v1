@@ -120,7 +120,7 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
       <Stack gap="md">
         <Group justify="space-between">
           <Text fw={600}>Vacations</Text>
-          <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+          <Button id="vacation-manager-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
             Add vacation
           </Button>
         </Group>
@@ -149,6 +149,7 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
                     <Table.Td>
                       <Group gap="xs">
                         <Button
+                          id={`vacation-row-${v.id}-edit`}
                           variant="subtle"
                           size="compact-sm"
                           leftSection={<IconPencil size={14} />}
@@ -157,6 +158,7 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
                           Edit
                         </Button>
                         <Button
+                          id={`vacation-row-${v.id}-delete`}
                           variant="subtle"
                           size="compact-sm"
                           leftSection={<IconTrash size={14} />}
@@ -176,16 +178,16 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
       </Stack>
 
       <Modal opened={opened} onClose={close} title={editingVacation ? 'Edit vacation' : 'Add vacation'} size="md">
-        <form onSubmit={handleSubmit}>
+        <form id="vacation-form" onSubmit={handleSubmit}>
           <Stack gap="md">
-            <TextInput label="Name" placeholder="Summer Vacation" {...form.getInputProps('name')} />
-            <TextInput label="Name (Arabic)" placeholder="إجازة الصيف" {...form.getInputProps('nameAr')} />
-            <TextInput label="Start date" type="date" {...form.getInputProps('startDate')} />
-            <TextInput label="End date" type="date" {...form.getInputProps('endDate')} />
+            <TextInput id="vacation-form-name" label="Name" placeholder="Summer Vacation" {...form.getInputProps('name')} />
+            <TextInput id="vacation-form-name-ar" label="Name (Arabic)" placeholder="إجازة الصيف" {...form.getInputProps('nameAr')} />
+            <TextInput id="vacation-form-start" label="Start date" type="date" {...form.getInputProps('startDate')} />
+            <TextInput id="vacation-form-end" label="End date" type="date" {...form.getInputProps('endDate')} />
             
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={close}>Cancel</Button>
-              <Button type="submit" loading={createMutation.isPending || updateMutation.isPending}>
+              <Button id="vacation-form-cancel" variant="light" onClick={close}>Cancel</Button>
+              <Button id="vacation-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
                 {editingVacation ? 'Update' : 'Save'}
               </Button>
             </Group>

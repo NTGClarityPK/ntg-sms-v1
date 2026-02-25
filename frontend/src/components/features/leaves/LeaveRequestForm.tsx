@@ -79,7 +79,7 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
 
   return (
     <Paper withBorder p="md">
-      <form key={student?.id || 'no-student'} onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="leave-request-form" key={student?.id || 'no-student'} onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Text fw={600}>Request leave</Text>
           {quota && (
@@ -100,6 +100,7 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
             </Stack>
           )}
           <DatePickerInput
+            id="leave-request-start-date"
             label="Start date"
             {...form.getInputProps('startDate')}
             placeholder="Select start date"
@@ -107,6 +108,7 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
             maxDate={form.values.endDate || undefined}
           />
           <DatePickerInput
+            id="leave-request-end-date"
             label="End date"
             {...form.getInputProps('endDate')}
             placeholder="Select end date"
@@ -114,12 +116,14 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
             minDate={form.values.startDate || undefined}
           />
           <Textarea
+            id="leave-request-reason"
             label="Reason"
             minRows={3}
             {...form.getInputProps('reason')}
           />
           <Group justify="flex-end">
             <Button
+              id="leave-request-submit"
               type="submit"
               variant="light"
               loading={createLeave.isPending}

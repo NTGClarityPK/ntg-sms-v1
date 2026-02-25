@@ -108,12 +108,13 @@ export function LibraryCategoryEditor() {
 
         <Group align="flex-end">
           <TextInput
+            id="library-category-editor-input"
             label="Add category"
             placeholder="Textbooks"
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
           />
-          <Button variant="light" onClick={addItem}>
+          <Button id="library-category-editor-add" variant="light" onClick={addItem}>
             Add
           </Button>
         </Group>
@@ -197,7 +198,7 @@ export function LibraryCategoryEditor() {
         )}
 
         <Group justify="flex-end">
-          <Button variant="light" onClick={onSave} loading={updateMutation.isPending || settingQuery.isLoading}>
+          <Button id="library-category-editor-save" variant="light" onClick={onSave} loading={updateMutation.isPending || settingQuery.isLoading}>
             Save
           </Button>
         </Group>

@@ -123,7 +123,7 @@ export function Header() {
                 </Badge>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item onClick={() => router.push('/admin/assign-branch')}>
+                <Menu.Item id="header-link-assign-branch" onClick={() => router.push('/admin/assign-branch')}>
                   Assign Branch to Tenant
                 </Menu.Item>
               </Menu.Dropdown>
@@ -145,6 +145,7 @@ export function Header() {
           }}
           component="a"
           href="https://ntgclarity.com/"
+          id="header-link-ntg"
           target="_blank"
           rel="noopener noreferrer"
           title="NTG Clarity"

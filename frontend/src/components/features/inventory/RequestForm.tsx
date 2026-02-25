@@ -130,6 +130,7 @@ export function RequestForm({
   return (
     <Stack gap="md">
       <Select
+        id="uniform-request-student"
         label="Student"
         placeholder="Select student"
         data={studentOptions}
@@ -150,6 +151,7 @@ export function RequestForm({
           <Paper key={index} p="sm" withBorder>
             <Group align="flex-end" gap="xs">
               <Select
+                id={`uniform-request-line-${index}-item`}
                 label="Item"
                 placeholder="Select item"
                 data={uniforms.map((u) => ({
@@ -174,6 +176,7 @@ export function RequestForm({
                 </Text>
               ) : (
                 <Select
+                  id={`uniform-request-line-${index}-size`}
                   label="Size"
                   placeholder="Size"
                   data={inStockSizes.map((s) => ({
@@ -187,6 +190,7 @@ export function RequestForm({
               )}
               {!isOutOfStock && (
                 <NumberInput
+                  id={`uniform-request-line-${index}-qty`}
                   label="Qty"
                   min={1}
                   max={maxQty}
@@ -211,7 +215,7 @@ export function RequestForm({
           </Paper>
         );
       })}
-      <Button variant="light" onClick={addLine} disabled={!firstInStockItem}>
+      <Button id="uniform-request-add-item" variant="light" onClick={addLine} disabled={!firstInStockItem}>
         Add item
       </Button>
       {uniforms.length > 0 && !firstInStockItem && (
@@ -221,12 +225,14 @@ export function RequestForm({
         </Text>
       )}
       <Textarea
+        id="uniform-request-notes"
         label="Notes (optional)"
         placeholder="Any notes for the request"
         value={notes}
         onChange={(e) => setNotes(e.currentTarget.value)}
       />
       <Button
+        id="uniform-request-submit"
         onClick={handleSubmit}
         disabled={!canSubmit}
         loading={createMutation.isPending}

@@ -69,9 +69,10 @@ export function PublicStatsSettings() {
         Allow anyone with the password to view anonymised student counts per class (no login, no individual data).
       </Text>
 
-      <form onSubmit={handleSubmit}>
+      <form id="public-stats-settings-form" onSubmit={handleSubmit}>
         <Stack gap="md">
           <Switch
+            id="public-stats-settings-enabled"
             label="Enable public statistics page"
             description="When enabled, users can view class-wise student counts at a public URL after entering the password."
             checked={localEnabled}
@@ -79,6 +80,7 @@ export function PublicStatsSettings() {
           />
 
           <TextInput
+            id="public-stats-settings-password"
             label="Password (optional)"
             description="Leave blank to keep the existing password. Set a new value to change it."
             type="password"
@@ -102,7 +104,7 @@ export function PublicStatsSettings() {
             </Alert>
           )}
 
-          <Button type="submit" loading={updatePublicStats.isPending}>
+          <Button id="public-stats-settings-submit" type="submit" loading={updatePublicStats.isPending}>
             Save changes
           </Button>
 
@@ -111,7 +113,7 @@ export function PublicStatsSettings() {
               <Text size="sm" fw={500}>
                 Public page link
               </Text>
-              <Anchor href={publicUrl} target="_blank" rel="noopener noreferrer" size="sm">
+              <Anchor id="public-stats-settings-link" href={publicUrl} target="_blank" rel="noopener noreferrer" size="sm">
                 {publicUrl}
               </Anchor>
             </Stack>

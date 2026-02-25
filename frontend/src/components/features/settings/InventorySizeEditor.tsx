@@ -224,13 +224,14 @@ export function InventorySizeEditor() {
         )}
 
         <Group>
-          <Button variant="light" size="sm" leftSection={<IconPlus size={16} />} onClick={addSize}>
+          <Button id="inventory-size-editor-add" variant="light" size="sm" leftSection={<IconPlus size={16} />} onClick={addSize}>
             Add size
           </Button>
         </Group>
 
         <Group justify="flex-end">
           <Button
+            id="inventory-size-editor-save"
             variant="light"
             onClick={onSave}
             loading={updateMutation.isPending || settingQuery.isLoading}

@@ -65,18 +65,18 @@ export function AcademicYearForm({ opened, onClose, onSubmit, isSubmitting }: Ac
 
   return (
     <Modal opened={opened} onClose={onClose} title="Create academic year" size="md">
-      <form onSubmit={handleSubmit}>
+      <form id="academic-year-form" onSubmit={handleSubmit}>
         <Stack gap="md">
-          <TextInput label="Name" placeholder="2025-2026" {...form.getInputProps('name')} />
-          <TextInput label="Start date" type="date" {...form.getInputProps('startDate')} />
-          <TextInput label="End date" type="date" {...form.getInputProps('endDate')} />
+          <TextInput id="academic-year-form-name" label="Name" placeholder="2025-2026" {...form.getInputProps('name')} />
+          <TextInput id="academic-year-form-start-date" label="Start date" type="date" {...form.getInputProps('startDate')} />
+          <TextInput id="academic-year-form-end-date" label="End date" type="date" {...form.getInputProps('endDate')} />
         </Stack>
 
         <Group justify="flex-end" mt="md">
-          <Button variant="light" onClick={onClose} disabled={isSubmitting}>
+          <Button id="academic-year-form-cancel" variant="light" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" loading={isSubmitting}>
+          <Button id="academic-year-form-submit" type="submit" loading={isSubmitting}>
             Save
           </Button>
         </Group>

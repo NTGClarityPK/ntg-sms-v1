@@ -102,16 +102,18 @@ export function SubjectTemplateForm({
       title={entity ? 'Edit Subject Template' : 'Create Subject Template'}
       size="lg"
     >
-      <form onSubmit={submit}>
+      <form id="subject-template-form" onSubmit={submit}>
         <Stack gap="md">
-          <TextInput label="Name" placeholder="Science Group" required {...form.getInputProps('name')} />
+          <TextInput id="subject-template-form-name" label="Name" placeholder="Science Group" required {...form.getInputProps('name')} />
           <Textarea
+            id="subject-template-form-description"
             label="Description"
             placeholder="Template for science stream students"
             {...form.getInputProps('description')}
           />
 
           <MultiSelect
+            id="subject-template-form-subjects"
             label="Subjects"
             placeholder="Select subjects"
             data={subjectOptions}
@@ -120,6 +122,7 @@ export function SubjectTemplateForm({
           />
 
           <MultiSelect
+            id="subject-template-form-classes"
             label="Assign to Classes"
             placeholder="Select classes"
             data={classOptions}
@@ -136,6 +139,7 @@ export function SubjectTemplateForm({
           />
 
           <MultiSelect
+            id="subject-template-form-levels"
             label="Assign to Levels"
             placeholder="Select levels"
             data={levelOptions}
@@ -152,10 +156,10 @@ export function SubjectTemplateForm({
           />
 
           <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={onClose} disabled={isSubmitting}>
+            <Button id="subject-template-form-cancel" variant="light" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" loading={isSubmitting}>
+            <Button id="subject-template-form-submit" type="submit" loading={isSubmitting}>
               {entity ? 'Update' : 'Create'}
             </Button>
           </Group>

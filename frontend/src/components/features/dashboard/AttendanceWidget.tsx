@@ -145,6 +145,7 @@ export function AttendanceWidget({ embedded }: AttendanceWidgetProps = {}) {
       {!embedded && (
         <Group grow>
           <Button
+            id="dashboard-link-attendance-mark"
             component={Link}
             href="/attendance/mark"
             leftSection={<IconCalendarCheck size={18} />}
@@ -153,6 +154,7 @@ export function AttendanceWidget({ embedded }: AttendanceWidgetProps = {}) {
             Mark Attendance
           </Button>
           <Button
+            id="dashboard-link-attendance-history"
             component={Link}
             href="/attendance/history"
             leftSection={<IconEye size={18} />}

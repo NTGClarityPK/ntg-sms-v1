@@ -91,6 +91,7 @@ export default function SelectChildPage() {
                   </Text>
                 </div>
                 <Button
+                  id={`select-child-btn-${child.id}`}
                   onClick={() => selectChild.mutate(child.id)}
                   loading={selectChild.isPending}
                 >

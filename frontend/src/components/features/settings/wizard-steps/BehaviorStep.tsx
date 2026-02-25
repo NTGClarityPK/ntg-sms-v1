@@ -69,6 +69,7 @@ export function BehaviorStep({ data, onChange, onNext, onBack }: BehaviorStepPro
 
       <Stack gap="lg" mt="md">
         <Checkbox
+          id="behavior-step-enabled"
           label="Enable behavioral assessment"
           checked={formData.enabled}
           onChange={(e) => handleToggleEnabled(e.currentTarget.checked)}
@@ -77,6 +78,7 @@ export function BehaviorStep({ data, onChange, onNext, onBack }: BehaviorStepPro
         {formData.enabled && (
           <>
             <Checkbox
+              id="behavior-step-mandatory"
               label="Make behavioral assessment mandatory"
               checked={formData.mandatory}
               onChange={(e) => handleToggleMandatory(e.currentTarget.checked)}
@@ -88,6 +90,7 @@ export function BehaviorStep({ data, onChange, onNext, onBack }: BehaviorStepPro
               </Text>
               <Group gap="xs" mb="xs">
                 <TextInput
+                  id="behavior-step-attribute-input"
                   placeholder="Add attribute (e.g., Respect, Responsibility)"
                   value={newAttribute}
                   onChange={(e) => setNewAttribute(e.target.value)}
@@ -99,7 +102,7 @@ export function BehaviorStep({ data, onChange, onNext, onBack }: BehaviorStepPro
                   }}
                   style={{ flex: 1 }}
                 />
-                <Button onClick={handleAddAttribute} size="sm">
+                <Button id="behavior-step-add-attribute" onClick={handleAddAttribute} size="sm">
                   Add
                 </Button>
               </Group>
@@ -109,6 +112,7 @@ export function BehaviorStep({ data, onChange, onNext, onBack }: BehaviorStepPro
                     <Group key={attr} justify="space-between">
                       <Text size="sm">{attr}</Text>
                       <Button
+                        id={`behavior-step-remove-${attr.replace(/\s+/g, '-').toLowerCase()}`}
                         variant="subtle"
                         color="red"
                         size="xs"
@@ -126,10 +130,10 @@ export function BehaviorStep({ data, onChange, onNext, onBack }: BehaviorStepPro
       </Stack>
 
       <Group justify="space-between" mt="xl">
-        <Button variant="light" onClick={onBack}>
+        <Button id="behavior-step-back" variant="light" onClick={onBack}>
           Back
         </Button>
-        <Button onClick={handleNext} color={colors.primary}>
+        <Button id="behavior-step-next" onClick={handleNext} color={colors.primary}>
           Next
         </Button>
       </Group>

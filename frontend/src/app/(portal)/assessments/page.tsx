@@ -86,7 +86,7 @@ export default function AssessmentsPage() {
               </ActionIcon>
             </Tooltip>
             {canEdit && (
-              <Button leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
+              <Button id="assessments-btn-create" leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
                 Create Assessment
               </Button>
             )}
@@ -109,12 +109,14 @@ export default function AssessmentsPage() {
           <Stack gap="md">
             <Group grow>
               <TextInput
+                id="assessments-search"
                 placeholder="Search assessments..."
                 leftSection={<IconSearch size={16} />}
                 value={search}
                 onChange={(e) => setSearch(e.currentTarget.value)}
               />
               <Select
+                id="assessments-filter-status"
                 placeholder="Filter by status"
                 data={[
                   { value: 'all', label: 'All' },

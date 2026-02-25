@@ -158,7 +158,7 @@ export default function ResetPasswordPage() {
 
   return (
     <Box style={{ maxWidth: 400, margin: '0 auto', paddingTop: '5rem' }}>
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="reset-password-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="lg">
           <Box>
             <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
@@ -185,6 +185,7 @@ export default function ResetPasswordPage() {
           )}
 
           <PasswordInput
+            id="reset-password-new"
             label="New Password"
             placeholder="Enter your new password"
             required
@@ -197,6 +198,7 @@ export default function ResetPasswordPage() {
           />
 
           <PasswordInput
+            id="reset-password-confirm"
             label="Confirm Password"
             placeholder="Confirm your new password"
             required
@@ -209,6 +211,7 @@ export default function ResetPasswordPage() {
           />
 
           <Button
+            id="reset-password-submit"
             type="submit"
             fullWidth
             loading={loading}
@@ -226,6 +229,7 @@ export default function ResetPasswordPage() {
           <Text ta="center" size="sm" style={{ color: themeColors.colorTextMedium }}>
             Remember your password?{' '}
             <a
+              id="reset-password-signin-link"
               href="/login"
               style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500, textDecoration: 'none' }}
             >

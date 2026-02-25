@@ -81,6 +81,7 @@ export function LevelManager() {
         <Group justify="space-between" mt="sm">
           <Text size="sm">Please try again.</Text>
           <Button
+            id="level-manager-retry"
             variant="light"
             leftSection={<IconRefresh size={16} />}
             onClick={() => {
@@ -128,7 +129,7 @@ export function LevelManager() {
     <>
       <Group justify="space-between" mb="xs">
         <Text size="lg" fw={500}>Levels</Text>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+        <Button id="level-manager-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add level
         </Button>
       </Group>
@@ -176,9 +177,10 @@ export function LevelManager() {
       <Modal opened={opened} onClose={handleClose} title={editLevel ? 'Edit level' : 'Add level'} size="md">
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput label="Name" placeholder="Primary" {...form.getInputProps('name')} />
+            <TextInput id="level-form-name" label="Name" placeholder="Primary" {...form.getInputProps('name')} />
             {!editLevel && (
               <MultiSelect
+                id="level-form-classes"
                 label="Classes"
                 placeholder="Select classes"
                 data={classOptions}
@@ -187,10 +189,10 @@ export function LevelManager() {
               />
             )}
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button id="level-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
-              <Button type="submit" loading={createMutation.isPending || updateMutation.isPending}>
+              <Button id="level-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
                 Save
               </Button>
             </Group>

@@ -116,11 +116,12 @@ export function CreateClassSectionModal({
       title={isEdit ? 'Edit Class Section' : 'Create Class Section'}
       size="md"
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="create-class-section-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           {!isEdit && (
             <>
               <Select
+                id="create-class-section-class"
                 label="Class"
                 placeholder="Select class"
                 data={classOptions}
@@ -128,6 +129,7 @@ export function CreateClassSectionModal({
                 {...form.getInputProps('classId')}
               />
               <Select
+                id="create-class-section-section"
                 label="Section"
                 placeholder="Select section"
                 data={sectionOptions}
@@ -137,22 +139,25 @@ export function CreateClassSectionModal({
             </>
           )}
           <NumberInput
+            id="create-class-section-capacity"
             label="Capacity (optional)"
             placeholder="Leave empty for default"
             min={1}
             {...form.getInputProps('capacity')}
           />
           <Switch
+            id="create-class-section-active"
             label="Active"
             {...form.getInputProps('isActive', { type: 'checkbox' })}
           />
         </Stack>
 
         <Group justify="flex-end" mt="xl">
-          <Button variant="subtle" onClick={handleClose}>
+          <Button id="create-class-section-cancel" variant="subtle" onClick={handleClose}>
             Cancel
           </Button>
           <Button
+            id="create-class-section-submit"
             type="submit"
             loading={createClassSection.isPending || updateClassSection.isPending}
           >

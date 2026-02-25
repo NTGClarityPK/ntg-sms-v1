@@ -80,7 +80,7 @@ export function ClassList() {
       <Alert color={colors.error} title="Failed to load classes">
         <Group justify="space-between" mt="sm">
           <Text size="sm">Please try again.</Text>
-          <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
+          <Button id="class-list-retry" variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
             Retry
           </Button>
         </Group>
@@ -93,7 +93,7 @@ export function ClassList() {
   return (
     <>
       <Group justify="flex-end" mb="md">
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+        <Button id="class-list-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add class
         </Button>
       </Group>
@@ -134,14 +134,14 @@ export function ClassList() {
       <Modal opened={opened} onClose={handleClose} title={editClass ? 'Edit class' : 'Add class'} size="md">
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput label="Name" placeholder="10" {...form.getInputProps('name')} />
-            <TextInput label="Display name" placeholder="Grade 10" {...form.getInputProps('displayName')} />
-            <NumberInput label="Sort order" min={0} {...form.getInputProps('sortOrder')} />
+            <TextInput id="class-form-name" label="Name" placeholder="10" {...form.getInputProps('name')} />
+            <TextInput id="class-form-display-name" label="Display name" placeholder="Grade 10" {...form.getInputProps('displayName')} />
+            <NumberInput id="class-form-sort-order" label="Sort order" min={0} {...form.getInputProps('sortOrder')} />
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button id="class-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
-              <Button type="submit" loading={createMutation.isPending || updateMutation.isPending}>
+              <Button id="class-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
                 Save
               </Button>
             </Group>

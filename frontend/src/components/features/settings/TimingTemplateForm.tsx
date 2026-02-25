@@ -81,18 +81,18 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
     <Modal opened={opened} onClose={onClose} title="Create timing template" size="lg">
       <form onSubmit={submit}>
         <Stack gap="md">
-          <TextInput label="Name" placeholder="Primary Morning Schedule" {...form.getInputProps('name')} />
+          <TextInput id="timing-template-name" label="Name" placeholder="Primary Morning Schedule" {...form.getInputProps('name')} />
           <Group grow>
-            <TextInput label="School start time" type="time" {...form.getInputProps('startTime')} />
-            <TextInput label="School end time" type="time" {...form.getInputProps('endTime')} />
+            <TextInput id="timing-template-start-time" label="School start time" type="time" {...form.getInputProps('startTime')} />
+            <TextInput id="timing-template-end-time" label="School end time" type="time" {...form.getInputProps('endTime')} />
           </Group>
-          <NumberInput label="Period duration (minutes)" min={1} {...form.getInputProps('periodDurationMinutes')} />
+          <NumberInput id="timing-template-period-duration" label="Period duration (minutes)" min={1} {...form.getInputProps('periodDurationMinutes')} />
 
           <Divider my="sm" />
 
           <Group justify="space-between" align="center">
             <Text fw={500}>Slots (Assembly, Break, etc.)</Text>
-            <Button size="compact-sm" leftSection={<IconPlus size={16} />} onClick={addSlot} variant="light">
+            <Button id="timing-template-add-slot" size="compact-sm" leftSection={<IconPlus size={16} />} onClick={addSlot} variant="light">
               Add Slot
             </Button>
           </Group>
@@ -118,17 +118,20 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
                       </ActionIcon>
                     </Group>
                     <TextInput
+                      id={`timing-template-slot-${index}-name`}
                       label="Slot name"
                       placeholder="e.g., Assembly, Break, Lunch"
                       {...form.getInputProps(`slots.${index}.name`)}
                     />
                     <Group grow>
                       <TextInput
+                        id={`timing-template-slot-${index}-start`}
                         label="Start time (optional)"
                         type="time"
                         {...form.getInputProps(`slots.${index}.startTime`)}
                       />
                       <TextInput
+                        id={`timing-template-slot-${index}-end`}
                         label="End time (optional)"
                         type="time"
                         {...form.getInputProps(`slots.${index}.endTime`)}
@@ -141,10 +144,10 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
           )}
 
           <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={onClose} disabled={isSubmitting}>
+            <Button id="timing-template-cancel" variant="light" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" loading={isSubmitting}>
+            <Button id="timing-template-submit" type="submit" loading={isSubmitting}>
               Save
             </Button>
           </Group>

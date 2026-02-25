@@ -34,6 +34,7 @@ export default function ClassReportByIdPage() {
               <ExportButton variant="class" classSectionId={classSectionId} />
             )}
             <Button
+              id="reports-class-back"
               component={Link}
               href="/reports/class"
               leftSection={<IconArrowLeft size={16} />}

@@ -400,6 +400,7 @@ export function Sidebar({
     
     const content = (
       <Button
+        id={`nav-link-${item.href.slice(1).replace(/\//g, '-')}`}
         component="button"
         type="button"
         variant="subtle"
@@ -502,6 +503,7 @@ export function Sidebar({
           withArrow
         >
           <ActionIcon
+            id="sidebar-toggle"
             variant="subtle"
             size="lg"
             onClick={() => onCollapseChange?.(!collapsed)}

@@ -127,6 +127,7 @@ export default function EventsPage() {
               </ActionIcon>
             </Tooltip>
             <Button
+              id="events-btn-create"
               leftSection={<IconPlus size={16} />}
               onClick={() => router.push('/events/create')}
             >
@@ -151,12 +152,14 @@ export default function EventsPage() {
             <Stack gap="md">
               <Group grow>
                 <TextInput
+                  id="events-search"
                   placeholder="Search events..."
                   leftSection={<IconSearch size={16} />}
                   value={search}
                   onChange={(e) => setSearch(e.currentTarget.value)}
                 />
                 <Select
+                  id="events-filter-status"
                   placeholder="Filter by status"
                   data={[
                     { value: 'all', label: 'All' },
@@ -168,6 +171,7 @@ export default function EventsPage() {
                   clearable
                 />
                 <Select
+                  id="events-filter-consent"
                   placeholder="Requires consent"
                   data={[
                     { value: 'true', label: 'Yes' },
@@ -180,12 +184,14 @@ export default function EventsPage() {
               </Group>
               <Group grow>
                 <DatePickerInput
+                  id="events-filter-start-date"
                   placeholder="Start date"
                   value={startDate}
                   onChange={setStartDate}
                   clearable
                 />
                 <DatePickerInput
+                  id="events-filter-end-date"
                   placeholder="End date"
                   value={endDate}
                   onChange={setEndDate}

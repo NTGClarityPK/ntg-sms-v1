@@ -136,12 +136,13 @@ export function InventoryCategoryEditor() {
 
         <Group align="flex-end">
           <TextInput
+            id="inventory-category-editor-input"
             label="Add category"
             placeholder="e.g. Shirt"
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
           />
-          <Button variant="light" onClick={addItem}>
+          <Button id="inventory-category-editor-add" variant="light" onClick={addItem}>
             Add
           </Button>
         </Group>
@@ -226,6 +227,7 @@ export function InventoryCategoryEditor() {
 
         <Group justify="flex-end">
           <Button
+            id="inventory-category-editor-save"
             variant="light"
             onClick={onSave}
             loading={updateMutation.isPending || settingQuery.isLoading}

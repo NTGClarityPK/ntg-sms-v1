@@ -75,7 +75,7 @@ export default function ParentAssociationsPage() {
                 <IconRefresh size={18} />
               </ActionIcon>
             </Tooltip>
-            <Button leftSection={<IconPlus size={16} />} onClick={open}>
+            <Button id="parent-associations-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
               Create Association
             </Button>
           </Group>
@@ -86,6 +86,7 @@ export default function ParentAssociationsPage() {
         <Stack gap="md">
         <Flex gap="md" wrap="wrap" align="flex-end">
           <TextInput
+            id="parent-associations-search"
             placeholder="Search by parent name or email..."
             leftSection={<IconSearch size={16} />}
             value={search}
@@ -98,6 +99,7 @@ export default function ParentAssociationsPage() {
           />
           <Box w={250}>
             <Select
+              id="parent-associations-filter-parent"
               placeholder="Filter by parent"
               data={parents.map((p) => ({
                 value: p.id,
@@ -116,6 +118,7 @@ export default function ParentAssociationsPage() {
           </Box>
           <Box w={250}>
             <Select
+              id="parent-associations-filter-student"
               placeholder="Filter by student"
               data={students.map((s) => ({
                 value: s.id,

@@ -172,13 +172,14 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
 
   return (
     <Paper withBorder p="md">
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="authorize-early-departure-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Text fw={600}>Authorize Early Departure</Text>
           <Text size="sm" c="dimmed">
             Authorize a student's early departure. This will immediately notify the parent(s) and mark the request as excused.
           </Text>
           <Select
+            id="authorize-early-departure-student"
             label="Student"
             placeholder="Select student"
             data={availableStudents.map((s) => ({
@@ -277,12 +278,14 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
             </Alert>
           )}
           <DatePickerInput
+            id="authorize-early-departure-date"
             label="Date"
             {...form.getInputProps('date')}
             placeholder="Select date"
             leftSection={<IconCalendar size={16} />}
           />
           <Select
+            id="authorize-early-departure-time"
             label="Departure time"
             placeholder="Select time"
             leftSection={<IconClock size={16} />}
@@ -327,6 +330,7 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
             </Alert>
           )}
           <Textarea
+            id="authorize-early-departure-reason"
             label="Reason (optional)"
             minRows={2}
             {...form.getInputProps('reason')}
@@ -334,6 +338,7 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
           />
           <Group justify="flex-end">
             <Button
+              id="authorize-early-departure-submit"
               type="submit"
               variant="light"
               loading={authorizeRequest.isPending}

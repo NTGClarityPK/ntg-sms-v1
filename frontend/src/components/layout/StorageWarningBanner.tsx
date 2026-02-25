@@ -31,7 +31,7 @@ export function StorageWarningBanner() {
     >
       <Text size="sm" component="span">
         Branch storage usage is high.{' '}
-        <Link href="/admin/storage" style={{ fontWeight: 600 }}>
+        <Link id="storage-warning-link-dashboard" href="/admin/storage" style={{ fontWeight: 600 }}>
           View storage dashboard
         </Link>
       </Text>

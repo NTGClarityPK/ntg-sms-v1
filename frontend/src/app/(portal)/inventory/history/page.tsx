@@ -60,6 +60,7 @@ export default function InventoryHistoryPage() {
           <Title order={1}>Issuance history</Title>
           {canEdit && (
             <Button
+              id="inventory-history-btn-direct-issue"
               leftSection={<IconPlus size={16} />}
               onClick={openDirectIssue}
             >
@@ -85,6 +86,7 @@ export default function InventoryHistoryPage() {
             </Text>
             <Group align="flex-end" gap="md" wrap="wrap">
               <Select
+                id="inventory-history-filter-student"
                 label="Student"
                 placeholder="All students"
                 data={students.map((s) => ({
@@ -97,6 +99,7 @@ export default function InventoryHistoryPage() {
                 searchable
               />
               <Select
+                id="inventory-history-filter-item"
                 label="Item"
                 placeholder="All items"
                 data={uniforms.map((u) => ({ value: u.id, label: u.name }))}
@@ -105,12 +108,14 @@ export default function InventoryHistoryPage() {
                 clearable
               />
               <TextInput
+                id="inventory-history-filter-from"
                 type="date"
                 label="From date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.currentTarget.value)}
               />
               <TextInput
+                id="inventory-history-filter-to"
                 type="date"
                 label="To date"
                 value={dateTo}
@@ -131,6 +136,7 @@ export default function InventoryHistoryPage() {
                 History by student
               </Text>
               <Select
+                id="inventory-history-select-student"
                 placeholder="Select student to view history"
                 data={students.map((s) => ({
                   value: s.id,

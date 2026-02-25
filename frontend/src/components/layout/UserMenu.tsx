@@ -96,7 +96,7 @@ export function UserMenu() {
   return (
     <Menu shadow="md" width={200}>
       <Menu.Target>
-        <Group gap="xs" style={{ cursor: 'pointer' }}>
+        <Group id="user-menu-trigger" gap="xs" style={{ cursor: 'pointer' }}>
           <Avatar color="blue" radius="xl">
             {initials}
           </Avatar>
@@ -124,6 +124,7 @@ export function UserMenu() {
 
         {showInstallApp && (
           <Menu.Item
+            id="user-menu-install-app"
             leftSection={<IconDownload size={14} />}
             onClick={handleInstallApp}
           >
@@ -135,6 +136,7 @@ export function UserMenu() {
           <>
             <Menu.Divider />
             <Menu.Item
+              id="user-menu-switch-branch"
               leftSection={<IconSwitchHorizontal size={14} />}
               onClick={handleSwitchBranch}
             >
@@ -145,6 +147,7 @@ export function UserMenu() {
         
         <Menu.Divider />
         <Menu.Item
+          id="user-menu-logout"
           color="red"
           leftSection={<IconLogout size={14} />}
           onClick={handleLogout}

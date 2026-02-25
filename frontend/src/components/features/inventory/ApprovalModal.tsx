@@ -43,6 +43,7 @@ export function ApprovalModal({
       {request && (
         <Stack gap="md">
           <Textarea
+            id="approval-modal-notes"
             label="Notes (optional)"
             placeholder={
               mode === 'approve'
@@ -53,10 +54,11 @@ export function ApprovalModal({
             onChange={(e) => setNotes(e.currentTarget.value)}
           />
           <Group justify="flex-end">
-            <Button variant="default" onClick={handleClose}>
+            <Button id="approval-modal-cancel" variant="default" onClick={handleClose}>
               Cancel
             </Button>
             <Button
+              id={mode === 'approve' ? 'approval-modal-approve' : 'approval-modal-reject'}
               color={mode === 'approve' ? 'green' : 'red'}
               loading={isPending}
               onClick={handleConfirm}

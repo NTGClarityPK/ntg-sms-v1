@@ -78,6 +78,7 @@ export function TimingTemplateCard({
 
       <Stack gap="sm" mt="md">
         <MultiSelect
+          id={`timing-template-card-${template.id}-classes`}
           label="Assigned classes"
           data={options}
           value={selected}
@@ -87,6 +88,7 @@ export function TimingTemplateCard({
         />
         <Group justify="flex-end">
           <Button
+            id={`timing-template-card-${template.id}-save`}
             variant="light"
             disabled={!hasChanges}
             loading={isSavingAssignments}

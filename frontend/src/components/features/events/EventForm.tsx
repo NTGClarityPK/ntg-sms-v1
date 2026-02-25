@@ -261,9 +261,10 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
   }
 
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)}>
+    <form id="event-form" onSubmit={form.onSubmit(handleSubmit)}>
       <Stack gap="md">
         <TextInput
+          id="event-form-title"
           label="Title"
           placeholder="Enter event title"
           required
@@ -271,6 +272,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
         />
 
         <Textarea
+          id="event-form-description"
           label="Description"
           placeholder="Enter event description"
           minRows={3}
@@ -279,12 +281,14 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
 
         <Group grow>
           <DatePickerInput
+            id="event-form-start-date"
             label="Start Date"
             placeholder="Select start date"
             required
             {...form.getInputProps('startDate')}
           />
           <DatePickerInput
+            id="event-form-end-date"
             label="End Date"
             placeholder="Select end date"
             required
@@ -293,6 +297,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
         </Group>
 
         <Switch
+          id="event-form-requires-consent"
           label="Requires Parent Consent"
           description="Parents must approve their child's participation"
           {...form.getInputProps('requiresConsent', { type: 'checkbox' })}
@@ -300,6 +305,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
 
         {form.values.requiresConsent && (
           <DatePickerInput
+            id="event-form-consent-deadline"
             label="Consent Deadline"
             placeholder="Select consent deadline"
             description="Deadline for parents to submit consent (must be before start date)"
@@ -308,6 +314,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
         )}
 
         <MultiSelect
+          id="event-form-class-sections"
           label="Class Sections"
           placeholder="Select class sections"
           description="Select classes participating in this event"
@@ -318,6 +325,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
         />
 
         <MultiSelect
+          id="event-form-students"
           label="Individual Students (Optional)"
           placeholder={
             selectedClassSectionIds.length === 0
@@ -376,7 +384,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
           )}
 
         <Group justify="flex-end" mt="md">
-          <Button type="submit" loading={isLoading}>
+          <Button id="event-form-submit" type="submit" loading={isLoading}>
             {event ? 'Update Event' : 'Create Event'}
           </Button>
         </Group>

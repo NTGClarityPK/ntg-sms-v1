@@ -55,18 +55,19 @@ export function SchoolDaysSelector({ initialActiveDays, isSaving, onSave }: Scho
       <Stack gap="md">
         <Text fw={600}>School days</Text>
         <Checkbox.Group
+          id="school-days-group"
           value={value}
           onChange={(values) => setSelected(values.map((v) => Number(v)).filter((n) => Number.isFinite(n)))}
         >
           <Group gap="md" wrap="wrap">
             {items.map((i) => (
-              <Checkbox key={i.value} value={i.value} label={i.label} />
+              <Checkbox key={i.value} id={`school-days-day-${i.value}`} value={i.value} label={i.label} />
             ))}
           </Group>
         </Checkbox.Group>
 
         <Group justify="flex-end">
-          <Button variant="light" onClick={handleSave} loading={isSaving}>
+          <Button id="school-days-save" variant="light" onClick={handleSave} loading={isSaving}>
             Save
           </Button>
         </Group>

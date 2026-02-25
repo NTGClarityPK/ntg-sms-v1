@@ -48,21 +48,24 @@ export function AcademicYearStep({ data, onChange, onNext }: AcademicYearStepPro
         Create and activate an academic year for your school. This will be the active year used throughout the system.
       </Text>
 
-      <form onSubmit={form.onSubmit(handleNext)}>
+      <form id="wizard-academic-year-form" onSubmit={form.onSubmit(handleNext)}>
         <Stack gap="md">
           <TextInput
+            id="wizard-academic-year-name"
             label="Academic Year Name"
             placeholder="2025-2026"
             required
             {...form.getInputProps('name')}
           />
           <TextInput
+            id="wizard-academic-year-start"
             label="Start Date"
             type="date"
             required
             {...form.getInputProps('startDate')}
           />
           <TextInput
+            id="wizard-academic-year-end"
             label="End Date"
             type="date"
             required
@@ -71,7 +74,7 @@ export function AcademicYearStep({ data, onChange, onNext }: AcademicYearStepPro
         </Stack>
 
         <Group justify="flex-end" mt="xl">
-          <Button onClick={handleNext} color={colors.primary}>
+          <Button id="wizard-academic-year-next" onClick={handleNext} color={colors.primary}>
             Next
           </Button>
         </Group>

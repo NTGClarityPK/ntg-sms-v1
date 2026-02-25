@@ -76,10 +76,10 @@ export default function StudentsPage() {
             </Tooltip>
             {canEdit && (
               <>
-                <Button component={Link} href="/students/bulk-import" variant="light" leftSection={<IconUpload size={16} />}>
+                <Button id="students-link-bulk-import" component={Link} href="/students/bulk-import" variant="light" leftSection={<IconUpload size={16} />}>
                   Bulk Import
                 </Button>
-                <Button leftSection={<IconPlus size={16} />} onClick={open}>
+                <Button id="students-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
                   Create Student
                 </Button>
               </>
@@ -99,6 +99,7 @@ export default function StudentsPage() {
 
         <Group>
           <TextInput
+            id="students-search"
             placeholder="Search students..."
             leftSection={<IconSearch size={16} />}
             value={search}
@@ -110,6 +111,7 @@ export default function StudentsPage() {
           />
           <div style={{ width: 200, flexShrink: 0 }}>
             <MultiSelect
+              id="students-filter-class"
               placeholder="Filter by class"
               data={classes.map((c) => {
                 const classEntity = c as ClassEntity;
@@ -127,6 +129,7 @@ export default function StudentsPage() {
           </div>
           <div style={{ width: 180, flexShrink: 0 }}>
             <MultiSelect
+              id="students-filter-section"
               placeholder="Filter by section"
               data={sections.map((s) => ({ value: s.id, label: s.name }))}
               value={sectionFilter}

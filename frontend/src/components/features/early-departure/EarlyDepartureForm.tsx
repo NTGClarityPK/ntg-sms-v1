@@ -199,16 +199,18 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
 
   return (
     <Paper withBorder p="md">
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="early-departure-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Text fw={600}>Request early departure</Text>
           <DatePickerInput
+            id="early-departure-date"
             label="Date"
             {...form.getInputProps('date')}
             placeholder="Select date"
             leftSection={<IconCalendar size={16} />}
           />
           <Select
+            id="early-departure-time"
             label="Departure time"
             placeholder="Select time"
             leftSection={<IconClock size={16} />}
@@ -252,12 +254,14 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
             </Alert>
           )}
           <Textarea
+            id="early-departure-reason"
             label="Reason"
             minRows={2}
             {...form.getInputProps('reason')}
           />
           <Group justify="flex-end">
             <Button
+              id="early-departure-submit"
               type="submit"
               variant="light"
               loading={createRequest.isPending}

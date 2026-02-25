@@ -134,6 +134,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
               return (
                 <Checkbox
                   key={day.value}
+                  id={`schedule-step-day-${day.value}`}
                   label={day.label}
                   checked={isActive}
                   onChange={() => handleToggleDay(day.value)}
@@ -154,6 +155,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
           <Stack gap="md">
             {/* Template Name */}
             <TextInput
+              id="schedule-step-template-name"
               label="Name"
               placeholder="Primary Morning Schedule"
               value={templateName}
@@ -164,6 +166,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
             {/* School Start/End Time */}
             <Group grow>
               <TextInput
+                id="schedule-step-start-time"
                 label="School start time"
                 type="time"
                 value={schoolStartTime}
@@ -171,6 +174,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
                 required
               />
               <TextInput
+                id="schedule-step-end-time"
                 label="School end time"
                 type="time"
                 value={schoolEndTime}
@@ -182,6 +186,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
 
             {/* Period Duration */}
             <NumberInput
+              id="schedule-step-period-duration"
               label="Period duration (minutes)"
               value={periodDuration}
               min={1}
@@ -195,6 +200,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
             <Group justify="space-between" align="center">
               <Text fw={500}>Slots (Assembly, Break, etc.)</Text>
               <Button 
+                id="schedule-step-add-slot"
                 size="compact-sm" 
                 leftSection={<IconPlus size={16} />} 
                 onClick={handleAddSlot}
@@ -209,18 +215,21 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
             <Paper withBorder p="sm" bg="gray.0">
               <Stack gap="xs">
                 <TextInput
+                  id="schedule-step-slot-name"
                   placeholder="Slot name (e.g., Assembly, Break, Lunch)"
                   value={newSlot.name}
                   onChange={(e) => setNewSlot({ ...newSlot, name: e.currentTarget.value })}
                 />
                 <Group grow>
                   <TextInput
+                    id="schedule-step-slot-start"
                     placeholder="Start time (optional)"
                     type="time"
                     value={newSlot.startTime}
                     onChange={(e) => setNewSlot({ ...newSlot, startTime: e.currentTarget.value })}
                   />
                   <TextInput
+                    id="schedule-step-slot-end"
                     placeholder="End time (optional)"
                     type="time"
                     value={newSlot.endTime}
@@ -268,10 +277,11 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
       </Stack>
 
       <Group justify="space-between" mt="xl">
-        <Button variant="light" onClick={onBack}>
+        <Button id="schedule-step-back" variant="light" onClick={onBack}>
           Back
         </Button>
         <Button 
+          id="schedule-step-next"
           onClick={handleNext} 
           color={colors.primary} 
           disabled={isNextDisabled}

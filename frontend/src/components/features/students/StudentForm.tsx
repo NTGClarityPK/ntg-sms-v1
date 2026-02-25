@@ -207,12 +207,13 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
   return (
     <Modal opened={opened} onClose={onClose} title={isEdit ? 'Edit Student' : 'Create Student'} size="lg">
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="student-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           {!isEdit && (
             <>
-              <TextInput label="Email" placeholder="student@example.com" required {...form.getInputProps('email')} />
+              <TextInput id="student-form-email" label="Email" placeholder="student@example.com" required {...form.getInputProps('email')} />
               <TextInput
+                id="student-form-password"
                 label="Password"
                 type="password"
                 placeholder="Minimum 6 characters"
@@ -222,11 +223,12 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
             </>
           )}
 
-          <TextInput label="First Name" placeholder="John" required {...form.getInputProps('firstName')} />
-          <TextInput label="Second Name" placeholder="Doe" required {...form.getInputProps('lastName')} />
+          <TextInput id="student-form-first-name" label="First Name" placeholder="John" required {...form.getInputProps('firstName')} />
+          <TextInput id="student-form-last-name" label="Second Name" placeholder="Doe" required {...form.getInputProps('lastName')} />
 
           {isEdit && (
             <TextInput
+              id="student-form-student-id"
               label="Student ID"
               value={student?.studentId || ''}
               readOnly
@@ -235,6 +237,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           )}
 
           <Select
+            id="student-form-academic-year"
             label="Academic Year"
             data={academicYears.map((y) => ({ value: y.id, label: y.name }))}
             {...form.getInputProps('academicYearId')}
@@ -242,22 +245,25 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
           <Group grow>
             <Select
+              id="student-form-class"
               label="Class"
               data={classes.map((c) => ({ value: c.id, label: c.displayName }))}
               {...form.getInputProps('classId')}
             />
             <Select
+              id="student-form-section"
               label="Section"
               data={sections.map((s) => ({ value: s.id, label: s.name }))}
               {...form.getInputProps('sectionId')}
             />
           </Group>
 
-          <TextInput label="Phone" placeholder="+1234567890" {...form.getInputProps('phone')} />
-          <TextInput label="Address" placeholder="123 Main St" {...form.getInputProps('address')} />
-          <TextInput label="Date of Birth" type="date" {...form.getInputProps('dateOfBirth')} />
+          <TextInput id="student-form-phone" label="Phone" placeholder="+1234567890" {...form.getInputProps('phone')} />
+          <TextInput id="student-form-address" label="Address" placeholder="123 Main St" {...form.getInputProps('address')} />
+          <TextInput id="student-form-date-of-birth" label="Date of Birth" type="date" {...form.getInputProps('dateOfBirth')} />
 
           <Select
+            id="student-form-gender"
             label="Gender"
             data={[
               { value: 'male', label: 'Male' },
@@ -266,11 +272,12 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
             {...form.getInputProps('gender')}
           />
 
-          <TextInput label="Blood Group" placeholder="O+" {...form.getInputProps('bloodGroup')} />
-          <Textarea label="Medical Notes" placeholder="Any medical conditions..." {...form.getInputProps('medicalNotes')} />
-          <TextInput label="Admission Date" type="date" {...form.getInputProps('admissionDate')} />
+          <TextInput id="student-form-blood-group" label="Blood Group" placeholder="O+" {...form.getInputProps('bloodGroup')} />
+          <Textarea id="student-form-medical-notes" label="Medical Notes" placeholder="Any medical conditions..." {...form.getInputProps('medicalNotes')} />
+          <TextInput id="student-form-admission-date" label="Admission Date" type="date" {...form.getInputProps('admissionDate')} />
 
           <Select
+            id="student-form-subject-template"
             label="Subject Template (Optional)"
             placeholder={
               effectiveClassId
@@ -293,6 +300,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           />
 
           <Select
+            id="student-form-status"
             label="Status"
             data={[
               { value: 'true', label: 'Active' },
@@ -351,10 +359,10 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           )}
 
           <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={onClose}>
+            <Button id="student-form-cancel" variant="subtle" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={createStudent.isPending || updateStudent.isPending}>
+            <Button id="student-form-submit" type="submit" loading={createStudent.isPending || updateStudent.isPending}>
               {isEdit ? 'Update' : 'Create'}
             </Button>
           </Group>

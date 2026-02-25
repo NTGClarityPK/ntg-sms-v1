@@ -44,6 +44,7 @@ export default function ClassReportSelectPage() {
       >
         <Stack gap="md">
           <Select
+            id="reports-class-select"
             label="Select class section"
             placeholder="Choose a class section"
             data={options}
@@ -58,6 +59,7 @@ export default function ClassReportSelectPage() {
             <Alert color="blue">Select a class section to view the report.</Alert>
           ) : (
             <Button
+              id="reports-class-link-view"
               component={Link}
               href={`/reports/class/${classSectionId}`}
               variant="filled"

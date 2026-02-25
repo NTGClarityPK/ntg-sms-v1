@@ -205,7 +205,7 @@ export default function SignupPage() {
   };
 
   return (
-    <form onSubmit={handleFormSubmit}>
+    <form id="signup-form" onSubmit={handleFormSubmit}>
       <Stack gap="lg">
         <Box>
           <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
@@ -224,6 +224,7 @@ export default function SignupPage() {
           >
             <Stack gap="md" mt="xl">
               <TextInput
+                id="signup-school-name"
                 label="School Name"
                 placeholder="Alekaf High School"
                 required
@@ -235,6 +236,7 @@ export default function SignupPage() {
               />
 
               <TextInput
+                id="signup-school-code"
                 label="School Code (Optional)"
                 placeholder="ALEKAF001"
                 description="Unique code for your school. Leave empty to auto-generate."
@@ -246,6 +248,7 @@ export default function SignupPage() {
               />
 
               <TextInput
+                id="signup-school-domain"
                 label="Domain (Optional)"
                 placeholder="alekaf.edu"
                 description="School website domain"
@@ -265,6 +268,7 @@ export default function SignupPage() {
           >
             <Stack gap="md" mt="xl">
               <TextInput
+                id="signup-branch-name"
                 label="Branch Name"
                 placeholder="Main Branch"
                 required
@@ -276,6 +280,7 @@ export default function SignupPage() {
               />
 
               <TextInput
+                id="signup-branch-address"
                 label="Address (Optional)"
                 placeholder="123 School Street, City"
                 size="lg"
@@ -286,6 +291,7 @@ export default function SignupPage() {
 
               <Group grow>
                 <TextInput
+                  id="signup-branch-phone"
                   label="Phone (Optional)"
                   placeholder="+1234567890"
                   leftSection={<IconPhone size={18} />}
@@ -296,8 +302,9 @@ export default function SignupPage() {
                 />
 
                 <TextInput
-                  label="Email (Optional)"
-                  placeholder="branch@school.com"
+                id="signup-branch-email"
+                label="Email (Optional)"
+                placeholder="branch@school.com"
                   leftSection={<IconMail size={18} />}
                   size="lg"
                   radius="md"
@@ -315,6 +322,7 @@ export default function SignupPage() {
           >
             <Stack gap="md" mt="xl">
               <TextInput
+                id="signup-email"
                 label="Email"
                 placeholder="admin@school.com"
                 required
@@ -327,6 +335,7 @@ export default function SignupPage() {
               />
 
               <TextInput
+                id="signup-full-name"
                 label="Full Name"
                 placeholder="John Doe"
                 required
@@ -338,6 +347,7 @@ export default function SignupPage() {
               />
 
               <TextInput
+                id="signup-phone"
                 label="Phone (Optional)"
                 placeholder="+1234567890"
                 leftSection={<IconPhone size={18} />}
@@ -348,6 +358,7 @@ export default function SignupPage() {
               />
 
               <PasswordInput
+                id="signup-password"
                 label="Password"
                 placeholder="Enter your password"
                 required
@@ -360,6 +371,7 @@ export default function SignupPage() {
               />
 
               <PasswordInput
+                id="signup-confirm-password"
                 label="Confirm Password"
                 placeholder="Confirm your password"
                 required
@@ -479,6 +491,7 @@ export default function SignupPage() {
         <Group justify="space-between" mt="xl">
           {active > 0 ? (
             <Button
+              id="signup-prev"
               type="button"
               variant="default"
               onClick={prevStep}
@@ -496,6 +509,7 @@ export default function SignupPage() {
           )}
           {active < 3 ? (
             <Button
+              id="signup-next"
               type="button"
               onClick={nextStep}
               disabled={loading}
@@ -508,12 +522,9 @@ export default function SignupPage() {
             </Button>
           ) : (
             <Button
+              id="signup-submit"
               type="button"
               loading={loading}
-              size="lg"
-              radius="md"
-              leftSection={<IconCheck size={16} />}
-              onClick={() => form.onSubmit(handleSubmit)()}
               style={{
                 backgroundColor: DEFAULT_THEME_COLOR,
                 color: 'white',
@@ -526,7 +537,7 @@ export default function SignupPage() {
 
         <Text ta="center" size="sm" style={{ color: themeColors.colorTextMedium }}>
           Already have an account?{' '}
-          <Anchor href="/login" size="sm" style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}>
+          <Anchor id="signup-signin-link" href="/login" size="sm" style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}>
             Sign in
           </Anchor>
         </Text>

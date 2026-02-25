@@ -35,6 +35,7 @@ export function AcademicYearCard({ year, onActivate, onLock, isActivating, isLoc
 
       <Group justify="flex-end" mt="md">
         <Button
+          id={`academic-year-card-${year.id}-activate`}
           variant="light"
           disabled={year.isLocked || year.isActive}
           loading={isActivating}
@@ -43,6 +44,7 @@ export function AcademicYearCard({ year, onActivate, onLock, isActivating, isLoc
           Activate
         </Button>
         <Button
+          id={`academic-year-card-${year.id}-lock`}
           variant="light"
           disabled={year.isLocked || !year.isActive}
           loading={isLocking}

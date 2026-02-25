@@ -143,6 +143,7 @@ export default function InventoryItemsPage() {
             </Tooltip>
             {canEdit && (
               <Button
+                id="inventory-items-btn-add"
                 leftSection={<IconPlus size={16} />}
                 onClick={() => {
                   setSelectedItem(null);
@@ -174,6 +175,7 @@ export default function InventoryItemsPage() {
             <Stack gap="md">
               <Group grow>
                 <TextInput
+                  id="inventory-items-search"
                   placeholder="Search by name, code, description..."
                   leftSection={<IconSearch size={16} />}
                   value={search}
@@ -183,6 +185,7 @@ export default function InventoryItemsPage() {
                   }}
                 />
                 <Select
+                  id="inventory-items-filter-category"
                   placeholder="Category"
                   data={categoryFilterOptions}
                   value={categoryFilter}
@@ -193,6 +196,7 @@ export default function InventoryItemsPage() {
                   clearable
                 />
                 <Select
+                  id="inventory-items-filter-gender"
                   placeholder="Gender"
                   data={GENDERS}
                   value={genderFilter}

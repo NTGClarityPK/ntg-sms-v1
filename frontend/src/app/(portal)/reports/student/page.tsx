@@ -86,6 +86,7 @@ export default function StudentReportSelectPage() {
             </Alert>
           ) : (
             <Select
+              id="reports-student-select"
               label="Select student"
               placeholder="Choose a student"
               data={studentOptions}

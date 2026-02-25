@@ -141,24 +141,27 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           </Text>
           <Group gap="xs" mb="xs">
             <TextInput
+              id="academic-step-subject-name"
               placeholder="Subject name"
               value={newSubject.name}
               onChange={(e) => setNewSubject({ ...newSubject, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <TextInput
+              id="academic-step-subject-code"
               placeholder="Code (optional)"
               value={newSubject.code}
               onChange={(e) => setNewSubject({ ...newSubject, code: e.target.value })}
               style={{ width: 120 }}
             />
             <NumberInput
+              id="academic-step-subject-order"
               placeholder="Order"
               value={newSubject.sortOrder}
               onChange={(val) => setNewSubject({ ...newSubject, sortOrder: Number(val) || 0 })}
               style={{ width: 100 }}
             />
-            <Button onClick={handleAddSubject} size="sm">
+            <Button id="academic-step-add-subject" onClick={handleAddSubject} size="sm">
               Add
             </Button>
           </Group>
@@ -189,24 +192,27 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           </Text>
           <Group gap="xs" mb="xs">
             <TextInput
+              id="academic-step-class-name"
               placeholder="Class name"
               value={newClass.name}
               onChange={(e) => setNewClass({ ...newClass, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <TextInput
+              id="academic-step-class-display-name"
               placeholder="Display name"
               value={newClass.displayName}
               onChange={(e) => setNewClass({ ...newClass, displayName: e.target.value })}
               style={{ flex: 1 }}
             />
             <NumberInput
+              id="academic-step-class-order"
               placeholder="Order"
               value={newClass.sortOrder}
               onChange={(val) => setNewClass({ ...newClass, sortOrder: Number(val) || 0 })}
               style={{ width: 100 }}
             />
-            <Button onClick={handleAddClass} size="sm">
+            <Button id="academic-step-add-class" onClick={handleAddClass} size="sm">
               Add
             </Button>
           </Group>
@@ -235,18 +241,20 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           </Text>
           <Group gap="xs" mb="xs">
             <TextInput
+              id="academic-step-section-name"
               placeholder="Section name"
               value={newSection.name}
               onChange={(e) => setNewSection({ ...newSection, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <NumberInput
+              id="academic-step-section-order"
               placeholder="Order"
               value={newSection.sortOrder}
               onChange={(val) => setNewSection({ ...newSection, sortOrder: Number(val) || 0 })}
               style={{ width: 100 }}
             />
-            <Button onClick={handleAddSection} size="sm">
+            <Button id="academic-step-add-section" onClick={handleAddSection} size="sm">
               Add
             </Button>
           </Group>
@@ -275,19 +283,21 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           </Text>
           <Group gap="xs" mb="xs" align="flex-end">
             <TextInput
+              id="academic-step-level-name"
               placeholder="Level name"
               value={newLevel.name}
               onChange={(e) => setNewLevel({ ...newLevel, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <MultiSelect
+              id="academic-step-level-classes"
               placeholder="Assign classes"
               data={classOptions}
               value={newLevel.classIds}
               onChange={(val) => setNewLevel({ ...newLevel, classIds: val })}
               style={{ flex: 1 }}
             />
-            <Button onClick={handleAddLevel} size="sm">
+            <Button id="academic-step-add-level" onClick={handleAddLevel} size="sm">
               Add
             </Button>
           </Group>
@@ -314,10 +324,10 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
       </Stack>
 
       <Group justify="space-between" mt="xl">
-        <Button variant="light" onClick={onBack}>
+        <Button id="academic-step-back" variant="light" onClick={onBack}>
           Back
         </Button>
-        <Button onClick={handleNext} color={colors.primary} disabled={data.subjects.length === 0 || data.classes.length === 0 || data.sections.length === 0 || data.levels.length === 0}>
+        <Button id="academic-step-next" onClick={handleNext} color={colors.primary} disabled={data.subjects.length === 0 || data.classes.length === 0 || data.sections.length === 0 || data.levels.length === 0}>
           Next
         </Button>
       </Group>

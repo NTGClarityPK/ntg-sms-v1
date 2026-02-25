@@ -44,6 +44,7 @@ export default function StudentReportByIdPage() {
               <ExportButton variant="student" studentId={id} />
             )}
             <Button
+              id="reports-student-back"
               component={Link}
               href="/reports/student"
               leftSection={<IconArrowLeft size={16} />}

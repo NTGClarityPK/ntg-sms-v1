@@ -79,7 +79,7 @@ export function SubjectList() {
       <Alert color={colors.error} title="Failed to load subjects">
         <Group justify="space-between" mt="sm">
           <Text size="sm">Please try again.</Text>
-          <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
+          <Button id="subject-list-retry" variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
             Retry
           </Button>
         </Group>
@@ -92,7 +92,7 @@ export function SubjectList() {
   return (
     <>
       <Group justify="flex-end" mb="md">
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+        <Button id="subject-list-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Add subject
         </Button>
       </Group>
@@ -131,13 +131,13 @@ export function SubjectList() {
       <Modal opened={opened} onClose={handleClose} title={editSubject ? 'Edit subject' : 'Add subject'} size="md">
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput label="Name" placeholder="Mathematics" {...form.getInputProps('name')} />
-            <TextInput label="Code" placeholder="MATH" {...form.getInputProps('code')} />
+            <TextInput id="subject-form-name" label="Name" placeholder="Mathematics" {...form.getInputProps('name')} />
+            <TextInput id="subject-form-code" label="Code" placeholder="MATH" {...form.getInputProps('code')} />
             <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button id="subject-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
-              <Button type="submit" loading={createMutation.isPending || updateMutation.isPending}>
+              <Button id="subject-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
                 Save
               </Button>
             </Group>

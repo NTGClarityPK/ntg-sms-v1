@@ -155,14 +155,14 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
       title={isEdit ? 'Edit Library Item' : 'Upload Library Item'}
       size="lg"
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="library-upload-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           {!isEdit && (
             <>
               <StorageQuotaBar />
               <FileButton onChange={setSelectedFile} accept=".pdf,.doc,.docx,.txt,application/pdf">
                 {(props) => (
-                  <Button {...props} leftSection={<IconUpload size={16} />} variant="light" fullWidth>
+                  <Button id="library-upload-select-file" {...props} leftSection={<IconUpload size={16} />} variant="light" fullWidth>
                     {selectedFile ? `Selected: ${selectedFile.name}` : 'Select File'}
                   </Button>
                 )}
@@ -181,6 +181,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
           {uploading && <Progress value={uploadProgress} animated />}
 
           <TextInput
+            id="library-upload-title"
             label="Title"
             placeholder="Enter title"
             required
@@ -188,12 +189,14 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
           />
 
           <TextInput
+            id="library-upload-author"
             label="Author"
             placeholder="Enter author name"
             {...form.getInputProps('author')}
           />
 
           <Textarea
+            id="library-upload-description"
             label="Description"
             placeholder="Enter description"
             rows={3}
@@ -201,6 +204,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
           />
 
           <Select
+            id="library-upload-category"
             label="Category"
             placeholder="Select category"
             required
@@ -210,6 +214,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
           />
 
           <Select
+            id="library-upload-subject"
             label="Subject"
             placeholder="Select subject (optional)"
             data={subjects.map((s) => ({ value: s.id, label: s.name }))}
@@ -219,6 +224,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
           />
 
           <Select
+            id="library-upload-class"
             label="Class"
             placeholder="Select class (optional)"
             data={classes.map((c) => {
@@ -231,10 +237,10 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
           />
 
           <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={onClose}>
+            <Button id="library-upload-cancel" variant="subtle" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={createMutation.isPending || updateMutation.isPending || uploading}>
+            <Button id="library-upload-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending || uploading}>
               {isEdit ? 'Update' : 'Upload'}
             </Button>
           </Group>

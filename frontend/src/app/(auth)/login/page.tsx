@@ -209,7 +209,7 @@ export default function LoginPage() {
   };
 
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)}>
+    <form id="login-form" onSubmit={form.onSubmit(handleSubmit)}>
       <Stack gap="lg">
         <Box>
           <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
@@ -236,6 +236,7 @@ export default function LoginPage() {
         )}
 
         <TextInput
+          id="login-email"
           label="Email"
           placeholder="your@email.com"
           required
@@ -248,6 +249,7 @@ export default function LoginPage() {
         />
 
         <PasswordInput
+          id="login-password"
           label="Password"
           placeholder="Enter your password"
           required
@@ -260,6 +262,7 @@ export default function LoginPage() {
         />
 
         <Anchor
+          id="login-forgot-password"
           component="button"
           type="button"
           size="sm"
@@ -270,6 +273,7 @@ export default function LoginPage() {
         </Anchor>
 
         <Button
+          id="login-submit"
           type="submit"
           fullWidth
           loading={loading}
@@ -286,6 +290,7 @@ export default function LoginPage() {
         <Divider label="OR" labelPosition="center" />
 
         <Button
+          id="login-google"
           variant="outline"
           fullWidth
           leftSection={<IconBrandGoogle size={16} />}
@@ -302,7 +307,7 @@ export default function LoginPage() {
 
         <Text ta="center" size="sm" style={{ color: themeColors.colorTextMedium }}>
           Don't have an account?{' '}
-          <Anchor href="/signup" size="sm" style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}>
+          <Anchor id="login-signup-link" href="/signup" size="sm" style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}>
             Sign up
           </Anchor>
         </Text>
@@ -361,6 +366,7 @@ export default function LoginPage() {
               )}
 
               <TextInput
+                id="login-reset-email"
                 label="Email"
                 placeholder="your@email.com"
                 required
@@ -373,6 +379,7 @@ export default function LoginPage() {
 
               <Group justify="flex-end" mt="md">
                 <Button
+                  id="login-reset-cancel"
                   variant="light"
                   onClick={handleCloseForgotPassword}
                   disabled={resetLoading}
@@ -380,6 +387,7 @@ export default function LoginPage() {
                   Cancel
                 </Button>
                 <Button
+                  id="login-reset-submit"
                   type="submit"
                   loading={resetLoading}
                   style={{

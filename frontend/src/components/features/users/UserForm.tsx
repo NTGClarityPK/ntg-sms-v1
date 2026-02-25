@@ -130,17 +130,19 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
       title={isEdit ? 'Edit User' : 'Create User'}
       size="lg"
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="user-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           {!isEdit && (
             <>
               <TextInput
+                id="user-form-email"
                 label="Email"
                 placeholder="user@example.com"
                 required
                 {...form.getInputProps('email')}
               />
               <TextInput
+                id="user-form-password"
                 label="Password"
                 type="password"
                 placeholder="Minimum 6 characters"
@@ -151,6 +153,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
           )}
 
           <TextInput
+            id="user-form-full-name"
             label="Full Name"
             placeholder="John Doe"
             required
@@ -158,24 +161,28 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
           />
 
           <TextInput
+            id="user-form-phone"
             label="Phone"
             placeholder="+1234567890"
             {...form.getInputProps('phone')}
           />
 
           <TextInput
+            id="user-form-address"
             label="Address"
             placeholder="123 Main St"
             {...form.getInputProps('address')}
           />
 
           <TextInput
+            id="user-form-date-of-birth"
             label="Date of Birth"
             type="date"
             {...form.getInputProps('dateOfBirth')}
           />
 
           <Select
+            id="user-form-gender"
             label="Gender"
             data={[
               { value: 'male', label: 'Male' },
@@ -185,12 +192,14 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
           />
 
           <MultiSelect
+            id="user-form-roles"
             label="Roles"
             data={roles.map((r) => ({ value: r.id, label: r.displayName }))}
             {...form.getInputProps('roleIds')}
           />
 
           <Select
+            id="user-form-status"
             label="Status"
             data={[
               { value: 'true', label: 'Active' },
@@ -201,10 +210,11 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
           />
 
           <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={onClose}>
+            <Button id="user-form-cancel" variant="subtle" onClick={onClose}>
               Cancel
             </Button>
             <Button
+              id="user-form-submit"
               type="submit"
               loading={createUser.isPending || updateUser.isPending || updateUserRoles.isPending}
             >

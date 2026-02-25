@@ -106,18 +106,20 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
           </Text>
           <Group gap="xs" mb="xs">
             <TextInput
+              id="assessment-step-type-name"
               placeholder="Type name"
               value={newAssessmentType.name}
               onChange={(e) => setNewAssessmentType({ ...newAssessmentType, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <NumberInput
+              id="assessment-step-type-order"
               placeholder="Order"
               value={newAssessmentType.sortOrder}
               onChange={(val) => setNewAssessmentType({ ...newAssessmentType, sortOrder: Number(val) || 0 })}
               style={{ width: 100 }}
             />
-            <Button onClick={handleAddAssessmentType} size="sm">
+            <Button id="assessment-step-add-type" onClick={handleAddAssessmentType} size="sm">
               Add
             </Button>
           </Group>
@@ -138,12 +140,13 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
           </Text>
           <Group gap="xs" mb="xs">
             <TextInput
+              id="assessment-step-template-name"
               placeholder="Template name"
               value={newGradeTemplate.name}
               onChange={(e) => setNewGradeTemplate({ ...newGradeTemplate, name: e.target.value })}
               style={{ flex: 1 }}
             />
-            <Button onClick={handleAddGradeTemplate} size="sm">
+            <Button id="assessment-step-add-template" onClick={handleAddGradeTemplate} size="sm">
               Add Template
             </Button>
           </Group>
@@ -170,24 +173,27 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
                       </Text>
                       <Group gap="xs" mb="xs">
                         <TextInput
+                          id="assessment-step-range-letter"
                           placeholder="Letter (A, B, C...)"
                           value={newRange.letter}
                           onChange={(e) => setNewRange({ ...newRange, letter: e.target.value })}
                           style={{ width: 100 }}
                         />
                         <NumberInput
+                          id="assessment-step-range-min"
                           placeholder="Min %"
                           value={newRange.minPercentage}
                           onChange={(val) => setNewRange({ ...newRange, minPercentage: Number(val) || 0 })}
                           style={{ width: 100 }}
                         />
                         <NumberInput
+                          id="assessment-step-range-max"
                           placeholder="Max %"
                           value={newRange.maxPercentage}
                           onChange={(val) => setNewRange({ ...newRange, maxPercentage: Number(val) || 100 })}
                           style={{ width: 100 }}
                         />
-                        <Button onClick={handleAddRange} size="sm">
+                        <Button id="assessment-step-add-range" onClick={handleAddRange} size="sm">
                           Add Range
                         </Button>
                       </Group>
@@ -204,6 +210,7 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
             Leave Quota (per academic year)
           </Text>
           <NumberInput
+            id="assessment-step-leave-quota"
             value={leaveQuota}
             onChange={handleLeaveQuotaChange}
             min={0}
@@ -213,10 +220,10 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
       </Stack>
 
       <Group justify="space-between" mt="xl">
-        <Button variant="light" onClick={onBack}>
+        <Button id="assessment-step-back" variant="light" onClick={onBack}>
           Back
         </Button>
-        <Button onClick={handleNext} color={colors.primary} disabled={data.assessmentTypes.length === 0 || data.gradeTemplates.length === 0 || !data.leaveQuota}>
+        <Button id="assessment-step-next" onClick={handleNext} color={colors.primary} disabled={data.assessmentTypes.length === 0 || data.gradeTemplates.length === 0 || !data.leaveQuota}>
           Next
         </Button>
       </Group>

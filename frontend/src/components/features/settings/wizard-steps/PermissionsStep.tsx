@@ -93,6 +93,7 @@ export function PermissionsStep({ data, onChange, onNext, onBack }: PermissionsS
                   </Table.Td>
                   <Table.Td>
                     <Select
+                      id={`permissions-step-${feature.id}-${adminRole.id}`}
                       size="xs"
                       data={[
                         { value: 'none', label: 'None' },
@@ -115,10 +116,10 @@ export function PermissionsStep({ data, onChange, onNext, onBack }: PermissionsS
       )}
 
       <Group justify="space-between" mt="xl">
-        <Button variant="light" onClick={onBack}>
+        <Button id="permissions-step-back" variant="light" onClick={onBack}>
           Back
         </Button>
-        <Button onClick={handleNext} color={colors.primary}>
+        <Button id="permissions-step-next" onClick={handleNext} color={colors.primary}>
           Next
         </Button>
       </Group>

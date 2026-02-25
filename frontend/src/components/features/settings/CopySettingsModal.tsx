@@ -101,6 +101,7 @@ export function CopySettingsModal({ opened, onClose, onSuccess }: CopySettingsMo
         </Alert>
 
         <Select
+          id="copy-settings-source-branch"
           label="Source Branch"
           placeholder="Select a branch to copy settings from"
           data={branchesWithSettings.map((b) => ({
@@ -119,10 +120,11 @@ export function CopySettingsModal({ opened, onClose, onSuccess }: CopySettingsMo
         </Text>
 
         <Group justify="flex-end" mt="md">
-          <Button variant="light" onClick={onClose} disabled={copyMutation.isPending}>
+          <Button id="copy-settings-cancel" variant="light" onClick={onClose} disabled={copyMutation.isPending}>
             Cancel
           </Button>
           <Button
+            id="copy-settings-submit"
             onClick={handleCopy}
             color={colors.primary}
             disabled={!selectedBranchId || copyMutation.isPending}
