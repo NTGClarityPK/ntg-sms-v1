@@ -15,6 +15,7 @@ import {
   Skeleton,
 } from '@mantine/core';
 import { IconSearch, IconFilter } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
 import { MatrixCell } from './MatrixCell';
 import { useClassSections } from '@/hooks/useClassSections';
@@ -26,6 +27,7 @@ interface TeacherMappingMatrixProps {
 }
 
 export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps) {
+  const t = useTranslations('teacher');
   // Fetch all class sections (no pagination) for proper sorting
   const { data: classSectionsData, isLoading: isLoadingClassSections } = useClassSections({
     limit: 500, // Maximum allowed limit - fetch all class sections
@@ -177,7 +179,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
     })
     .map((cs) => ({
       value: cs.id,
-      label: `${cs.classDisplayName ?? cs.className ?? 'Unknown'} - ${cs.sectionName ?? 'Unknown'}`,
+      label: `${cs.classDisplayName ?? cs.className ?? t('unknown')} - ${cs.sectionName ?? t('unknown')}`,
     }));
   const subjectOptions = uniqueSubjects.map((s) => ({ value: s.id, label: s.name }));
 
@@ -198,7 +200,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
     return (
       <Paper p="md" withBorder>
         <Text c="dimmed" ta="center">
-          Please create class-sections and subjects first before creating teacher assignments.
+          {t('pleaseCreateFirst')}
         </Text>
       </Paper>
     );
@@ -229,25 +231,25 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
         <Group gap="xs" mb="sm">
           <IconFilter size={18} />
           <Text size="sm" fw={600}>
-            Filters
+            {t('filters')}
           </Text>
         </Group>
         <Stack gap="sm">
           <Switch
-            label="Only show rows and columns where at least one teacher is assigned"
-            description="Hide class sections and subjects with no assignments."
+            label={t('onlyShowAssignedLabel')}
+            description={t('onlyShowAssignedDescription')}
             checked={onlyShowAssigned}
             onChange={(e) => setOnlyShowAssigned(e.currentTarget.checked)}
           />
           <Group grow align="flex-start" wrap="wrap">
             <MultiSelect
-              label="Show class sections"
+              label={t('showClassSectionsLabel')}
               placeholder={
                 selectedClassSectionIds.length === 0
-                  ? 'All class sections'
-                  : `${selectedClassSectionIds.length} class section${selectedClassSectionIds.length === 1 ? '' : 's'} selected`
+                  ? t('allClassSections')
+                  : t('classSectionsSelected', { count: selectedClassSectionIds.length })
               }
-              description="Narrow by class sections. Clear to show all."
+              description={t('showClassSectionsDescription')}
               data={classSectionOptions}
               value={selectedClassSectionIds}
               onChange={setSelectedClassSectionIds}
@@ -256,13 +258,13 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
               style={{ minWidth: 200 }}
             />
             <MultiSelect
-              label="Show subjects"
+              label={t('showSubjectsLabel')}
               placeholder={
                 selectedSubjectIds.length === 0
-                  ? 'All subjects'
-                  : `${selectedSubjectIds.length} subject${selectedSubjectIds.length === 1 ? '' : 's'} selected`
+                  ? t('allSubjects')
+                  : t('subjectsSelected', { count: selectedSubjectIds.length })
               }
-              description="Narrow by subjects. Clear to show all."
+              description={t('showSubjectsDescription')}
               data={subjectOptions}
               value={selectedSubjectIds}
               onChange={setSelectedSubjectIds}
@@ -271,9 +273,9 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
               style={{ minWidth: 200 }}
             />
             <TextInput
-              label="Filter by teacher"
-              placeholder="Search by teacher name..."
-              description="Show only cells where this teacher is assigned."
+              label={t('filterByTeacherLabel')}
+              placeholder={t('filterByTeacherPlaceholder')}
+              description={t('filterByTeacherDescription')}
               leftSection={<IconSearch size={16} />}
               value={teacherSearchQuery}
               onChange={(e) => setTeacherSearchQuery(e.currentTarget.value)}
@@ -285,8 +287,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
 
       {visibleClassSections.length === 0 || visibleSubjects.length === 0 ? (
         <Text c="dimmed" ta="center" py="xl">
-          No rows or columns match the current filters. Clear the teacher search or adjust class section and subject
-          selections.
+          {t('noRowsOrColumnsMatch')}
         </Text>
       ) : (
         <ScrollArea type="hover" scrollbarSize={8} mt="md">
@@ -294,7 +295,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
             <Table.Thead>
               <Table.Tr>
                 <Table.Th style={stickyHeaderStyle}>
-                  Class-Section
+                  {t('classSection')}
                 </Table.Th>
                 {visibleSubjects.map((subject) => (
                   <Table.Th key={subject.id}>{subject.name}</Table.Th>
@@ -305,8 +306,8 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
               {visibleClassSections.map((classSection, rowIndex) => (
                 <Table.Tr key={classSection.id}>
                   <Table.Td style={stickyCellStyle(rowIndex % 2 === 1)}>
-                    {classSection.classDisplayName || classSection.className || 'Unknown'} –{' '}
-                    {classSection.sectionName || 'Unknown'}
+                    {classSection.classDisplayName || classSection.className || t('unknown')} –{' '}
+                    {classSection.sectionName || t('unknown')}
                   </Table.Td>
                   {visibleSubjects.map((subject) => {
                     const key = `${classSection.id}-${subject.id}`;

@@ -2,6 +2,7 @@
 
 import { Modal, Select, Button, Stack, Group, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { useTranslations } from 'next-intl';
 import { useAssignClassTeacher } from '@/hooks/useClassSections';
 import type { ClassSection } from '@/types/class-sections';
 import { useStaff } from '@/hooks/useStaff';
@@ -17,6 +18,7 @@ export function AssignClassTeacherModal({
   onClose,
   classSection,
 }: AssignClassTeacherModalProps) {
+  const t = useTranslations('class');
   const assignClassTeacher = useAssignClassTeacher();
   const { data: staffData } = useStaff();
   const staffResponse = staffData as
@@ -56,7 +58,7 @@ export function AssignClassTeacherModal({
   };
 
   const staffOptions = [
-    { value: '', label: 'None (Unassign)' },
+    { value: '', label: t('noneUnassign') },
     ...availableStaff.map((s) => ({
       value: s.id,
       label: s.fullName || s.employeeId || 'Unknown',
@@ -67,30 +69,30 @@ export function AssignClassTeacherModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Assign Class Teacher"
+      title={t('assignClassTeacherTitle')}
       size="md"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Select
-            label="Class Teacher"
-            placeholder="Select teacher"
+            label={t('classTeacher')}
+            placeholder={t('classTeacherPlaceholder')}
             data={staffOptions}
             {...form.getInputProps('staffId')}
           />
           {classSection.classTeacherName && (
             <Text size="sm" c="dimmed">
-              Current teacher: {classSection.classTeacherName}
+              {t('currentTeacher', { name: classSection.classTeacherName })}
             </Text>
           )}
         </Stack>
 
         <Group justify="flex-end" mt="xl">
           <Button variant="subtle" onClick={onClose}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button type="submit" loading={assignClassTeacher.isPending}>
-            {form.values.staffId ? 'Assign' : 'Unassign'}
+            {form.values.staffId ? t('assign') : t('unassign')}
           </Button>
         </Group>
       </form>

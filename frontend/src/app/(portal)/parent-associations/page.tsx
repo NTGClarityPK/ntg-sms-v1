@@ -5,6 +5,7 @@ import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { ParentAssociationTable } from '@/components/features/parents/ParentAssociationTable';
 import { CreateParentAssociationModal } from '@/components/features/parents/CreateParentAssociationModal';
 import { useParentAssociations } from '@/hooks/useParentAssociations';
@@ -14,6 +15,7 @@ import { useRoles } from '@/hooks/useRoles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function ParentAssociationsPage() {
+  const t = useTranslations('user');
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const [opened, { open, close }] = useDisclosure(false);
@@ -63,9 +65,9 @@ export default function ParentAssociationsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Parent-Student Association</Title>
+          <Title order={1}>{t('parentAssociationTitle')}</Title>
           <Group gap="sm">
-            <Tooltip label="Refresh">
+            <Tooltip label={t('refresh')}>
               <ActionIcon
                 variant="light"
                 size="lg"
@@ -76,7 +78,7 @@ export default function ParentAssociationsPage() {
               </ActionIcon>
             </Tooltip>
             <Button id="parent-associations-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
-              Create Association
+              {t('createAssociation')}
             </Button>
           </Group>
         </Group>
@@ -87,7 +89,7 @@ export default function ParentAssociationsPage() {
         <Flex gap="md" wrap="wrap" align="flex-end">
           <TextInput
             id="parent-associations-search"
-            placeholder="Search by parent name or email..."
+            placeholder={t('searchPlaceholderParent')}
             leftSection={<IconSearch size={16} />}
             value={search}
             onChange={(e) => {
@@ -100,7 +102,7 @@ export default function ParentAssociationsPage() {
           <Box w={250}>
             <Select
               id="parent-associations-filter-parent"
-              placeholder="Filter by parent"
+              placeholder={t('filterByParent')}
               data={parents.map((p) => ({
                 value: p.id,
                 label: `${p.fullName}${p.email ? ` (${p.email})` : ''}`,
@@ -119,7 +121,7 @@ export default function ParentAssociationsPage() {
           <Box w={250}>
             <Select
               id="parent-associations-filter-student"
-              placeholder="Filter by student"
+              placeholder={t('filterByStudent')}
               data={students.map((s) => ({
                 value: s.id,
                 label: `${`${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'N/A'} (${s.studentId})`,
@@ -143,23 +145,22 @@ export default function ParentAssociationsPage() {
             <Skeleton height={50} />
           </Stack>
         ) : associationsQuery.error ? (
-          <Alert color={colors.error} title="Failed to load associations">
+          <Alert color={colors.error} title={t('failedToLoadAssociations')}>
             <Group justify="space-between" mt="sm">
-              <Text size="sm">Please try again.</Text>
+              <Text size="sm">{t('pleaseTryAgain')}</Text>
               <Button
                 variant="light"
                 leftSection={<IconRefresh size={16} />}
                 onClick={() => associationsQuery.refetch()}
               >
-                Retry
+                {t('retry')}
               </Button>
             </Group>
           </Alert>
         ) : !associationsQuery.data.data || associationsQuery.data.data.length === 0 ? (
-          <Alert color={colors.info} title="No associations found">
+          <Alert color={colors.info} title={t('noAssociationsFound')}>
             <Text size="sm">
-              No parent-student associations have been created yet. Click "Create Association" to add
-              one.
+              {t('noAssociationsHint')}
             </Text>
           </Alert>
         ) : (

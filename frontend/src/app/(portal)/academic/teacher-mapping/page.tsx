@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Container, Title, Group, Button, Skeleton, Text, SegmentedControl, Stack } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { useTeacherAssignments } from '@/hooks/useTeacherAssignments';
 import { TeacherMappingList } from '@/components/features/academic/TeacherMappingList';
 import { TeacherMappingMatrix } from '@/components/features/academic/TeacherMappingMatrix';
@@ -12,6 +13,7 @@ import { useDisclosure } from '@mantine/hooks';
 type ViewMode = 'list' | 'matrix';
 
 export default function TeacherMappingPage() {
+  const t = useTranslations('teacher');
   const [opened, { open, close }] = useDisclosure(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const { data, isLoading, error } = useTeacherAssignments();
@@ -22,18 +24,18 @@ export default function TeacherMappingPage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%" mt="xs">
-            <Title order={1}>Teacher Mapping</Title>
+            <Title order={1}>{t('title')}</Title>
             <Group>
               <SegmentedControl
                 value={viewMode}
                 onChange={(value) => setViewMode(value as ViewMode)}
                 data={[
-                  { label: 'List View', value: 'list' },
-                  { label: 'Matrix View', value: 'matrix' },
+                  { label: t('listView'), value: 'list' },
+                  { label: t('matrixView'), value: 'matrix' },
                 ]}
               />
               <Button leftSection={<IconPlus size={16} />} onClick={open}>
-                Create Assignment
+                {t('createAssignment')}
               </Button>
             </Group>
           </Group>
@@ -62,18 +64,18 @@ export default function TeacherMappingPage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%" mt="xs">
-            <Title order={1}>Teacher Mapping</Title>
+            <Title order={1}>{t('title')}</Title>
             <Group>
               <SegmentedControl
                 value={viewMode}
                 onChange={(value) => setViewMode(value as ViewMode)}
                 data={[
-                  { label: 'List View', value: 'list' },
-                  { label: 'Matrix View', value: 'matrix' },
+                  { label: t('listView'), value: 'list' },
+                  { label: t('matrixView'), value: 'matrix' },
                 ]}
               />
               <Button leftSection={<IconPlus size={16} />} onClick={open}>
-                Create Assignment
+                {t('createAssignment')}
               </Button>
             </Group>
           </Group>
@@ -88,8 +90,7 @@ export default function TeacherMappingPage() {
           }}
         >
           <Text c="red">
-            Error loading teacher assignments:{' '}
-            {error instanceof Error ? error.message : 'Unknown error'}
+            {t('errorLoading', { message: error instanceof Error ? error.message : 'Unknown error' })}
           </Text>
         </div>
       </>
@@ -102,18 +103,18 @@ export default function TeacherMappingPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%" mt="xs">
-          <Title order={1}>Teacher Mapping</Title>
+          <Title order={1}>{t('title')}</Title>
           <Group>
             <SegmentedControl
               value={viewMode}
               onChange={(value) => setViewMode(value as ViewMode)}
               data={[
-                { label: 'List View', value: 'list' },
-                { label: 'Matrix View', value: 'matrix' },
+                { label: t('listView'), value: 'list' },
+                { label: t('matrixView'), value: 'matrix' },
               ]}
             />
             <Button leftSection={<IconPlus size={16} />} onClick={open}>
-              Create Assignment
+              {t('createAssignment')}
             </Button>
           </Group>
         </Group>

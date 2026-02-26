@@ -29,6 +29,7 @@ import '@mantine/dates/styles.css';
 import { IconPlus, IconRefresh, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { useEvents, useDeleteEvent, useEventConflicts } from '@/hooks/api/useEvents';
 import { modals } from '@mantine/modals';
 import dayjs from 'dayjs';
@@ -36,6 +37,7 @@ import type { Event } from '@/types/events';
 import { IconAlertTriangle } from '@tabler/icons-react';
 
 export default function EventsPage() {
+  const t = useTranslations('event');
   const queryClient = useQueryClient();
   const router = useRouter();
   const [page, setPage] = useState(1);
@@ -59,13 +61,13 @@ export default function EventsPage() {
 
   const handleDelete = (id: string, title: string) => {
     modals.openConfirmModal({
-      title: 'Delete Event',
+      title: t('deleteTitle'),
       children: (
         <Text size="sm">
-          Are you sure you want to delete the event <strong>{title}</strong>? This action cannot be undone.
+          {t.rich('deleteConfirm', { title, strong: (chunk) => <strong>{chunk}</strong> })}
         </Text>
       ),
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      labels: { confirm: t('delete'), cancel: t('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => deleteEvent.mutate(id),
     });
@@ -77,12 +79,12 @@ export default function EventsPage() {
     const end = dayjs(event.endDate);
 
     if (end.isBefore(today)) {
-      return <Badge color="gray">Past</Badge>;
+      return <Badge color="gray">{t('statusPast')}</Badge>;
     }
     if (start.isBefore(today) && end.isAfter(today)) {
-      return <Badge color="blue">Ongoing</Badge>;
+      return <Badge color="blue">{t('statusOngoing')}</Badge>;
     }
-    return <Badge color="green">Upcoming</Badge>;
+    return <Badge color="green">{t('statusUpcoming')}</Badge>;
   };
 
   // Component to show conflict badge for an event
@@ -98,11 +100,11 @@ export default function EventsPage() {
         conflicts.assessmentConflicts.length + conflicts.eventConflicts.length;
       return (
         <Tooltip
-          label={`${totalConflicts} conflict${totalConflicts > 1 ? 's' : ''} detected`}
+          label={t('conflictsDetected', { count: totalConflicts })}
           withArrow
         >
           <Badge color="yellow" leftSection={<IconAlertTriangle size={12} />}>
-            Conflict
+            {t('conflictBadge')}
           </Badge>
         </Tooltip>
       );
@@ -114,9 +116,9 @@ export default function EventsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Event</Title>
+          <Title order={1}>{t('title')}</Title>
           <Group gap="sm">
-            <Tooltip label="Refresh">
+            <Tooltip label={t('refresh')}>
               <ActionIcon
                 variant="light"
                 size="lg"
@@ -131,7 +133,7 @@ export default function EventsPage() {
               leftSection={<IconPlus size={16} />}
               onClick={() => router.push('/events/create')}
             >
-              Create Event
+              {t('createEvent')}
             </Button>
           </Group>
         </Group>
@@ -153,18 +155,18 @@ export default function EventsPage() {
               <Group grow>
                 <TextInput
                   id="events-search"
-                  placeholder="Search events..."
+                  placeholder={t('searchPlaceholder')}
                   leftSection={<IconSearch size={16} />}
                   value={search}
                   onChange={(e) => setSearch(e.currentTarget.value)}
                 />
                 <Select
                   id="events-filter-status"
-                  placeholder="Filter by status"
+                  placeholder={t('filterByStatus')}
                   data={[
-                    { value: 'all', label: 'All' },
-                    { value: 'upcoming', label: 'Upcoming' },
-                    { value: 'past', label: 'Past' },
+                    { value: 'all', label: t('filterStatusAll') },
+                    { value: 'upcoming', label: t('filterStatusUpcoming') },
+                    { value: 'past', label: t('filterStatusPast') },
                   ]}
                   value={status}
                   onChange={setStatus}
@@ -172,10 +174,10 @@ export default function EventsPage() {
                 />
                 <Select
                   id="events-filter-consent"
-                  placeholder="Requires consent"
+                  placeholder={t('requiresConsentFilter')}
                   data={[
-                    { value: 'true', label: 'Yes' },
-                    { value: 'false', label: 'No' },
+                    { value: 'true', label: t('yes') },
+                    { value: 'false', label: t('no') },
                   ]}
                   value={requiresConsent}
                   onChange={setRequiresConsent}
@@ -185,14 +187,14 @@ export default function EventsPage() {
               <Group grow>
                 <DatePickerInput
                   id="events-filter-start-date"
-                  placeholder="Start date"
+                  placeholder={t('startDate')}
                   value={startDate}
                   onChange={setStartDate}
                   clearable
                 />
                 <DatePickerInput
                   id="events-filter-end-date"
-                  placeholder="End date"
+                  placeholder={t('endDate')}
                   value={endDate}
                   onChange={setEndDate}
                   clearable
@@ -215,11 +217,11 @@ export default function EventsPage() {
                   <Table striped highlightOnHover>
                     <Table.Thead>
                       <Table.Tr>
-                        <Table.Th>Title</Table.Th>
-                        <Table.Th>Dates</Table.Th>
-                        <Table.Th>Status</Table.Th>
-                        <Table.Th>Consent Required</Table.Th>
-                        <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
+                        <Table.Th>{t('tableTitle')}</Table.Th>
+                        <Table.Th>{t('tableDates')}</Table.Th>
+                        <Table.Th>{t('tableStatus')}</Table.Th>
+                        <Table.Th>{t('tableConsentRequired')}</Table.Th>
+                        <Table.Th style={{ textAlign: 'right' }}>{t('tableActions')}</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -248,14 +250,14 @@ export default function EventsPage() {
                           </Table.Td>
                           <Table.Td>
                             {event.requiresConsent ? (
-                              <Badge color="orange">Required</Badge>
+                              <Badge color="orange">{t('consentRequired')}</Badge>
                             ) : (
-                              <Badge color="gray">Not Required</Badge>
+                              <Badge color="gray">{t('consentNotRequired')}</Badge>
                             )}
                           </Table.Td>
                           <Table.Td>
                             <Group gap="xs" justify="flex-end">
-                              <Tooltip label="View Details">
+                              <Tooltip label={t('viewDetails')}>
                                 <ActionIcon
                                   variant="subtle"
                                   color="blue"
@@ -275,14 +277,14 @@ export default function EventsPage() {
                                     leftSection={<IconEdit size={14} />}
                                     onClick={() => router.push(`/events/${event.id}/edit`)}
                                   >
-                                    Edit
+                                    {t('edit')}
                                   </Menu.Item>
                                   <Menu.Item
                                     leftSection={<IconTrash size={14} />}
                                     color="red"
                                     onClick={() => handleDelete(event.id, event.title)}
                                   >
-                                    Delete
+                                    {t('delete')}
                                   </Menu.Item>
                                 </Menu.Dropdown>
                               </Menu>
@@ -303,7 +305,7 @@ export default function EventsPage() {
               </Stack>
             ) : (
               <Text c="dimmed" ta="center" py="xl">
-                No events found. Create your first event to get started.
+                {t('noEventsFound')}
               </Text>
             )}
           </Paper>

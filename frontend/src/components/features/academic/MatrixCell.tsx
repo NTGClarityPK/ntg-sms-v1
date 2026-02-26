@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ActionIcon, Badge, Button, Group, Menu, Text, Tooltip } from '@mantine/core';
 import { IconPlus, IconX } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
 import { useStaff } from '@/hooks/useStaff';
 import type { CreateTeacherAssignmentInput } from '@/types/teacher-assignments';
@@ -48,6 +49,7 @@ function TeacherBadge({
   assignment: TeacherAssignment;
   onUnassign: (id: string) => void;
 }) {
+  const t = useTranslations('teacher');
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -67,9 +69,9 @@ function TeacherBadge({
           color: 'var(--theme-matrix-teacher-badge-text, var(--mantine-color-blue-8))',
         }}
       >
-        {assignment.staffName || 'Unknown'}
+        {assignment.staffName || t('unknown')}
       </Badge>
-      <Tooltip label="Remove" withArrow>
+      <Tooltip label={t('remove')} withArrow>
         <ActionIcon
           size="xs"
           variant="subtle"
@@ -79,7 +81,7 @@ function TeacherBadge({
             e.stopPropagation();
             onUnassign(assignment.id);
           }}
-          aria-label="Remove teacher"
+          aria-label={t('removeTeacherAria')}
         >
           <IconX size={12} />
         </ActionIcon>
@@ -95,6 +97,7 @@ export function MatrixCell({
   onCreate,
   onDelete,
 }: MatrixCellProps) {
+  const t = useTranslations('teacher');
   const [assignMenuOpened, setAssignMenuOpened] = useState(false);
   const { data: staffData } = useStaff();
 
@@ -130,7 +133,7 @@ export function MatrixCell({
   });
   const staffOptions = sortedAvailableStaff.map((s) => ({
     value: s.id,
-    label: s.fullName || s.employeeId || 'Unknown',
+    label: s.fullName || s.employeeId || t('unknown'),
   }));
 
   const handleAssign = async (staffId: string) => {
@@ -144,9 +147,7 @@ export function MatrixCell({
         staffOptions={staffOptions}
         onAssign={handleAssign}
         emptyMessage={
-          assignments.length > 0
-            ? 'All available teachers are already assigned'
-            : 'No teachers available'
+          assignments.length > 0 ? t('allTeachersAssigned') : t('noTeachersAvailable')
         }
       />
     </Menu.Dropdown>
@@ -157,7 +158,7 @@ export function MatrixCell({
     return (
       <Menu opened={assignMenuOpened} onChange={setAssignMenuOpened}>
         <Menu.Target>
-          <Tooltip label="Assign Teacher" withArrow>
+          <Tooltip label={t('assignTeacher')} withArrow>
             <Button
               variant="light"
               size="xs"
@@ -184,7 +185,7 @@ export function MatrixCell({
       ))}
       <Menu opened={assignMenuOpened} onChange={setAssignMenuOpened}>
         <Menu.Target>
-          <Tooltip label="Assign Teacher" withArrow>
+          <Tooltip label={t('assignTeacher')} withArrow>
             <Button
               variant="light"
               size="xs"

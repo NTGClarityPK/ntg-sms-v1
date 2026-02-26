@@ -6,11 +6,13 @@
 
 import { Title, Paper, Button, Group, Stack } from '@mantine/core';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { EventForm } from '@/components/features/events/EventForm';
 import { useCreateEvent } from '@/hooks/api/useEvents';
 import type { CreateEventInput, UpdateEventInput } from '@/types/events';
 
 export default function CreateEventPage() {
+  const t = useTranslations('event');
   const router = useRouter();
   const createEvent = useCreateEvent();
 
@@ -26,7 +28,7 @@ export default function CreateEventPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Create Event</Title>
+          <Title order={1}>{t('createEvent')}</Title>
         </Group>
       </div>
 
@@ -46,7 +48,7 @@ export default function CreateEventPage() {
 
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => router.back()}>
-              Cancel
+              {t('cancel')}
             </Button>
           </Group>
         </Stack>

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { SimpleGrid, Text, Paper, Group } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import type { ClassSection } from '@/types/class-sections';
 import { ClassSectionCard } from './ClassSectionCard';
 import { useClasses } from '@/hooks/useCoreLookups';
@@ -13,6 +14,7 @@ interface ClassSectionGridProps {
 }
 
 export function ClassSectionGrid({ classSections }: ClassSectionGridProps) {
+  const t = useTranslations('class');
   const { data: classesData } = useClasses();
   const { data: sectionsData } = useSections();
   const { data: academicYearsData } = useAcademicYears();
@@ -62,7 +64,7 @@ export function ClassSectionGrid({ classSections }: ClassSectionGridProps) {
     return (
       <Paper p="md" withBorder>
         <Text c="dimmed" ta="center">
-          Please create classes and sections first before creating class-sections.
+          {t('pleaseCreateClassesAndSections')}
         </Text>
       </Paper>
     );
@@ -96,7 +98,7 @@ export function ClassSectionGrid({ classSections }: ClassSectionGridProps) {
                     {classData.displayName || classData.name} - {sectionData.name}
                   </Text>
                   <Text c="dimmed" size="sm">
-                    Not created
+                    {t('notCreated')}
                   </Text>
                 </div>
               </Group>

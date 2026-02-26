@@ -2,6 +2,7 @@
 
 import { Modal, Button, Stack, Select, Group, Text, Alert, Badge, Switch } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { useTranslations } from 'next-intl';
 import { useCreateParentAssociation, useParentAssociations } from '@/hooks/useParentAssociations';
 import { useUsers } from '@/hooks/useUsers';
 import { useStudents } from '@/hooks/useStudents';
@@ -17,6 +18,7 @@ export function CreateParentAssociationModal({
   opened,
   onClose,
 }: CreateParentAssociationModalProps) {
+  const t = useTranslations('user');
   const createAssociation = useCreateParentAssociation();
 
   const form = useForm({
@@ -28,9 +30,9 @@ export function CreateParentAssociationModal({
       canApprove: true,
     },
     validate: {
-      parentUserId: (value) => (!value ? 'Parent is required' : null),
-      studentId: (value) => (!value ? 'Student is required' : null),
-      relationship: (value) => (!value ? 'Relationship is required' : null),
+      parentUserId: (value) => (!value ? t('parentRequired') : null),
+      studentId: (value) => (!value ? t('studentRequired') : null),
+      relationship: (value) => (!value ? t('relationshipRequired') : null),
     },
   });
 
@@ -91,15 +93,15 @@ export function CreateParentAssociationModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Create Parent-Student Association"
+      title={t('createParentAssociationTitle')}
       size="md"
     >
       <form id="create-parent-association-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Select
             id="create-parent-association-parent"
-            label="Parent"
-            placeholder="Select a parent"
+            label={t('parentLabel')}
+            placeholder={t('selectParent')}
             data={parents.map((p) => ({
               value: p.id,
               label: `${p.fullName}${p.email ? ` (${p.email})` : ''}`,
@@ -111,8 +113,8 @@ export function CreateParentAssociationModal({
 
           <Select
             id="create-parent-association-student"
-            label="Student"
-            placeholder="Select a student"
+            label={t('studentLabel')}
+            placeholder={t('selectStudent')}
             data={students.map((s) => ({
               value: s.id,
               label: `${`${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'N/A'} (${s.studentId})`,
@@ -124,12 +126,12 @@ export function CreateParentAssociationModal({
 
           <Select
             id="create-parent-association-relationship"
-            label="Relationship"
-            placeholder="Select relationship"
+            label={t('relationship')}
+            placeholder={t('selectRelationship')}
             data={[
-              { value: 'father', label: 'Father' },
-              { value: 'mother', label: 'Mother' },
-              { value: 'guardian', label: 'Guardian' },
+              { value: 'father', label: t('father') },
+              { value: 'mother', label: t('mother') },
+              { value: 'guardian', label: t('guardian') },
             ]}
             required
             {...form.getInputProps('relationship')}
@@ -141,22 +143,25 @@ export function CreateParentAssociationModal({
               color={canCreate ? 'blue' : 'yellow'}
               title={
                 canCreate
-                  ? `Will be set as ${willBePriority === 1 ? 'Primary' : 'Secondary'} Guardian (Priority ${willBePriority})`
-                  : 'Maximum 2 guardians reached'
+                  ? willBePriority === 1 ? t('willBePrimaryGuardian') : t('willBeSecondaryGuardian')
+                  : t('maxGuardiansReached')
               }
             >
               <Text size="sm">
                 {canCreate
-                  ? `This student currently has ${currentGuardianCount} guardian(s). This will be the ${willBePriority === 1 ? 'primary' : 'secondary'} contact.`
-                  : 'This student already has 2 guardians. Please remove one before adding another.'}
+                  ? t('currentGuardiansInfo', {
+                      count: currentGuardianCount,
+                      primaryOrSecondary: willBePriority === 1 ? t('primaryContact') : t('secondaryContact'),
+                    })
+                  : t('maxGuardiansInfo')}
               </Text>
             </Alert>
           )}
 
           <Switch
             id="create-parent-association-can-approve"
-            label="Can approve requests"
-            description="Allow this parent to approve child-related requests (e.g., leave requests, early departure, consent forms)"
+            label={t('canApproveRequests')}
+            description={t('canApproveRequestsDescription')}
             checked={form.values.canApprove}
             onChange={(e) => form.setFieldValue('canApprove', e.currentTarget.checked)}
             mt="md"
@@ -164,10 +169,10 @@ export function CreateParentAssociationModal({
 
           <Group justify="flex-end" mt="md">
             <Button id="create-parent-association-cancel" variant="subtle" onClick={onClose}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button id="create-parent-association-submit" type="submit" loading={createAssociation.isPending} disabled={!canCreate}>
-              Create Association
+              {t('createAssociation')}
             </Button>
           </Group>
         </Stack>

@@ -3,7 +3,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 import type {
   Event,
@@ -164,6 +164,8 @@ export function useCheckEventConflicts(
  */
 export function useCreateEvent() {
   const queryClient = useQueryClient();
+  const t = useTranslations('event');
+  const tCommon = useTranslations('common');
   const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
@@ -174,8 +176,8 @@ export function useCreateEvent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       notifications.show({
-        title: 'Success',
-        message: 'Event created successfully',
+        title: tCommon('success'),
+        message: t('toastCreated'),
         color: successColor,
       });
     },
@@ -196,6 +198,8 @@ export function useCreateEvent() {
  */
 export function useUpdateEvent(id: string) {
   const queryClient = useQueryClient();
+  const t = useTranslations('event');
+  const tCommon = useTranslations('common');
   const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
@@ -207,8 +211,8 @@ export function useUpdateEvent(id: string) {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.invalidateQueries({ queryKey: ['events', id] });
       notifications.show({
-        title: 'Success',
-        message: 'Event updated successfully',
+        title: tCommon('success'),
+        message: t('toastUpdated'),
         color: successColor,
       });
     },
@@ -229,6 +233,8 @@ export function useUpdateEvent(id: string) {
  */
 export function useDeleteEvent() {
   const queryClient = useQueryClient();
+  const t = useTranslations('event');
+  const tCommon = useTranslations('common');
   const { success: successColor, error: errorColor } = useThemeColors();
 
   return useMutation({
@@ -239,8 +245,8 @@ export function useDeleteEvent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       notifications.show({
-        title: 'Success',
-        message: 'Event deleted successfully',
+        title: tCommon('success'),
+        message: t('toastDeleted'),
         color: successColor,
       });
     },

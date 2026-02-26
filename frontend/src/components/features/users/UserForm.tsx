@@ -1,34 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
+import { useTranslations } from 'next-intl';
 import { useCreateUser, useUpdateUser, useUpdateUserRoles } from '@/hooks/useUsers';
 import type { User, CreateUserInput, UpdateUserInput } from '@/types/users';
 import type { Role } from '@/types/permissions';
-
-const createUserSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  fullName: z.string().min(1, 'Full name is required'),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  dateOfBirth: z.string().optional(),
-  gender: z.enum(['male', 'female']).optional(),
-  roleIds: z.array(z.string()).optional(),
-  isActive: z.boolean().optional(),
-});
-
-const updateUserSchema = z.object({
-  fullName: z.string().min(1, 'Full name is required'),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  dateOfBirth: z.string().optional(),
-  gender: z.enum(['male', 'female']).optional(),
-  isActive: z.boolean().optional(),
-});
 
 interface UserFormProps {
   opened: boolean;
@@ -38,6 +18,34 @@ interface UserFormProps {
 }
 
 export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
+  const t = useTranslations('user');
+  const createUserSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().email(t('invalidEmail')),
+        password: z.string().min(6, t('passwordMinLength')),
+        fullName: z.string().min(1, t('fullNameRequired')),
+        phone: z.string().optional(),
+        address: z.string().optional(),
+        dateOfBirth: z.string().optional(),
+        gender: z.enum(['male', 'female']).optional(),
+        roleIds: z.array(z.string()).optional(),
+        isActive: z.boolean().optional(),
+      }),
+    [t],
+  );
+  const updateUserSchema = useMemo(
+    () =>
+      z.object({
+        fullName: z.string().min(1, t('fullNameRequired')),
+        phone: z.string().optional(),
+        address: z.string().optional(),
+        dateOfBirth: z.string().optional(),
+        gender: z.enum(['male', 'female']).optional(),
+        isActive: z.boolean().optional(),
+      }),
+    [t],
+  );
   const isEdit = !!user;
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
@@ -127,7 +135,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Edit User' : 'Create User'}
+      title={isEdit ? t('editUser') : t('createUser')}
       size="lg"
     >
       <form id="user-form" onSubmit={form.onSubmit(handleSubmit)}>
@@ -136,16 +144,16 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
             <>
               <TextInput
                 id="user-form-email"
-                label="Email"
-                placeholder="user@example.com"
+                label={t('email')}
+                placeholder={t('emailPlaceholder')}
                 required
                 {...form.getInputProps('email')}
               />
               <TextInput
                 id="user-form-password"
-                label="Password"
+                label={t('password')}
                 type="password"
-                placeholder="Minimum 6 characters"
+                placeholder={t('passwordPlaceholder')}
                 required={!isEdit}
                 {...form.getInputProps('password')}
               />
@@ -154,56 +162,56 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
 
           <TextInput
             id="user-form-full-name"
-            label="Full Name"
-            placeholder="John Doe"
+            label={t('fullName')}
+            placeholder={t('fullNamePlaceholder')}
             required
             {...form.getInputProps('fullName')}
           />
 
           <TextInput
             id="user-form-phone"
-            label="Phone"
-            placeholder="+1234567890"
+            label={t('phone')}
+            placeholder={t('phonePlaceholder')}
             {...form.getInputProps('phone')}
           />
 
           <TextInput
             id="user-form-address"
-            label="Address"
-            placeholder="123 Main St"
+            label={t('address')}
+            placeholder={t('addressPlaceholder')}
             {...form.getInputProps('address')}
           />
 
           <TextInput
             id="user-form-date-of-birth"
-            label="Date of Birth"
+            label={t('dateOfBirth')}
             type="date"
             {...form.getInputProps('dateOfBirth')}
           />
 
           <Select
             id="user-form-gender"
-            label="Gender"
+            label={t('gender')}
             data={[
-              { value: 'male', label: 'Male' },
-              { value: 'female', label: 'Female' },
+              { value: 'male', label: t('male') },
+              { value: 'female', label: t('female') },
             ]}
             {...form.getInputProps('gender')}
           />
 
           <MultiSelect
             id="user-form-roles"
-            label="Roles"
+            label={t('roles')}
             data={roles.map((r) => ({ value: r.id, label: r.displayName }))}
             {...form.getInputProps('roleIds')}
           />
 
           <Select
             id="user-form-status"
-            label="Status"
+            label={t('status')}
             data={[
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
+              { value: 'true', label: t('active') },
+              { value: 'false', label: t('inactive') },
             ]}
             value={form.values.isActive ? 'true' : 'false'}
             onChange={(value) => form.setFieldValue('isActive', value === 'true')}
@@ -211,14 +219,14 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
 
           <Group justify="flex-end" mt="md">
             <Button id="user-form-cancel" variant="subtle" onClick={onClose}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               id="user-form-submit"
               type="submit"
               loading={createUser.isPending || updateUser.isPending || updateUserRoles.isPending}
             >
-              {isEdit ? 'Update' : 'Create'}
+              {isEdit ? t('update') : t('create')}
             </Button>
           </Group>
         </Stack>

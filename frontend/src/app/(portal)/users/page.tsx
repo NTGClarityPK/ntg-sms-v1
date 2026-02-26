@@ -5,6 +5,7 @@ import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { UserTable } from '@/components/features/users/UserTable';
 import { UserForm } from '@/components/features/users/UserForm';
 import { useUsers } from '@/hooks/useUsers';
@@ -17,6 +18,7 @@ const PAGE_SIZE = 20;
 const FETCH_LIMIT = 500; // Fetch all branch users once; filter All/Active/Inactive on frontend
 
 export default function UsersPage() {
+  const t = useTranslations('user');
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { isLoading: permissionsLoading } = usePermissions();
@@ -111,10 +113,10 @@ export default function UsersPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <div>
-            <Title order={1}>User</Title>
+            <Title order={1}>{t('title')}</Title>
           </div>
           <Group gap="sm">
-            <Tooltip label="Refresh">
+            <Tooltip label={t('refresh')}>
               <ActionIcon
                 variant="light"
                 size="lg"
@@ -126,7 +128,7 @@ export default function UsersPage() {
             </Tooltip>
             {canEdit && (
               <Button id="users-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
-                Create User
+                {t('createUser')}
               </Button>
             )}
           </Group>
@@ -135,9 +137,9 @@ export default function UsersPage() {
 
       <Stack gap="md">
         {!permissionsLoading && !canEdit && (
-          <Alert color={colors.info} title="View only">
+          <Alert color={colors.info} title={t('viewOnly')}>
             <Text size="sm">
-              You have view access for User Management. Create, update, and deactivate actions are disabled.
+              {t('viewOnlyMessage')}
             </Text>
           </Alert>
         )}
@@ -145,7 +147,7 @@ export default function UsersPage() {
         <Group>
           <TextInput
             id="users-search"
-            placeholder="Search users..."
+            placeholder={t('searchPlaceholder')}
             leftSection={<IconSearch size={16} />}
             value={search}
             onChange={(e) => {
@@ -157,7 +159,7 @@ export default function UsersPage() {
           <div style={{ width: 200, flexShrink: 0 }}>
             <MultiSelect
               id="users-filter-role"
-              placeholder="Filter by role"
+              placeholder={t('filterByRole')}
               data={staffRoles.map((r) => ({ value: r.id, label: r.displayName }))}
               value={roleFilter}
               onChange={(value) => {
@@ -182,7 +184,7 @@ export default function UsersPage() {
               }}
               variant="filled"
             >
-              All
+              {t('all')}
             </Chip>
             <Chip.Group
               value={statusFilter === undefined ? '' : statusFilter ? 'active' : 'inactive'}
@@ -196,10 +198,10 @@ export default function UsersPage() {
             >
               <Group gap="xs" wrap="wrap">
                 <Chip value="active" variant="filled">
-                  Active
+                  {t('active')}
                 </Chip>
                 <Chip value="inactive" variant="filled">
-                  Inactive
+                  {t('inactive')}
                 </Chip>
               </Group>
             </Chip.Group>
@@ -213,28 +215,28 @@ export default function UsersPage() {
             <Skeleton height={50} />
           </Stack>
         ) : usersQuery.error ? (
-          <Alert color={colors.error} title="Failed to load users">
+          <Alert color={colors.error} title={t('failedToLoad')}>
             <Group justify="space-between" mt="sm">
-              <Text size="sm">Please try again.</Text>
+              <Text size="sm">{t('pleaseTryAgain')}</Text>
               <Button
                 variant="light"
                 leftSection={<IconRefresh size={16} />}
                 onClick={() => usersQuery.refetch()}
               >
-                Retry
+                {t('retry')}
               </Button>
             </Group>
           </Alert>
         ) : paginatedUsers.length === 0 && !usersQuery.isLoading ? (
-          <Alert color={colors.info} title={hasActiveFilter ? 'No users match the filter' : 'No users found'}>
+          <Alert color={colors.info} title={hasActiveFilter ? t('noUsersMatchFilter') : t('noUsersFound')}>
             <Text size="sm">
               {hasActiveFilter
                 ? statusFilter === false
-                  ? 'No inactive users. Try "All" or "Active" to see other users.'
-                  : 'No users match the current filters. Try changing or clearing filters.'
+                  ? t('noUsersFilterHintInactive')
+                  : t('noUsersFilterHint')
                 : canEdit
-                  ? 'No users have been created yet. Click "Create User" to add one.'
-                  : 'No users have been created yet.'}
+                  ? t('noUsersHintCanEdit')
+                  : t('noUsersHint')}
             </Text>
           </Alert>
         ) : (

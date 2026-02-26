@@ -20,6 +20,7 @@ import {
 } from '@mantine/core';
 import { IconCalendar, IconCheck, IconX, IconClock, IconUsers, IconRotateClockwise } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useMyEvents, useSubmitConsent } from '@/hooks/api/useEvents';
 import { useAuth } from '@/hooks/useAuth';
 import dayjs from 'dayjs';
@@ -27,6 +28,7 @@ import type { Event } from '@/types/events';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function MyEventsPage() {
+  const t = useTranslations('event');
   const router = useRouter();
   const { user } = useAuth();
   const { data, isLoading } = useMyEvents();
@@ -41,12 +43,12 @@ export default function MyEventsPage() {
     const end = dayjs(event.endDate);
 
     if (end.isBefore(today)) {
-      return <Badge color="gray">Past</Badge>;
+      return <Badge color="gray">{t('statusPast')}</Badge>;
     }
     if (start.isBefore(today) && end.isAfter(today)) {
-      return <Badge color="blue">Ongoing</Badge>;
+      return <Badge color="blue">{t('statusOngoing')}</Badge>;
     }
-    return <Badge color="green">Upcoming</Badge>;
+    return <Badge color="green">{t('statusUpcoming')}</Badge>;
   };
 
   const upcomingEvents = events.filter((e) => dayjs(e.endDate).isAfter(dayjs()));
@@ -74,7 +76,7 @@ export default function MyEventsPage() {
       <Stack gap="sm" mt="xs">
         <Divider />
         <Text size="sm" fw={500} c="dimmed">
-          Consent Status:
+          {t('consentStatus')}
         </Text>
         {event.consentStatuses.map((consent) => (
           <Group key={consent.studentId} justify="space-between">
@@ -90,7 +92,7 @@ export default function MyEventsPage() {
                 }
                 variant="light"
               >
-                {consent.status.charAt(0).toUpperCase() + consent.status.slice(1)}
+                {consent.status === 'approved' ? t('approved') : consent.status === 'rejected' ? t('rejected') : t('pending')}
               </Badge>
             </Text>
             <Group gap="xs">
@@ -103,7 +105,7 @@ export default function MyEventsPage() {
                     onClick={() => handleConsent(consent.studentId, 'approved')}
                     loading={submitConsent.isPending}
                   >
-                    Approve
+                    {t('approve')}
                   </Button>
                   <Button
                     size="xs"
@@ -113,7 +115,7 @@ export default function MyEventsPage() {
                     onClick={() => handleConsent(consent.studentId, 'rejected')}
                     loading={submitConsent.isPending}
                   >
-                    Reject
+                    {t('reject')}
                   </Button>
                 </>
               )}
@@ -126,7 +128,7 @@ export default function MyEventsPage() {
                   onClick={() => handleConsent(consent.studentId, 'rejected')}
                   loading={submitConsent.isPending}
                 >
-                  Change to Reject
+                  {t('changeToReject')}
                 </Button>
               )}
               {consent.status === 'rejected' && (
@@ -138,7 +140,7 @@ export default function MyEventsPage() {
                   onClick={() => handleConsent(consent.studentId, 'approved')}
                   loading={submitConsent.isPending}
                 >
-                  Change to Approve
+                  {t('changeToApprove')}
                 </Button>
               )}
             </Group>
@@ -152,7 +154,7 @@ export default function MyEventsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>My Event</Title>
+          <Title order={1}>{t('myEventTitle')}</Title>
         </Group>
       </div>
 
@@ -180,7 +182,7 @@ export default function MyEventsPage() {
                   <Stack gap="md">
                     <Group>
                       <IconCalendar size={20} />
-                      <Title order={3}>Upcoming Events</Title>
+                      <Title order={3}>{t('upcomingEvents')}</Title>
                     </Group>
                     <ScrollArea>
                       <Stack gap="sm">
@@ -193,7 +195,7 @@ export default function MyEventsPage() {
                                     <Text fw={500}>{event.title}</Text>
                                     {getStatusBadge(event)}
                                     {event.requiresConsent && (
-                                      <Badge color="orange">Consent Required</Badge>
+                                      <Badge color="orange">{t('consentRequired')}</Badge>
                                     )}
                                   </Group>
                                   <Group gap="xs">
@@ -223,7 +225,7 @@ export default function MyEventsPage() {
                                   size="sm"
                                   onClick={() => router.push(`/events/${event.id}`)}
                                 >
-                                  View Details
+                                  {t('viewDetails')}
                                 </Button>
                               </Group>
                               <ConsentActions event={event} />
@@ -242,7 +244,7 @@ export default function MyEventsPage() {
                   <Stack gap="md">
                     <Group>
                       <IconClock size={20} />
-                      <Title order={3}>Past Events</Title>
+                      <Title order={3}>{t('pastEvents')}</Title>
                     </Group>
                     <ScrollArea>
                       <Stack gap="sm">
@@ -282,7 +284,7 @@ export default function MyEventsPage() {
                                   size="sm"
                                   onClick={() => router.push(`/events/${event.id}`)}
                                 >
-                                  View Details
+                                  {t('viewDetails')}
                                 </Button>
                               </Group>
                               <ConsentActions event={event} />
@@ -298,7 +300,7 @@ export default function MyEventsPage() {
           ) : (
             <Paper p="xl" withBorder>
               <Text c="dimmed" ta="center">
-                No events found. Events you're participating in will appear here.
+                {t('noEventsMyEvent')}
               </Text>
             </Paper>
           )}

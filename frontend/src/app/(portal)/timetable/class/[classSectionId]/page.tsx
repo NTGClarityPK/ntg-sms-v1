@@ -3,12 +3,14 @@
 import { useParams, useRouter } from 'next/navigation';
 import { Title, Group, Button, Stack, Skeleton, Alert } from '@mantine/core';
 import { IconArrowLeft } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { useClassSection } from '@/hooks/useClassSections';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ClassTimetableContent } from '@/components/features/timetable/ClassTimetableContent';
 import type { ClassSection } from '@/types/class-sections';
 
 export default function ClassTimetablePage() {
+  const t = useTranslations('class');
   const params = useParams();
   const router = useRouter();
   const classSectionId = params.classSectionId as string;
@@ -20,20 +22,20 @@ export default function ClassTimetablePage() {
 
   const className = classSection
     ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
-    : 'Class Timetable';
+    : t('classTimetableTitle');
 
   if (classSectionLoading) {
     return (
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>Class Timetable</Title>
+            <Title order={1}>{t('classTimetableTitle')}</Title>
             <Button
               variant="subtle"
               leftSection={<IconArrowLeft size={18} />}
               onClick={() => router.push('/timetable')}
             >
-              Back
+              {t('back')}
             </Button>
           </Group>
         </div>
@@ -60,13 +62,13 @@ export default function ClassTimetablePage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>Class Timetable</Title>
+            <Title order={1}>{t('classTimetableTitle')}</Title>
             <Button
               variant="subtle"
               leftSection={<IconArrowLeft size={18} />}
               onClick={() => router.push('/timetable')}
             >
-              Back
+              {t('back')}
             </Button>
           </Group>
         </div>
@@ -97,13 +99,13 @@ export default function ClassTimetablePage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>{className} Timetable</Title>
+          <Title order={1}>{className} {t('timetable')}</Title>
           <Button
             variant="subtle"
             leftSection={<IconArrowLeft size={18} />}
             onClick={() => router.push('/timetable')}
           >
-            Back
+            {t('back')}
           </Button>
         </Group>
       </div>

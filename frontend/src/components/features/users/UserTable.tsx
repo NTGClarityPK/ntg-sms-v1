@@ -5,6 +5,7 @@ import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core
 import { IconEdit, IconTrash, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
+import { useTranslations } from 'next-intl';
 import type { User } from '@/types/users';
 import { UserForm } from './UserForm';
 import { useRoles } from '@/hooks/useRoles';
@@ -26,6 +27,7 @@ interface UserTableProps {
 }
 
 export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: UserTableProps) {
+  const t = useTranslations('user');
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { data: rolesData } = useRoles();
@@ -40,13 +42,13 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
 
   const handleDelete = (user: User) => {
     modals.openConfirmModal({
-      title: 'Deactivate User',
+      title: t('deactivateUser'),
       children: (
         <Text size="sm">
-          Are you sure you want to deactivate {user.fullName}? This will prevent them from logging in.
+          {t('deactivateConfirm', { name: user.fullName ?? '' })}
         </Text>
       ),
-      labels: { confirm: 'Deactivate', cancel: 'Cancel' },
+      labels: { confirm: t('deactivate'), cancel: t('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => {
         deleteUser.mutate(user.id);
@@ -55,7 +57,7 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
   };
 
   const getRoleBadges = (userRoles?: User['roles']) => {
-    if (!userRoles || userRoles.length === 0) return <Text c="dimmed" size="sm">No roles</Text>;
+    if (!userRoles || userRoles.length === 0) return <Text c="dimmed" size="sm">{t('noRoles')}</Text>;
     
     const roleMap = new Map(roles.map((r) => [r.id, r.displayName]));
     return (
@@ -93,11 +95,11 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <SortableHeader field="fullName">Name</SortableHeader>
-            <SortableHeader field="email">Email</SortableHeader>
-            <Table.Th>Roles</Table.Th>
-            <SortableHeader field="isActive">Status</SortableHeader>
-            <Table.Th>Actions</Table.Th>
+            <SortableHeader field="fullName">{t('name')}</SortableHeader>
+            <SortableHeader field="email">{t('email')}</SortableHeader>
+            <Table.Th>{t('roles')}</Table.Th>
+            <SortableHeader field="isActive">{t('status')}</SortableHeader>
+            <Table.Th>{t('actions')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -112,7 +114,7 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
               <Table.Td>{getRoleBadges(user.roles)}</Table.Td>
               <Table.Td>
                 <Badge color={user.isActive ? 'green' : 'red'} variant="light">
-                  {user.isActive ? 'Active' : 'Inactive'}
+                  {user.isActive ? t('active') : t('inactive')}
                 </Badge>
               </Table.Td>
               <Table.Td>

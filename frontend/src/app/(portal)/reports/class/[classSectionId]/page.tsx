@@ -14,10 +14,12 @@ import {
 } from '@mantine/core';
 import Link from 'next/link';
 import { IconArrowLeft } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { useClassReport } from '@/hooks/useReports';
 import { ExportButton } from '@/components/features/reports/ExportButton';
 
 export default function ClassReportByIdPage() {
+  const t = useTranslations('class');
   const params = useParams();
   const classSectionId = typeof params.classSectionId === 'string' ? params.classSectionId : null;
 
@@ -28,7 +30,7 @@ export default function ClassReportByIdPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Class report</Title>
+          <Title order={1}>{t('classReportTitle')}</Title>
           <Group>
             {classSectionId && (
               <ExportButton variant="class" classSectionId={classSectionId} />
@@ -40,7 +42,7 @@ export default function ClassReportByIdPage() {
               leftSection={<IconArrowLeft size={16} />}
               variant="subtle"
             >
-              Back
+              {t('back')}
             </Button>
           </Group>
         </Group>
@@ -58,24 +60,24 @@ export default function ClassReportByIdPage() {
           {reportQuery.isLoading ? (
             <Skeleton height={200} radius="sm" />
           ) : !report ? (
-            <Text c="dimmed">No report data.</Text>
+            <Text c="dimmed">{t('noReportData')}</Text>
           ) : (
             <>
               <Text fw={600}>
                 {report.className} {report.sectionName}
               </Text>
               <Paper withBorder p="md">
-                <Text fw={600} mb="md">Attendance</Text>
+                <Text fw={600} mb="md">{t('attendance')}</Text>
                 <Table withTableBorder withColumnBorders>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Student</Table.Th>
-                      <Table.Th>Present</Table.Th>
-                      <Table.Th>Total days</Table.Th>
-                      <Table.Th>Attendance %</Table.Th>
-                      <Table.Th>Average Grade %</Table.Th>
-                      <Table.Th>Assignment Viewing</Table.Th>
-                      <Table.Th>Assignment Submission</Table.Th>
+                      <Table.Th>{t('student')}</Table.Th>
+                      <Table.Th>{t('present')}</Table.Th>
+                      <Table.Th>{t('totalDays')}</Table.Th>
+                      <Table.Th>{t('attendancePercent')}</Table.Th>
+                      <Table.Th>{t('averageGradePercent')}</Table.Th>
+                      <Table.Th>{t('assignmentViewing')}</Table.Th>
+                      <Table.Th>{t('assignmentSubmission')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>

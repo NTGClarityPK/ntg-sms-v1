@@ -20,12 +20,14 @@ import {
 } from '@mantine/core';
 import { IconEdit, IconCalendar, IconUsers, IconCheck, IconX } from '@tabler/icons-react';
 import { useRouter, useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useEvent, useEventConflicts, useEventConsents } from '@/hooks/api/useEvents';
 import { useAuth } from '@/hooks/useAuth';
 import dayjs from 'dayjs';
 import type { Event } from '@/types/events';
 
 export default function EventDetailPage() {
+  const t = useTranslations('event');
   const router = useRouter();
   const params = useParams();
   const eventId = params.id as string;
@@ -57,12 +59,12 @@ export default function EventDetailPage() {
     const end = dayjs(event.endDate);
 
     if (end.isBefore(today)) {
-      return <Badge color="gray">Past</Badge>;
+      return <Badge color="gray">{t('statusPast')}</Badge>;
     }
     if (start.isBefore(today) && end.isAfter(today)) {
-      return <Badge color="blue">Ongoing</Badge>;
+      return <Badge color="blue">{t('statusOngoing')}</Badge>;
     }
-    return <Badge color="green">Upcoming</Badge>;
+    return <Badge color="green">{t('statusUpcoming')}</Badge>;
   };
 
   if (isLoading || !eventData) {
@@ -93,7 +95,7 @@ export default function EventDetailPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Event Not Found</Title>
+          <Title order={1}>{t('eventNotFound')}</Title>
         </div>
         <div
           style={{
@@ -104,7 +106,7 @@ export default function EventDetailPage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Alert color="red">The requested event could not be found.</Alert>
+          <Alert color="red">{t('eventNotFoundMessage')}</Alert>
         </div>
       </>
     );
@@ -120,7 +122,7 @@ export default function EventDetailPage() {
               leftSection={<IconEdit size={16} />}
               onClick={() => router.push(`/events/${event.id}/edit`)}
             >
-              Edit Event
+              {t('editEvent')}
             </Button>
           )}
         </Group>
@@ -141,7 +143,7 @@ export default function EventDetailPage() {
             <Stack gap="md">
               <Group>
                 <IconCalendar size={20} />
-                <Text fw={500}>Event Dates</Text>
+                <Text fw={500}>{t('eventDates')}</Text>
               </Group>
               <Text>
                 {dayjs(event.startDate).format('MMMM D, YYYY')}
@@ -152,7 +154,7 @@ export default function EventDetailPage() {
                 {getStatusBadge(event)}
                 {event.requiresConsent && (
                   <Badge color="orange" leftSection={<IconUsers size={12} />}>
-                    Consent Required
+                    {t('consentRequired')}
                   </Badge>
                 )}
               </Group>
@@ -168,7 +170,7 @@ export default function EventDetailPage() {
                 <>
                   <Divider />
                   <Group>
-                    <Text fw={500}>Consent Deadline:</Text>
+                    <Text fw={500}>{t('consentDeadline')}</Text>
                     <Text>{dayjs(event.consentDeadline).format('MMMM D, YYYY')}</Text>
                   </Group>
                 </>
@@ -180,7 +182,7 @@ export default function EventDetailPage() {
                   <Divider />
                   <Group>
                     <IconUsers size={20} />
-                    <Text fw={500}>Participating Classes:</Text>
+                    <Text fw={500}>{t('participatingClasses')}</Text>
                   </Group>
                   <Group gap="xs">
                     {event.participants
@@ -196,7 +198,7 @@ export default function EventDetailPage() {
                         );
                       })}
                     {event.participants.filter((p) => p.classSectionId).length === 0 && (
-                        <Text c="dimmed" size="sm">No class sections assigned</Text>
+                        <Text c="dimmed" size="sm">{t('noClassSectionsAssigned')}</Text>
                       )}
                   </Group>
                 </>
@@ -207,11 +209,11 @@ export default function EventDetailPage() {
           {/* Conflicts Warning */}
           {conflicts &&
             (conflicts.assessmentConflicts.length > 0 || conflicts.eventConflicts.length > 0) && (
-              <Alert color="yellow" title="Conflicts Detected">
+              <Alert color="yellow" title={t('conflictsDetectedTitle')}>
                 <Stack gap="xs">
                   {conflicts.assessmentConflicts.length > 0 && (
                     <div>
-                      <Text fw={500}>Assessment Conflicts:</Text>
+                      <Text fw={500}>{t('assessmentConflicts')}</Text>
                       <ul>
                         {conflicts.assessmentConflicts.map((conflict) => (
                           <li key={conflict.id}>
@@ -223,7 +225,7 @@ export default function EventDetailPage() {
                   )}
                   {conflicts.eventConflicts.length > 0 && (
                     <div>
-                      <Text fw={500}>Event Conflicts:</Text>
+                      <Text fw={500}>{t('eventConflicts')}</Text>
                       <ul>
                         {conflicts.eventConflicts.map((conflict) => (
                           <li key={conflict.id}>
@@ -245,17 +247,17 @@ export default function EventDetailPage() {
               <Stack gap="md">
                 <Group>
                   <IconUsers size={20} />
-                  <Text fw={500}>Consent Statistics</Text>
+                  <Text fw={500}>{t('consentStatistics')}</Text>
                 </Group>
                 <Group>
                   <Badge color="green" leftSection={<IconCheck size={12} />}>
-                    Approved: {consentStats.approved}
+                    {t('approved')}: {consentStats.approved}
                   </Badge>
                   <Badge color="red" leftSection={<IconX size={12} />}>
-                    Rejected: {consentStats.rejected}
+                    {t('rejected')}: {consentStats.rejected}
                   </Badge>
-                  <Badge color="yellow">Pending: {consentStats.pending}</Badge>
-                  <Badge color="gray">Total: {consentStats.total}</Badge>
+                  <Badge color="yellow">{t('pending')}: {consentStats.pending}</Badge>
+                  <Badge color="gray">{t('total')}: {consentStats.total}</Badge>
                 </Group>
 
                 {consents.length > 0 && (
@@ -265,11 +267,11 @@ export default function EventDetailPage() {
                       <Table>
                         <Table.Thead>
                           <Table.Tr>
-                            <Table.Th>Student</Table.Th>
-                            <Table.Th>Class</Table.Th>
-                            <Table.Th>Parent</Table.Th>
-                            <Table.Th>Status</Table.Th>
-                            <Table.Th>Responded At</Table.Th>
+                            <Table.Th>{t('student')}</Table.Th>
+                            <Table.Th>{t('class')}</Table.Th>
+                            <Table.Th>{t('parent')}</Table.Th>
+                            <Table.Th>{t('status')}</Table.Th>
+                            <Table.Th>{t('respondedAt')}</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
@@ -309,7 +311,7 @@ export default function EventDetailPage() {
                                         : 'yellow'
                                   }
                                 >
-                                  {consent.status}
+                                  {consent.status === 'approved' ? t('approved') : consent.status === 'rejected' ? t('rejected') : t('pending')}
                                 </Badge>
                               </Table.Td>
                               <Table.Td>

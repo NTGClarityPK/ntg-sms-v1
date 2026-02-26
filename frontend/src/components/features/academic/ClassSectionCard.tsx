@@ -10,6 +10,7 @@ import {
   IconDots,
 } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
+import { useTranslations } from 'next-intl';
 import type { ClassSection } from '@/types/class-sections';
 import { useDeleteClassSection } from '@/hooks/useClassSections';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -29,6 +30,7 @@ export function ClassSectionCard({
   className,
   sectionName,
 }: ClassSectionCardProps) {
+  const t = useTranslations('class');
   const colors = useThemeColors();
   const deleteClassSection = useDeleteClassSection();
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
@@ -41,19 +43,18 @@ export function ClassSectionCard({
 
   const handleDelete = () => {
     modals.openConfirmModal({
-      title: 'Delete Class Section',
+      title: t('deleteClassSection'),
       children: (
         <Text size="sm">
-          Are you sure you want to delete {className} - {sectionName}? This action cannot be undone.
+          {t('deleteConfirm', { className, sectionName })}
           {studentCount > 0 && (
             <Text c="red" size="sm" mt="xs">
-              Warning: This class-section has {studentCount} enrolled student(s). You must remove
-              all students before deleting.
+              {t('warningStudentsEnrolled', { count: studentCount })}
             </Text>
           )}
         </Text>
       ),
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      labels: { confirm: t('delete'), cancel: t('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => {
         deleteClassSection.mutate(classSection.id);
@@ -82,7 +83,7 @@ export function ClassSectionCard({
             </Text>
             <Group gap="xs">
               <Badge variant="light" color={statusColor}>
-                {classSection.isActive ? 'Active' : 'Inactive'}
+                {classSection.isActive ? t('active') : t('inactive')}
               </Badge>
             </Group>
           </Stack>
@@ -94,13 +95,13 @@ export function ClassSectionCard({
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Item leftSection={<IconEdit size={16} />} onClick={openEdit}>
-                Edit
+                {t('edit')}
               </Menu.Item>
               <Menu.Item leftSection={<IconUsers size={16} />} onClick={openStudents}>
-                View Students
+                {t('viewStudents')}
               </Menu.Item>
               <Menu.Item leftSection={<IconUser size={16} />} onClick={openTeacher}>
-                {classSection.classTeacherId ? 'Change Teacher' : 'Assign Teacher'}
+                {classSection.classTeacherId ? t('changeTeacher') : t('assignTeacher')}
               </Menu.Item>
               <Menu.Divider />
               <Menu.Item
@@ -108,7 +109,7 @@ export function ClassSectionCard({
                 color="red"
                 onClick={handleDelete}
               >
-                Delete
+                {t('delete')}
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
@@ -117,7 +118,7 @@ export function ClassSectionCard({
         <Stack gap="xs" mt="md">
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              Students
+              {t('students')}
             </Text>
             <Text size="sm" fw={500}>
               {studentCount} / {capacity}
@@ -126,7 +127,7 @@ export function ClassSectionCard({
           {classSection.classTeacherName && (
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                Class Teacher
+                {t('classTeacher')}
               </Text>
               <Text size="sm" fw={500}>
                 {classSection.classTeacherName}

@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Title, Group, Button, Skeleton, Text, Stack } from '@mantine/core';
 import { IconChecklist } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { useClassSections, useBulkCreateClassSections } from '@/hooks/useClassSections';
 import { ClassSectionGrid } from '@/components/features/academic/ClassSectionGrid';
 import { useClasses } from '@/hooks/useCoreLookups';
@@ -10,6 +11,7 @@ import { useSections } from '@/hooks/useCoreLookups';
 import { modals } from '@mantine/modals';
 
 export default function ClassSectionsPage() {
+  const t = useTranslations('class');
   const [isBulkCreating, setIsBulkCreating] = useState(false);
   const { data, isLoading, error } = useClassSections();
   const { data: classesData } = useClasses();
@@ -57,13 +59,13 @@ export default function ClassSectionsPage() {
   const handleBulkCreate = () => {
     if (missingCombinations.length === 0) {
       modals.openConfirmModal({
-        title: 'No Missing Combinations',
+        title: t('noMissingCombinations'),
         children: (
           <Text size="sm">
-            All class-section combinations have already been created.
+            {t('allCombinationsCreated')}
           </Text>
         ),
-        labels: { confirm: 'OK', cancel: '' },
+        labels: { confirm: t('ok'), cancel: '' },
         confirmProps: { style: { display: 'none' } },
         cancelProps: { style: { display: 'none' } },
       });
@@ -71,13 +73,13 @@ export default function ClassSectionsPage() {
     }
 
     modals.openConfirmModal({
-      title: 'Create class-section combinations',
+      title: t('createCombinationsTitle'),
       children: (
         <Text size="sm">
-          This will create {missingCombinations.length} class-section combination(s) with default capacity of 30.
+          {t('createCombinationsMessage', { count: missingCombinations.length })}
           <br />
           <br />
-          <strong>Combinations to create:</strong>
+          <strong>{t('combinationsToCreate')}</strong>
           <br />
           {missingCombinations.slice(0, 10).map((combo, idx) => {
             const cls = classes.find((c) => c.id === combo.classId);
@@ -90,12 +92,12 @@ export default function ClassSectionsPage() {
           })}
           {missingCombinations.length > 10 && (
             <Text size="sm" c="dimmed">
-              ... and {missingCombinations.length - 10} more
+              {t('andXMore', { count: missingCombinations.length - 10 })}
             </Text>
           )}
         </Text>
       ),
-      labels: { confirm: 'Create All', cancel: 'Cancel' },
+      labels: { confirm: t('createAllButton'), cancel: t('cancel') },
       confirmProps: { color: 'blue' },
       onConfirm: () => {
         setIsBulkCreating(true);
@@ -115,7 +117,7 @@ export default function ClassSectionsPage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>Class</Title>
+            <Title order={1}>{t('title')}</Title>
           </Group>
         </div>
         <div
@@ -142,7 +144,7 @@ export default function ClassSectionsPage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>Class</Title>
+            <Title order={1}>{t('title')}</Title>
           </Group>
         </div>
         <div
@@ -154,7 +156,7 @@ export default function ClassSectionsPage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Text c="red">Error loading class sections: {error instanceof Error ? error.message : 'Unknown error'}</Text>
+          <Text c="red">{t('errorLoadingClassSections', { message: error instanceof Error ? error.message : 'Unknown error' })}</Text>
         </div>
       </>  
     );
@@ -164,7 +166,7 @@ export default function ClassSectionsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Class</Title>
+          <Title order={1}>{t('title')}</Title>
           {missingCombinations.length > 0 && (
             <Button
               leftSection={<IconChecklist size={16} />}
@@ -173,7 +175,7 @@ export default function ClassSectionsPage() {
               loading={isBulkCreating}
               disabled={isBulkCreating}
             >
-              Create All ({missingCombinations.length})
+              {t('createAllCount', { count: missingCombinations.length })}
             </Button>
           )}
         </Group>

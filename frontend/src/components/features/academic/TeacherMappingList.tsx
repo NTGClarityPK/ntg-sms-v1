@@ -14,6 +14,7 @@ import {
 } from '@mantine/core';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
+import { useTranslations } from 'next-intl';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
 import { useDeleteTeacherAssignment, useUpdateTeacherAssignment } from '@/hooks/useTeacherAssignments';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -39,6 +40,7 @@ export function TeacherMappingList({
   meta,
   onPageChange,
 }: TeacherMappingListProps) {
+  const t = useTranslations('teacher');
   const deleteAssignment = useDeleteTeacherAssignment();
   const updateAssignment = useUpdateTeacherAssignment();
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
@@ -80,7 +82,7 @@ export function TeacherMappingList({
 
   const teacherOptions = staff
     .filter((s) => s.isActive)
-    .map((s) => ({ value: s.id, label: s.fullName || s.employeeId || 'Unknown' }));
+    .map((s) => ({ value: s.id, label: s.fullName || s.employeeId || t('unknown') }));
 
   // Filter assignments
   const filteredAssignments = assignments.filter((assignment) => {
@@ -106,14 +108,16 @@ export function TeacherMappingList({
 
   const handleDelete = (assignment: TeacherAssignment) => {
     modals.openConfirmModal({
-      title: 'Delete Teacher Assignment',
+      title: t('deleteAssignmentTitle'),
       children: (
         <Text size="sm">
-          Are you sure you want to delete the assignment for {assignment.subjectName} in{' '}
-          {assignment.classSectionName}?
+          {t('deleteConfirm', {
+            subjectName: assignment.subjectName,
+            classSectionName: assignment.classSectionName,
+          })}
         </Text>
       ),
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      labels: { confirm: t('delete'), cancel: t('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => {
         deleteAssignment.mutate(assignment.id);
@@ -128,8 +132,8 @@ export function TeacherMappingList({
           <Stack gap="md">
             <Group>
               <MultiSelect
-                label="Filter by Class"
-                placeholder="Select classes"
+                label={t('filterByClass')}
+                placeholder={t('selectClasses')}
                 data={classOptions}
                 value={classFilter}
                 onChange={setClassFilter}
@@ -137,8 +141,8 @@ export function TeacherMappingList({
                 style={{ flex: 1 }}
               />
               <MultiSelect
-                label="Filter by Section"
-                placeholder="Select sections"
+                label={t('filterBySection')}
+                placeholder={t('selectSections')}
                 data={sectionOptions}
                 value={sectionFilter}
                 onChange={setSectionFilter}
@@ -146,8 +150,8 @@ export function TeacherMappingList({
                 style={{ flex: 1 }}
               />
               <MultiSelect
-                label="Filter by Subject"
-                placeholder="Select subjects"
+                label={t('filterBySubject')}
+                placeholder={t('selectSubjects')}
                 data={subjectOptions}
                 value={subjectFilter}
                 onChange={setSubjectFilter}
@@ -155,8 +159,8 @@ export function TeacherMappingList({
                 style={{ flex: 1 }}
               />
               <MultiSelect
-                label="Filter by Teacher"
-                placeholder="Select teachers"
+                label={t('filterByTeacher')}
+                placeholder={t('selectTeachers')}
                 data={teacherOptions}
                 value={teacherFilter}
                 onChange={setTeacherFilter}
@@ -171,10 +175,10 @@ export function TeacherMappingList({
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Class-Section</Table.Th>
-                <Table.Th>Subject</Table.Th>
-                <Table.Th>Teacher</Table.Th>
-                <Table.Th>Actions</Table.Th>
+                <Table.Th>{t('classSection')}</Table.Th>
+                <Table.Th>{t('subject')}</Table.Th>
+                <Table.Th>{t('teacher')}</Table.Th>
+                <Table.Th>{t('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -182,16 +186,16 @@ export function TeacherMappingList({
                 <Table.Tr>
                   <Table.Td colSpan={4}>
                     <Text c="dimmed" ta="center" py="xl">
-                      No teacher assignments found
+                      {t('noAssignmentsFound')}
                     </Text>
                   </Table.Td>
                 </Table.Tr>
               ) : (
                 filteredAssignments.map((assignment) => (
                   <Table.Tr key={assignment.id}>
-                    <Table.Td>{assignment.classSectionName || 'Unknown'}</Table.Td>
-                    <Table.Td>{assignment.subjectName || 'Unknown'}</Table.Td>
-                    <Table.Td>{assignment.staffName || 'Unknown'}</Table.Td>
+                    <Table.Td>{assignment.classSectionName || t('unknown')}</Table.Td>
+                    <Table.Td>{assignment.subjectName || t('unknown')}</Table.Td>
+                    <Table.Td>{assignment.staffName || t('unknown')}</Table.Td>
                     <Table.Td>
                       <Group gap="xs">
                         <ActionIcon

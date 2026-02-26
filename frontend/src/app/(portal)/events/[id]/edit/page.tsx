@@ -6,11 +6,13 @@
 
 import { Title, Paper, Button, Group, Stack, Skeleton, Alert } from '@mantine/core';
 import { useRouter, useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { EventForm } from '@/components/features/events/EventForm';
 import { useEvent, useUpdateEvent } from '@/hooks/api/useEvents';
 import type { CreateEventInput, UpdateEventInput } from '@/types/events';
 
 export default function EditEventPage() {
+  const t = useTranslations('event');
   const router = useRouter();
   const params = useParams();
   const eventId = params.id as string;
@@ -54,7 +56,7 @@ export default function EditEventPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Event Not Found</Title>
+          <Title order={1}>{t('eventNotFound')}</Title>
         </div>
         <div
           style={{
@@ -65,7 +67,7 @@ export default function EditEventPage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Alert color="red">The requested event could not be found.</Alert>
+          <Alert color="red">{t('eventNotFoundMessage')}</Alert>
         </div>
       </>
     );
@@ -75,7 +77,7 @@ export default function EditEventPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Edit Event</Title>
+          <Title order={1}>{t('editEvent')}</Title>
         </Group>
       </div>
 
@@ -95,7 +97,7 @@ export default function EditEventPage() {
 
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => router.back()}>
-              Cancel
+              {t('cancel')}
             </Button>
           </Group>
         </Stack>

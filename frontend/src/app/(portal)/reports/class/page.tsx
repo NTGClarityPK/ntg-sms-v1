@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { Group, Title, Select, Stack, Alert } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import { useClassSections } from '@/hooks/useClassSections';
 import Link from 'next/link';
 import { Button } from '@mantine/core';
 import type { ClassSection } from '@/types/class-sections';
 
 export default function ClassReportSelectPage() {
+  const t = useTranslations('class');
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
 
   const classSectionsQuery = useClassSections({ limit: 100 });
@@ -30,7 +32,7 @@ export default function ClassReportSelectPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Class report</Title>
+          <Title order={1}>{t('classReportTitle')}</Title>
         </Group>
       </div>
       <div
@@ -45,8 +47,8 @@ export default function ClassReportSelectPage() {
         <Stack gap="md">
           <Select
             id="reports-class-select"
-            label="Select class section"
-            placeholder="Choose a class section"
+            label={t('selectClassSectionLabel')}
+            placeholder={t('chooseClassSection')}
             data={options}
             value={classSectionId}
             onChange={setClassSectionId}
@@ -56,7 +58,7 @@ export default function ClassReportSelectPage() {
           />
 
           {!classSectionId ? (
-            <Alert color="blue">Select a class section to view the report.</Alert>
+            <Alert color="blue">{t('selectClassToViewReport')}</Alert>
           ) : (
             <Button
               id="reports-class-link-view"
@@ -64,7 +66,7 @@ export default function ClassReportSelectPage() {
               href={`/reports/class/${classSectionId}`}
               variant="filled"
             >
-              View class report
+              {t('viewClassReport')}
             </Button>
           )}
         </Stack>

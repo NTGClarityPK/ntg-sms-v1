@@ -5,6 +5,7 @@ import { Modal, Select, Button, Stack, Group } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
+import { useTranslations } from 'next-intl';
 import {
   useCreateTeacherAssignment,
   useUpdateTeacherAssignment,
@@ -14,11 +15,12 @@ import { useClassSections } from '@/hooks/useClassSections';
 import { useSubjects } from '@/hooks/useCoreLookups';
 import { useStaff } from '@/hooks/useStaff';
 
-const createAssignmentSchema = z.object({
-  classSectionId: z.string().min(1, 'Class-section is required'),
-  subjectId: z.string().min(1, 'Subject is required'),
-  staffId: z.string().min(1, 'Teacher is required'),
-});
+const createAssignmentSchema = (t: (key: string) => string) =>
+  z.object({
+    classSectionId: z.string().min(1, t('classSectionRequired')),
+    subjectId: z.string().min(1, t('subjectRequired')),
+    staffId: z.string().min(1, t('teacherRequired')),
+  });
 
 interface CreateAssignmentModalProps {
   opened: boolean;
@@ -31,6 +33,7 @@ export function CreateAssignmentModal({
   onClose,
   assignment,
 }: CreateAssignmentModalProps) {
+  const t = useTranslations('teacher');
   const isEdit = !!assignment;
   const createAssignment = useCreateTeacherAssignment();
   const updateAssignment = useUpdateTeacherAssignment();
@@ -60,7 +63,7 @@ export function CreateAssignmentModal({
       subjectId: '',
       staffId: '',
     },
-    validate: zodResolver(createAssignmentSchema),
+    validate: zodResolver(createAssignmentSchema(t)),
   });
 
   // Reset form when assignment prop changes (for edit mode)
@@ -97,7 +100,7 @@ export function CreateAssignmentModal({
 
   const classSectionOptions = classSections.map((cs) => ({
     value: cs.id,
-    label: `${cs.classDisplayName || cs.className || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
+    label: `${cs.classDisplayName || cs.className || t('unknown')} - ${cs.sectionName || t('unknown')}`,
   }));
 
   const subjectOptions = subjects.map((s) => ({
@@ -117,14 +120,14 @@ export function CreateAssignmentModal({
     })
     .map((s) => ({
       value: s.id,
-      label: s.fullName || s.employeeId || 'Unknown',
+      label: s.fullName || s.employeeId || t('unknown'),
     }));
 
   return (
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Edit Teacher Assignment' : 'Create Teacher Assignment'}
+      title={isEdit ? t('editAssignmentTitle') : t('createAssignmentTitle')}
       size="md"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
@@ -132,16 +135,16 @@ export function CreateAssignmentModal({
           {!isEdit && (
             <>
               <Select
-                label="Class-Section"
-                placeholder="Select class-section"
+                label={t('classSection')}
+                placeholder={t('selectClassSection')}
                 data={classSectionOptions}
                 required
                 searchable
                 {...form.getInputProps('classSectionId')}
               />
               <Select
-                label="Subject"
-                placeholder="Select subject"
+                label={t('subject')}
+                placeholder={t('selectSubject')}
                 data={subjectOptions}
                 required
                 searchable
@@ -150,8 +153,8 @@ export function CreateAssignmentModal({
             </>
           )}
           <Select
-            label="Teacher"
-            placeholder="Select teacher"
+            label={t('teacher')}
+            placeholder={t('selectTeacher')}
             data={staffOptions}
             required
             searchable
@@ -161,13 +164,13 @@ export function CreateAssignmentModal({
 
         <Group justify="flex-end" mt="xl">
           <Button variant="subtle" onClick={onClose}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button
             type="submit"
             loading={createAssignment.isPending || updateAssignment.isPending}
           >
-            {isEdit ? 'Update' : 'Create'}
+            {isEdit ? t('update') : t('create')}
           </Button>
         </Group>
       </form>

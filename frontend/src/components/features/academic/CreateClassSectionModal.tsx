@@ -1,21 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Modal, Select, NumberInput, Button, Stack, Switch, Group } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
+import { useTranslations } from 'next-intl';
 import { useCreateClassSection, useUpdateClassSection } from '@/hooks/useClassSections';
 import type { ClassSection } from '@/types/class-sections';
 import { useClasses } from '@/hooks/useCoreLookups';
 import { useSections } from '@/hooks/useCoreLookups';
-
-const createClassSectionSchema = z.object({
-  classId: z.string().min(1, 'Class is required'),
-  sectionId: z.string().min(1, 'Section is required'),
-  capacity: z.number().min(1, 'Capacity must be at least 1').optional(),
-  isActive: z.boolean().optional(),
-});
 
 interface CreateClassSectionModalProps {
   opened: boolean;
@@ -32,6 +26,17 @@ export function CreateClassSectionModal({
   initialClassId,
   initialSectionId,
 }: CreateClassSectionModalProps) {
+  const t = useTranslations('class');
+  const createClassSectionSchema = useMemo(
+    () =>
+      z.object({
+        classId: z.string().min(1, t('classRequired')),
+        sectionId: z.string().min(1, t('sectionRequired')),
+        capacity: z.number().min(1, t('capacityMin')).optional(),
+        isActive: z.boolean().optional(),
+      }),
+    [t],
+  );
   const isEdit = !!classSection;
   const createClassSection = useCreateClassSection();
   const updateClassSection = useUpdateClassSection();
@@ -113,7 +118,7 @@ export function CreateClassSectionModal({
     <Modal
       opened={opened}
       onClose={handleClose}
-      title={isEdit ? 'Edit Class Section' : 'Create Class Section'}
+      title={isEdit ? t('editClassSection') : t('createClassSection')}
       size="md"
     >
       <form id="create-class-section-form" onSubmit={form.onSubmit(handleSubmit)}>
@@ -122,16 +127,16 @@ export function CreateClassSectionModal({
             <>
               <Select
                 id="create-class-section-class"
-                label="Class"
-                placeholder="Select class"
+                label={t('classLabel')}
+                placeholder={t('selectClass')}
                 data={classOptions}
                 required
                 {...form.getInputProps('classId')}
               />
               <Select
                 id="create-class-section-section"
-                label="Section"
-                placeholder="Select section"
+                label={t('sectionLabel')}
+                placeholder={t('selectSection')}
                 data={sectionOptions}
                 required
                 {...form.getInputProps('sectionId')}
@@ -140,28 +145,28 @@ export function CreateClassSectionModal({
           )}
           <NumberInput
             id="create-class-section-capacity"
-            label="Capacity (optional)"
-            placeholder="Leave empty for default"
+            label={t('capacityOptional')}
+            placeholder={t('capacityPlaceholder')}
             min={1}
             {...form.getInputProps('capacity')}
           />
           <Switch
             id="create-class-section-active"
-            label="Active"
+            label={t('active')}
             {...form.getInputProps('isActive', { type: 'checkbox' })}
           />
         </Stack>
 
         <Group justify="flex-end" mt="xl">
           <Button id="create-class-section-cancel" variant="subtle" onClick={handleClose}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button
             id="create-class-section-submit"
             type="submit"
             loading={createClassSection.isPending || updateClassSection.isPending}
           >
-            {isEdit ? 'Update' : 'Create'}
+            {isEdit ? t('update') : t('create')}
           </Button>
         </Group>
       </form>

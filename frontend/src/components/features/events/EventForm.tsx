@@ -28,49 +28,50 @@ import { useStudents } from '@/hooks/useStudents';
 import { useCheckEventConflicts } from '@/hooks/api/useEvents';
 import dayjs from 'dayjs';
 
-const eventSchema = z
-  .object({
-    titleTranslations: z.object({ en: z.string(), ar: z.string() }),
-    descriptionTranslations: z.object({ en: z.string(), ar: z.string() }).optional(),
-    startDate: z.date({ required_error: 'Start date is required' }),
-    endDate: z.date({ required_error: 'End date is required' }),
-    requiresConsent: z.boolean().optional(),
-    consentDeadline: z.date().nullable().optional(),
-    classSectionIds: z.array(z.string().uuid()).optional(),
-    studentIds: z.array(z.string().uuid()).optional(),
-  })
-  .refine((data) => (data.titleTranslations?.en ?? '').trim() !== '' || (data.titleTranslations?.ar ?? '').trim() !== '', {
-    message: 'Title (EN or AR) is required',
-    path: ['titleTranslations'],
-  })
-  .refine((data) => data.endDate >= data.startDate, {
-    message: 'End date must be greater than or equal to start date',
-    path: ['endDate'],
-  })
-  .refine(
-    (data) => {
-      if (data.requiresConsent && data.consentDeadline) {
-        return data.consentDeadline <= data.startDate;
-      }
-      return true;
-    },
-    {
-      message: 'Consent deadline must be before or equal to start date',
-      path: ['consentDeadline'],
-    },
-  )
-  .refine(
-    (data) => {
-      return (
-        (data.classSectionIds && data.classSectionIds.length > 0) ||
-        (data.studentIds && data.studentIds.length > 0)
-      );
-    },
-    {
-      message: 'At least one class section or student must be selected',
-      path: ['classSectionIds'],
-    },
-  );
+const createEventSchema = (t: (key: string) => string) =>
+  z
+    .object({
+      titleTranslations: z.object({ en: z.string(), ar: z.string() }),
+      descriptionTranslations: z.object({ en: z.string(), ar: z.string() }).optional(),
+      startDate: z.date({ required_error: t('validationStartDateRequired') }),
+      endDate: z.date({ required_error: t('validationEndDateRequired') }),
+      requiresConsent: z.boolean().optional(),
+      consentDeadline: z.date().nullable().optional(),
+      classSectionIds: z.array(z.string().uuid()).optional(),
+      studentIds: z.array(z.string().uuid()).optional(),
+    })
+    .refine((data) => (data.titleTranslations?.en ?? '').trim() !== '' || (data.titleTranslations?.ar ?? '').trim() !== '', {
+      message: t('validationTitleRequired'),
+      path: ['titleTranslations'],
+    })
+    .refine((data) => data.endDate >= data.startDate, {
+      message: t('validationEndDateAfterStart'),
+      path: ['endDate'],
+    })
+    .refine(
+      (data) => {
+        if (data.requiresConsent && data.consentDeadline) {
+          return data.consentDeadline <= data.startDate;
+        }
+        return true;
+      },
+      {
+        message: t('validationConsentDeadlineBeforeStart'),
+        path: ['consentDeadline'],
+      },
+    )
+    .refine(
+      (data) => {
+        return (
+          (data.classSectionIds && data.classSectionIds.length > 0) ||
+          (data.studentIds && data.studentIds.length > 0)
+        );
+      },
+      {
+        message: t('validationAtLeastOneParticipant'),
+        path: ['classSectionIds'],
+      },
+    );
 
 const emptyTranslations: TranslatableValue = { en: '', ar: '' };
 
@@ -92,6 +93,7 @@ interface EventFormProps {
 }
 
 export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
+  const t = useTranslations('event');
   const tStudents = useTranslations('students');
   // Track selected class sections to conditionally load students
   const [selectedClassSectionIds, setSelectedClassSectionIds] = useState<string[]>([]);
@@ -127,7 +129,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
   );
 
   const form = useForm<FormValues>({
-    validate: zodResolver(eventSchema),
+    validate: zodResolver(createEventSchema(t)),
     initialValues: {
       titleTranslations: event ? { en: event.title ?? '', ar: '' } : { ...emptyTranslations },
       descriptionTranslations: event ? { en: event.description ?? '', ar: '' } : { ...emptyTranslations },
@@ -252,16 +254,16 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
   // Helper text for students select
   const studentSelectDescription = useMemo(() => {
     if (selectedClassSectionIds.length === 0) {
-      return 'Select class sections first to load students from those classes';
+      return t('formSelectClassSectionsToLoad');
     }
     if (studentsLoading) {
-      return 'Loading students from selected classes...';
+      return t('formLoadingStudentsFromClasses');
     }
     if (students.length === 0) {
-      return 'No students found in selected classes';
+      return t('formNoStudentsInClasses');
     }
     return tStudents('studentsAvailable', { count: students.length });
-  }, [selectedClassSectionIds, studentsLoading, students.length, tStudents]);
+  }, [selectedClassSectionIds, studentsLoading, students.length, t, tStudents]);
 
   if (dataLoading) {
     return (
@@ -279,33 +281,33 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
       <Stack gap="md">
         <TranslatableInput
           id="event-form-title"
-          label="Title"
+          label={t('formTitle')}
           value={form.values.titleTranslations}
           onChange={(v) => form.setFieldValue('titleTranslations', v)}
           required
-          placeholder={{ en: 'Enter event title', ar: 'أدخل عنوان الحدث' }}
+          placeholder={{ en: t('formTitlePlaceholderEn'), ar: t('formTitlePlaceholderAr') }}
         />
 
         <TranslatableInput
           id="event-form-description"
-          label="Description"
+          label={t('formDescription')}
           value={form.values.descriptionTranslations}
           onChange={(v) => form.setFieldValue('descriptionTranslations', v)}
-          placeholder={{ en: 'Enter event description', ar: 'أدخل وصف الحدث' }}
+          placeholder={{ en: t('formDescriptionPlaceholderEn'), ar: t('formDescriptionPlaceholderAr') }}
         />
 
         <Group grow>
           <DatePickerInput
             id="event-form-start-date"
-            label="Start Date"
-            placeholder="Select start date"
+            label={t('formStartDate')}
+            placeholder={t('formSelectStartDate')}
             required
             {...form.getInputProps('startDate')}
           />
           <DatePickerInput
             id="event-form-end-date"
-            label="End Date"
-            placeholder="Select end date"
+            label={t('formEndDate')}
+            placeholder={t('formSelectEndDate')}
             required
             {...form.getInputProps('endDate')}
           />
@@ -313,26 +315,26 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
 
         <Switch
           id="event-form-requires-consent"
-          label="Requires Parent Consent"
-          description="Parents must approve their child's participation"
+          label={t('formRequiresConsent')}
+          description={t('formRequiresConsentDescription')}
           {...form.getInputProps('requiresConsent', { type: 'checkbox' })}
         />
 
         {form.values.requiresConsent && (
           <DatePickerInput
             id="event-form-consent-deadline"
-            label="Consent Deadline"
-            placeholder="Select consent deadline"
-            description="Deadline for parents to submit consent (must be before start date)"
+            label={t('formConsentDeadline')}
+            placeholder={t('formConsentDeadlinePlaceholder')}
+            description={t('formConsentDeadlineDescription')}
             {...form.getInputProps('consentDeadline')}
           />
         )}
 
         <MultiSelect
           id="event-form-class-sections"
-          label="Class Sections"
-          placeholder="Select class sections"
-          description="Select classes participating in this event"
+          label={t('formClassSections')}
+          placeholder={t('formClassSectionsPlaceholder')}
+          description={t('formClassSectionsDescription')}
           data={classSections}
           {...form.getInputProps('classSectionIds')}
           clearable
@@ -341,13 +343,13 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
 
         <MultiSelect
           id="event-form-students"
-          label="Individual Students (Optional)"
+          label={t('formIndividualStudents')}
           placeholder={
             selectedClassSectionIds.length === 0
-              ? 'First select class sections above'
+              ? t('formSelectClassSectionsFirst')
               : studentsLoading
-                ? 'Loading students...'
-                : 'Select additional individual students'
+                ? t('formLoadingStudents')
+                : t('formSelectIndividualStudents')
           }
           description={studentSelectDescription}
           data={students}
@@ -359,18 +361,18 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
 
         {(form.values.classSectionIds.length === 0 && form.values.studentIds.length === 0) && (
           <Alert color="yellow">
-            Please select at least one class section or individual student.
+            {t('formSelectOneClassOrStudent')}
           </Alert>
         )}
 
         {/* Conflicts Warning */}
         {conflicts &&
           (conflicts.assessmentConflicts.length > 0 || conflicts.eventConflicts.length > 0) && (
-            <Alert color="yellow" title="Conflicts Detected">
+            <Alert color="yellow" title={t('conflictsDetectedTitle')}>
               <Stack gap="xs">
                 {conflicts.assessmentConflicts.length > 0 && (
                   <div>
-                    <Text fw={500}>Assessment Conflicts:</Text>
+                    <Text fw={500}>{t('assessmentConflicts')}</Text>
                     <ul>
                       {conflicts.assessmentConflicts.map((conflict) => (
                         <li key={conflict.id}>
@@ -382,7 +384,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
                 )}
                 {conflicts.eventConflicts.length > 0 && (
                   <div>
-                    <Text fw={500}>Event Conflicts:</Text>
+                    <Text fw={500}>{t('eventConflicts')}</Text>
                     <ul>
                       {conflicts.eventConflicts.map((conflict) => (
                         <li key={conflict.id}>
@@ -400,7 +402,7 @@ export function EventForm({ event, onSubmit, isLoading }: EventFormProps) {
 
         <Group justify="flex-end" mt="md">
           <Button id="event-form-submit" type="submit" loading={isLoading}>
-            {event ? 'Update Event' : 'Create Event'}
+            {event ? t('formUpdateEvent') : t('formCreateEvent')}
           </Button>
         </Group>
       </Stack>

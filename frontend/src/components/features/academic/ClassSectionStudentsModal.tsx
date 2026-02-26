@@ -1,6 +1,7 @@
 'use client';
 
 import { Modal, Table, Text, Skeleton, Paper, Group, Stack } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import { useClassSectionStudents } from '@/hooks/useClassSections';
 
 interface ClassSectionStudentsModalProps {
@@ -14,6 +15,7 @@ export function ClassSectionStudentsModal({
   onClose,
   classSectionId,
 }: ClassSectionStudentsModalProps) {
+  const t = useTranslations('class');
   const { data, isLoading, error } = useClassSectionStudents(
     opened ? classSectionId : null,
   );
@@ -24,7 +26,7 @@ export function ClassSectionStudentsModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Students in Class Section"
+      title={t('studentsInClassSection')}
       size="lg"
     >
       {isLoading && (
@@ -37,7 +39,7 @@ export function ClassSectionStudentsModal({
 
       {error && (
         <Text c="red" size="sm">
-          Error loading students: {error instanceof Error ? error.message : 'Unknown error'}
+          {t('errorLoadingStudents', { message: error instanceof Error ? error.message : 'Unknown error' })}
         </Text>
       )}
 
@@ -45,15 +47,15 @@ export function ClassSectionStudentsModal({
         <>
           {students.length === 0 ? (
             <Text c="dimmed" ta="center" py="xl">
-              No students enrolled in this class section.
+              {t('noStudentsEnrolled')}
             </Text>
           ) : (
             <Paper p="md" withBorder>
               <Table>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Student ID</Table.Th>
-                    <Table.Th>Name</Table.Th>
+                    <Table.Th>{t('studentId')}</Table.Th>
+                    <Table.Th>{t('name')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>

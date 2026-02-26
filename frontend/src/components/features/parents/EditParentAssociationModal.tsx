@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Modal, Button, Stack, Switch, Group, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { useTranslations } from 'next-intl';
 import { useUpdateParentAssociation } from '@/hooks/useParentAssociations';
 import type { ParentAssociation } from '@/hooks/useParentAssociations';
 
@@ -17,6 +18,7 @@ export function EditParentAssociationModal({
   onClose,
   association,
 }: EditParentAssociationModalProps) {
+  const t = useTranslations('user');
   const updateAssociation = useUpdateParentAssociation();
 
   const form = useForm({
@@ -54,21 +56,21 @@ export function EditParentAssociationModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Edit Parent-Student Association"
+      title={t('editParentAssociationTitle')}
       size="md"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            Parent: <strong>{association.parentName}</strong>
+            {t('parentLabel')}: <strong>{association.parentName}</strong>
           </Text>
           <Text size="sm" c="dimmed">
-            Student: <strong>{association.studentName}</strong> ({association.studentStudentId})
+            {t('studentLabel')}: <strong>{association.studentName}</strong> ({association.studentStudentId})
           </Text>
 
           <Switch
-            label="Can approve requests"
-            description="Allow this parent to approve child-related requests (e.g., leave requests, early departure, consent forms)"
+            label={t('canApproveRequests')}
+            description={t('canApproveRequestsDescription')}
             checked={form.values.canApprove}
             onChange={(e) => form.setFieldValue('canApprove', e.currentTarget.checked)}
             mt="md"
@@ -76,10 +78,10 @@ export function EditParentAssociationModal({
 
           <Group justify="flex-end" mt="md">
             <Button id="edit-parent-association-cancel" variant="subtle" onClick={onClose}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button id="edit-parent-association-submit" type="submit" loading={updateAssociation.isPending}>
-              Save Changes
+              {t('saveChanges')}
             </Button>
           </Group>
         </Stack>

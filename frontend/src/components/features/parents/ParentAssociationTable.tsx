@@ -5,6 +5,7 @@ import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core
 import { IconTrash, IconEdit } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import { useDisclosure } from '@mantine/hooks';
+import { useTranslations } from 'next-intl';
 import type { ParentAssociation } from '@/hooks/useParentAssociations';
 import { useDeleteParentAssociation } from '@/hooks/useParentAssociations';
 import { EditParentAssociationModal } from './EditParentAssociationModal';
@@ -25,6 +26,7 @@ export function ParentAssociationTable({
   meta,
   onPageChange,
 }: ParentAssociationTableProps) {
+  const t = useTranslations('user');
   const deleteAssociation = useDeleteParentAssociation();
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedAssociation, setSelectedAssociation] = useState<ParentAssociation | null>(null);
@@ -36,15 +38,17 @@ export function ParentAssociationTable({
 
   const handleDelete = (association: ParentAssociation) => {
     modals.openConfirmModal({
-      title: 'Remove Association',
+      title: t('removeAssociation'),
       children: (
         <Text size="sm">
-          Are you sure you want to remove the association between{' '}
-          <strong>{association.parentName}</strong> and{' '}
-          <strong>{association.studentName}</strong> ({association.studentStudentId})?
+          {t('removeAssociationConfirm', {
+            parentName: association.parentName ?? '',
+            studentName: association.studentName ?? '',
+            studentStudentId: association.studentStudentId ?? '',
+          })}
         </Text>
       ),
-      labels: { confirm: 'Remove', cancel: 'Cancel' },
+      labels: { confirm: t('remove'), cancel: t('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => {
         deleteAssociation.mutate({
@@ -61,9 +65,10 @@ export function ParentAssociationTable({
       mother: 'pink',
       guardian: 'gray',
     };
+    const label = relationship === 'father' ? t('father') : relationship === 'mother' ? t('mother') : t('guardian');
     return (
       <Badge size="sm" variant="light" color={colors[relationship] || 'gray'}>
-        {relationship.charAt(0).toUpperCase() + relationship.slice(1)}
+        {label}
       </Badge>
     );
   };
@@ -74,14 +79,14 @@ export function ParentAssociationTable({
         <Table highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Parent Name</Table.Th>
-              <Table.Th>Student Name</Table.Th>
-              <Table.Th>Student ID</Table.Th>
-              <Table.Th>Relationship</Table.Th>
-              <Table.Th>Priority</Table.Th>
-              <Table.Th>Phone</Table.Th>
-              <Table.Th>Can Approve</Table.Th>
-              <Table.Th style={{ width: 100 }}>Actions</Table.Th>
+              <Table.Th>{t('parentName')}</Table.Th>
+              <Table.Th>{t('studentName')}</Table.Th>
+              <Table.Th>{t('studentId')}</Table.Th>
+              <Table.Th>{t('relationship')}</Table.Th>
+              <Table.Th>{t('priority')}</Table.Th>
+              <Table.Th>{t('phone')}</Table.Th>
+              <Table.Th>{t('canApprove')}</Table.Th>
+              <Table.Th style={{ width: 100 }}>{t('actions')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -106,7 +111,7 @@ export function ParentAssociationTable({
                       variant="light"
                       color={association.priority === 1 ? 'green' : 'blue'}
                     >
-                      {association.priority === 1 ? 'Primary' : 'Secondary'}
+                      {association.priority === 1 ? t('primary') : t('secondary')}
                     </Badge>
                   ) : (
                     <Text c="dimmed" size="sm">
@@ -120,11 +125,11 @@ export function ParentAssociationTable({
                 <Table.Td>
                   {association.canApprove ? (
                     <Badge size="sm" variant="light" color="green">
-                      Yes
+                      {t('yes')}
                     </Badge>
                   ) : (
                     <Badge size="sm" variant="light" color="red">
-                      No
+                      {t('no')}
                     </Badge>
                   )}
                 </Table.Td>
@@ -155,8 +160,11 @@ export function ParentAssociationTable({
       {meta && meta.totalPages > 1 && (
         <Group justify="space-between" mt="md">
           <Text size="sm" c="dimmed">
-            Showing {((meta.page - 1) * meta.limit) + 1} to{' '}
-            {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} associations
+            {t('showingXtoYofZ', {
+              from: ((meta.page - 1) * meta.limit) + 1,
+              to: Math.min(meta.page * meta.limit, meta.total),
+              total: meta.total,
+            })}
           </Text>
           <Pagination
             value={meta.page}
