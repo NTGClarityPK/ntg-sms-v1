@@ -5,6 +5,7 @@
  * Allows bulk grade entry for all students in an assessment
  */
 
+import { useTranslations } from 'next-intl';
 import { Title, Paper, Stack, Text, Skeleton, Group, Button } from '@mantine/core';
 import { useRouter, useParams } from 'next/navigation';
 import { useAssessment } from '@/hooks/api/useAssessments';
@@ -12,6 +13,8 @@ import { GradeEntrySheet } from '@/components/assessments/GradeEntrySheet';
 import { useFeaturePermission } from '@/hooks/usePermissions';
 
 export default function AssessmentGradesPage() {
+  const t = useTranslations('assessment');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const params = useParams();
   const { canEdit } = useFeaturePermission('assessment');
@@ -44,7 +47,7 @@ export default function AssessmentGradesPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Grade</Title>
+          <Title order={1}>{t('gradeEntry')}</Title>
         </div>
         <div
           style={{
@@ -57,7 +60,7 @@ export default function AssessmentGradesPage() {
         >
           <Paper p="xl" withBorder>
             <Text ta="center" c="dimmed">
-              Assessment not found.
+              {t('assessmentNotFound')}
             </Text>
           </Paper>
         </div>
@@ -69,9 +72,9 @@ export default function AssessmentGradesPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>{canEdit ? `Grade Entry: ${assessment.title}` : `Grade: ${assessment.title}`}</Title>
+          <Title order={1}>{canEdit ? t('gradeEntryTitle', { title: assessment.title }) : t('gradeTitle', { title: assessment.title })}</Title>
           <Button variant="subtle" onClick={() => router.back()}>
-            Back
+            {tCommon('back')}
           </Button>
         </Group>
       </div>

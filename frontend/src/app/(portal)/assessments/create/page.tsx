@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { Title, Paper, Button, Group, Stack } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 import { AssessmentForm } from '@/components/assessments/AssessmentForm';
@@ -18,6 +19,8 @@ import type { Assessment } from '@/types/assessment';
 import type { StagedDraftFile } from '@/types/assessment';
 
 export default function CreateAssessmentPage() {
+  const t = useTranslations('assessment');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const { canEdit } = useFeaturePermission('assessment');
   const [draftId] = useState(() =>
@@ -29,7 +32,7 @@ export default function CreateAssessmentPage() {
   const compressDraftFile = useCompressDraftFile(draftId);
   const [stagedFiles, setStagedFiles] = useState<StagedDraftFile[]>([]);
   const [compressionProgress, setCompressionProgress] = useState<number | null>(null);
-  const [compressionMessage, setCompressionMessage] = useState('Compressing materials…');
+  const [compressionMessage, setCompressionMessage] = useState(t('compressingMaterials'));
   const progressMaxRef = useRef(25);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hadCompressionPhaseRef = useRef(false);
@@ -63,7 +66,7 @@ export default function CreateAssessmentPage() {
       progressTickRef.current = 0;
       progressMaxRef.current = 25;
       setCompressionProgress(15);
-      setCompressionMessage('Preparing…');
+      setCompressionMessage(t('preparing'));
 
       progressIntervalRef.current = setInterval(() => {
         progressTickRef.current += 1;
@@ -88,8 +91,8 @@ export default function CreateAssessmentPage() {
           setCompressionProgress((prev) => Math.max(prev ?? 0, newCap));
           setCompressionMessage(
             total === 1
-              ? 'Compressing materials…'
-              : `Compressing materials… ${i + 1} of ${total}`,
+              ? t('compressingMaterials')
+              : t('compressingProgress', { current: i + 1, total }),
           );
         }
       } catch {
@@ -100,7 +103,7 @@ export default function CreateAssessmentPage() {
 
       clearProgressInterval();
       setCompressionProgress(85);
-      setCompressionMessage('Creating assessment…');
+      setCompressionMessage(t('creatingAssessment'));
     }
 
     createAssessment.mutate(payload, {
@@ -109,7 +112,7 @@ export default function CreateAssessmentPage() {
         if (hadCompressionPhaseRef.current) {
           hadCompressionPhaseRef.current = false;
           setCompressionProgress(100);
-          setCompressionMessage('Done');
+          setCompressionMessage(t('done'));
           setTimeout(() => setCompressionProgress(null), 400);
         } else {
           setCompressionProgress(null);
@@ -120,8 +123,8 @@ export default function CreateAssessmentPage() {
         const assessmentId = assessment?.id;
         if (!assessmentId) {
           notifications.show({
-            title: 'Error',
-            message: 'Assessment was created but could not load its ID. Please go to Assessments list.',
+            title: t('error'),
+            message: t('errorCreatedNoId'),
             color: 'red',
           });
           router.push('/assessments');
@@ -135,15 +138,15 @@ export default function CreateAssessmentPage() {
         const message = error.response?.data?.message ?? error.message ?? '';
         if (message.includes('10MB') || message.includes('10 MB')) {
           notifications.show({
-            title: 'Materials limit exceeded',
-            message: 'Total size of materials exceeds 10MB. Please remove some files or use smaller files, then try again.',
+            title: t('materialsLimitExceeded'),
+            message: t('materialsLimitMessage'),
             color: 'red',
             autoClose: 8000,
           });
         } else {
           notifications.show({
-            title: 'Error',
-            message: message || 'Failed to create assessment',
+            title: t('error'),
+            message: message || t('failedToCreate'),
             color: 'red',
           });
         }
@@ -155,7 +158,7 @@ export default function CreateAssessmentPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Create Assessment</Title>
+          <Title order={1}>{t('createAssessmentTitle')}</Title>
         </Group>
       </div>
 
@@ -183,7 +186,7 @@ export default function CreateAssessmentPage() {
 
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => router.back()}>
-              Cancel
+              {tCommon('cancel')}
             </Button>
           </Group>
         </Stack>

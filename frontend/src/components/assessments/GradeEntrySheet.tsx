@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Stack,
   Table,
@@ -39,6 +40,7 @@ interface GradeRow extends CreateStudentGradeInput {
 }
 
 export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntrySheetProps) {
+  const t = useTranslations('assessment');
   const colors = useThemeColors();
   const { data: existingGrades, isLoading: gradesLoading } = useAssessmentGrades(assessment.id);
   const { data: classSection, isLoading: classSectionLoading } = useClassSection(assessment.classSectionId);
@@ -106,16 +108,16 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
 
   if (!classSection) {
     return (
-      <Alert icon={<IconAlertCircle size={16} />} title="Error" color="red">
-        Class section not found for this assessment.
+      <Alert icon={<IconAlertCircle size={16} />} title={t('error')} color="red">
+        {t('classSectionNotFound')}
       </Alert>
     );
   }
 
   if (!studentsData?.data || studentsData.data.length === 0) {
     return (
-      <Alert icon={<IconAlertCircle size={16} />} title="No Students" color="yellow">
-        No active students found in this class section. Please add students before entering grades.
+      <Alert icon={<IconAlertCircle size={16} />} title={t('noStudents')} color="yellow">
+        {t('noActiveStudentsInSection')}
       </Alert>
     );
   }
@@ -123,14 +125,14 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
   return (
     <Stack gap="md">
       <Group justify="space-between">
-        <Text fw={500}>Student Grades</Text>
+        <Text fw={500}>{t('studentGrades')}</Text>
         <Group gap="md">
           <Badge variant="light" color={colors.info} size="lg">
-            Total Marks: {assessment.totalMarks}
+            {t('totalMarksLabel')}: {assessment.totalMarks}
           </Badge>
           {!readOnly && (
             <Button onClick={handleSubmit} loading={bulkCreateGrades.isPending}>
-              Save All Grades
+              {t('saveAllGrades')}
             </Button>
           )}
         </Group>
@@ -138,8 +140,8 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
 
       {readOnly && (
         <>
-          <Alert icon={<IconAlertCircle size={16} />} color={colors.info} title="View only">
-            You have view access for assessments. Grade changes are disabled.
+          <Alert icon={<IconAlertCircle size={16} />} color={colors.info} title={t('viewOnly')}>
+            {t('viewOnlyGradeMessage')}
           </Alert>
           <Divider />
         </>
@@ -149,11 +151,11 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Student Name</Table.Th>
-              <Table.Th>Marks Obtained</Table.Th>
-              <Table.Th>Absent</Table.Th>
-              <Table.Th>Excused</Table.Th>
-              <Table.Th>Remarks</Table.Th>
+              <Table.Th>{t('studentName')}</Table.Th>
+              <Table.Th>{t('marksObtained')}</Table.Th>
+              <Table.Th>{t('absent')}</Table.Th>
+              <Table.Th>{t('excused')}</Table.Th>
+              <Table.Th>{t('remarks')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -193,7 +195,7 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
                   <TextInput
                     value={grade.remarks}
                     onChange={(e) => updateGrade(index, 'remarks', e.currentTarget.value)}
-                    placeholder="Optional remarks"
+                    placeholder={t('optionalRemarks')}
                     size="sm"
                     disabled={readOnly}
                   />

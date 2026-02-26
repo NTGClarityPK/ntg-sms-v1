@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Badge, Alert, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
@@ -10,42 +12,9 @@ import { useAcademicYearsList } from '@/hooks/useAcademicYears';
 import { useTemplatesForClass, useStudentTemplate } from '@/hooks/useSubjectTemplates';
 import { useAuth } from '@/hooks/useAuth';
 import type { Student, CreateStudentInput, UpdateStudentInput } from '@/types/students';
-import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStudentGuardians } from '@/hooks/useParentAssociations';
 import { IconPhone, IconUser } from '@tabler/icons-react';
-
-const createStudentSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Second name is required'),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  dateOfBirth: z.string().optional(),
-  gender: z.enum(['male', 'female']).optional(),
-  classId: z.string().optional(),
-  sectionId: z.string().optional(),
-  bloodGroup: z.string().optional(),
-  medicalNotes: z.string().optional(),
-  admissionDate: z.string().optional(),
-  isActive: z.boolean().optional(),
-});
-
-const updateStudentSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Second name is required'),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  dateOfBirth: z.string().optional(),
-  gender: z.enum(['male', 'female']).optional(),
-  classId: z.string().optional(),
-  sectionId: z.string().optional(),
-  bloodGroup: z.string().optional(),
-  medicalNotes: z.string().optional(),
-  admissionDate: z.string().optional(),
-  isActive: z.boolean().optional(),
-});
 
 interface StudentFormProps {
   opened: boolean;
@@ -54,12 +23,46 @@ interface StudentFormProps {
 }
 
 export function StudentForm({ opened, onClose, student }: StudentFormProps) {
+  const t = useTranslations('students');
+  const tCommon = useTranslations('common');
   const isEdit = !!student;
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const queryClient = useQueryClient();
   const createStudent = useCreateStudent();
   const updateStudent = useUpdateStudent();
+
+  const createStudentSchema = z.object({
+    email: z.string().email(t('invalidEmail')),
+    password: z.string().min(6, t('passwordMinLength')),
+    firstName: z.string().min(1, t('firstNameRequired')),
+    lastName: z.string().min(1, t('secondNameRequired')),
+    phone: z.string().optional(),
+    address: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    gender: z.enum(['male', 'female']).optional(),
+    classId: z.string().optional(),
+    sectionId: z.string().optional(),
+    bloodGroup: z.string().optional(),
+    medicalNotes: z.string().optional(),
+    admissionDate: z.string().optional(),
+    isActive: z.boolean().optional(),
+  });
+
+  const updateStudentSchema = z.object({
+    firstName: z.string().min(1, t('firstNameRequired')),
+    lastName: z.string().min(1, t('secondNameRequired')),
+    phone: z.string().optional(),
+    address: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    gender: z.enum(['male', 'female']).optional(),
+    classId: z.string().optional(),
+    sectionId: z.string().optional(),
+    bloodGroup: z.string().optional(),
+    medicalNotes: z.string().optional(),
+    admissionDate: z.string().optional(),
+    isActive: z.boolean().optional(),
+  });
 
   const { data: classesData } = useClasses();
   const { data: sectionsData } = useSections();
@@ -206,30 +209,30 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title={isEdit ? 'Edit Student' : 'Create Student'} size="lg">
+    <Modal opened={opened} onClose={onClose} title={isEdit ? t('editStudent') : t('createStudent')} size="lg">
       <form id="student-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           {!isEdit && (
             <>
-              <TextInput id="student-form-email" label="Email" placeholder="student@example.com" required {...form.getInputProps('email')} />
+              <TextInput id="student-form-email" label={t('email')} placeholder={t('emailPlaceholder')} required {...form.getInputProps('email')} />
               <TextInput
                 id="student-form-password"
-                label="Password"
+                label={t('password')}
                 type="password"
-                placeholder="Minimum 6 characters"
+                placeholder={t('passwordPlaceholder')}
                 required
                 {...form.getInputProps('password')}
               />
             </>
           )}
 
-          <TextInput id="student-form-first-name" label="First Name" placeholder="John" required {...form.getInputProps('firstName')} />
-          <TextInput id="student-form-last-name" label="Second Name" placeholder="Doe" required {...form.getInputProps('lastName')} />
+          <TextInput id="student-form-first-name" label={t('firstName')} placeholder={t('firstNamePlaceholder')} required {...form.getInputProps('firstName')} />
+          <TextInput id="student-form-last-name" label={t('secondName')} placeholder={t('lastNamePlaceholder')} required {...form.getInputProps('lastName')} />
 
           {isEdit && (
             <TextInput
               id="student-form-student-id"
-              label="Student ID"
+              label={t('studentId')}
               value={student?.studentId || ''}
               readOnly
               styles={{ input: { backgroundColor: 'var(--mantine-color-default-hover)' } }}
@@ -238,7 +241,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
           <Select
             id="student-form-academic-year"
-            label="Academic Year"
+            label={t('academicYear')}
             data={academicYears.map((y) => ({ value: y.id, label: y.name }))}
             {...form.getInputProps('academicYearId')}
           />
@@ -246,65 +249,65 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           <Group grow>
             <Select
               id="student-form-class"
-              label="Class"
+              label={t('class')}
               data={classes.map((c) => ({ value: c.id, label: c.displayName }))}
               {...form.getInputProps('classId')}
             />
             <Select
               id="student-form-section"
-              label="Section"
+              label={t('section')}
               data={sections.map((s) => ({ value: s.id, label: s.name }))}
               {...form.getInputProps('sectionId')}
             />
           </Group>
 
-          <TextInput id="student-form-phone" label="Phone" placeholder="+1234567890" {...form.getInputProps('phone')} />
-          <TextInput id="student-form-address" label="Address" placeholder="123 Main St" {...form.getInputProps('address')} />
-          <TextInput id="student-form-date-of-birth" label="Date of Birth" type="date" {...form.getInputProps('dateOfBirth')} />
+          <TextInput id="student-form-phone" label={t('phone')} placeholder={t('phonePlaceholder')} {...form.getInputProps('phone')} />
+          <TextInput id="student-form-address" label={t('address')} placeholder={t('addressPlaceholder')} {...form.getInputProps('address')} />
+          <TextInput id="student-form-date-of-birth" label={t('dateOfBirth')} type="date" {...form.getInputProps('dateOfBirth')} />
 
           <Select
             id="student-form-gender"
-            label="Gender"
+            label={t('gender')}
             data={[
-              { value: 'male', label: 'Male' },
-              { value: 'female', label: 'Female' },
+              { value: 'male', label: t('male') },
+              { value: 'female', label: t('female') },
             ]}
             {...form.getInputProps('gender')}
           />
 
-          <TextInput id="student-form-blood-group" label="Blood Group" placeholder="O+" {...form.getInputProps('bloodGroup')} />
-          <Textarea id="student-form-medical-notes" label="Medical Notes" placeholder="Any medical conditions..." {...form.getInputProps('medicalNotes')} />
-          <TextInput id="student-form-admission-date" label="Admission Date" type="date" {...form.getInputProps('admissionDate')} />
+          <TextInput id="student-form-blood-group" label={t('bloodGroup')} placeholder={t('bloodGroupPlaceholder')} {...form.getInputProps('bloodGroup')} />
+          <Textarea id="student-form-medical-notes" label={t('medicalNotes')} placeholder={t('medicalNotesPlaceholder')} {...form.getInputProps('medicalNotes')} />
+          <TextInput id="student-form-admission-date" label={t('admissionDate')} type="date" {...form.getInputProps('admissionDate')} />
 
           <Select
             id="student-form-subject-template"
-            label="Subject Template (Optional)"
+            label={t('subjectTemplateOptional')}
             placeholder={
               effectiveClassId
                 ? availableTemplates.length === 0
-                  ? 'No templates available for this class'
-                  : 'Select subject template'
-                : 'Select a class first'
+                  ? t('noTemplatesForClass')
+                  : t('selectSubjectTemplate')
+                : t('selectClassFirst')
             }
-            data={availableTemplates.map((t) => ({ value: t.id, label: t.name }))}
+            data={availableTemplates.map((tmpl) => ({ value: tmpl.id, label: tmpl.name }))}
             {...form.getInputProps('subjectTemplateId')}
             clearable
             disabled={!effectiveClassId || availableTemplates.length === 0}
             description={
               !effectiveClassId
-                ? 'Select a class to see available templates'
+                ? t('selectClassToSeeTemplates')
                 : availableTemplates.length === 0
-                  ? 'No subject templates are assigned to this class. Assign templates in Settings > Subject Templates.'
-                  : 'Templates available for this class/level. Only one template can be assigned per student.'
+                  ? t('noTemplatesAssignedToClass')
+                  : t('templatesDescription')
             }
           />
 
           <Select
             id="student-form-status"
-            label="Status"
+            label={t('status')}
             data={[
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
+              { value: 'true', label: t('active') },
+              { value: 'false', label: t('inactive') },
             ]}
             value={form.values.isActive ? 'true' : 'false'}
             onChange={(value) => form.setFieldValue('isActive', value === 'true')}
@@ -318,11 +321,11 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
                 <Stack gap="sm">
                   <Group>
                     <IconUser size={20} />
-                    <Text fw={500}>Emergency Contacts</Text>
+                    <Text fw={500}>{t('emergencyContacts')}</Text>
                   </Group>
                   {guardians.length === 0 ? (
                     <Alert color="yellow">
-                      <Text size="sm">No guardians assigned. Add guardians from Parent Associations page.</Text>
+                      <Text size="sm">{t('noGuardiansAssigned')}</Text>
                     </Alert>
                   ) : (
                     <Stack gap="xs">
@@ -334,7 +337,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
                               color={guardian.priority === 1 ? 'green' : 'blue'}
                               variant="light"
                             >
-                              {guardian.priority === 1 ? 'Primary' : 'Secondary'}
+                              {guardian.priority === 1 ? t('primary') : t('secondary')}
                             </Badge>
                             <Text size="sm" fw={500}>
                               {guardian.parentName || 'N/A'}
@@ -360,10 +363,10 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
           <Group justify="flex-end" mt="md">
             <Button id="student-form-cancel" variant="subtle" onClick={onClose}>
-              Cancel
+              {tCommon('cancel')}
             </Button>
             <Button id="student-form-submit" type="submit" loading={createStudent.isPending || updateStudent.isPending}>
-              {isEdit ? 'Update' : 'Create'}
+              {isEdit ? t('update') : t('create')}
             </Button>
           </Group>
         </Stack>

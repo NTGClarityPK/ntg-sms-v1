@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Group,
   Button,
@@ -26,6 +27,7 @@ import '@mantine/dates/styles.css';
  * Used in the main Attendance page (History tab) and on the standalone /attendance/history page.
  */
 export function AttendanceHistoryContent() {
+  const t = useTranslations('attendance');
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('table');
   const [showAllFilters, setShowAllFilters] = useState(false);
   const [selectedClassSectionIds, setSelectedClassSectionIds] = useState<string[]>([]);
@@ -85,8 +87,8 @@ export function AttendanceHistoryContent() {
           <Group wrap="wrap" align="flex-end" gap="sm">
             <Box style={{ minWidth: 0, flex: '1 1 200px' }}>
               <MultiSelect
-                label="Class-Section"
-                placeholder="Select class-sections"
+                label={t('classSection')}
+                placeholder={t('selectClassSections')}
                 data={classSectionOptions}
                 value={selectedClassSectionIds}
                 onChange={setSelectedClassSectionIds}
@@ -98,13 +100,13 @@ export function AttendanceHistoryContent() {
               <>
                 <Box style={{ minWidth: 0, flex: '1 1 160px' }}>
                   <MultiSelect
-                    label="Status"
-                    placeholder="Select statuses"
+                    label={t('status')}
+                    placeholder={t('selectStatuses')}
                     data={[
-                      { value: 'present', label: 'Present' },
-                      { value: 'absent', label: 'Absent' },
-                      { value: 'late', label: 'Late' },
-                      { value: 'excused', label: 'Excused' },
+                      { value: 'present', label: t('present') },
+                      { value: 'absent', label: t('absent') },
+                      { value: 'late', label: t('late') },
+                      { value: 'excused', label: t('excused') },
                     ]}
                     value={selectedStatuses}
                     onChange={setSelectedStatuses}
@@ -113,8 +115,8 @@ export function AttendanceHistoryContent() {
                 </Box>
                 <Box style={{ minWidth: 0, flex: '1 1 140px' }}>
                   <DatePickerInput
-                    label="Start Date"
-                    placeholder="Start"
+                    label={t('startDate')}
+                    placeholder={t('startPlaceholder')}
                     value={startDate}
                     onChange={setStartDate}
                     leftSection={<IconCalendar size={16} />}
@@ -122,8 +124,8 @@ export function AttendanceHistoryContent() {
                 </Box>
                 <Box style={{ minWidth: 0, flex: '1 1 140px' }}>
                   <DatePickerInput
-                    label="End Date"
-                    placeholder="End"
+                    label={t('endDate')}
+                    placeholder={t('endPlaceholder')}
                     value={endDate}
                     onChange={setEndDate}
                     leftSection={<IconCalendar size={16} />}
@@ -137,7 +139,7 @@ export function AttendanceHistoryContent() {
               leftSection={<IconFilter size={16} />}
               onClick={() => setShowAllFilters((v) => !v)}
             >
-              {showAllFilters ? 'Fewer filters' : 'Show more filters'}
+              {showAllFilters ? t('fewerFilters') : t('showMoreFilters')}
             </Button>
             <Button
               variant="subtle"
@@ -148,7 +150,7 @@ export function AttendanceHistoryContent() {
                 setEndDate(null);
               }}
             >
-              Clear
+              {t('clear')}
             </Button>
           </Group>
         </Stack>
@@ -158,8 +160,8 @@ export function AttendanceHistoryContent() {
         value={viewMode}
         onChange={(value) => setViewMode(value as 'calendar' | 'table')}
         data={[
-          { label: 'Calendar View', value: 'calendar' },
-          { label: 'Table View', value: 'table' },
+          { label: t('calendarView'), value: 'calendar' },
+          { label: t('tableView'), value: 'table' },
         ]}
         fullWidth
         size="sm"

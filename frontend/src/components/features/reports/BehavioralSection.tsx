@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Table, Paper, Text, Skeleton } from '@mantine/core';
 import type { BehavioralSection as BehavioralSectionType } from '@/types/reports';
 import { StarRating } from '@/components/features/behavioral/StarRating';
@@ -10,6 +11,7 @@ interface BehavioralSectionProps {
 }
 
 export function BehavioralSectionReport({ data, isLoading }: BehavioralSectionProps) {
+  const t = useTranslations('behavioral');
   if (isLoading) {
     return (
       <Paper withBorder p="md">
@@ -21,8 +23,8 @@ export function BehavioralSectionReport({ data, isLoading }: BehavioralSectionPr
   if (!data || !data.periods || data.periods.length === 0) {
     return (
       <Paper withBorder p="md">
-        <Text fw={600} mb="xs">Behavioral</Text>
-        <Text c="dimmed" size="sm">No behavioral assessments.</Text>
+        <Text fw={600} mb="xs">{t('behavioralLabel')}</Text>
+        <Text c="dimmed" size="sm">{t('noBehavioralAssessments')}</Text>
       </Paper>
     );
   }
@@ -33,11 +35,11 @@ export function BehavioralSectionReport({ data, isLoading }: BehavioralSectionPr
 
   return (
     <Paper withBorder p="md">
-      <Text fw={600} mb="md">Behavioral</Text>
+      <Text fw={600} mb="md">{t('behavioralLabel')}</Text>
       <Table withTableBorder withColumnBorders>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Period</Table.Th>
+            <Table.Th>{t('period')}</Table.Th>
             {allAttributes.map((attr) => (
               <Table.Th key={attr}>{attr}</Table.Th>
             ))}

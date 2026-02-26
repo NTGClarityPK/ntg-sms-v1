@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Button,
   FileInput,
@@ -24,6 +25,7 @@ import * as XLSX from 'xlsx';
 import type { BulkImportPreview, BulkImportResult, BulkStudentRowDto } from '@/hooks/useBulkImport';
 
 export default function BulkImportStudentsPage() {
+  const t = useTranslations('students');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<BulkImportPreview | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
@@ -52,23 +54,23 @@ export default function BulkImportStudentsPage() {
       setPreview(result);
       if (result.invalidRows > 0) {
         notifications.show({
-          title: 'Validation issues',
-          message: `${result.invalidRows} of ${result.totalRows} rows have errors. Please review below.`,
+          title: t('bulkValidationIssues'),
+          message: t('bulkValidationIssuesMessage', { invalid: result.invalidRows, total: result.totalRows }),
           color: 'yellow',
           icon: <IconAlertCircle size={16} />,
         });
       } else {
         notifications.show({
-          title: 'Ready to import',
-          message: `All ${result.validRows} rows are valid and ready to import.`,
+          title: t('bulkReadyToImport'),
+          message: t('bulkReadyToImportMessage', { count: result.validRows }),
           color: 'green',
           icon: <IconCheck size={16} />,
         });
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to parse file';
+      const message = err instanceof Error ? err.message : t('bulkFailedToParseFile');
       notifications.show({
-        title: 'Upload failed',
+        title: t('bulkUploadFailed'),
         message,
         color: 'red',
         icon: <IconX size={16} />,
@@ -79,8 +81,8 @@ export default function BulkImportStudentsPage() {
   const handleImport = async () => {
     if (!preview || !selectedYear) {
       notifications.show({
-        title: 'Missing information',
-        message: 'Please select an academic year',
+        title: t('bulkMissingInformation'),
+        message: t('bulkPleaseSelectAcademicYear'),
         color: 'red',
       });
       return;
@@ -90,8 +92,8 @@ export default function BulkImportStudentsPage() {
       .map((r) => r.data);
     if (validRows.length === 0) {
       notifications.show({
-        title: 'No valid rows',
-        message: 'There are no valid rows to import.',
+        title: t('bulkNoValidRows'),
+        message: t('bulkNoValidRowsMessage'),
         color: 'red',
       });
       return;
@@ -103,10 +105,10 @@ export default function BulkImportStudentsPage() {
       });
       setLastImportResult(result);
       notifications.show({
-        title: 'Import complete',
+        title: t('bulkImportComplete'),
         message: result.errors.length > 0
-          ? `${result.successCount} imported, ${result.failureCount} failed. See details below.`
-          : `Successfully imported ${result.successCount} students.`,
+          ? t('bulkImportCompletePartial', { successCount: result.successCount, failureCount: result.failureCount })
+          : t('bulkImportCompleteSuccess', { successCount: result.successCount }),
         color: result.failureCount === 0 ? 'green' : 'yellow',
         icon: <IconCheck size={16} />,
       });
@@ -114,9 +116,9 @@ export default function BulkImportStudentsPage() {
       setPreview(null);
       setSelectedYear(null);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to import students';
+      const message = err instanceof Error ? err.message : t('bulkFailedToImportStudents');
       notifications.show({
-        title: 'Import failed',
+        title: t('bulkImportFailed'),
         message,
         color: 'red',
         icon: <IconX size={16} />,
@@ -149,8 +151,8 @@ export default function BulkImportStudentsPage() {
     XLSX.utils.book_append_sheet(wb, ws, 'Students');
     XLSX.writeFile(wb, 'students-import-template.xlsx');
     notifications.show({
-      title: 'Template downloaded',
-      message: 'Check your downloads folder',
+      title: t('bulkTemplateDownloaded'),
+      message: t('bulkTemplateDownloadedMessage'),
       color: 'green',
       icon: <IconCheck size={16} />,
     });
@@ -184,57 +186,53 @@ export default function BulkImportStudentsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Bulk Import Students</Title>
+          <Title order={1}>{t('bulkImportTitle')}</Title>
           <Button
             id="bulk-import-download-template"
             leftSection={<IconDownload size={16} />}
             variant="light"
             onClick={handleDownloadTemplate}
           >
-            Download Template
+            {t('downloadTemplate')}
           </Button>
         </Group>
       </div>
 
       <div style={{ marginTop: '60px', padding: 'var(--mantine-spacing-md)' }}>
         <Stack gap="lg">
-          <Alert icon={<IconAlertCircle size={16} />} title="How to use" color="blue">
+          <Alert icon={<IconAlertCircle size={16} />} title={t('howToUse')} color="blue">
             <ol style={{ margin: 0, paddingLeft: 20 }}>
-              <li>Download the template Excel file</li>
-              <li>
-                Fill in student information (required: First Name, Last Name, Email, Gender).
-                Optional: Phone, Date of Birth; Class and Section (name or ID from Settings);
-                Subject Template (must be linked to the class in Settings).
-              </li>
-              <li>Upload the completed file to preview</li>
-              <li>Edit any cell in the preview table if needed, then select an academic year and click &quot;Import Students&quot;</li>
+              <li>{t('bulkStep1')}</li>
+              <li>{t('bulkStep2')}</li>
+              <li>{t('bulkStep3')}</li>
+              <li>{t('bulkStep4')}</li>
             </ol>
           </Alert>
 
           {lastImportResult != null && (
             <Paper p="md" withBorder>
               <Stack gap="xs">
-                <Title order={5}>Last import result</Title>
+                <Title order={5}>{t('lastImportResult')}</Title>
                 <Text size="sm">
-                  {lastImportResult.successCount} student(s) imported successfully.
+                  {t('bulkStudentsImportedSuccess', { count: lastImportResult.successCount })}
                   {lastImportResult.failureCount > 0 && (
-                    <> {lastImportResult.failureCount} row(s) failed.</>
+                    <> {t('bulkRowsFailed', { count: lastImportResult.failureCount })}</>
                   )}
                 </Text>
                 {lastImportResult.successCount > 0 && (
                   <Text size="xs" c="dimmed">
-                    Imported students appear in the Student list. Clear class/section filters if you do not see them.
+                    {t('importedStudentsHint')}
                   </Text>
                 )}
                 {lastImportResult.errors.length > 0 && (
                   <>
-                    <Alert color="red" title="Errors by row">
+                    <Alert color="red" title={t('errorsByRow')}>
                       <Stack gap={4}>
                         {lastImportResult.errors
                           .filter((e) => !e.message.startsWith('Student imported but:'))
                           .map((e, idx) => (
                             <Text key={idx} size="sm">
-                              Row {e.row}: {e.message}
+                              {t('rowWithMessage', { row: e.row, message: e.message })}
                             </Text>
                           ))}
                       </Stack>
@@ -242,13 +240,13 @@ export default function BulkImportStudentsPage() {
                     {lastImportResult.errors.some((e) =>
                       e.message.startsWith('Student imported but:')
                     ) && (
-                      <Alert color="yellow" title="Warnings (student imported with issues)">
+                      <Alert color="yellow" title={t('warningsImportedWithIssues')}>
                         <Stack gap={4}>
                           {lastImportResult.errors
                             .filter((e) => e.message.startsWith('Student imported but:'))
                             .map((e, idx) => (
                               <Text key={idx} size="sm">
-                                Row {e.row}: {e.message}
+                                {t('rowWithMessage', { row: e.row, message: e.message })}
                               </Text>
                             ))}
                         </Stack>
@@ -264,8 +262,8 @@ export default function BulkImportStudentsPage() {
             <Stack gap="md">
               <FileInput
                 id="bulk-import-file"
-                label="Upload Excel or CSV file"
-                placeholder="Click to select file"
+                label={t('uploadFileLabel')}
+                placeholder={t('uploadFilePlaceholder')}
                 accept=".xlsx,.xls,.csv"
                 value={file}
                 onChange={handleFileUpload}
@@ -278,8 +276,8 @@ export default function BulkImportStudentsPage() {
               {preview && (
                 <Select
                   id="bulk-import-academic-year"
-                  label="Academic year"
-                  placeholder="Select academic year"
+                  label={t('academicYear')}
+                  placeholder={t('selectAcademicYear')}
                   value={selectedYear}
                   onChange={setSelectedYear}
                   data={academicYears.map((y) => ({ value: y.id, label: y.name }))}

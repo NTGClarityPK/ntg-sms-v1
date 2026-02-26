@@ -5,6 +5,7 @@
  * Shows class assessments, attachments, and allows status updates.
  */
 
+import { useTranslations } from 'next-intl';
 import {
   Title,
   Paper,
@@ -29,6 +30,8 @@ import { useMyAssessments, useUpdateMyAssessmentStatus } from '@/hooks/api/useMy
 import type { MyAssessmentAttachment } from '@/hooks/api/useMyAssessments';
 
 export default function MyAssessmentsPage() {
+  const t = useTranslations('assessment');
+  const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
   const { data, isLoading, error, isRefetching } = useMyAssessments();
   const updateStatus = useUpdateMyAssessmentStatus();
@@ -77,7 +80,7 @@ export default function MyAssessmentsPage() {
     if (!status) {
       return (
         <Badge color="gray" variant="light">
-          Not started
+          {t('notStarted')}
         </Badge>
       );
     }
@@ -85,7 +88,7 @@ export default function MyAssessmentsPage() {
     if (status === 'submitted') {
       return (
         <Badge color="green" variant="filled">
-          Submitted{isRead ? '' : ' (unread)'}
+          {isRead ? t('submitted') : t('submittedUnread')}
         </Badge>
       );
     }
@@ -93,7 +96,7 @@ export default function MyAssessmentsPage() {
     if (status === 'in_progress') {
       return (
         <Badge color="yellow" variant="light">
-          In progress{isRead ? '' : ' (unread)'}
+          {isRead ? t('inProgress') : t('inProgressUnread')}
         </Badge>
       );
     }
@@ -121,8 +124,8 @@ export default function MyAssessmentsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>My Assessment</Title>
-          <Tooltip label="Refresh">
+          <Title order={1}>{t('myAssessmentTitle')}</Title>
+          <Tooltip label={tCommon('retry')}>
             <ActionIcon
               variant="light"
               size="lg"
@@ -154,18 +157,18 @@ export default function MyAssessmentsPage() {
               </Stack>
             ) : error ? (
               <Text c="red" ta="center" py="xl">
-                Failed to load your assessments. Please try again.
+                {t('failedToLoadYourAssessments')}
               </Text>
             ) : data && data.length > 0 ? (
               <ScrollArea>
                 <Table striped highlightOnHover>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Title</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Due Date</Table.Th>
-                      <Table.Th>Attachments</Table.Th>
-                      <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
+                      <Table.Th>{t('titleColumn')}</Table.Th>
+                      <Table.Th>{t('status')}</Table.Th>
+                      <Table.Th>{t('dueDate')}</Table.Th>
+                      <Table.Th>{t('attachments')}</Table.Th>
+                      <Table.Th style={{ textAlign: 'right' }}>{tCommon('actions')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -196,7 +199,7 @@ export default function MyAssessmentsPage() {
                             {item.attachments.length > 0 ? (
                               <Group gap="xs">
                                 {item.attachments.map((att) => (
-                                  <Tooltip key={att.id} label={`View: ${att.fileName}`}>
+                                  <Tooltip key={att.id} label={t('viewFileName', { fileName: att.fileName })}>
                                     <ActionIcon
                                       variant="subtle"
                                       onClick={() => setPreviewAttachment(att)}
@@ -205,7 +208,7 @@ export default function MyAssessmentsPage() {
                                     </ActionIcon>
                                   </Tooltip>
                                 ))}
-                                <Tooltip label="Download all">
+                                <Tooltip label={t('downloadAll')}>
                                   <ActionIcon
                                     variant="subtle"
                                     onClick={() => handleDownloadAll(item.attachments)}
@@ -216,7 +219,7 @@ export default function MyAssessmentsPage() {
                               </Group>
                             ) : (
                               <Text size="xs" c="dimmed">
-                                No attachments
+                                {t('noAttachments')}
                               </Text>
                             )}
                           </Table.Td>
@@ -227,14 +230,14 @@ export default function MyAssessmentsPage() {
                                 variant="subtle"
                                 onClick={() => handleMarkRead(a.id, status?.status, isRead)}
                               >
-                                {isRead ? 'Mark unread' : 'Mark as read'}
+                                {isRead ? t('markUnread') : t('markAsRead')}
                               </Button>
                               <Button
                                 size="xs"
                                 color="green"
                                 onClick={() => handleMarkSubmitted(a.id, status?.status)}
                               >
-                                {status?.status === 'submitted' ? 'Mark not submitted' : 'Mark submitted'}
+                                {status?.status === 'submitted' ? t('markNotSubmitted') : t('markSubmitted')}
                               </Button>
                             </Group>
                           </Table.Td>
@@ -246,7 +249,7 @@ export default function MyAssessmentsPage() {
               </ScrollArea>
             ) : (
               <Text ta="center" c="dimmed" py="xl">
-                No assessments assigned to you yet.
+                {t('noAssessmentsAssigned')}
               </Text>
             )}
           </Paper>
@@ -256,7 +259,7 @@ export default function MyAssessmentsPage() {
       <Modal
         opened={!!previewAttachment}
         onClose={() => setPreviewAttachment(null)}
-        title={previewAttachment?.fileName ?? 'Attachment preview'}
+        title={previewAttachment?.fileName ?? t('attachmentPreview')}
         size="xl"
         centered
       >
@@ -265,7 +268,7 @@ export default function MyAssessmentsPage() {
         ) : previewType === 'pdf' ? (
           <Stack gap="sm">
             <Text size="xs" c="dimmed">
-              PDF preview depends on browser support. If it does not render, use download.
+              {t('pdfPreviewNote')}
             </Text>
             <iframe
               src={previewAttachment.fileUrl}
@@ -289,19 +292,19 @@ export default function MyAssessmentsPage() {
             }}
             src={previewAttachment.fileUrl}
           >
-            Your browser does not support the video tag.{' '}
+            {t('videoNotSupported')}{' '}
             <a href={previewAttachment.fileUrl} target="_blank" rel="noopener noreferrer">
-              Download instead
+              {t('downloadInstead')}
             </a>
           </video>
         ) : (
           <Stack gap="sm">
             <Text size="sm" c="dimmed">
-              In-app preview is not available for this file type yet. Please download to view.
+              {t('previewNotAvailable')}
             </Text>
             <Group justify="flex-end">
               <Button onClick={() => openInNewTab(previewAttachment.fileUrl)} leftSection={<IconDownload size={16} />}>
-                Download file
+                {t('downloadFile')}
               </Button>
             </Group>
           </Stack>

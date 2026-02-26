@@ -63,10 +63,10 @@ export default function StudentsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <div>
-            <Title order={1}>Student</Title>
+            <Title order={1}>{tStudents('title')}</Title>
           </div>
           <Group gap="sm">
-            <Tooltip label="Refresh">
+            <Tooltip label={tStudents('refresh')}>
               <ActionIcon
                 variant="light"
                 size="lg"
@@ -79,10 +79,10 @@ export default function StudentsPage() {
             {canEdit && (
               <>
                 <Button id="students-link-bulk-import" component={Link} href="/students/bulk-import" variant="light" leftSection={<IconUpload size={16} />}>
-                  Bulk Import
+                  {tStudents('bulkImport')}
                 </Button>
                 <Button id="students-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
-                  Create Student
+                  {tStudents('createStudent')}
                 </Button>
               </>
             )}
@@ -92,9 +92,9 @@ export default function StudentsPage() {
 
       <Stack gap="md">
         {!canEdit && (
-          <Alert color={colors.info} title="View only">
+          <Alert color={colors.info} title={tStudents('viewOnly')}>
             <Text size="sm">
-              You have view access for Student Management. Create and update actions are disabled.
+              {tStudents('viewOnlyMessage')}
             </Text>
           </Alert>
         )}
@@ -102,7 +102,7 @@ export default function StudentsPage() {
         <Group>
           <TextInput
             id="students-search"
-            placeholder="Search students..."
+            placeholder={tStudents('searchPlaceholder')}
             leftSection={<IconSearch size={16} />}
             value={search}
             onChange={(e) => {
@@ -114,7 +114,7 @@ export default function StudentsPage() {
           <div style={{ width: 200, flexShrink: 0 }}>
             <MultiSelect
               id="students-filter-class"
-              placeholder="Filter by class"
+              placeholder={tStudents('filterByClass')}
               data={classes.map((c) => {
                 const classEntity = c as ClassEntity;
                 return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
@@ -132,7 +132,7 @@ export default function StudentsPage() {
           <div style={{ width: 180, flexShrink: 0 }}>
             <MultiSelect
               id="students-filter-section"
-              placeholder="Filter by section"
+              placeholder={tStudents('filterBySection')}
               data={sections.map((s) => ({ value: s.id, label: s.name }))}
               value={sectionFilter}
               onChange={(value) => {
@@ -153,24 +153,24 @@ export default function StudentsPage() {
             <Skeleton height={50} />
           </Stack>
         ) : studentsQuery.error ? (
-          <Alert color={colors.error} title="Failed to load students">
+          <Alert color={colors.error} title={tStudents('failedToLoad')}>
             <Group justify="space-between" mt="sm">
-              <Text size="sm">Please try again.</Text>
+              <Text size="sm">{tStudents('pleaseTryAgain')}</Text>
               <Button
                 variant="light"
                 leftSection={<IconRefresh size={16} />}
                 onClick={() => studentsQuery.refetch()}
               >
-                Retry
+                {tStudents('retry')}
               </Button>
             </Group>
           </Alert>
         ) : !studentsResponse?.data || studentsResponse.data.length === 0 ? (
-          <Alert color={colors.info} title="No students found">
+          <Alert color={colors.info} title={tStudents('noStudentsFound')}>
             <Text size="sm">
               {canEdit
-                ? 'No students have been created yet. Click "Create Student" to add one.'
-                : 'No students have been created yet.'}
+                ? tStudents('noStudentsCreateHint')
+                : tStudents('noStudentsViewOnly')}
             </Text>
           </Alert>
         ) : (
@@ -181,7 +181,7 @@ export default function StudentsPage() {
             <StudentTable
               canEdit={canEdit}
               students={studentsResponse.data}
-            meta={studentsResponse.meta}
+              meta={studentsResponse.meta}
             onPageChange={setPage}
             sortBy={sortBy}
             sortOrder={sortOrder}

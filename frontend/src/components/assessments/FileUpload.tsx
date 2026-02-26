@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button, Group, Stack, Text, FileButton, Paper, Progress, ActionIcon, Tooltip, Alert } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconUpload, IconX, IconFile, IconDownload, IconInfoCircle } from '@tabler/icons-react';
@@ -17,6 +18,8 @@ interface FileUploadProps {
 }
 
 export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) {
+  const t = useTranslations('assessment');
+  const tCommon = useTranslations('common');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   
   const { data: attachments = [], isLoading } = useAssessmentAttachments(assessmentId);
@@ -54,13 +57,13 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
   };
 
   const handleDelete = async (attachmentId: string) => {
-    if (confirm('Are you sure you want to delete this file?')) {
+    if (confirm(t('confirmDeleteFile'))) {
       await deleteAttachment.mutateAsync(attachmentId);
     }
   };
 
   const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return 'Unknown size';
+    if (!bytes) return t('unknownSize');
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -80,10 +83,10 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
         <Paper p="md" withBorder>
           <Stack gap="md">
             <Text size="sm" fw={500}>
-              Upload Assignment Materials
+              {t('uploadAssignmentMaterials')}
             </Text>
-            <Alert variant="light" color="blue" icon={<IconInfoCircle size={16} />} title="Compression and limit">
-              Images and videos are compressed when uploaded (images: max 1920px, 85% quality; videos: compressed). Total materials must be 10MB or less.
+            <Alert variant="light" color="blue" icon={<IconInfoCircle size={16} />} title={t('compressionAndLimit')}>
+              {t('compressionInfoEdit')}
             </Alert>
             <Group>
               <FileButton
@@ -93,7 +96,7 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
               >
                 {(props) => (
                   <Button leftSection={<IconUpload size={16} />} {...props}>
-                    Select Files
+                    {t('selectFiles')}
                   </Button>
                 )}
               </FileButton>
@@ -103,7 +106,7 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
                   loading={uploading}
                   disabled={uploading}
                 >
-                  Upload {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}
+                  {selectedFiles.length === 1 ? t('uploadFileCount', { count: 1 }) : t('uploadFilesCount', { count: selectedFiles.length })}
                 </Button>
               )}
             </Group>
@@ -120,12 +123,12 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
               <Stack gap="xs">
                 <Progress value={progress} size="sm" />
                 <Text size="xs" c="dimmed" ta="center">
-                  {progress}% uploaded
+                  {t('percentUploaded', { percent: progress })}
                 </Text>
               </Stack>
             )}
             <Text size="xs" c="dimmed">
-              Supported: PDF, Word, Excel, PowerPoint, images, video (MP4, WebM, etc.), text. Total materials limit 10MB.
+              {t('supportedFormatsEdit')}
             </Text>
           </Stack>
         </Paper>
@@ -133,11 +136,11 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
 
       {/* Existing Attachments */}
       {isLoading ? (
-        <Text size="sm" c="dimmed">Loading attachments...</Text>
+        <Text size="sm" c="dimmed">{t('loadingAttachments')}</Text>
       ) : attachments.length > 0 ? (
         <Paper p="md" withBorder>
           <Text size="sm" fw={500} mb="md">
-            Attached Files ({attachments.length})
+            {t('attachedFilesCount', { count: attachments.length })}
           </Text>
           <Stack gap="xs">
             {attachments.map((attachment: AssessmentAttachment) => (
@@ -152,7 +155,7 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
                   </Stack>
                 </Group>
                 <Group gap="xs">
-                  <Tooltip label="Download">
+                  <Tooltip label={t('download')}>
                     <ActionIcon
                       variant="subtle"
                       onClick={() => window.open(attachment.fileUrl, '_blank')}
@@ -161,7 +164,7 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
                     </ActionIcon>
                   </Tooltip>
                   {!readonly && (
-                    <Tooltip label="Delete">
+                    <Tooltip label={tCommon('delete')}>
                       <ActionIcon
                         variant="subtle"
                         color="red"
@@ -179,7 +182,7 @@ export function FileUpload({ assessmentId, readonly = false }: FileUploadProps) 
         </Paper>
       ) : (
         <Text size="sm" c="dimmed">
-          No files attached
+          {t('noFilesAttached')}
         </Text>
       )}
     </Stack>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Group, Select, Button, Stack, Paper, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { IconCalendar, IconX } from '@tabler/icons-react';
@@ -18,6 +19,7 @@ import '@mantine/dates/styles.css';
  * Used in the main Attendance page (Mark Attendance tab) and on the standalone /attendance/mark page.
  */
 export function MarkAttendanceContent() {
+  const t = useTranslations('attendance');
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const { user } = useAuth();
@@ -47,8 +49,8 @@ export function MarkAttendanceContent() {
         <Stack gap="md">
           <Group grow>
             <Select
-              label="Class-Section"
-              placeholder="Select class-section"
+              label={t('classSection')}
+              placeholder={t('selectClassSection')}
               data={classSections
                 .sort((a, b) => {
                   const classOrderA = a.classSortOrder ?? 999;
@@ -68,8 +70,8 @@ export function MarkAttendanceContent() {
               searchable
             />
             <DatePickerInput
-              label="Date"
-              placeholder="Select date"
+              label={t('date')}
+              placeholder={t('selectDate')}
               value={selectedDate}
               onChange={setSelectedDate}
               leftSection={<IconCalendar size={16} />}
@@ -86,7 +88,7 @@ export function MarkAttendanceContent() {
                   setSelectedDate(new Date());
                 }}
               >
-                Clear Selection
+                {t('clearSelection')}
               </Button>
             </Group>
           )}
@@ -116,7 +118,7 @@ export function MarkAttendanceContent() {
             <IconCalendar size={48} style={{ opacity: 0.5 }} />
             <Group justify="center">
               <Select
-                placeholder="Select class-section"
+                placeholder={t('selectClassSection')}
                 data={classSections.map((cs) => ({
                   value: cs.id,
                   label: `${cs.className || cs.classDisplayName || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
@@ -129,7 +131,7 @@ export function MarkAttendanceContent() {
               />
             </Group>
             <Text size="sm" c="dimmed">
-              Select a class-section and date to mark attendance
+              {t('selectClassSectionAndDateHint')}
             </Text>
           </Stack>
         </Paper>

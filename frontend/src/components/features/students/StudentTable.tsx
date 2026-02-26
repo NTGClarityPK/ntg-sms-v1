@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core';
 import { IconEdit, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
@@ -23,6 +24,7 @@ interface StudentTableProps {
 }
 
 export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: StudentTableProps) {
+  const t = useTranslations('students');
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
@@ -55,14 +57,14 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <SortableHeader field="studentId">Student ID</SortableHeader>
-            <SortableHeader field="firstName">First Name</SortableHeader>
-            <SortableHeader field="lastName">Last Name</SortableHeader>
-            <SortableHeader field="className">Class</SortableHeader>
-            <SortableHeader field="sectionName">Section</SortableHeader>
-            <Table.Th>Subject Template</Table.Th>
-            <SortableHeader field="isActive">Status</SortableHeader>
-            <Table.Th>Actions</Table.Th>
+            <SortableHeader field="studentId">{t('studentId')}</SortableHeader>
+            <SortableHeader field="firstName">{t('firstName')}</SortableHeader>
+            <SortableHeader field="lastName">{t('lastName')}</SortableHeader>
+            <SortableHeader field="className">{t('class')}</SortableHeader>
+            <SortableHeader field="sectionName">{t('section')}</SortableHeader>
+            <Table.Th>{t('subjectTemplate')}</Table.Th>
+            <SortableHeader field="isActive">{t('status')}</SortableHeader>
+            <Table.Th>{t('actions')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -70,7 +72,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
             <Table.Tr>
               <Table.Td colSpan={8}>
                 <Text c="dimmed" ta="center" py="md">
-                  No students found
+                  {t('noStudentsFound')}
                 </Text>
               </Table.Td>
             </Table.Tr>
@@ -97,7 +99,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                 </Table.Td>
                 <Table.Td>
                   <Badge color={student.isActive ? 'green' : 'red'} variant="light">
-                    {student.isActive ? 'Active' : 'Inactive'}
+                    {student.isActive ? t('active') : t('inactive')}
                   </Badge>
                 </Table.Td>
                 <Table.Td>

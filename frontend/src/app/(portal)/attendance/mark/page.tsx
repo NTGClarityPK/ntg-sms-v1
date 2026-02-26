@@ -1,14 +1,16 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Group, Title } from '@mantine/core';
 import { MarkAttendanceContent } from '@/components/features/attendance/MarkAttendanceContent';
 
 export default function MarkAttendancePage() {
+  const t = useTranslations('attendance');
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Mark Attendance</Title>
+          <Title order={1}>{t('markAttendanceTitle')}</Title>
         </Group>
       </div>
       <div

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Group, Title, Tabs } from '@mantine/core';
 import { IconCalendarCheck, IconHistory, IconUserCheck } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,6 +12,7 @@ import { MarkAttendanceContent } from '@/components/features/attendance/MarkAtte
 import { ChildAttendanceContent } from '@/components/features/attendance/ChildAttendanceContent';
 
 export default function AttendancePage() {
+  const t = useTranslations('attendance');
   const [activeTab, setActiveTab] = useState<string | null>('history');
   const { user } = useAuth();
   const { canEdit } = useFeaturePermission('attendance');
@@ -24,7 +26,7 @@ export default function AttendancePage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Attendance</Title>
+          <Title order={1}>{t('title')}</Title>
         </Group>
       </div>
       <div className="page-sub-title-bar" />
@@ -40,16 +42,16 @@ export default function AttendancePage() {
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>
-              History
+              {t('tabHistory')}
             </Tabs.Tab>
             {isTeacher && canEdit && (
               <Tabs.Tab value="mark" leftSection={<IconCalendarCheck size={16} />}>
-                Mark Attendance
+                {t('tabMarkAttendance')}
               </Tabs.Tab>
             )}
             {isParent && (
               <Tabs.Tab value="child" leftSection={<IconUserCheck size={16} />}>
-                Child Attendance
+                {t('tabChildAttendance')}
               </Tabs.Tab>
             )}
           </Tabs.List>

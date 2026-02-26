@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Title,
   Paper,
@@ -35,6 +36,8 @@ import dayjs from 'dayjs';
 import type { Assessment } from '@/types/assessment';
 
 export default function AssessmentsPage() {
+  const t = useTranslations('assessment');
+  const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
   const router = useRouter();
   const { canEdit } = useFeaturePermission('assessment');
@@ -57,13 +60,13 @@ export default function AssessmentsPage() {
 
   const handleDelete = (id: string, title: string) => {
     modals.openConfirmModal({
-      title: 'Delete Assessment',
+      title: t('deleteAssessment'),
       children: (
         <Text size="sm">
-          Are you sure you want to delete the assessment <strong>{title}</strong>? This action cannot be undone.
+          {t('deleteConfirmMessage', { title })}
         </Text>
       ),
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      labels: { confirm: tCommon('delete'), cancel: tCommon('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => deleteAssessment.mutate(id),
     });
@@ -73,9 +76,9 @@ export default function AssessmentsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Assessment</Title>
+          <Title order={1}>{t('title')}</Title>
           <Group gap="sm">
-            <Tooltip label="Refresh">
+            <Tooltip label={tCommon('retry')}>
               <ActionIcon
                 variant="light"
                 size="lg"
@@ -87,7 +90,7 @@ export default function AssessmentsPage() {
             </Tooltip>
             {canEdit && (
               <Button id="assessments-btn-create" leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
-                Create Assessment
+                {t('createAssessment')}
               </Button>
             )}
           </Group>
@@ -110,18 +113,18 @@ export default function AssessmentsPage() {
             <Group grow>
               <TextInput
                 id="assessments-search"
-                placeholder="Search assessments..."
+                placeholder={t('searchPlaceholder')}
                 leftSection={<IconSearch size={16} />}
                 value={search}
                 onChange={(e) => setSearch(e.currentTarget.value)}
               />
               <Select
                 id="assessments-filter-status"
-                placeholder="Filter by status"
+                placeholder={t('filterByStatus')}
                 data={[
-                  { value: 'all', label: 'All' },
-                  { value: 'true', label: 'Published' },
-                  { value: 'false', label: 'Unpublished' },
+                  { value: 'all', label: t('all') },
+                  { value: 'true', label: t('published') },
+                  { value: 'false', label: t('draft') },
                 ]}
                 value={isPublished}
                 onChange={setIsPublished}
@@ -141,7 +144,7 @@ export default function AssessmentsPage() {
             </Stack>
           ) : error ? (
             <Text c="red" ta="center" py="xl">
-              Error loading assessments. Please try again.
+              {t('errorLoading')}
             </Text>
           ) : data?.data && Array.isArray(data.data) && data.data.length > 0 ? (
             <Stack gap="md">
@@ -149,11 +152,11 @@ export default function AssessmentsPage() {
                 <Table striped highlightOnHover>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Title</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Total Marks</Table.Th>
-                      <Table.Th>Due Date</Table.Th>
-                      <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
+                      <Table.Th>{t('titleColumn')}</Table.Th>
+                      <Table.Th>{t('status')}</Table.Th>
+                      <Table.Th>{t('totalMarks')}</Table.Th>
+                      <Table.Th>{t('dueDate')}</Table.Th>
+                      <Table.Th style={{ textAlign: 'right' }}>{tCommon('actions')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -171,7 +174,7 @@ export default function AssessmentsPage() {
                         </Table.Td>
                         <Table.Td>
                           <Badge color={assessment.isPublished ? 'green' : 'gray'}>
-                            {assessment.isPublished ? 'Published' : 'Draft'}
+                            {assessment.isPublished ? t('published') : t('draft')}
                           </Badge>
                         </Table.Td>
                         <Table.Td>{assessment.totalMarks}</Table.Td>
@@ -180,7 +183,7 @@ export default function AssessmentsPage() {
                         </Table.Td>
                         <Table.Td>
                           <Group gap="xs" justify="flex-end">
-                            <Tooltip label="View Statistics">
+                            <Tooltip label={t('viewStatistics')}>
                               <ActionIcon
                                 variant="subtle"
                                 color="blue"
@@ -189,7 +192,7 @@ export default function AssessmentsPage() {
                                 <IconChartBar size={16} />
                               </ActionIcon>
                             </Tooltip>
-                            <Tooltip label={canEdit ? 'Grade Entry' : 'View Grades'}>
+                            <Tooltip label={canEdit ? t('gradeEntry') : t('viewGrades')}>
                               <ActionIcon
                                 variant="subtle"
                                 color="green"
@@ -210,14 +213,14 @@ export default function AssessmentsPage() {
                                     leftSection={<IconEdit size={14} />}
                                     onClick={() => router.push(`/assessments/${assessment.id}/edit`)}
                                   >
-                                    Edit
+                                    {tCommon('edit')}
                                   </Menu.Item>
                                   <Menu.Item
                                     leftSection={<IconTrash size={14} />}
                                     color="red"
                                     onClick={() => handleDelete(assessment.id, assessment.title)}
                                   >
-                                    Delete
+                                    {tCommon('delete')}
                                   </Menu.Item>
                                 </Menu.Dropdown>
                               </Menu>
@@ -239,7 +242,7 @@ export default function AssessmentsPage() {
             </Stack>
           ) : (
             <Text c="dimmed" ta="center" py="xl">
-              No assessments found. Create your first assessment to get started.
+              {t('noAssessmentsFound')}
             </Text>
           )}
         </Paper>

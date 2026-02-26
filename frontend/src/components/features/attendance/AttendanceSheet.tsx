@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Paper,
   Stack,
@@ -37,6 +38,7 @@ export function AttendanceSheet({
   className,
   sectionName,
 }: AttendanceSheetProps) {
+  const t = useTranslations('attendance');
   const [localAttendance, setLocalAttendance] = useState<Attendance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch] = useDebouncedValue(searchQuery, 300);
@@ -125,7 +127,7 @@ export function AttendanceSheet({
     return (
       <Paper withBorder p="xl">
         <Alert icon={<IconAlertCircle size={16} />} color={notifyColors.warning}>
-          No students found in this class-section. Please ensure students are enrolled.
+          {t('noStudentsInClassSection')}
         </Alert>
       </Paper>
     );
@@ -144,12 +146,12 @@ export function AttendanceSheet({
             loading={bulkMarkMutation.isPending}
             disabled={bulkMarkMutation.isPending || isLoading}
           >
-            Save Attendance
+            {t('saveAttendance')}
           </Button>
         </Group>
 
         <TextInput
-          placeholder="Search by student name or ID..."
+          placeholder={t('searchByStudentNameOrId')}
           leftSection={<IconSearch size={16} />}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.currentTarget.value)}
@@ -160,11 +162,11 @@ export function AttendanceSheet({
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Student</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Entry Time</Table.Th>
-                <Table.Th>Exit Time</Table.Th>
-                <Table.Th>Notes</Table.Th>
+                <Table.Th>{t('student')}</Table.Th>
+                <Table.Th>{t('status')}</Table.Th>
+                <Table.Th>{t('entryTime')}</Table.Th>
+                <Table.Th>{t('exitTime')}</Table.Th>
+                <Table.Th>{t('notes')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -173,8 +175,8 @@ export function AttendanceSheet({
                   <Table.Td colSpan={5}>
                     <Text c="dimmed" size="sm" ta="center" py="md">
                       {debouncedSearch.trim()
-                        ? 'No students found matching your search'
-                        : 'No students found'}
+                        ? t('noStudentsMatchingSearch')
+                        : t('noStudentsFound')}
                     </Text>
                   </Table.Td>
                 </Table.Tr>

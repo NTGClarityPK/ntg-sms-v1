@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Group, Select, Stack, Alert, Paper } from '@mantine/core';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useBehavioralMatrix } from '@/hooks/useBehavioral';
@@ -27,6 +28,7 @@ const defaultMonth = new Date().toISOString().slice(0, 7) + '-01';
  * Used on the main Behavioral page (Matrix tab) and on /behavioral/assess.
  */
 export function BehavioralAssessContent() {
+  const t = useTranslations('behavioral');
   const colors = useThemeColors();
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
   const [month, setMonth] = useState<string>(defaultMonth);
@@ -54,8 +56,8 @@ export function BehavioralAssessContent() {
       <Paper withBorder p="md">
         <Group align="flex-end" wrap="wrap" gap="md">
           <Select
-            label="Class section"
-            placeholder="Select class section"
+            label={t('classSection')}
+            placeholder={t('selectClassSection')}
             data={classSectionOptions}
             value={classSectionId}
             onChange={(v) => setClassSectionId(v)}
@@ -63,7 +65,7 @@ export function BehavioralAssessContent() {
             style={{ minWidth: 200 }}
           />
           <Select
-            label="Month"
+            label={t('month')}
             data={monthOptions}
             value={month}
             onChange={(v) => setMonth(v ?? defaultMonth)}
@@ -74,7 +76,7 @@ export function BehavioralAssessContent() {
 
       {!classSectionId ? (
         <Alert color={colors.primary}>
-          Select a class section and month to load the matrix.
+          {t('selectSectionAndMonth')}
         </Alert>
       ) : (
         <BehavioralMatrix

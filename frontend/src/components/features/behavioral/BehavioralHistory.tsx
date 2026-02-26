@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Table, Paper, Text, Skeleton, Stack } from '@mantine/core';
 import type { BehavioralAssessment } from '@/types/behavioral';
 
@@ -12,6 +13,7 @@ interface BehavioralHistoryProps {
  * Displays a student's behavioral assessment history (by month with attribute scores).
  */
 export function BehavioralHistory({ assessments, isLoading }: BehavioralHistoryProps) {
+  const t = useTranslations('behavioral');
   if (isLoading) {
     return (
       <Paper withBorder p="md">
@@ -23,7 +25,7 @@ export function BehavioralHistory({ assessments, isLoading }: BehavioralHistoryP
   if (!assessments || assessments.length === 0) {
     return (
       <Paper withBorder p="md">
-        <Text c="dimmed">No behavioral assessments yet.</Text>
+        <Text c="dimmed">{t('noAssessmentsYet')}</Text>
       </Paper>
     );
   }
@@ -35,11 +37,11 @@ export function BehavioralHistory({ assessments, isLoading }: BehavioralHistoryP
   return (
     <Paper withBorder p="md">
       <Stack gap="sm">
-        <Text fw={600}>History by month</Text>
+        <Text fw={600}>{t('historyByMonth')}</Text>
         <Table withTableBorder withColumnBorders>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Month</Table.Th>
+              <Table.Th>{t('monthColumn')}</Table.Th>
               {allAttributes.map((attr) => (
                 <Table.Th key={attr}>{attr}</Table.Th>
               ))}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Group, Paper, Stack, Text, Badge, Progress } from '@mantine/core';
 import type { Attendance } from '@/types/attendance';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -13,6 +14,7 @@ export function AttendanceStats({
   attendance,
   totalStudents,
 }: AttendanceStatsProps) {
+  const t = useTranslations('attendance');
   const notifyColors = useThemeColors();
 
   const presentCount = attendance.filter((a) => a.status === 'present').length;
@@ -29,12 +31,12 @@ export function AttendanceStats({
     <Paper withBorder p="md">
       <Stack gap="md">
         <Text fw={500} size="lg">
-          Attendance Statistics
+          {t('attendanceStatistics')}
         </Text>
         <Group grow>
           <Stack gap="xs" align="center">
             <Text size="sm" c="dimmed">
-              Present
+              {t('present')}
             </Text>
             <Badge variant="light" color={notifyColors.success} size="lg">
               {presentCount}
@@ -42,7 +44,7 @@ export function AttendanceStats({
           </Stack>
           <Stack gap="xs" align="center">
             <Text size="sm" c="dimmed">
-              Absent
+              {t('absent')}
             </Text>
             <Badge variant="light" color={notifyColors.error} size="lg">
               {absentCount}
@@ -50,7 +52,7 @@ export function AttendanceStats({
           </Stack>
           <Stack gap="xs" align="center">
             <Text size="sm" c="dimmed">
-              Late
+              {t('late')}
             </Text>
             <Badge variant="light" color={notifyColors.warning} size="lg">
               {lateCount}
@@ -58,7 +60,7 @@ export function AttendanceStats({
           </Stack>
           <Stack gap="xs" align="center">
             <Text size="sm" c="dimmed">
-              Excused
+              {t('excused')}
             </Text>
             <Badge variant="light" color={notifyColors.info} size="lg">
               {excusedCount}
@@ -66,7 +68,7 @@ export function AttendanceStats({
           </Stack>
           <Stack gap="xs" align="center">
             <Text size="sm" c="dimmed">
-              Total
+              {t('total')}
             </Text>
             <Text fw={600} size="lg">
               {totalStudents}
@@ -76,7 +78,7 @@ export function AttendanceStats({
         <Stack gap="xs">
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              Attendance Rate
+              {t('attendanceRate')}
             </Text>
             <Text fw={600}>{presentPercentage}%</Text>
           </Group>

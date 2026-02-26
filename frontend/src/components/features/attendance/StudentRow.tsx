@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Group,
   Avatar,
@@ -29,6 +30,7 @@ export function StudentRow({
   onTimeChange,
   onNotesChange,
 }: StudentRowProps) {
+  const t = useTranslations('attendance');
   const [entryTime, setEntryTime] = useState(attendance.entryTime || '');
   const [exitTime, setExitTime] = useState(attendance.exitTime || '');
   const [notes, setNotes] = useState(attendance.notes || '');
@@ -135,15 +137,15 @@ export function StudentRow({
                 variant={notes ? 'light' : 'subtle'}
                 color={notes ? notifyColors.primary : 'gray'}
                 size="sm"
-                title={notes || 'Add notes'}
+                title={notes || t('addNotes')}
               >
                 <IconNotes size={16} />
               </ActionIcon>
             </Popover.Target>
             <Popover.Dropdown>
               <Textarea
-                label="Notes"
-                placeholder="Optional notes..."
+                label={t('notes')}
+                placeholder={t('notesPlaceholder')}
                 value={notes}
                 onChange={(e) => {
                   const value = e.currentTarget.value;

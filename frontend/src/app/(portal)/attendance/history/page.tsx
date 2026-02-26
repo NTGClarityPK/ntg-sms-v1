@@ -1,14 +1,16 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Group, Title } from '@mantine/core';
 import { AttendanceHistoryContent } from '@/components/features/attendance/AttendanceHistoryContent';
 
 export default function AttendanceHistoryPage() {
+  const t = useTranslations('attendance');
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Attendance History</Title>
+          <Title order={1}>{t('historyTitle')}</Title>
         </Group>
       </div>
       <div

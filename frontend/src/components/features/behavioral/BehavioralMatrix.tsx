@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Table,
   ScrollArea,
@@ -25,6 +26,7 @@ interface BehavioralMatrixProps {
  * Save per row: create or update assessment for that student/month.
  */
 export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixProps) {
+  const t = useTranslations('behavioral');
   const createMutation = useCreateBehavioralMutation();
   const updateMutation = useUpdateBehavioralMutation();
 
@@ -104,7 +106,7 @@ export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixP
   if (!data || attributes.length === 0) {
     return (
       <Paper withBorder p="md">
-        <Text c="dimmed">No attributes configured. Add attributes in Settings → Behavior.</Text>
+        <Text c="dimmed">{t('noAttributesConfigured')}</Text>
       </Paper>
     );
   }
@@ -112,7 +114,7 @@ export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixP
   if (rows.length === 0) {
     return (
       <Paper withBorder p="md">
-        <Text c="dimmed">No students in this class section.</Text>
+        <Text c="dimmed">{t('noStudentsInSection')}</Text>
       </Paper>
     );
   }
@@ -123,11 +125,11 @@ export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixP
         <Table withTableBorder withColumnBorders striped>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Student</Table.Th>
+              <Table.Th>{t('student')}</Table.Th>
               {attributes.map((attr) => (
                 <Table.Th key={attr}>{attr}</Table.Th>
               ))}
-              <Table.Th>Actions</Table.Th>
+              <Table.Th>{t('actions')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -154,7 +156,7 @@ export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixP
                     loading={isSaving}
                     onClick={() => handleSaveRow(row)}
                   >
-                    Save
+                    {t('save')}
                   </Button>
                 </Table.Td>
               </Table.Tr>

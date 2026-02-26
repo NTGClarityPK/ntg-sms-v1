@@ -5,6 +5,7 @@
  */
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Title, Paper, Stack, Skeleton, Text, Group, Button } from '@mantine/core';
 import { useRouter, useParams } from 'next/navigation';
 import { AssessmentForm } from '@/components/assessments/AssessmentForm';
@@ -13,6 +14,8 @@ import { useFeaturePermission } from '@/hooks/usePermissions';
 import type { UpdateAssessmentInput } from '@/types/assessment';
 
 export default function EditAssessmentPage() {
+  const t = useTranslations('assessment');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const params = useParams();
   const { canEdit } = useFeaturePermission('assessment');
@@ -58,7 +61,7 @@ export default function EditAssessmentPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Edit Assessment</Title>
+          <Title order={1}>{t('editAssessment')}</Title>
         </div>
         <div
           style={{
@@ -71,7 +74,7 @@ export default function EditAssessmentPage() {
         >
           <Paper p="xl" withBorder>
             <Text ta="center" c="dimmed">
-              Assessment not found.
+              {t('assessmentNotFound')}
             </Text>
           </Paper>
         </div>
@@ -83,7 +86,7 @@ export default function EditAssessmentPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Edit Assessment</Title>
+          <Title order={1}>{t('editAssessment')}</Title>
         </Group>
       </div>
 
@@ -107,7 +110,7 @@ export default function EditAssessmentPage() {
 
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => router.back()}>
-              Cancel
+              {tCommon('cancel')}
             </Button>
           </Group>
         </Stack>

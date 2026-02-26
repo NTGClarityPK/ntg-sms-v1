@@ -5,6 +5,7 @@
  * Form for creating and editing assessments
  */
 
+import { useTranslations } from 'next-intl';
 import { useForm, zodResolver } from '@mantine/form';
 import { Alert, Button, Stack, Text, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton, Divider, MultiSelect, Checkbox, Progress } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
@@ -121,10 +122,12 @@ interface AssessmentFormProps {
   onStagedFilesChange?: (files: StagedDraftFile[]) => void;
 }
 
-export function AssessmentForm({ assessment, onSubmit, isLoading, compressionProgress = null, compressionMessage = 'Compressing materials…', draftId = '', stagedFiles = [], onStagedFilesChange }: AssessmentFormProps) {
+export function AssessmentForm({ assessment, onSubmit, isLoading, compressionProgress = null, compressionMessage, draftId = '', stagedFiles = [], onStagedFilesChange }: AssessmentFormProps) {
+  const t = useTranslations('assessment');
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const isEditMode = !!assessment;
+  const defaultCompressionMessage = compressionMessage ?? t('compressingMaterials');
 
   // Current user as staff (teacher) and their assignments for dropdown filtering
   const { data: myStaffResponse } = useMyStaff();
@@ -447,7 +450,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
     createFormErrors.subjectTemplateId ||
     createFormErrors.classSectionIds ||
     createFormErrors._root ||
-    'Please complete all required fields above.';
+    t('pleaseCompleteRequired');
 
   return (
     <form
@@ -461,24 +464,24 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
     >
       <Stack gap="md">
         {hasCreateErrors && (
-          <Alert variant="light" color="red" title="Cannot create yet">
+          <Alert variant="light" color="red" title={t('cannotCreateYet')}>
             {firstCreateError}
           </Alert>
         )}
-        <TextInput id="assessment-form-title" label="Title" placeholder="Enter assessment title" required {...getInputProps('title')} />
+        <TextInput id="assessment-form-title" label={t('titleColumn')} placeholder={t('titlePlaceholder')} required {...getInputProps('title')} />
 
         <Textarea
           id="assessment-form-description"
-          label="Description"
-          placeholder="Enter assessment description"
+          label={t('description')}
+          placeholder={t('descriptionPlaceholder')}
           minRows={3}
           {...getInputProps('description')}
         />
 
         <Select
           id="assessment-form-type"
-          label="Assessment Type"
-          placeholder="Select type"
+          label={t('assessmentType')}
+          placeholder={t('selectType')}
           data={assessmentTypes}
           required
           {...getInputProps('assessmentTypeId')}
@@ -486,10 +489,10 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
 
         {!isEditMode && (
           <Stack gap="xs">
-            <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>Creation Mode</div>
+            <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>{t('creationMode')}</div>
             <Checkbox
               checked={createForm.values.mode === 'single'}
-              label="Single Class Section"
+              label={t('singleClassSection')}
               onChange={() => {
                 createForm.setFieldValue('mode', 'single');
                 createForm.setFieldValue('classSectionId', '');
@@ -501,7 +504,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
             />
             <Checkbox
               checked={createForm.values.mode === 'class-template'}
-              label="Class + Subject Template (All Sections)"
+              label={t('classSubjectTemplateAll')}
               onChange={() => {
                 createForm.setFieldValue('mode', 'class-template');
                 createForm.setFieldValue('classSectionId', '');
@@ -513,7 +516,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
             />
             <Checkbox
               checked={createForm.values.mode === 'class-sections'}
-              label="Class + Specific Sections"
+              label={t('classSpecificSections')}
               onChange={() => {
                 createForm.setFieldValue('mode', 'class-sections');
                 createForm.setFieldValue('classSectionId', '');
@@ -529,15 +532,15 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         {isEditMode ? (
           <>
             <Select
-              label="Class Section"
-              placeholder="Select class section"
+              label={t('classSection')}
+              placeholder={t('selectClassSection')}
               data={classSections}
               required
               {...getInputProps('classSectionId')}
             />
             <Select
-              label="Subject"
-              placeholder="Select subject"
+              label={t('subject')}
+              placeholder={t('selectSubject')}
               data={subjects}
               required
               {...getInputProps('subjectId')}
@@ -548,8 +551,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
             {(currentMode === 'single' || !currentMode) && (
               <>
                 <Select
-                  label="Class Section"
-                  placeholder="Select class section"
+                  label={t('classSection')}
+                  placeholder={t('selectClassSection')}
                   data={classSections}
                   required
                   {...getInputProps('classSectionId')}
@@ -560,8 +563,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
                 />
                 <Select
                   key={`subject-single-${createForm.values.classSectionId || 'none'}`}
-                  label="Subject"
-                  placeholder={createForm.values.classSectionId ? 'Select subject' : 'Select class section first'}
+                  label={t('subject')}
+                  placeholder={createForm.values.classSectionId ? t('selectSubject') : t('selectClassSectionFirst')}
                   data={subjects}
                   required
                   disabled={!createForm.values.classSectionId}
@@ -573,8 +576,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
             {currentMode === 'class-template' && (
               <>
                 <Select
-                  label="Class"
-                  placeholder="Select class"
+                  label={t('class')}
+                  placeholder={t('selectClass')}
                   data={classesForTemplateMode}
                   required
                   searchable
@@ -589,8 +592,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
                   }}
                 />
                 <Select
-                  label="Subject Template"
-                  placeholder={dependentDataLoading && currentMode === 'class-template' ? 'Loading…' : 'Select subject template'}
+                  label={t('subjectTemplate')}
+                  placeholder={dependentDataLoading && currentMode === 'class-template' ? t('loading') : t('selectSubjectTemplate')}
                   data={subjectTemplates}
                   required
                   searchable
@@ -605,8 +608,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
                   }}
                 />
                 <Select
-                  label="Subject"
-                  placeholder="Select subject"
+                  label={t('subject')}
+                  placeholder={t('selectSubject')}
                   data={subjects}
                   required
                   disabled={!createForm.values.subjectTemplateId}
@@ -618,8 +621,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
             {currentMode === 'class-sections' && (
               <>
                 <Select
-                  label="Class"
-                  placeholder="Select class"
+                  label={t('class')}
+                  placeholder={t('selectClass')}
                   data={classes}
                   required
                   searchable
@@ -633,8 +636,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
                   }}
                 />
                 <MultiSelect
-                  label="Class Sections"
-                  placeholder={dependentDataLoading && currentMode === 'class-sections' ? 'Loading…' : 'Select sections'}
+                  label={t('classSections')}
+                  placeholder={dependentDataLoading && currentMode === 'class-sections' ? t('loading') : t('selectSections')}
                   data={sectionsForClass}
                   required
                   searchable
@@ -648,8 +651,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
                 />
                 <Select
                   key={`subject-sections-${(createForm.values.classSectionIds || []).join(',') || 'none'}`}
-                  label="Subject"
-                  placeholder={(createForm.values.classSectionIds?.length ?? 0) > 0 ? 'Select subject' : 'Select class sections first'}
+                  label={t('subject')}
+                  placeholder={(createForm.values.classSectionIds?.length ?? 0) > 0 ? t('selectSubject') : t('selectClassSectionsFirst')}
                   data={subjects}
                   required
                   disabled={!(createForm.values.classSectionIds?.length)}
@@ -663,8 +666,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         <Group grow>
           <NumberInput
             id="assessment-form-total-marks"
-            label="Total Marks"
-            placeholder="Enter total marks"
+            label={t('totalMarks')}
+            placeholder={t('enterTotalMarks')}
             min={0}
             required
             {...getInputProps('totalMarks')}
@@ -672,8 +675,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
 
           <DatePickerInput
             id="assessment-form-due-date"
-            label="Due Date"
-            placeholder="Select due date"
+            label={t('dueDate')}
+            placeholder={t('selectDueDate')}
             leftSection={<IconCalendar size={16} />}
             {...getInputProps('dueDate')}
           />
@@ -681,18 +684,18 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
 
         <DatePickerInput
           id="assessment-form-publish-date"
-          label="Publish Date"
-          placeholder="Select publish date"
+          label={t('publishDate')}
+          placeholder={t('selectPublishDate')}
           leftSection={<IconCalendar size={16} />}
           {...getInputProps('publishDate')}
         />
 
         <Group>
-          <Switch id="assessment-form-published" label="Published" {...getInputProps('isPublished')} />
+          <Switch id="assessment-form-published" label={t('published')} {...getInputProps('isPublished')} />
 
           <Switch
             id="assessment-form-allow-late"
-            label="Allow Late Submission"
+            label={t('allowLateSubmission')}
             {...getInputProps('allowLateSubmission')}
           />
         </Group>
@@ -703,7 +706,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         ) : (
           <>
             <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>
-              Optional: Assignment materials
+              {t('optionalMaterials')}
             </div>
             <FileUploadForCreate
               draftId={draftId}
@@ -716,7 +719,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         {compressionProgress !== null && compressionProgress !== undefined && (
           <Stack gap="xs" mt="md">
             <Text size="sm" c="dimmed">
-              {compressionMessage}
+              {compressionMessage ?? defaultCompressionMessage}
               {compressionProgress < 100 ? ` ${Math.round(compressionProgress)}%` : ''}
             </Text>
             <Progress value={compressionProgress} size="lg" radius="xl" />
@@ -730,7 +733,7 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
             loading={isLoading}
             disabled={compressionProgress !== null && compressionProgress !== undefined}
           >
-            {assessment ? 'Update Assessment' : 'Create Assessment'}
+            {assessment ? t('updateAssessment') : t('createAssessment')}
           </Button>
         </Group>
       </Stack>

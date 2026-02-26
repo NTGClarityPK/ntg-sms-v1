@@ -5,6 +5,7 @@
  * Uploads and compresses each file to draft as the user adds them. Total materials limit 10MB (post-compression).
  */
 
+import { useTranslations } from 'next-intl';
 import { Group, Stack, Text, FileButton, Paper, Button, Alert, Loader } from '@mantine/core';
 import { IconUpload, IconFile, IconInfoCircle } from '@tabler/icons-react';
 import { useUploadDraftFile, useDeleteDraftFile } from '@/hooks/api/useAssessmentAttachments';
@@ -24,6 +25,7 @@ export function FileUploadForCreate({
   stagedFiles,
   onStagedFilesChange,
 }: FileUploadForCreateProps) {
+  const t = useTranslations('assessment');
   const colors = useThemeColors();
   const uploadDraft = useUploadDraftFile(draftId);
   const deleteDraft = useDeleteDraftFile(draftId);
@@ -73,11 +75,10 @@ export function FileUploadForCreate({
     <Paper p="md" withBorder>
       <Stack gap="md">
         <Text size="sm" fw={500}>
-          Upload Assignment Materials
+          {t('uploadAssignmentMaterials')}
         </Text>
-        <Alert variant="light" color={colors.info} icon={<IconInfoCircle size={16} />} title="Compression and limit">
-          When you press Create Assessment, images and videos are compressed (images: max 1920px, 85% quality; videos: compressed).
-          Total size after compression must be 10MB or less. PDFs and documents are stored as-is.
+        <Alert variant="light" color={colors.info} icon={<IconInfoCircle size={16} />} title={t('compressionAndLimit')}>
+          {t('compressionInfoCreate')}
         </Alert>
         <Group>
           <FileButton
@@ -91,7 +92,7 @@ export function FileUploadForCreate({
                 leftSection={uploadDraft.isPending ? <Loader size={16} /> : <IconUpload size={16} />}
                 {...props}
               >
-                Select Files
+                {t('selectFiles')}
               </Button>
             )}
           </FileButton>
@@ -100,11 +101,11 @@ export function FileUploadForCreate({
           <Stack gap="xs">
             <Group justify="space-between">
               <Text size="sm" fw={500}>
-                Materials ({stagedFiles.length})
+                {t('materialsCount', { count: stagedFiles.length })}
               </Text>
               <Text size="sm" c={totalExceeds ? 'red' : 'dimmed'}>
-                Total: {formatFileSize(totalBytes)} / 10 MB
-                {totalExceeds && ' — exceeds limit'}
+                {t('totalSizeLimit', { size: formatFileSize(totalBytes) })}
+                {totalExceeds && ` ${t('exceedsLimit')}`}
               </Text>
             </Group>
             {stagedFiles.map((file, index) => (
@@ -133,14 +134,14 @@ export function FileUploadForCreate({
                   onClick={() => handleRemoveFile(index)}
                   loading={deleteDraft.isPending}
                 >
-                  Remove
+                  {t('remove')}
                 </Button>
               </Group>
             ))}
           </Stack>
         )}
         <Text size="xs" c="dimmed">
-          Supported: PDF, Word, Excel, PowerPoint, images, video (MP4, WebM, etc.), text. Total after compression must be ≤10MB.
+          {t('supportedFormatsCreate')}
         </Text>
       </Stack>
     </Paper>

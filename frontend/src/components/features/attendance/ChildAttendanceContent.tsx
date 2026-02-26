@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Group,
   Select,
@@ -40,6 +41,7 @@ interface Child {
  * Used in the main Attendance page (Child Attendance tab) and on the standalone /attendance/child page.
  */
 export function ChildAttendanceContent() {
+  const t = useTranslations('attendance');
   const { user } = useAuth();
   const notifyColors = useThemeColors();
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export function ChildAttendanceContent() {
     return (
       <Alert icon={<IconAlertCircle size={16} />} color={notifyColors.warning}>
         <Text size="sm">
-          No children linked to your account. Please contact the school administrator.
+          {t('noChildrenLinked')}
         </Text>
       </Alert>
     );
@@ -105,8 +107,8 @@ export function ChildAttendanceContent() {
       {children.length > 1 && (
         <Paper withBorder p="md">
           <Select
-            label="Select Child"
-            placeholder="Choose a child"
+            label={t('selectChild')}
+            placeholder={t('chooseChild')}
             data={children.map((c) => ({
               value: c.studentId,
               label: c.studentName || `Student ${c.studentStudentId || c.studentId}`,
@@ -132,10 +134,10 @@ export function ChildAttendanceContent() {
               </Avatar>
               <Stack gap={2}>
                 <Text fw={500} size="lg">
-                  {selectedChild.studentName || 'Student'}
+                  {selectedChild.studentName || t('student')}
                 </Text>
                 <Text size="sm" c="dimmed">
-                  Student ID: {selectedChild.studentStudentId || selectedChild.studentId}
+                  {t('studentIdLabel')}: {selectedChild.studentStudentId || selectedChild.studentId}
                 </Text>
               </Stack>
             </Group>
@@ -145,29 +147,29 @@ export function ChildAttendanceContent() {
             <Paper withBorder p="md">
               <Stack gap="md">
                 <Text fw={500} size="lg">
-                  Attendance Summary
+                  {t('attendanceSummary')}
                 </Text>
                 <Group grow>
                   <Stack gap="xs" align="center">
-                    <Text size="sm" c="dimmed">Present</Text>
+                    <Text size="sm" c="dimmed">{t('present')}</Text>
                     <Badge variant="light" color={notifyColors.success} size="lg">
                       {summary.presentDays}
                     </Badge>
                   </Stack>
                   <Stack gap="xs" align="center">
-                    <Text size="sm" c="dimmed">Absent</Text>
+                    <Text size="sm" c="dimmed">{t('absent')}</Text>
                     <Badge variant="light" color={notifyColors.error} size="lg">
                       {summary.absentDays}
                     </Badge>
                   </Stack>
                   <Stack gap="xs" align="center">
-                    <Text size="sm" c="dimmed">Late</Text>
+                    <Text size="sm" c="dimmed">{t('late')}</Text>
                     <Badge variant="light" color={notifyColors.warning} size="lg">
                       {summary.lateDays}
                     </Badge>
                   </Stack>
                   <Stack gap="xs" align="center">
-                    <Text size="sm" c="dimmed">Attendance Rate</Text>
+                    <Text size="sm" c="dimmed">{t('attendanceRate')}</Text>
                     <Text fw={600} size="xl">{summary.percentage}%</Text>
                   </Stack>
                 </Group>

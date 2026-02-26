@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Group,
   Title,
@@ -18,6 +19,7 @@ import { usePendingBehavioral } from '@/hooks/useBehavioral';
 import { BehavioralAssessContent } from '@/components/features/behavioral/BehavioralAssessContent';
 
 export default function BehavioralPage() {
+  const t = useTranslations('behavioral');
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<string | null>('matrix');
   const pendingQuery = usePendingBehavioral();
@@ -28,8 +30,8 @@ export default function BehavioralPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Behavioural Assessment</Title>
-          <Tooltip label="Refresh">
+          <Title order={1}>{t('title')}</Title>
+          <Tooltip label={t('refresh')}>
             <ActionIcon
               variant="light"
               size="lg"
@@ -54,10 +56,10 @@ export default function BehavioralPage() {
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="matrix" leftSection={<IconTable size={16} />}>
-              Matrix
+              {t('matrix')}
             </Tabs.Tab>
             <Tabs.Tab value="pending" leftSection={<IconListCheck size={16} />}>
-              Pending this month
+              {t('pendingThisMonth')}
             </Tabs.Tab>
           </Tabs.List>
 
@@ -69,13 +71,13 @@ export default function BehavioralPage() {
             <Stack gap="md">
               <Paper withBorder p="md">
                 <Text size="sm" fw={500} mb="xs">
-                  Students in your class sections who have not been assessed yet this month.
+                  {t('pendingDescription')}
                 </Text>
                 {isLoadingPending ? (
                   <Skeleton height={80} radius="sm" />
                 ) : pending.length === 0 ? (
                   <Text size="sm" c="dimmed">
-                    No pending students, or you are not assigned to any class section.
+                    {t('noPending')}
                   </Text>
                 ) : (
                   <Stack gap="xs">
@@ -89,7 +91,7 @@ export default function BehavioralPage() {
                     ))}
                     {pending.length > 50 && (
                       <Text size="sm" c="dimmed">
-                        +{pending.length - 50} more
+                        {t('moreCount', { count: pending.length - 50 })}
                       </Text>
                     )}
                   </Stack>

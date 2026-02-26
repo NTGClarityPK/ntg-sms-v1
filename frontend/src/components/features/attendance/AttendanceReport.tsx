@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import {
   Paper,
   Stack,
@@ -27,6 +28,7 @@ export function AttendanceReport({
   startDate,
   endDate,
 }: AttendanceReportProps) {
+  const t = useTranslations('attendance');
   if (isLoading) {
     return (
       <Paper withBorder p="xl">
@@ -82,7 +84,7 @@ export function AttendanceReport({
       <Stack gap="md">
         <Group justify="space-between">
           <Text fw={500} size="lg">
-            Attendance Report
+            {t('attendanceReport')}
           </Text>
           {attendance.length > 0 && (
             <Button
@@ -90,15 +92,15 @@ export function AttendanceReport({
               variant="light"
               onClick={handleExport}
             >
-              Export CSV
+              {t('exportCsv')}
             </Button>
           )}
         </Group>
 
         {startDate || endDate ? (
           <Text size="sm" c="dimmed">
-            Period: {startDate ? new Date(startDate).toLocaleDateString() : 'All'} -{' '}
-            {endDate ? new Date(endDate).toLocaleDateString() : 'All'}
+            {t('periodLabel')}: {startDate ? new Date(startDate).toLocaleDateString() : t('all')} -{' '}
+            {endDate ? new Date(endDate).toLocaleDateString() : t('all')}
           </Text>
         ) : null}
 
@@ -106,7 +108,7 @@ export function AttendanceReport({
           <Paper withBorder p="sm">
             <Stack gap="xs" align="center">
               <Text size="sm" c="dimmed">
-                Total Records
+                {t('totalRecords')}
               </Text>
               <Text fw={600} size="xl">
                 {total}
@@ -116,7 +118,7 @@ export function AttendanceReport({
           <Paper withBorder p="sm">
             <Stack gap="xs" align="center">
               <Text size="sm" c="dimmed">
-                Present
+                {t('present')}
               </Text>
               <Badge variant="filled" color="green" size="lg">
                 {String(presentCount)}
@@ -126,7 +128,7 @@ export function AttendanceReport({
           <Paper withBorder p="sm">
             <Stack gap="xs" align="center">
               <Text size="sm" c="dimmed">
-                Absent
+                {t('absent')}
               </Text>
               <Badge variant="filled" color="red" size="lg">
                 {String(absentCount)}
@@ -136,7 +138,7 @@ export function AttendanceReport({
           <Paper withBorder p="sm">
             <Stack gap="xs" align="center">
               <Text size="sm" c="dimmed">
-                Late
+                {t('late')}
               </Text>
               <Badge variant="filled" color="yellow" size="lg">
                 {String(lateCount)}
@@ -146,7 +148,7 @@ export function AttendanceReport({
           <Paper withBorder p="sm">
             <Stack gap="xs" align="center">
               <Text size="sm" c="dimmed">
-                Attendance Rate
+                {t('attendanceRate')}
               </Text>
               <Text fw={600} size="xl">
                 {presentPercentage}%
@@ -157,7 +159,7 @@ export function AttendanceReport({
 
         {attendance.length === 0 ? (
           <Text c="dimmed" ta="center" py="xl">
-            No attendance records found for the selected filters
+            {t('noAttendanceForFilters')}
           </Text>
         ) : (
           <Box
@@ -171,15 +173,15 @@ export function AttendanceReport({
             <Table striped highlightOnHover style={{ minWidth: 600 }}>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Date</Table.Th>
-                    <Table.Th>Student Name</Table.Th>
-                    <Table.Th>Student ID</Table.Th>
-                    <Table.Th>Class</Table.Th>
-                    <Table.Th>Section</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th>Entry Time</Table.Th>
-                    <Table.Th>Exit Time</Table.Th>
-                    <Table.Th>Notes</Table.Th>
+                    <Table.Th>{t('dateColumn')}</Table.Th>
+                    <Table.Th>{t('studentName')}</Table.Th>
+                    <Table.Th>{t('studentId')}</Table.Th>
+                    <Table.Th>{t('class')}</Table.Th>
+                    <Table.Th>{t('section')}</Table.Th>
+                    <Table.Th>{t('statusColumn')}</Table.Th>
+                    <Table.Th>{t('entryTime')}</Table.Th>
+                    <Table.Th>{t('exitTime')}</Table.Th>
+                    <Table.Th>{t('notes')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>

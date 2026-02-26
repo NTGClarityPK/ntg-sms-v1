@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Paper, Stack, Text, Skeleton, Group, Badge } from '@mantine/core';
 import type { Attendance } from '@/types/attendance';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -19,6 +20,7 @@ export function AttendanceCalendar({
   endDate,
   isSingleStudent = false,
 }: AttendanceCalendarProps) {
+  const t = useTranslations('attendance');
   const notifyColors = useThemeColors();
 
   if (isLoading) {
@@ -80,15 +82,15 @@ export function AttendanceCalendar({
     const getStatusLabel = (status: string | null) => {
       switch (status) {
         case 'present':
-          return 'Present';
+          return t('present');
         case 'late':
-          return 'Late';
+          return t('late');
         case 'absent':
-          return 'Absent';
+          return t('absent');
         case 'excused':
-          return 'Excused';
+          return t('excused');
         default:
-          return 'No Record';
+          return t('noRecord');
       }
     };
 
@@ -96,11 +98,11 @@ export function AttendanceCalendar({
       <Paper withBorder p="md">
         <Stack gap="md">
           <Text fw={500} size="lg">
-            Attendance Calendar
+            {t('attendanceCalendar')}
           </Text>
           {dateStats.length === 0 ? (
             <Text c="dimmed" ta="center" py="xl">
-              No attendance records found for the selected period
+              {t('noAttendanceForPeriod')}
             </Text>
           ) : (
             <Stack gap="xs">
@@ -124,12 +126,12 @@ export function AttendanceCalendar({
                       </Badge>
                       {stat.entryTime && (
                         <Text size="sm" c="dimmed">
-                          Entry: {stat.entryTime.slice(0, 5)}
+                          {t('entryLabel')}: {stat.entryTime.slice(0, 5)}
                         </Text>
                       )}
                       {stat.exitTime && (
                         <Text size="sm" c="dimmed">
-                          Exit: {stat.exitTime.slice(0, 5)}
+                          {t('exitLabel')}: {stat.exitTime.slice(0, 5)}
                         </Text>
                       )}
                     </Group>
@@ -181,11 +183,11 @@ export function AttendanceCalendar({
     <Paper withBorder p="md">
       <Stack gap="md">
         <Text fw={500} size="lg">
-          Attendance Calendar
+          {t('attendanceCalendar')}
         </Text>
         {dateStats.length === 0 ? (
           <Text c="dimmed" ta="center" py="xl">
-            No attendance records found for the selected period
+            {t('noAttendanceForPeriod')}
           </Text>
         ) : (
           <Stack gap="xs">
@@ -195,15 +197,15 @@ export function AttendanceCalendar({
                   <Group gap="md">
                     <Text fw={500}>{new Date(stat.date).toLocaleDateString()}</Text>
                     <Badge variant="light" color={getDateColor(stat.presentPercentage)}>
-                      {stat.presentPercentage}% Present
+                      {t('percentPresent', { percent: stat.presentPercentage })}
                     </Badge>
                   </Group>
                   <Group gap="xs">
                     <Badge variant="light" color={notifyColors.success} size="sm">
-                      {stat.presentCount} Present
+                      {t('countPresent', { count: stat.presentCount })}
                     </Badge>
                     <Badge variant="light" color={notifyColors.error} size="sm">
-                      {stat.absentCount} Absent
+                      {t('countAbsent', { count: stat.absentCount })}
                     </Badge>
                     {stat.lateCount > 0 && (
                       <Badge
@@ -211,12 +213,12 @@ export function AttendanceCalendar({
                         color={notifyColors.warning}
                         size="sm"
                       >
-                        {stat.lateCount} Late
+                        {t('countLate', { count: stat.lateCount })}
                       </Badge>
                     )}
                     {stat.excusedCount > 0 && (
                       <Badge variant="light" color={notifyColors.info} size="sm">
-                        {stat.excusedCount} Excused
+                        {t('countExcused', { count: stat.excusedCount })}
                       </Badge>
                     )}
                   </Group>
