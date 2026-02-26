@@ -10,7 +10,7 @@ export default getRequestConfig(async () => {
       .then((m) => m.default as Record<string, unknown>)
       .catch(() => ({}));
 
-  const [common, auth, students, navigation, dashboard, attendance, assessment, behavioral] =
+  const [common, auth, students, navigation, dashboard, attendance, assessment, behavioral, leave, earlyDeparture, notification, messages, library, inventory] =
     await Promise.all([
       load('common.json'),
       load('auth.json'),
@@ -20,10 +20,16 @@ export default getRequestConfig(async () => {
       load('attendance.json'),
       load('assessment.json'),
       load('behavioral.json'),
+      load('leave.json'),
+      load('earlyDeparture.json'),
+      load('notification.json'),
+      load('messages.json'),
+      load('library.json'),
+      load('inventory.json'),
     ]);
 
   return {
     locale,
-    messages: { common, auth, students, navigation, dashboard, attendance, assessment, behavioral },
+    messages: { common, auth, students, navigation, dashboard, attendance, assessment, behavioral, leave, earlyDeparture, notification, messages, library, inventory },
   };
 });

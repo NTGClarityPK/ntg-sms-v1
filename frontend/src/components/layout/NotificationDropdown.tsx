@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import {
   Stack,
   Text,
@@ -31,6 +32,7 @@ export function NotificationDropdown({
   alertsEnabled,
   onToggleAlerts,
 }: NotificationDropdownProps) {
+  const t = useTranslations('notification');
   const router = useRouter();
   const notifyColors = useThemeColors();
   const { data: notificationsData, isLoading } = useNotifications({
@@ -104,7 +106,7 @@ export function NotificationDropdown({
         <Group gap="xs">
           <IconBell size={18} />
           <Text fw={500} size="sm">
-            Notifications
+            {t('dropdownTitle')}
           </Text>
           {notifications.length > 0 && (
             <Badge variant="light" size="sm" color={notifyColors.primary}>
@@ -114,7 +116,7 @@ export function NotificationDropdown({
         </Group>
         <Group gap="xs">
           <Tooltip
-            label={alertsEnabled ? 'Disable notification alerts' : 'Enable notification alerts'}
+            label={alertsEnabled ? t('disableAlertsTooltip') : t('enableAlertsTooltip')}
             position="bottom"
             withArrow
           >
@@ -122,7 +124,7 @@ export function NotificationDropdown({
               variant="subtle"
               size="sm"
               onClick={onToggleAlerts}
-              aria-label={alertsEnabled ? 'Disable notification alerts' : 'Enable notification alerts'}
+              aria-label={alertsEnabled ? t('disableAlertsTooltip') : t('enableAlertsTooltip')}
             >
               {alertsEnabled ? <IconBell size={16} /> : <IconBellOff size={16} />}
             </ActionIcon>
@@ -138,7 +140,7 @@ export function NotificationDropdown({
               }}
               loading={markAllAsRead.isPending}
             >
-              Mark all read
+              {t('markAllRead')}
             </Button>
           )}
         </Group>
@@ -156,7 +158,7 @@ export function NotificationDropdown({
           loading={pushLoading}
           mb="sm"
         >
-          Enable push notifications
+          {t('enablePushNotifications')}
         </Button>
       )}
 
@@ -170,7 +172,7 @@ export function NotificationDropdown({
         <Stack align="center" gap="sm" py="xl">
           <IconBell size={32} style={{ opacity: 0.3 }} />
           <Text size="sm" c="dimmed">
-            No new notifications
+            {t('noNewNotifications')}
           </Text>
         </Stack>
       ) : (
@@ -203,7 +205,7 @@ export function NotificationDropdown({
                       </Badge>
                       {notification.isCritical && (
                         <Badge variant="filled" size="xs" color="red">
-                          Critical
+                          {t('critical')}
                         </Badge>
                       )}
                       <Text fw={500} size="sm" lineClamp={1}>
@@ -252,7 +254,7 @@ export function NotificationDropdown({
               onClose();
             }}
           >
-            View All Notifications
+            {t('viewAllNotifications')}
           </Button>
         </>
       )}

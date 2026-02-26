@@ -3,6 +3,7 @@
 import { SimpleGrid, Pagination, Group, Text, Badge, Card, Image, Stack, ActionIcon, Modal } from '@mantine/core';
 import { IconDownload, IconEye, IconEdit, IconTrash, IconFolderOff } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
+import { useTranslations } from 'next-intl';
 import { useDownloadLibraryItem, useDeleteLibraryItem, useIncrementLibraryViewCount } from '@/hooks/useLibrary';
 import { saveDocumentForOffline } from '@/lib/offline/documents';
 import { modals } from '@mantine/modals';
@@ -39,6 +40,7 @@ interface LibraryGridProps {
 const isPdf = (fileName: string) => /\.pdf$/i.test(fileName);
 
 export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: LibraryGridProps) {
+  const t = useTranslations('library');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<{ fileUrl: string; fileName: string } | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
@@ -72,10 +74,10 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
         url,
         blob
       );
-      notifications.show({ title: 'Saved for offline', message: 'Open it from Offline documents.', color: 'green' });
+      notifications.show({ title: t('savedForOffline'), message: t('openFromOffline'), color: 'green' });
     } catch (e) {
       notifications.show({
-        title: 'Failed to save',
+        title: t('failedToSave'),
         message: e instanceof Error ? e.message : 'Unknown error',
         color: 'red',
       });
@@ -89,13 +91,13 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
 
   const handleDelete = (id: string, title: string) => {
     modals.openConfirmModal({
-      title: 'Delete Library Item',
+      title: t('deleteItem'),
       children: (
         <Text size="sm">
-          Are you sure you want to delete <strong>{title}</strong>? This action cannot be undone.
+          {t('deleteConfirm', { title })}
         </Text>
       ),
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      labels: { confirm: t('delete'), cancel: t('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => deleteMutation.mutate(id),
     });
@@ -121,7 +123,7 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
               </Text>
               {item.author && (
                 <Text size="sm" c="dimmed">
-                  by {item.author}
+                  {t('authorBy')} {item.author}
                 </Text>
               )}
               <Badge size="sm" variant="light">
@@ -147,13 +149,13 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
                   <div />
                 )}
                 <Group gap="xs">
-                  <ActionIcon variant="light" size="sm" onClick={() => handleView(item.id)} title="View">
+                  <ActionIcon variant="light" size="sm" onClick={() => handleView(item.id)} title={t('view')}>
                     <IconEye size={16} />
                   </ActionIcon>
-                  <ActionIcon variant="light" size="sm" onClick={() => handleDownload(item.id)} title="Download">
+                  <ActionIcon variant="light" size="sm" onClick={() => handleDownload(item.id)} title={t('download')}>
                     <IconDownload size={16} />
                   </ActionIcon>
-                  <ActionIcon variant="light" size="sm" onClick={() => handleSaveForOffline(item.id)} title="Save for offline">
+                  <ActionIcon variant="light" size="sm" onClick={() => handleSaveForOffline(item.id)} title={t('saveForOffline')}>
                     <IconFolderOff size={16} />
                   </ActionIcon>
                   {canEdit && (
@@ -186,14 +188,14 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
       <Modal
         opened={!!previewItem}
         onClose={() => setPreviewItem(null)}
-        title={previewItem?.fileName ?? 'Preview'}
+        title={previewItem?.fileName ?? t('preview')}
         size="xl"
         centered
       >
         {previewItem && (isPdf(previewItem.fileName) ? (
           <Stack gap="sm">
             <Text size="xs" c="dimmed">
-              PDF preview depends on browser support. If it does not render, use download.
+              {t('pdfPreviewHint')}
             </Text>
             <iframe
               src={previewItem.fileUrl}
@@ -209,7 +211,7 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
         ) : (
           <Stack gap="sm">
             <Text size="sm" c="dimmed">
-              In-app preview is not available for this file type. Please download to view.
+              {t('previewNotAvailable')}
             </Text>
             <Group justify="flex-end">
               <ActionIcon

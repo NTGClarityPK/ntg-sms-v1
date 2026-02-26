@@ -1,6 +1,7 @@
 'use client';
 
 import { Group, Badge, Text, Stack } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import type { StockEntry } from '@/types/inventory';
 
 interface StockMatrixProps {
@@ -14,10 +15,11 @@ export function StockMatrix({
   lowStockThreshold = 10,
   onEditQuantity,
 }: StockMatrixProps) {
+  const t = useTranslations('inventory');
   if (!stock || stock.length === 0) {
     return (
       <Text size="sm" c="dimmed">
-        No sizes defined. Add stock to see quantities.
+        {t('noSizesDefined')}
       </Text>
     );
   }
@@ -35,8 +37,8 @@ export function StockMatrix({
           const badgeColor = isOutOfStock ? 'red' : isLow ? 'red' : 'gray';
           const badgeVariant = isOutOfStock || isLow ? 'filled' : 'light';
           const label = isOutOfStock
-            ? `${entry.size}: Out of stock`
-            : `${entry.size}: ${entry.quantity}`;
+            ? `${entry.size}: ${t('outOfStock')}`
+            : t('sizeQuantity', { size: entry.size, quantity: entry.quantity });
           return (
             <Badge
               key={entry.id}

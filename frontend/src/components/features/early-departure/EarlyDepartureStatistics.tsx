@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Table, Badge, Text, Group, Stack, Paper, Skeleton } from '@mantine/core';
 import type { StudentEarlyDepartureStatistics } from '@/hooks/useEarlyDepartures';
 
@@ -12,6 +13,7 @@ export function EarlyDepartureStatistics({
   statistics,
   isLoading,
 }: EarlyDepartureStatisticsProps) {
+  const t = useTranslations('earlyDeparture');
   if (isLoading) {
     return (
       <Stack gap="md">
@@ -25,7 +27,7 @@ export function EarlyDepartureStatistics({
     return (
       <Paper withBorder p="md">
         <Text c="dimmed" ta="center">
-          No statistics available. No early departure requests have been submitted yet.
+          {t('noStatisticsAvailable')}
         </Text>
       </Paper>
     );
@@ -35,13 +37,13 @@ export function EarlyDepartureStatistics({
       <Table striped highlightOnHover>
       <Table.Thead>
         <Table.Tr>
-          <Table.Th>Student</Table.Th>
-          <Table.Th>Total Requests</Table.Th>
-          <Table.Th>Approved</Table.Th>
-          <Table.Th>Rejected</Table.Th>
-          <Table.Th>Cancelled</Table.Th>
-          <Table.Th>Pending</Table.Th>
-          <Table.Th>Excused</Table.Th>
+          <Table.Th>{t('student')}</Table.Th>
+          <Table.Th>{t('totalRequests')}</Table.Th>
+          <Table.Th>{t('approved')}</Table.Th>
+          <Table.Th>{t('rejected')}</Table.Th>
+          <Table.Th>{t('cancelled')}</Table.Th>
+          <Table.Th>{t('pending')}</Table.Th>
+          <Table.Th>{t('excused')}</Table.Th>
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>

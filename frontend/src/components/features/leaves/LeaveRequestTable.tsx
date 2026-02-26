@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Table, Badge, Group, Button, Pagination, Text, Tooltip, Modal, Textarea, Stack, ActionIcon } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useState } from 'react';
@@ -163,6 +164,7 @@ export function LeaveRequestTable({
   activeSchoolDays,
   excludedDates,
 }: LeaveRequestTableProps) {
+  const t = useTranslations('leave');
   const [reviewModalOpened, { open: openReviewModal, close: closeReviewModal }] = useDisclosure(false);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | null>(null);
@@ -206,13 +208,13 @@ export function LeaveRequestTable({
   const statusBadge = (status: LeaveRequest['status']) => {
     const badge = (
       <Badge variant="light" color={statusColorMap[status] ?? 'gray'}>
-        {status}
+        {t(status)}
       </Badge>
     );
 
     if (status === 'pending') {
       return (
-        <Tooltip label="Pending from teacher's end" withArrow>
+        <Tooltip label={t('pendingFromTeacher')} withArrow>
           {badge}
         </Tooltip>
       );
@@ -226,17 +228,17 @@ export function LeaveRequestTable({
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Date Requested</Table.Th>
-            <Table.Th>Leave Period</Table.Th>
-            <Table.Th>Days</Table.Th>
-            <Table.Th>Student</Table.Th>
-            <Table.Th>Quota usage</Table.Th>
-            <Table.Th>Reason</Table.Th>
-            <Table.Th>Status</Table.Th>
-            <Table.Th>Reviewed By</Table.Th>
-            <Table.Th>Date Reviewed</Table.Th>
-            <Table.Th>Review Notes</Table.Th>
-            <Table.Th>Actions</Table.Th>
+            <Table.Th>{t('dateRequested')}</Table.Th>
+            <Table.Th>{t('leavePeriod')}</Table.Th>
+            <Table.Th>{t('days')}</Table.Th>
+            <Table.Th>{t('student')}</Table.Th>
+            <Table.Th>{t('quotaUsage')}</Table.Th>
+            <Table.Th>{t('reason')}</Table.Th>
+            <Table.Th>{t('status')}</Table.Th>
+            <Table.Th>{t('reviewedBy')}</Table.Th>
+            <Table.Th>{t('dateReviewed')}</Table.Th>
+            <Table.Th>{t('reviewNotes')}</Table.Th>
+            <Table.Th>{t('actions')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -244,7 +246,7 @@ export function LeaveRequestTable({
             <Table.Tr>
               <Table.Td colSpan={11}>
                 <Text c="dimmed" ta="center" py="md">
-                  No leave requests found
+                  {t('noLeaveRequestsFound')}
                 </Text>
               </Table.Td>
             </Table.Tr>
@@ -347,7 +349,7 @@ export function LeaveRequestTable({
                             color="green"
                             onClick={() => handleReviewClick(request, 'approve')}
                           >
-                            Approve
+                            {t('approve')}
                           </Button>
                           <Button
                             size="xs"
@@ -355,12 +357,12 @@ export function LeaveRequestTable({
                             color="red"
                             onClick={() => handleReviewClick(request, 'reject')}
                           >
-                            Reject
+                            {t('reject')}
                           </Button>
                         </>
                       )}
                       {canCancel && (
-                        <Tooltip label="Cancel request" withArrow>
+                        <Tooltip label={t('cancelRequest')} withArrow>
                           <ActionIcon
                             variant="filled"
                             color="red"
@@ -398,20 +400,20 @@ export function LeaveRequestTable({
       <Modal
         opened={reviewModalOpened}
         onClose={closeReviewModal}
-        title={reviewAction === 'approve' ? 'Approve Leave Request' : 'Reject Leave Request'}
+        title={reviewAction === 'approve' ? t('approveLeaveRequest') : t('rejectLeaveRequest')}
         centered
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
             {reviewAction === 'approve'
-              ? 'You are about to approve this leave request. You can optionally add review notes below.'
-              : 'You are about to reject this leave request. Please provide a reason for rejection.'}
+              ? t('approveConfirmMessage')
+              : t('rejectConfirmMessage')}
           </Text>
 
           {selectedRequest && (
             <div>
               <Text size="xs" c="dimmed" fw={500} mb={4}>
-                Leave Period
+                {t('leavePeriod')}
               </Text>
               <Text size="sm">
                 {formatDateRange(selectedRequest.startDate, selectedRequest.endDate)}
@@ -419,7 +421,7 @@ export function LeaveRequestTable({
               {studentNameMap?.get(selectedRequest.studentId) && (
                 <>
                   <Text size="xs" c="dimmed" fw={500} mb={4} mt="xs">
-                    Student
+                    {t('student')}
                   </Text>
                   <Text size="sm">{studentNameMap.get(selectedRequest.studentId)}</Text>
                 </>
@@ -428,11 +430,11 @@ export function LeaveRequestTable({
           )}
 
           <Textarea
-            label={reviewAction === 'approve' ? 'Review Notes (Optional)' : 'Rejection Reason (Required)'}
+            label={reviewAction === 'approve' ? t('reviewNotesOptional') : t('rejectionReasonRequired')}
             placeholder={
               reviewAction === 'approve'
-                ? 'Add any notes about this approval...'
-                : 'Please provide a reason for rejection...'
+                ? t('reviewNotesPlaceholderApprove')
+                : t('reviewNotesPlaceholderReject')
             }
             value={reviewNotes}
             onChange={(e) => setReviewNotes(e.target.value)}
@@ -442,7 +444,7 @@ export function LeaveRequestTable({
 
           <Group justify="flex-end" mt="md">
             <Button variant="light" onClick={closeReviewModal}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               color={reviewAction === 'approve' ? 'green' : 'red'}
@@ -450,7 +452,7 @@ export function LeaveRequestTable({
               loading={updateStatus.isPending}
               disabled={reviewAction === 'reject' && !reviewNotes.trim()}
             >
-              {reviewAction === 'approve' ? 'Approve' : 'Reject'}
+              {reviewAction === 'approve' ? t('approve') : t('reject')}
             </Button>
           </Group>
         </Stack>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -33,6 +34,7 @@ import { supabase } from '@/lib/supabase/client';
 import type { MessageType, ConversationListItem, Message } from '@/types/messages';
 
 export default function MessagesPage() {
+  const t = useTranslations('messages');
   const searchParams = useSearchParams();
   const theme = useMantineTheme();
   const colors = useThemeColors();
@@ -391,7 +393,7 @@ export default function MessagesPage() {
   const conversationTitle = conversation
     ? conversation.type === 'broadcast' && (conversation.className || conversation.sectionName)
       ? `${conversation.className ?? ''} ${conversation.sectionName ?? ''}`.trim()
-      : conversation.participants?.map((p) => p.fullName).filter(Boolean).join(', ') || 'Conversation'
+      : conversation.participants?.map((p) => p.fullName).filter(Boolean).join(', ') || t('conversation')
     : '';
 
   const isOwnMessage = (m: Message) => m.senderId === user?.id;
@@ -424,19 +426,19 @@ export default function MessagesPage() {
               <ActionIcon
                 variant="subtle"
                 size="lg"
-                aria-label="Back to conversations"
+                aria-label={t('backToConversations')}
                 onClick={handleBackToList}
               >
                 <IconArrowLeft size={20} />
               </ActionIcon>
               <Title order={1} lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
-                {conversationTitle || 'Chat'}
+                {conversationTitle || t('chat')}
               </Title>
               <ActionIcon
                 variant="subtle"
                 color="red"
                 size="lg"
-                aria-label="Clear chat"
+                aria-label={t('clearChatAria')}
                 onClick={() => setClearConfirmOpen(true)}
               >
                 <IconEraser size={18} />
@@ -444,12 +446,12 @@ export default function MessagesPage() {
             </Group>
           ) : (
             <>
-              <Title order={1}>Messages</Title>
+              <Title order={1}>{t('title')}</Title>
               <Button
                 leftSection={<IconPlus size={18} />}
                 onClick={() => setNewConversationOpen(true)}
               >
-                New conversation
+                {t('newConversation')}
               </Button>
             </>
           )}
@@ -488,9 +490,9 @@ export default function MessagesPage() {
                 ) : conversations.length === 0 ? (
                   <Stack align="center" justify="center" p="xl" h={400}>
                     <IconMessage size={48} style={{ opacity: 0.3 }} />
-                    <Text c="dimmed">No conversations yet</Text>
+                    <Text c="dimmed">{t('noConversationsYet')}</Text>
                     <Button variant="light" onClick={() => setNewConversationOpen(true)}>
-                      Start a conversation
+                      {t('startConversation')}
                     </Button>
                   </Stack>
                 ) : (
@@ -511,8 +513,8 @@ export default function MessagesPage() {
                         <Group justify="space-between" wrap="nowrap" gap="xs">
                           <Text fw={selectedId === c.id ? 600 : 400} size="sm" lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
                             {c.type === 'broadcast'
-                              ? `${c.className ?? ''} ${c.sectionName ?? ''}`.trim() || 'Broadcast'
-                              : c.participantNames?.join(', ') || 'Conversation'}
+                              ? `${c.className ?? ''} ${c.sectionName ?? ''}`.trim() || t('broadcast')
+                              : c.participantNames?.join(', ') || t('conversation')}
                           </Text>
                           <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
                             {c.unreadCount > 0 && (
@@ -524,7 +526,7 @@ export default function MessagesPage() {
                               variant="subtle"
                               color="red"
                               size="sm"
-                              aria-label="Delete conversation"
+                              aria-label={t('deleteConversationAria')}
                               onClick={() => setDeleteConfirmId(c.id)}
                             >
                               <IconTrash size={16} />
@@ -548,7 +550,7 @@ export default function MessagesPage() {
               {!selectedId ? (
                 <Stack align="center" justify="center" h={480} p="xl">
                   <IconMessage size={64} style={{ opacity: 0.2 }} />
-                  <Text c="dimmed">Select a conversation or start a new one</Text>
+                  <Text c="dimmed">{t('selectOrStart')}</Text>
                 </Stack>
               ) : (
                 <Stack gap={0} h={isMobile ? chatHeight : 480} style={{ flex: 1, minHeight: 0 }}>
@@ -568,7 +570,7 @@ export default function MessagesPage() {
                           leftSection={<IconEraser size={14} />}
                           onClick={() => setClearConfirmOpen(true)}
                         >
-                          Clear chat
+                          {t('clearChat')}
                         </Button>
                       </Group>
                     </Box>
@@ -579,7 +581,7 @@ export default function MessagesPage() {
                         <Skeleton height={120} />
                       ) : messages.length === 0 ? (
                         <Text size="sm" c="dimmed" ta="center" py="xl">
-                          No messages yet. Say hello.
+                          {t('noMessagesYet')}
                         </Text>
                       ) : (
                         [...messages].reverse().map((m) => {
@@ -607,7 +609,7 @@ export default function MessagesPage() {
                               >
                                 {!own && (
                                   <Text size="xs" fw={500} c={own ? 'white' : 'dimmed'} mb={2}>
-                                    {m.senderName ?? 'User'}
+                                    {m.senderName ?? t('userFallback')}
                                   </Text>
                                 )}
                                 <Text
@@ -632,7 +634,7 @@ export default function MessagesPage() {
                     <Box p="sm" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
                       <Group gap="sm" align="flex-end" wrap="nowrap">
                         <Textarea
-                          placeholder="Type a message..."
+                          placeholder={t('typeMessagePlaceholder')}
                           value={body}
                           onChange={(e) => setBody(e.target.value)}
                           onKeyDown={(e) => {
@@ -675,22 +677,22 @@ export default function MessagesPage() {
           setNewRecipientUserId(null);
           setNewClassSectionId(null);
         }}
-        title="New conversation"
+        title={t('newConversation')}
       >
         <Stack gap="md">
           <Select
-            label="Conversation type"
+            label={t('conversationType')}
             data={[
-              { value: 'one_to_one', label: 'One-to-one' },
-              { value: 'broadcast', label: 'Broadcast to class' },
+              { value: 'one_to_one', label: t('oneToOne') },
+              { value: 'broadcast', label: t('broadcastToClass') },
             ]}
             value={newType}
             onChange={(v) => v && setNewType(v as 'one_to_one' | 'broadcast')}
           />
           {newType === 'one_to_one' && (
             <Select
-              label="Select user"
-              placeholder="Choose a user"
+              label={t('selectUser')}
+              placeholder={t('chooseUser')}
               searchable
               data={usersList.map((u) => ({
                 value: u.id,
@@ -702,8 +704,8 @@ export default function MessagesPage() {
           )}
           {newType === 'broadcast' && (
             <Select
-              label="Class section"
-              placeholder="Choose a class"
+              label={t('classSection')}
+              placeholder={t('chooseClass')}
               searchable
               data={classSectionsList.map((cs) => ({
                 value: cs.id,
@@ -718,7 +720,7 @@ export default function MessagesPage() {
               variant="default"
               onClick={() => setNewConversationOpen(false)}
             >
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleCreateConversation}
@@ -728,7 +730,7 @@ export default function MessagesPage() {
                 (newType === 'broadcast' && !newClassSectionId)
               }
             >
-              Create
+              {t('create')}
             </Button>
           </Group>
         </Stack>
@@ -737,14 +739,14 @@ export default function MessagesPage() {
       <Modal
         opened={deleteConfirmId !== null}
         onClose={() => setDeleteConfirmId(null)}
-        title="Delete conversation"
+        title={t('deleteConversationTitle')}
       >
         <Text size="sm" c="dimmed" mb="md">
-          Remove this conversation from your list? All messages will be permanently deleted. This cannot be undone.
+          {t('deleteConversationMessage')}
         </Text>
         <Group justify="flex-end" gap="sm">
           <Button variant="default" onClick={() => setDeleteConfirmId(null)}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button
             color="red"
@@ -763,7 +765,7 @@ export default function MessagesPage() {
               }
             }}
           >
-            Delete
+            {t('delete')}
           </Button>
         </Group>
       </Modal>
@@ -771,14 +773,14 @@ export default function MessagesPage() {
       <Modal
         opened={clearConfirmOpen}
         onClose={() => setClearConfirmOpen(false)}
-        title="Clear chat"
+        title={t('clearChatTitle')}
       >
         <Text size="sm" c="dimmed" mb="md">
-          Delete all messages in this conversation? This cannot be undone.
+          {t('clearChatMessage')}
         </Text>
         <Group justify="flex-end" gap="sm">
           <Button variant="default" onClick={() => setClearConfirmOpen(false)}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button
             color="red"
@@ -789,7 +791,7 @@ export default function MessagesPage() {
               });
             }}
           >
-            Clear all
+            {t('clearAll')}
           </Button>
         </Group>
       </Modal>

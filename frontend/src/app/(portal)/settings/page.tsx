@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar } from '@tabler/icons-react';
@@ -1182,6 +1183,7 @@ function ScheduleTabContent() {
 }
 
 function AssessmentTabContent() {
+  const tLeave = useTranslations('leave');
   const activeYearQuery = useActiveAcademicYear();
   const activeYearId = activeYearQuery.data?.data?.id;
 
@@ -1190,7 +1192,7 @@ function AssessmentTabContent() {
       <Tabs.List>
         <Tabs.Tab value="types">Assessment types</Tabs.Tab>
         <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
-        <Tabs.Tab value="leave">Leave quota</Tabs.Tab>
+        <Tabs.Tab value="leave">{tLeave('tabLeaveQuota')}</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="types" pt="md">

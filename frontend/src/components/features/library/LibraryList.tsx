@@ -3,6 +3,7 @@
 import { Table, Pagination, Group, Text, Badge, ActionIcon, Image, Modal, Stack } from '@mantine/core';
 import { IconDownload, IconEye, IconEdit, IconTrash, IconFolderOff } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
+import { useTranslations } from 'next-intl';
 import { useDownloadLibraryItem, useDeleteLibraryItem, useIncrementLibraryViewCount } from '@/hooks/useLibrary';
 import { saveDocumentForOffline } from '@/lib/offline/documents';
 import { modals } from '@mantine/modals';
@@ -37,6 +38,7 @@ interface LibraryListProps {
 }
 
 export function LibraryList({ items, meta, onPageChange, canEdit = false }: LibraryListProps) {
+  const t = useTranslations('library');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<{ fileUrl: string; fileName: string } | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
@@ -67,10 +69,10 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
       if (!res.ok) throw new Error('Failed to fetch file');
       const blob = await res.blob();
       await saveDocumentForOffline(libraryItem.title, 'library_item', url, blob);
-      notifications.show({ title: 'Saved for offline', message: 'Open it from Offline documents.', color: 'green' });
+      notifications.show({ title: t('savedForOffline'), message: t('openFromOffline'), color: 'green' });
     } catch (e) {
       notifications.show({
-        title: 'Failed to save',
+        title: t('failedToSave'),
         message: e instanceof Error ? e.message : 'Unknown error',
         color: 'red',
       });
@@ -84,13 +86,13 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
 
   const handleDelete = (id: string, title: string) => {
     modals.openConfirmModal({
-      title: 'Delete Library Item',
+      title: t('deleteItem'),
       children: (
         <Text size="sm">
-          Are you sure you want to delete <strong>{title}</strong>? This action cannot be undone.
+          {t('deleteConfirm', { title })}
         </Text>
       ),
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      labels: { confirm: t('delete'), cancel: t('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => deleteMutation.mutate(id),
     });
@@ -101,13 +103,13 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Thumbnail</Table.Th>
-            <Table.Th>Title</Table.Th>
-            <Table.Th>Author</Table.Th>
-            <Table.Th>Category</Table.Th>
-            {canEdit && <Table.Th>Views</Table.Th>}
-            {canEdit && <Table.Th>Downloads</Table.Th>}
-            <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
+            <Table.Th>{t('thumbnail')}</Table.Th>
+            <Table.Th>{t('tableTitle')}</Table.Th>
+            <Table.Th>{t('author')}</Table.Th>
+            <Table.Th>{t('category')}</Table.Th>
+            {canEdit && <Table.Th>{t('views')}</Table.Th>}
+            {canEdit && <Table.Th>{t('downloads')}</Table.Th>}
+            <Table.Th style={{ textAlign: 'right' }}>{t('actions')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -150,13 +152,13 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
               )}
               <Table.Td>
                 <Group gap="xs" justify="flex-end">
-                  <ActionIcon variant="light" size="sm" onClick={() => handleView(item.id)} title="View">
+                  <ActionIcon variant="light" size="sm" onClick={() => handleView(item.id)} title={t('view')}>
                     <IconEye size={16} />
                   </ActionIcon>
-                  <ActionIcon variant="light" size="sm" onClick={() => handleDownload(item.id)} title="Download">
+                  <ActionIcon variant="light" size="sm" onClick={() => handleDownload(item.id)} title={t('download')}>
                     <IconDownload size={16} />
                   </ActionIcon>
-                  <ActionIcon variant="light" size="sm" onClick={() => handleSaveForOffline(item.id)} title="Save for offline">
+                  <ActionIcon variant="light" size="sm" onClick={() => handleSaveForOffline(item.id)} title={t('saveForOffline')}>
                     <IconFolderOff size={16} />
                   </ActionIcon>
                   {canEdit && (
@@ -189,14 +191,14 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
       <Modal
         opened={!!previewItem}
         onClose={() => setPreviewItem(null)}
-        title={previewItem?.fileName ?? 'Preview'}
+        title={previewItem?.fileName ?? t('preview')}
         size="xl"
         centered
       >
         {previewItem && (isPdf(previewItem.fileName) ? (
             <Stack gap="sm">
               <Text size="xs" c="dimmed">
-                PDF preview depends on browser support. If it does not render, use download.
+                {t('pdfPreviewHint')}
               </Text>
               <iframe
                 src={previewItem.fileUrl}
@@ -212,7 +214,7 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
           ) : (
             <Stack gap="sm">
               <Text size="sm" c="dimmed">
-                In-app preview is not available for this file type. Please download to view.
+                {t('previewNotAvailable')}
               </Text>
               <Group justify="flex-end">
                 <ActionIcon

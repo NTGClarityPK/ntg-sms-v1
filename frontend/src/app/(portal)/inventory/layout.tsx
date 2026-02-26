@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { Tabs } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeaturePermission } from '@/hooks/usePermissions';
 import {
@@ -23,6 +24,7 @@ export default function InventoryLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const t = useTranslations('inventory');
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
@@ -46,16 +48,16 @@ export default function InventoryLayout({
           {canEdit && (
             <>
               <Tabs.Tab value="items" leftSection={<IconList size={16} />}>
-                Manage items
+                {t('tabManageItems')}
               </Tabs.Tab>
               <Tabs.Tab
                 value="requests"
                 leftSection={<IconClipboardList size={16} />}
               >
-                View requests
+                {t('tabViewRequests')}
               </Tabs.Tab>
               <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>
-                Issuance history
+                {t('tabIssuanceHistory')}
               </Tabs.Tab>
             </>
           )}
@@ -64,7 +66,7 @@ export default function InventoryLayout({
               value="request"
               leftSection={<IconClipboardList size={16} />}
             >
-              Request uniform
+              {t('tabRequestUniform')}
             </Tabs.Tab>
           )}
         </Tabs.List>

@@ -12,12 +12,14 @@ import {
   TextInput,
 } from '@mantine/core';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconPencil, IconTrash, IconX } from '@tabler/icons-react';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
 
 export function InventoryCategoryEditor() {
+  const t = useTranslations('inventory');
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
 
@@ -46,7 +48,7 @@ export function InventoryCategoryEditor() {
     if (normalizedItems.includes(next)) {
       notifications.show({
         title: 'Error',
-        message: 'Category already exists',
+        message: t('categoryAlreadyExists'),
         color: notifyColors.error,
       });
       return;
@@ -66,7 +68,7 @@ export function InventoryCategoryEditor() {
     if (!trimmedValue) {
       notifications.show({
         title: 'Error',
-        message: 'Category name cannot be empty',
+        message: t('categoryNameEmpty'),
         color: notifyColors.error,
       });
       return;
@@ -77,7 +79,7 @@ export function InventoryCategoryEditor() {
     ) {
       notifications.show({
         title: 'Error',
-        message: 'Category already exists',
+        message: t('categoryAlreadyExists'),
         color: notifyColors.error,
       });
       return;
@@ -94,7 +96,7 @@ export function InventoryCategoryEditor() {
   };
 
   const removeItem = (name: string) => {
-    if (window.confirm(`Delete category "${name}"?`)) {
+    if (window.confirm(t('deleteCategoryConfirm', { name }))) {
       setItems(normalizedItems.filter((x) => x !== name));
     }
   };
@@ -104,7 +106,7 @@ export function InventoryCategoryEditor() {
       await updateMutation.mutateAsync(normalizedItems);
       notifications.show({
         title: 'Success',
-        message: 'Inventory categories saved',
+        message: t('inventoryCategoriesSaved'),
         color: notifyColors.success,
       });
     } catch (error) {
@@ -120,7 +122,7 @@ export function InventoryCategoryEditor() {
 
   if (settingQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load categories">
+      <Alert color={colors.error} title={t('failedToLoadCategories')}>
         <Text size="sm">Please try again.</Text>
       </Alert>
     );
@@ -129,34 +131,34 @@ export function InventoryCategoryEditor() {
   return (
     <Paper withBorder p="md">
       <Stack gap="md">
-        <Text fw={600}>Uniform categories</Text>
+        <Text fw={600}>{t('uniformCategories')}</Text>
         <Text size="sm" c="dimmed">
-          Categories used when creating uniform items (e.g. Shirt, Pants, Skirt).
+          {t('uniformCategoriesDescription')}
         </Text>
 
         <Group align="flex-end">
           <TextInput
             id="inventory-category-editor-input"
-            label="Add category"
-            placeholder="e.g. Shirt"
+            label={t('addCategory')}
+            placeholder={t('addCategoryPlaceholder')}
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
           />
           <Button id="inventory-category-editor-add" variant="light" onClick={addItem}>
-            Add
+            {t('add')}
           </Button>
         </Group>
 
         {normalizedItems.length === 0 ? (
           <Text c="dimmed" size="sm">
-            No categories yet. Add some to use in Inventory.
+            {t('noCategoriesYet')}
           </Text>
         ) : (
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Category</Table.Th>
-                <Table.Th w={100}>Actions</Table.Th>
+                <Table.Th>{t('categoryColumn')}</Table.Th>
+                <Table.Th w={100}>{t('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -232,7 +234,7 @@ export function InventoryCategoryEditor() {
             onClick={onSave}
             loading={updateMutation.isPending || settingQuery.isLoading}
           >
-            Save
+            {t('save')}
           </Button>
         </Group>
       </Stack>

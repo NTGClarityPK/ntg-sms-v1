@@ -2,6 +2,7 @@
 
 import { Box, Card, Text, Group, Badge, Stack, ActionIcon, Image } from '@mantine/core';
 import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { StockMatrix } from './StockMatrix';
 import type { UniformItem, StockEntry } from '@/types/inventory';
 
@@ -14,14 +15,6 @@ interface UniformItemCardProps {
   canEdit?: boolean;
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  shirt: 'Shirt',
-  pants: 'Pants',
-  skirt: 'Skirt',
-  shoes: 'Shoes',
-  accessories: 'Accessories',
-};
-
 export function UniformItemCard({
   item,
   onEdit,
@@ -30,6 +23,14 @@ export function UniformItemCard({
   onEditStockQuantity,
   canEdit,
 }: UniformItemCardProps) {
+  const t = useTranslations('inventory');
+  const CATEGORY_LABELS: Record<string, string> = {
+    shirt: t('shirt'),
+    pants: t('pants'),
+    skirt: t('skirt'),
+    shoes: t('shoes'),
+    accessories: t('accessories'),
+  };
   const categoryLabel = CATEGORY_LABELS[item.category] ?? item.category;
   const stock = item.stock ?? [];
   const remainingQty = stock.reduce((sum, s) => sum + (s.quantity ?? 0), 0);
@@ -40,7 +41,7 @@ export function UniformItemCard({
       <Stack gap="sm">
         {canEdit && (
           <Text size="sm" fw={500} c="dimmed">
-            Remaining: {remainingQty}
+            {t('remaining')}: {remainingQty}
           </Text>
         )}
         <Box h={120} style={{ overflow: 'hidden' }}>
@@ -75,7 +76,7 @@ export function UniformItemCard({
                 variant="light"
                 size="sm"
                 onClick={() => onAddStock?.(item)}
-                title="Add stock"
+                title={t('addStock')}
               >
                 <IconPlus size={16} />
               </ActionIcon>
@@ -83,7 +84,7 @@ export function UniformItemCard({
                 variant="light"
                 size="sm"
                 onClick={() => onEdit?.(item)}
-                title="Edit item"
+                title={t('editItem')}
               >
                 <IconEdit size={16} />
               </ActionIcon>
@@ -92,7 +93,7 @@ export function UniformItemCard({
                 size="sm"
                 color="red"
                 onClick={() => onDelete?.(item)}
-                title="Delete item"
+                title={t('deleteItem')}
               >
                 <IconTrash size={16} />
               </ActionIcon>

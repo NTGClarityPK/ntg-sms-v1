@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Badge, Card, Group, Stack, Text, Button } from '@mantine/core';
 import type { EarlyDepartureRequest } from '@/types/early-departure';
 import { useUpdateEarlyDepartureStatus } from '@/hooks/useEarlyDepartures';
@@ -21,6 +22,7 @@ export function EarlyDepartureCard({
   request,
   isStaffView = false,
 }: EarlyDepartureCardProps) {
+  const t = useTranslations('earlyDeparture');
   const updateStatus = useUpdateEarlyDepartureStatus();
 
   const canReview = isStaffView && request.status === 'pending';
@@ -43,7 +45,7 @@ export function EarlyDepartureCard({
             variant="light"
             color={statusColorMap[request.status] ?? 'gray'}
           >
-            {request.status}
+            {t(request.status)}
           </Badge>
         </Group>
         {request.reason && (
@@ -61,7 +63,7 @@ export function EarlyDepartureCard({
                 onClick={() => handleAction('approve')}
                 loading={updateStatus.isPending}
               >
-                Approve
+                {t('approve')}
               </Button>
               <Button
                 size="xs"
@@ -70,7 +72,7 @@ export function EarlyDepartureCard({
                 onClick={() => handleAction('reject')}
                 loading={updateStatus.isPending}
               >
-                Reject
+                {t('reject')}
               </Button>
             </>
           )}

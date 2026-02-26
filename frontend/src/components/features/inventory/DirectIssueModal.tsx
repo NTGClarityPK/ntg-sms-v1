@@ -4,19 +4,12 @@ import { Modal, Select, NumberInput, Textarea, Button, Stack } from '@mantine/co
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { useUniforms } from '@/hooks/useInventory';
 import { useDirectIssuance } from '@/hooks/useUniformIssuances';
 import { useStudents } from '@/hooks/useStudents';
 import type { UniformItem } from '@/types/inventory';
-
-const schema = z.object({
-  studentId: z.string().min(1, 'Select a student'),
-  uniformItemId: z.string().min(1, 'Select an item'),
-  size: z.string().min(1, 'Select size'),
-  quantity: z.number().min(1, 'At least 1'),
-  notes: z.string().optional(),
-});
 
 interface DirectIssueModalProps {
   opened: boolean;
@@ -24,6 +17,18 @@ interface DirectIssueModalProps {
 }
 
 export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
+  const t = useTranslations('inventory');
+  const schema = useMemo(
+    () =>
+      z.object({
+        studentId: z.string().min(1, t('selectStudentRequired')),
+        uniformItemId: z.string().min(1, t('selectItemRequired')),
+        size: z.string().min(1, t('selectSizeRequired')),
+        quantity: z.number().min(1, t('quantityMinOne')),
+        notes: z.string().optional(),
+      }),
+    [t],
+  );
   const directIssueMutation = useDirectIssuance();
   const { data: uniformsResponse } = useUniforms({ page: 1, limit: 200 });
   const { data: studentsData } = useStudents({ page: 1, limit: 500 });
@@ -65,13 +70,13 @@ export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Direct issuance">
+    <Modal opened={opened} onClose={onClose} title={t('directIssuanceTitle')}>
       <form id="direct-issue-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Select
             id="direct-issue-student"
-            label="Student"
-            placeholder="Select student"
+            label={t('student')}
+            placeholder={t('selectStudent')}
             data={students.map((s) => ({
               value: s.id,
               label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || s.id,
@@ -81,8 +86,8 @@ export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
           />
           <Select
             id="direct-issue-item"
-            label="Item"
-            placeholder="Select item"
+            label={t('items')}
+            placeholder={t('selectItem')}
             data={uniforms.map((u) => ({ value: u.id, label: u.name }))}
             {...form.getInputProps('uniformItemId')}
             onChange={(v) => {
@@ -92,20 +97,20 @@ export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
           />
           <Select
             id="direct-issue-size"
-            label="Size"
-            placeholder="Select size"
+            label={t('size')}
+            placeholder={t('selectSizeRequired')}
             data={sizes.map((s) => ({ value: s, label: s }))}
             {...form.getInputProps('size')}
           />
           <NumberInput
             id="direct-issue-quantity"
-            label="Quantity"
+            label={t('quantity')}
             min={1}
             {...form.getInputProps('quantity')}
           />
           <Textarea
             id="direct-issue-notes"
-            label="Notes (optional)"
+            label={t('notesOptional')}
             {...form.getInputProps('notes')}
           />
           <Button
@@ -113,7 +118,7 @@ export function DirectIssueModal({ opened, onClose }: DirectIssueModalProps) {
             type="submit"
             loading={directIssueMutation.isPending}
           >
-            Issue
+            {t('issue')}
           </Button>
         </Stack>
       </form>

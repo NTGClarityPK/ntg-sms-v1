@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Alert, Button, Group, NumberInput, Paper, Stack, Text } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { notifications } from '@mantine/notifications';
@@ -11,6 +12,8 @@ interface LeaveQuotaSettingProps {
 }
 
 export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
+  const t = useTranslations('leave');
+  const tCommon = useTranslations('common');
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
   const quotaQuery = useLeaveQuota(academicYearId);
@@ -23,16 +26,16 @@ export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
 
   if (!academicYearId) {
     return (
-      <Alert color={colors.warning} title="No active academic year">
-        Create and activate an academic year to configure leave quota.
+      <Alert color={colors.warning} title={t('noActiveAcademicYear')}>
+        {t('createActivateAcademicYear')}
       </Alert>
     );
   }
 
   if (quotaQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load leave quota">
-        <Text size="sm">Please try again.</Text>
+      <Alert color={colors.error} title={t('failedToLoadLeaveQuota')}>
+        <Text size="sm">{t('pleaseTryAgain')}</Text>
       </Alert>
     );
   }
@@ -40,27 +43,26 @@ export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
   const onSave = async () => {
     try {
       await setQuota.mutateAsync({ academicYearId, annualQuota: value });
-      notifications.show({ title: 'Success', message: 'Leave quota saved', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: t('leaveQuotaSaved'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   return (
     <>
-      <Text size="lg" fw={500} mb="xs">Leave Quota</Text>
+      <Text size="lg" fw={500} mb="xs">{t('leaveQuotaTitle')}</Text>
       <Text size="sm" c="dimmed" mb="md">
-        Set the annual leave quota for students per academic year. This limit determines the maximum number of leave days 
-        a student can take during the academic year. The system tracks used and remaining leave days for each student.
+        {t('leaveQuotaDescription')}
       </Text>
       <Paper withBorder p="md">
         <Stack gap="md">
-          <Text fw={600}>Annual leave quota</Text>
-        <NumberInput id="leave-quota-value" label="Quota" min={0} value={value} onChange={(v) => setValue(Number(v) || 0)} />
+          <Text fw={600}>{t('annualLeaveQuota')}</Text>
+        <NumberInput id="leave-quota-value" label={t('quota')} min={0} value={value} onChange={(v) => setValue(Number(v) || 0)} />
         <Group justify="flex-end">
           <Button id="leave-quota-save" variant="light" onClick={onSave} loading={setQuota.isPending || quotaQuery.isLoading}>
-            Save
+            {t('save')}
           </Button>
         </Group>
       </Stack>

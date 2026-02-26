@@ -16,6 +16,7 @@ import {
 } from '@mantine/core';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
+import { useTranslations } from 'next-intl';
 import { useLibraryItems, useLibraryCategories } from '@/hooks/useLibrary';
 import { useCoreLookups } from '@/hooks/useCoreLookups';
 import { useFeaturePermission } from '@/hooks/usePermissions';
@@ -26,6 +27,7 @@ import { UploadModal } from '@/components/features/library/UploadModal';
 import type { ClassEntity } from '@/types/settings';
 
 export default function LibraryPage() {
+  const t = useTranslations('library');
   const colors = useThemeColors();
   const { canEdit } = useFeaturePermission('library');
   const [opened, { open, close }] = useDisclosure(false);
@@ -82,10 +84,10 @@ export default function LibraryPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Library</Title>
+          <Title order={1}>{t('title')}</Title>
           {canEdit && (
             <Button id="library-btn-upload" leftSection={<IconPlus size={16} />} onClick={open}>
-              Upload Item
+              {t('uploadItem')}
             </Button>
           )}
         </Group>
@@ -107,7 +109,7 @@ export default function LibraryPage() {
               <Group grow>
                 <TextInput
                   id="library-search"
-                  placeholder="Search library items..."
+                  placeholder={t('searchPlaceholder')}
                   leftSection={<IconSearch size={16} />}
                   value={search}
                   onChange={(e) => {
@@ -117,7 +119,7 @@ export default function LibraryPage() {
                 />
                 <Select
                   id="library-filter-category"
-                  placeholder="Filter by category"
+                  placeholder={t('filterByCategory')}
                   data={categories.map((cat) => ({ value: cat, label: cat }))}
                   value={categoryFilter}
                   onChange={(value) => {
@@ -129,7 +131,7 @@ export default function LibraryPage() {
                 />
                 <Select
                   id="library-filter-subject"
-                  placeholder="Filter by subject"
+                  placeholder={t('filterBySubject')}
                   data={subjects.map((s) => ({ value: s.id, label: s.name }))}
                   value={subjectFilter}
                   onChange={(value) => {
@@ -141,7 +143,7 @@ export default function LibraryPage() {
                 />
                 <Select
                   id="library-filter-class"
-                  placeholder="Filter by class"
+                  placeholder={t('filterByClass')}
                   data={classes.map((c) => {
                     const classEntity = c as ClassEntity;
                     return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
@@ -161,10 +163,10 @@ export default function LibraryPage() {
                   >
                     <Group gap="xs" wrap="wrap">
                       <Chip value="grid" variant="filled">
-                        Grid
+                        {t('grid')}
                       </Chip>
                       <Chip value="list" variant="filled">
-                        List
+                        {t('list')}
                       </Chip>
                     </Group>
                   </Chip.Group>
@@ -181,20 +183,18 @@ export default function LibraryPage() {
               <Skeleton height={50} />
             </Stack>
           ) : libraryQuery.error ? (
-            <Alert color={colors.error} title="Failed to load library items">
+            <Alert color={colors.error} title={t('failedToLoad')}>
               <Group justify="space-between" mt="sm">
-                <Text size="sm">Please try again.</Text>
+                <Text size="sm">{t('pleaseTryAgain')}</Text>
                 <Button id="library-retry" variant="light" onClick={() => libraryQuery.refetch()}>
-                  Retry
+                  {t('retry')}
                 </Button>
               </Group>
             </Alert>
           ) : !libraryResponse?.data || libraryResponse.data.length === 0 ? (
-            <Alert color={colors.info} title="No library items found">
+            <Alert color={colors.info} title={t('noItemsFound')}>
               <Text size="sm">
-                {canEdit
-                  ? 'No library items have been uploaded yet. Click "Upload Item" to add one.'
-                  : 'No library items have been uploaded yet.'}
+                {canEdit ? t('noItemsHintCanEdit') : t('noItemsHint')}
               </Text>
             </Alert>
           ) : viewMode === 'grid' ? (

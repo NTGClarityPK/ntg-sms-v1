@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Card,
   Group,
@@ -43,6 +44,7 @@ interface ParentChild {
 }
 
 export default function EarlyDeparturePage() {
+  const t = useTranslations('earlyDeparture');
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
@@ -142,8 +144,8 @@ export default function EarlyDeparturePage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Early Departure</Title>
-          <Tooltip label="Refresh">
+          <Title order={1}>{t('title')}</Title>
+          <Tooltip label={t('refresh')}>
             <ActionIcon
               variant="light"
               size="lg"
@@ -176,10 +178,10 @@ export default function EarlyDeparturePage() {
           }}
         >
           <Tabs.List>
-            {isParent && <Tabs.Tab id="early-departure-tab-my-requests" value="my-requests">Raise a request</Tabs.Tab>}
-            {!isParent && <Tabs.Tab id="early-departure-tab-authorize" value="authorize">Authorize Early Departure</Tabs.Tab>}
-            <Tabs.Tab id="early-departure-tab-all-requests" value="all-requests">All requests</Tabs.Tab>
-            <Tabs.Tab id="early-departure-tab-statistics" value="statistics">Past Statistics</Tabs.Tab>
+            {isParent && <Tabs.Tab id="early-departure-tab-my-requests" value="my-requests">{t('tabRaiseRequest')}</Tabs.Tab>}
+            {!isParent && <Tabs.Tab id="early-departure-tab-authorize" value="authorize">{t('tabAuthorize')}</Tabs.Tab>}
+            <Tabs.Tab id="early-departure-tab-all-requests" value="all-requests">{t('tabAllRequests')}</Tabs.Tab>
+            <Tabs.Tab id="early-departure-tab-statistics" value="statistics">{t('tabStatistics')}</Tabs.Tab>
           </Tabs.List>
 
           {isParent && (
@@ -208,8 +210,8 @@ export default function EarlyDeparturePage() {
                         <Stack gap="sm">
                           <Select
                             id="early-departure-select-student"
-                            label="Select Student"
-                            placeholder="Choose a student"
+                            label={t('selectStudent')}
+                            placeholder={t('chooseStudent')}
                             data={availableStudents.map((s) => ({
                               value: s.id,
                               label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || `Student ${s.id.slice(0, 8)}`,
@@ -227,7 +229,7 @@ export default function EarlyDeparturePage() {
                                   <>
                                     <Group gap="xs">
                                       <Text size="sm" c="dimmed">
-                                        Pending:
+                                        {t('pending')}:
                                       </Text>
                                       <Badge variant="light" color="yellow" size="sm">
                                         {studentStats.data.pending}
@@ -235,7 +237,7 @@ export default function EarlyDeparturePage() {
                                     </Group>
                                     <Group gap="xs">
                                       <Text size="sm" c="dimmed">
-                                        Approved:
+                                        {t('approved')}:
                                       </Text>
                                       <Badge variant="light" color="green" size="sm">
                                         {studentStats.data.approved}
@@ -243,7 +245,7 @@ export default function EarlyDeparturePage() {
                                     </Group>
                                     <Group gap="xs">
                                       <Text size="sm" c="dimmed">
-                                        Rejected:
+                                        {t('rejected')}:
                                       </Text>
                                       <Badge variant="light" color="red" size="sm">
                                         {studentStats.data.rejected}
@@ -266,7 +268,7 @@ export default function EarlyDeparturePage() {
                             <Group gap="md">
                               <Group gap="xs">
                                 <Text size="sm" c="dimmed">
-                                  Pending requests:
+                                  {t('pendingRequests')}
                                 </Text>
                                 <Badge variant="light" color="yellow" size="sm">
                                   {studentStats.data.pending}
@@ -274,7 +276,7 @@ export default function EarlyDeparturePage() {
                               </Group>
                               <Group gap="xs">
                                 <Text size="sm" c="dimmed">
-                                  Approved requests:
+                                  {t('approvedRequests')}
                                 </Text>
                                 <Badge variant="light" color="green" size="sm">
                                   {studentStats.data.approved}
@@ -282,7 +284,7 @@ export default function EarlyDeparturePage() {
                               </Group>
                               <Group gap="xs">
                                 <Text size="sm" c="dimmed">
-                                  Rejected requests:
+                                  {t('rejectedRequests')}
                                 </Text>
                                 <Badge variant="light" color="red" size="sm">
                                   {studentStats.data.rejected}
@@ -295,7 +297,7 @@ export default function EarlyDeparturePage() {
                     )}
                     <Card withBorder p="md">
                       <Stack gap="sm">
-                        <Title order={3}>Request early departure</Title>
+                        <Title order={3}>{t('requestEarlyDeparture')}</Title>
                         <EarlyDepartureForm
                           student={selectedStudent}
                           onSuccess={() => setActiveTab('all-requests')}
@@ -305,7 +307,7 @@ export default function EarlyDeparturePage() {
                   </>
                 ) : (
                   <Text size="sm" c="dimmed">
-                    No student found for your account. {children.length > 0 ? `Found ${children.length} linked children, but no matching students.` : 'No children linked to your account.'}
+                    {t('noStudentForAccount')} {children.length > 0 ? t('foundLinkedNoMatch', { count: children.length }) : t('noChildrenLinked')}
                   </Text>
                 )}
               </Stack>
@@ -338,11 +340,11 @@ export default function EarlyDeparturePage() {
                 </Stack>
               ) : requestsQuery.error ? (
                 <Text size="sm" c="dimmed">
-                  Failed to load early departure requests. Please try again.
+                  {t('failedToLoadRequests')}
                 </Text>
               ) : requests.length === 0 ? (
                 <Text size="sm" c="dimmed">
-                  No early departure requests found.
+                  {t('noEarlyDepartureRequestsShort')}
                 </Text>
               ) : (
                 <EarlyDepartureTable
@@ -360,11 +362,11 @@ export default function EarlyDeparturePage() {
             <Stack gap="md">
               <Paper withBorder p="md">
                 <Stack gap="sm">
-                  <Text fw={600} size="lg">Early Departure Statistics</Text>
+                  <Text fw={600} size="lg">{t('statisticsTitle')}</Text>
                   <Text size="sm" c="dimmed">
                     {isParent
-                      ? 'Statistics for your student(s)'
-                      : 'Statistics for all students with early departure requests'}
+                      ? t('statisticsForYourStudents')
+                      : t('statisticsForAllStudents')}
                   </Text>
                 </Stack>
               </Paper>

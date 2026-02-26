@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Alert,
   Button,
@@ -14,21 +15,13 @@ import {
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconCalendar, IconClock, IconWifiOff } from '@tabler/icons-react';
-import { useForm, zodResolver } from '@mantine/form';
-import { z } from 'zod';
+import { useForm } from '@mantine/form';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCreateEarlyDeparture, useCheckEarlyDepartureConflict } from '@/hooks/useEarlyDepartures';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useTimingTemplates } from '@/hooks/useScheduleSettings';
 import { useStudent } from '@/hooks/useStudents';
 import type { Student } from '@/types/students';
-
-const schema = z.object({
-  studentId: z.string().uuid(),
-  date: z.date(),
-  departureTime: z.string().min(1, 'Departure time is required'),
-  reason: z.string().optional(),
-});
 
 interface EarlyDepartureFormProps {
   student: Student | null;
@@ -49,6 +42,7 @@ function buildTimeOptions(startMinutes: number, endMinutes: number): { value: st
 }
 
 export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormProps) {
+  const t = useTranslations('earlyDeparture');
   const colors = useThemeColors();
   const isOnline = useOnlineStatus();
   const createRequest = useCreateEarlyDeparture();
@@ -111,14 +105,14 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
 
   // Validation function that uses current schoolHours and timingTemplate
   const validateDepartureTime = (value: string): string | null => {
-    if (!value) return 'Departure time is required';
+    if (!value) return t('departureTimeRequired');
     if (!schoolHours || !timingTemplate) {
       return null; // No validation if school hours not available
     }
 
     const [hours, minutes] = value.split(':').map(Number);
     if (isNaN(hours) || isNaN(minutes)) {
-      return 'Please select a valid time';
+      return t('selectValidTime');
     }
 
     const timeInMinutes = hours * 60 + minutes;
@@ -129,12 +123,14 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
 
     const startInMinutes = startHours * 60 + startMinutes;
     const endInMinutes = endHours * 60 + endMinutes;
+    const startStr = timingTemplate.startTime.slice(0, 5);
+    const endStr = timingTemplate.endTime.slice(0, 5);
 
     if (timeInMinutes < startInMinutes) {
-      return `Departure time must be after school start time (${timingTemplate.startTime.slice(0, 5)})`;
+      return t('departureAfterStart', { time: startStr });
     }
     if (timeInMinutes > endInMinutes) {
-      return `Departure time must be before school end time (${timingTemplate.endTime.slice(0, 5)})`;
+      return t('departureBeforeEnd', { time: endStr });
     }
 
     return null;
@@ -203,29 +199,29 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
     <Paper withBorder p="md">
       <form id="early-departure-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
-          <Text fw={600}>Request early departure</Text>
+          <Text fw={600}>{t('requestEarlyDeparture')}</Text>
           {!isOnline && (
             <Alert color="red" icon={<IconWifiOff size={16} />}>
-              No internet connection. Please connect to submit your request.
+              {t('noInternetSubmit')}
             </Alert>
           )}
           <DatePickerInput
             id="early-departure-date"
-            label="Date"
+            label={t('date')}
             {...form.getInputProps('date')}
-            placeholder="Select date"
+            placeholder={t('selectDate')}
             leftSection={<IconCalendar size={16} />}
           />
           <Select
             id="early-departure-time"
-            label="Departure time"
-            placeholder="Select time"
+            label={t('departureTime')}
+            placeholder={t('selectTime')}
             leftSection={<IconClock size={16} />}
             data={departureTimeOptions}
             value={form.values.departureTime}
             onChange={(value) => {
               form.setFieldValue('departureTime', value ?? '');
-              const error = value ? validateDepartureTime(value) : 'Departure time is required';
+              const error = value ? validateDepartureTime(value) : t('departureTimeRequired');
               if (error) {
                 form.setFieldError('departureTime', error);
               } else {
@@ -235,8 +231,8 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
             error={form.errors.departureTime}
             description={
               timingTemplate
-                ? `School hours: ${timingTemplate.startTime.slice(0, 5)} - ${timingTemplate.endTime.slice(0, 5)}`
-                : 'School hours not configured'
+                ? t('schoolHours', { start: timingTemplate.startTime.slice(0, 5), end: timingTemplate.endTime.slice(0, 5) })
+                : t('schoolHoursNotConfigured')
             }
             clearable
             searchable
@@ -253,16 +249,15 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
             }}
           />
           {hasConflict && conflictDetails && (
-            <Alert color="yellow" title="Class Conflict Warning">
+            <Alert color="yellow" title={t('classConflictWarning')}>
               <Text size="sm">
-                The selected departure time conflicts with an ongoing class: <strong>{conflictDetails}</strong>.
-                You can still submit the request, but please be aware of this conflict.
+                {t('classConflictMessage', { details: conflictDetails })}
               </Text>
             </Alert>
           )}
           <Textarea
             id="early-departure-reason"
-            label="Reason"
+            label={t('reason')}
             minRows={2}
             {...form.getInputProps('reason')}
           />
@@ -279,7 +274,7 @@ export function EarlyDepartureForm({ student, onSuccess }: EarlyDepartureFormPro
                 !!form.errors.departureTime
               }
             >
-              {isOnline ? 'Submit request' : 'No Internet Connection'}
+              {isOnline ? t('submitRequest') : t('noInternetConnection')}
             </Button>
           </Group>
         </Stack>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Alert,
   Button,
@@ -40,6 +41,7 @@ function buildTimeOptions(startMinutes: number, endMinutes: number): { value: st
 }
 
 export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartureFormProps) {
+  const t = useTranslations('earlyDeparture');
   const colors = useThemeColors();
   const isOnline = useOnlineStatus();
   const authorizeRequest = useAuthorizeEarlyDeparture();
@@ -86,14 +88,14 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
 
   // Validation function that uses current schoolHours and timingTemplate
   const validateDepartureTime = (value: string): string | null => {
-    if (!value) return 'Departure time is required';
+    if (!value) return t('departureTimeRequired');
     if (!schoolHours || !timingTemplate) {
       return null; // No validation if school hours not available
     }
 
     const [hours, minutes] = value.split(':').map(Number);
     if (isNaN(hours) || isNaN(minutes)) {
-      return 'Please select a valid time';
+      return t('selectValidTime');
     }
 
     const timeInMinutes = hours * 60 + minutes;
@@ -104,12 +106,14 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
 
     const startInMinutes = startHours * 60 + startMinutes;
     const endInMinutes = endHours * 60 + endMinutes;
+    const startStr = timingTemplate.startTime.slice(0, 5);
+    const endStr = timingTemplate.endTime.slice(0, 5);
 
     if (timeInMinutes < startInMinutes) {
-      return `Departure time must be after school start time (${timingTemplate.startTime.slice(0, 5)})`;
+      return t('departureAfterStart', { time: startStr });
     }
     if (timeInMinutes > endInMinutes) {
-      return `Departure time must be before school end time (${timingTemplate.endTime.slice(0, 5)})`;
+      return t('departureBeforeEnd', { time: endStr });
     }
 
     return null;
@@ -123,7 +127,7 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
       reason: '',
     },
     validate: {
-      studentId: (value) => (!value ? 'Student is required' : null),
+      studentId: (value) => (!value ? t('studentRequired') : null),
       departureTime: (value) => validateDepartureTime(value),
     },
   });
@@ -176,19 +180,19 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
     <Paper withBorder p="md">
       <form id="authorize-early-departure-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
-          <Text fw={600}>Authorize Early Departure</Text>
+          <Text fw={600}>{t('authorizeEarlyDeparture')}</Text>
           <Text size="sm" c="dimmed">
-            Authorize a student's early departure. This will immediately notify the parent(s) and mark the request as excused.
+            {t('authorizeDescription')}
           </Text>
           {!isOnline && (
             <Alert color="red" icon={<IconWifiOff size={16} />}>
-              No internet connection. Please connect to submit.
+              {t('noInternetSubmitShort')}
             </Alert>
           )}
           <Select
             id="authorize-early-departure-student"
-            label="Student"
-            placeholder="Select student"
+            label={t('student')}
+            placeholder={t('selectStudentPlaceholder')}
             data={availableStudents.map((s) => ({
               value: s.id,
               label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || `Student ${s.id.slice(0, 8)}`,
@@ -200,10 +204,10 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
             required
           />
           {form.values.studentId && (
-            <Alert color={colors.info} title="Emergency Contact Information">
+            <Alert color={colors.info} title={t('emergencyContactInfo')}>
               <Stack gap="sm">
                 <Text size="sm" fw={500}>
-                  If this is an emergency, you can contact the guardian:
+                  {t('emergencyContactIntro')}
                 </Text>
                 {primaryGuardian ? (
                   <Paper p="sm" withBorder>
@@ -211,17 +215,17 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
                       <Group gap="xs">
                         <IconUser size={16} />
                         <Text size="sm" fw={500}>
-                          Primary Guardian ({primaryGuardian.relationship})
+                          {t('primaryGuardian', { relationship: primaryGuardian.relationship })}
                         </Text>
                       </Group>
                       <Text size="sm">
-                        <strong>Name:</strong> {primaryGuardian.parentName || 'Not available'}
+                        <strong>{t('name')}:</strong> {primaryGuardian.parentName || t('notAvailable')}
                       </Text>
                       {primaryGuardian.parentPhone && (
                         <Group gap="xs">
                           <IconPhone size={14} />
                           <Text size="sm">
-                            <strong>Phone:</strong> {primaryGuardian.parentPhone}
+                            <strong>{t('phone')}:</strong> {primaryGuardian.parentPhone}
                           </Text>
                         </Group>
                       )}
@@ -229,20 +233,20 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
                         <Group gap="xs">
                           <IconMail size={14} />
                           <Text size="sm">
-                            <strong>Email:</strong> {primaryGuardian.parentEmail}
+                            <strong>{t('email')}:</strong> {primaryGuardian.parentEmail}
                           </Text>
                         </Group>
                       )}
                       {!primaryGuardian.parentPhone && !primaryGuardian.parentEmail && (
                         <Text size="sm" c="dimmed">
-                          Contact information not available
+                          {t('contactInfoNotAvailable')}
                         </Text>
                       )}
                     </Stack>
                   </Paper>
                 ) : (
                   <Text size="sm" c="dimmed">
-                    Primary guardian information not available
+                    {t('primaryGuardianNotAvailable')}
                   </Text>
                 )}
                 {secondaryGuardian && (
@@ -251,17 +255,17 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
                       <Group gap="xs">
                         <IconUser size={16} />
                         <Text size="sm" fw={500}>
-                          Secondary Guardian ({secondaryGuardian.relationship})
+                          {t('secondaryGuardian', { relationship: secondaryGuardian.relationship })}
                         </Text>
                       </Group>
                       <Text size="sm">
-                        <strong>Name:</strong> {secondaryGuardian.parentName || 'Not available'}
+                        <strong>{t('name')}:</strong> {secondaryGuardian.parentName || t('notAvailable')}
                       </Text>
                       {secondaryGuardian.parentPhone && (
                         <Group gap="xs">
                           <IconPhone size={14} />
                           <Text size="sm">
-                            <strong>Phone:</strong> {secondaryGuardian.parentPhone}
+                            <strong>{t('phone')}:</strong> {secondaryGuardian.parentPhone}
                           </Text>
                         </Group>
                       )}
@@ -269,13 +273,13 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
                         <Group gap="xs">
                           <IconMail size={14} />
                           <Text size="sm">
-                            <strong>Email:</strong> {secondaryGuardian.parentEmail}
+                            <strong>{t('email')}:</strong> {secondaryGuardian.parentEmail}
                           </Text>
                         </Group>
                       )}
                       {!secondaryGuardian.parentPhone && !secondaryGuardian.parentEmail && (
                         <Text size="sm" c="dimmed">
-                          Contact information not available
+                          {t('contactInfoNotAvailable')}
                         </Text>
                       )}
                     </Stack>
@@ -286,21 +290,21 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
           )}
           <DatePickerInput
             id="authorize-early-departure-date"
-            label="Date"
+            label={t('date')}
             {...form.getInputProps('date')}
-            placeholder="Select date"
+            placeholder={t('selectDate')}
             leftSection={<IconCalendar size={16} />}
           />
           <Select
             id="authorize-early-departure-time"
-            label="Departure time"
-            placeholder="Select time"
+            label={t('departureTime')}
+            placeholder={t('selectTime')}
             leftSection={<IconClock size={16} />}
             data={departureTimeOptions}
             value={form.values.departureTime}
             onChange={(value) => {
               form.setFieldValue('departureTime', value ?? '');
-              const error = value ? validateDepartureTime(value) : 'Departure time is required';
+              const error = value ? validateDepartureTime(value) : t('departureTimeRequired');
               if (error) {
                 form.setFieldError('departureTime', error);
               } else {
@@ -310,8 +314,8 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
             error={form.errors.departureTime}
             description={
               timingTemplate
-                ? `School hours: ${timingTemplate.startTime.slice(0, 5)} - ${timingTemplate.endTime.slice(0, 5)}`
-                : 'School hours not configured'
+                ? t('schoolHours', { start: timingTemplate.startTime.slice(0, 5), end: timingTemplate.endTime.slice(0, 5) })
+                : t('schoolHoursNotConfigured')
             }
             clearable
             searchable
@@ -329,19 +333,18 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
             }}
           />
           {hasConflict && conflictDetails && (
-            <Alert color={colors.warning} title="Class Conflict Warning">
+            <Alert color={colors.warning} title={t('classConflictWarning')}>
               <Text size="sm">
-                The selected departure time conflicts with an ongoing class: <strong>{conflictDetails}</strong>.
-                You can still authorize the departure, but please be aware of this conflict.
+                {t('classConflictMessageAuthorize', { details: conflictDetails })}
               </Text>
             </Alert>
           )}
           <Textarea
             id="authorize-early-departure-reason"
-            label="Reason (optional)"
+            label={t('reasonOptional')}
             minRows={2}
             {...form.getInputProps('reason')}
-            placeholder="Enter reason for early departure authorization"
+            placeholder={t('reasonPlaceholder')}
           />
           <Group justify="flex-end">
             <Button
@@ -357,7 +360,7 @@ export function AuthorizeEarlyDepartureForm({ onSuccess }: AuthorizeEarlyDepartu
                 !!form.errors.studentId
               }
             >
-              {isOnline ? 'Authorize Early Departure' : 'No Internet Connection'}
+              {isOnline ? t('authorizeButton') : t('noInternetConnection')}
             </Button>
           </Group>
         </Stack>

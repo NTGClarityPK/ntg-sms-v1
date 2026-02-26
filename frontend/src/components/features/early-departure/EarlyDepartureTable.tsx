@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Table, Badge, Group, Button, Pagination, Text, Tooltip, Modal, Textarea, Stack, ActionIcon } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useState } from 'react';
@@ -48,6 +49,7 @@ export function EarlyDepartureTable({
   isStaffView = false,
   studentNameMap,
 }: EarlyDepartureTableProps) {
+  const t = useTranslations('earlyDeparture');
   const [reviewModalOpened, { open: openReviewModal, close: closeReviewModal }] = useDisclosure(false);
   const [selectedRequest, setSelectedRequest] = useState<EarlyDepartureRequest | null>(null);
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | null>(null);
@@ -93,7 +95,7 @@ export function EarlyDepartureTable({
     const status = request.status;
     const badge = (
       <Badge variant="light" color={statusColorMap[status] ?? 'gray'}>
-        {status}
+        {t(status)}
       </Badge>
     );
 
@@ -101,7 +103,7 @@ export function EarlyDepartureTable({
     if (request.hasConflict) {
       const conflictBadge = (
         <Badge variant="light" color="orange" ml="xs">
-          CONFLICT
+          {t('classConflictBadge')}
         </Badge>
       );
       
@@ -109,7 +111,7 @@ export function EarlyDepartureTable({
         return (
           <Group gap="xs">
             {badge}
-            <Tooltip label={`Class conflict: ${request.conflictDetails}`} withArrow>
+            <Tooltip label={t('classConflictTooltip', { details: request.conflictDetails })} withArrow>
               {conflictBadge}
             </Tooltip>
           </Group>
@@ -126,7 +128,7 @@ export function EarlyDepartureTable({
 
     if (status === 'pending') {
       return (
-        <Tooltip label="Pending from teacher's end" withArrow>
+        <Tooltip label={t('pendingFromTeacher')} withArrow>
           {badge}
         </Tooltip>
       );
@@ -140,15 +142,15 @@ export function EarlyDepartureTable({
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Date Requested</Table.Th>
-            <Table.Th>Departure Date & Time</Table.Th>
-            <Table.Th>Student</Table.Th>
-            <Table.Th>Reason</Table.Th>
-            <Table.Th>Status</Table.Th>
-            <Table.Th>Reviewed By</Table.Th>
-            <Table.Th>Date Reviewed</Table.Th>
-            <Table.Th>Review Notes</Table.Th>
-            <Table.Th>Actions</Table.Th>
+            <Table.Th>{t('dateRequested')}</Table.Th>
+            <Table.Th>{t('departureDateAndTime')}</Table.Th>
+            <Table.Th>{t('student')}</Table.Th>
+            <Table.Th>{t('reason')}</Table.Th>
+            <Table.Th>{t('status')}</Table.Th>
+            <Table.Th>{t('reviewedBy')}</Table.Th>
+            <Table.Th>{t('dateReviewed')}</Table.Th>
+            <Table.Th>{t('reviewNotes')}</Table.Th>
+            <Table.Th>{t('actions')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -156,7 +158,7 @@ export function EarlyDepartureTable({
             <Table.Tr>
               <Table.Td colSpan={9}>
                 <Text c="dimmed" ta="center" py="md">
-                  No early departure requests found
+                  {t('noEarlyDepartureRequestsFound')}
                 </Text>
               </Table.Td>
             </Table.Tr>
@@ -234,7 +236,7 @@ export function EarlyDepartureTable({
                             color="green"
                             onClick={() => handleReviewClick(request, 'approve')}
                           >
-                            Approve
+                            {t('approve')}
                           </Button>
                           <Button
                             size="xs"
@@ -242,12 +244,12 @@ export function EarlyDepartureTable({
                             color="red"
                             onClick={() => handleReviewClick(request, 'reject')}
                           >
-                            Reject
+                            {t('reject')}
                           </Button>
                         </>
                       )}
                       {canCancel && (
-                        <Tooltip label="Cancel request" withArrow>
+                        <Tooltip label={t('cancelRequest')} withArrow>
                           <ActionIcon
                             variant="filled"
                             color="red"
@@ -285,20 +287,20 @@ export function EarlyDepartureTable({
       <Modal
         opened={reviewModalOpened}
         onClose={closeReviewModal}
-        title={reviewAction === 'approve' ? 'Approve Early Departure Request' : 'Reject Early Departure Request'}
+        title={reviewAction === 'approve' ? t('approveEarlyDepartureRequest') : t('rejectEarlyDepartureRequest')}
         centered
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
             {reviewAction === 'approve'
-              ? 'You are about to approve this early departure request. You can optionally add review notes below.'
-              : 'You are about to reject this early departure request. Please provide a reason for rejection.'}
+              ? t('approveConfirmMessage')
+              : t('rejectConfirmMessage')}
           </Text>
 
           {selectedRequest && (
             <div>
               <Text size="xs" c="dimmed" fw={500} mb={4}>
-                Departure Date & Time
+                {t('departureDateAndTime')}
               </Text>
               <Text size="sm">
                 {formatDateTime(selectedRequest.date, selectedRequest.departureTime)}
@@ -306,7 +308,7 @@ export function EarlyDepartureTable({
               {studentNameMap?.get(selectedRequest.studentId) && (
                 <>
                   <Text size="xs" c="dimmed" fw={500} mb={4} mt="xs">
-                    Student
+                    {t('student')}
                   </Text>
                   <Text size="sm">{studentNameMap.get(selectedRequest.studentId)}</Text>
                 </>
@@ -315,11 +317,11 @@ export function EarlyDepartureTable({
           )}
 
           <Textarea
-            label={reviewAction === 'approve' ? 'Review Notes (Optional)' : 'Rejection Reason (Required)'}
+            label={reviewAction === 'approve' ? t('reviewNotesOptional') : t('rejectionReasonRequired')}
             placeholder={
               reviewAction === 'approve'
-                ? 'Add any notes about this approval...'
-                : 'Please provide a reason for rejection...'
+                ? t('reviewNotesPlaceholderApprove')
+                : t('reviewNotesPlaceholderReject')
             }
             value={reviewNotes}
             onChange={(e) => setReviewNotes(e.target.value)}
@@ -329,7 +331,7 @@ export function EarlyDepartureTable({
 
           <Group justify="flex-end" mt="md">
             <Button variant="light" onClick={closeReviewModal}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               color={reviewAction === 'approve' ? 'green' : 'red'}
@@ -337,7 +339,7 @@ export function EarlyDepartureTable({
               loading={updateStatus.isPending}
               disabled={reviewAction === 'reject' && !reviewNotes.trim()}
             >
-              {reviewAction === 'approve' ? 'Approve' : 'Reject'}
+              {reviewAction === 'approve' ? t('approve') : t('reject')}
             </Button>
           </Group>
         </Stack>

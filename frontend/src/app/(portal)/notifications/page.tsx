@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Group,
   Title,
@@ -27,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import type { Notification } from '@/types/notifications';
 
 export default function NotificationsPage() {
+  const t = useTranslations('notification');
   const router = useRouter();
   const notifyColors = useThemeColors();
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
@@ -125,7 +127,7 @@ export default function NotificationsPage() {
       return (
         <Stack align="center" gap="sm" py="xl">
           <IconBell size={48} style={{ opacity: 0.3 }} />
-          <Text c="dimmed">No notifications found</Text>
+          <Text c="dimmed">{t('noNotificationsFound')}</Text>
         </Stack>
       );
     }
@@ -134,12 +136,12 @@ export default function NotificationsPage() {
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Type</Table.Th>
-            <Table.Th>Title</Table.Th>
-            <Table.Th>Body</Table.Th>
-            <Table.Th>Date</Table.Th>
-            <Table.Th>Status</Table.Th>
-            <Table.Th>Actions</Table.Th>
+            <Table.Th>{t('type')}</Table.Th>
+            <Table.Th>{t('tableTitle')}</Table.Th>
+            <Table.Th>{t('body')}</Table.Th>
+            <Table.Th>{t('date')}</Table.Th>
+            <Table.Th>{t('status')}</Table.Th>
+            <Table.Th>{t('actions')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -156,7 +158,7 @@ export default function NotificationsPage() {
                   </Badge>
                   {notification.isCritical && (
                     <Badge variant="filled" color="red" size="sm">
-                      Critical
+                      {t('critical')}
                     </Badge>
                   )}
                 </Group>
@@ -181,7 +183,7 @@ export default function NotificationsPage() {
                   variant="light"
                   color={notification.isRead ? 'gray' : notifyColors.primary}
                 >
-                  {notification.isRead ? 'Read' : 'Unread'}
+                  {notification.isRead ? t('read') : t('unread')}
                 </Badge>
               </Table.Td>
               <Table.Td>
@@ -195,7 +197,7 @@ export default function NotificationsPage() {
                     }}
                     loading={markAsRead.isPending}
                   >
-                    Mark Read
+                    {t('markRead')}
                   </Button>
                 )}
               </Table.Td>
@@ -210,9 +212,9 @@ export default function NotificationsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Notification</Title>
+          <Title order={1}>{t('title')}</Title>
           <Group gap="sm">
-            <Tooltip label="Refresh">
+            <Tooltip label={t('refresh')}>
               <ActionIcon
                 variant="light"
                 size="lg"
@@ -228,7 +230,7 @@ export default function NotificationsPage() {
                 onClick={() => markAllAsRead.mutate()}
                 loading={markAllAsRead.isPending}
               >
-                Mark All as Read
+                {t('markAllAsRead')}
               </Button>
             )}
           </Group>
@@ -247,10 +249,10 @@ export default function NotificationsPage() {
         <Tabs defaultValue="all">
           <Tabs.List>
             <Tabs.Tab value="all" leftSection={<IconBell size={16} />}>
-              All notifications
+              {t('tabAll')}
             </Tabs.Tab>
             <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>
-              Notification settings
+              {t('tabSettings')}
             </Tabs.Tab>
           </Tabs.List>
 
@@ -263,18 +265,18 @@ export default function NotificationsPage() {
                     onChange={() => setSelectedFilters([])}
                     variant="filled"
                   >
-                    All ({allNotifications.length})
+                    {t('filterAll')} ({allNotifications.length})
                   </Chip>
                   <Chip.Group multiple value={selectedFilters} onChange={setSelectedFilters}>
                     <Group gap="xs" wrap="wrap">
                       <Chip value="unread" variant="filled">
-                        Unread ({unreadCount})
+                        {t('filterUnread')} ({unreadCount})
                       </Chip>
                       <Chip value="read" variant="filled">
-                        Read ({readCount})
+                        {t('filterRead')} ({readCount})
                       </Chip>
                       <Chip value="attendance" variant="filled">
-                        Attendance ({attendanceCount})
+                        {t('filterAttendance')} ({attendanceCount})
                       </Chip>
                     </Group>
                   </Chip.Group>
@@ -287,33 +289,33 @@ export default function NotificationsPage() {
           <Tabs.Panel value="settings" pt="md">
             <Paper withBorder p="md">
               <Stack gap="md">
-                <Title order={3}>Push notifications</Title>
+                <Title order={3}>{t('pushNotifications')}</Title>
                 <Text size="sm" c="dimmed">
-                  Allow this app to show push notifications in your browser. You can enable or disable them below.
+                  {t('pushDescription')}
                 </Text>
                 {!pushSupported && (
                   <Alert color="gray">
-                    Push notifications are not supported in this browser.
+                    {t('pushNotSupported')}
                   </Alert>
                 )}
                 {pushSupported && (
                   <Stack gap="sm">
                     <Group gap="xs">
-                      <Text size="sm" fw={500}>Permission:</Text>
+                      <Text size="sm" fw={500}>{t('permission')}</Text>
                       <Badge variant="light" color={pushPermission === 'granted' ? 'green' : pushPermission === 'denied' ? 'red' : 'gray'}>
                         {pushPermission}
                       </Badge>
                     </Group>
                     <Group gap="xs">
-                      <Text size="sm" fw={500}>Push subscribed:</Text>
+                      <Text size="sm" fw={500}>{t('pushSubscribed')}</Text>
                       {pushSubscribing ? (
                         <Group gap="xs">
                           <Loader size="sm" />
-                          <Text size="sm" c="dimmed">Subscribing…</Text>
+                          <Text size="sm" c="dimmed">{t('subscribing')}</Text>
                         </Group>
                       ) : (
                         <Badge variant="light" color={pushSubscribed ? 'green' : 'gray'}>
-                          {pushSubscribed ? 'Yes' : 'No'}
+                          {pushSubscribed ? t('yes') : t('no')}
                         </Badge>
                       )}
                     </Group>
@@ -324,7 +326,7 @@ export default function NotificationsPage() {
                         loading={pushLoading}
                         disabled={pushSubscribed || pushSubscribing}
                       >
-                        Allow notifications
+                        {t('allowNotifications')}
                       </Button>
                       <Button
                         variant="light"
@@ -334,11 +336,11 @@ export default function NotificationsPage() {
                         loading={pushLoading}
                         disabled={!pushSubscribed}
                       >
-                        Disable push notifications
+                        {t('disablePushNotifications')}
                       </Button>
                     </Group>
                     <Text size="xs" c="dimmed">
-                      Click &quot;Allow notifications&quot; to trigger your browser&apos;s permission dialog. In Safari, you must click this button to enable push.
+                      {t('allowNotificationsHint')}
                     </Text>
                   </Stack>
                 )}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Badge, Card, Group, Stack, Text, Button, Tooltip } from '@mantine/core';
 import type { LeaveRequest } from '@/types/leaves';
 import { useUpdateLeaveStatus } from '@/hooks/useLeaveRequests';
@@ -47,6 +48,7 @@ export function LeaveRequestCard({
   isStaffView = false,
   studentName,
 }: LeaveRequestCardProps) {
+  const t = useTranslations('leave');
   const updateStatus = useUpdateLeaveStatus();
 
   const canReview = isStaffView && request.status === 'pending';
@@ -64,7 +66,7 @@ export function LeaveRequestCard({
       variant="light"
       color={statusColorMap[request.status] ?? 'gray'}
     >
-      {request.status}
+      {t(request.status)}
     </Badge>
   );
 
@@ -75,7 +77,7 @@ export function LeaveRequestCard({
           <Stack gap="xs" style={{ flex: 1 }}>
             <div>
               <Text size="xs" c="dimmed" fw={500} mb={4}>
-                Date Requested
+                {t('dateRequested')}
               </Text>
               <Text size="sm" fw={500}>
                 {formatDate(request.createdAt)}
@@ -84,7 +86,7 @@ export function LeaveRequestCard({
             
             <div>
               <Text size="xs" c="dimmed" fw={500} mb={4}>
-                Leave Period
+                {t('leavePeriod')}
               </Text>
               <Text size="sm" fw={500}>
                 {formatDateRange(request.startDate, request.endDate)}
@@ -94,7 +96,7 @@ export function LeaveRequestCard({
             {studentName && (
               <div>
                 <Text size="xs" c="dimmed" fw={500} mb={4}>
-                  Student
+                  {t('student')}
                 </Text>
                 <Text size="sm" fw={500}>
                   {studentName}
@@ -104,7 +106,7 @@ export function LeaveRequestCard({
             
             <div>
               <Text size="xs" c="dimmed" fw={500} mb={4}>
-                Reason
+                {t('reason')}
               </Text>
               <Text size="sm">
                 {request.reason}
@@ -114,7 +116,7 @@ export function LeaveRequestCard({
           
           <div>
             {request.status === 'pending' ? (
-              <Tooltip label="Pending from teacher's end" withArrow>
+              <Tooltip label={t('pendingFromTeacher')} withArrow>
                 {statusBadge}
               </Tooltip>
             ) : (
@@ -132,7 +134,7 @@ export function LeaveRequestCard({
               onClick={() => handleAction('cancel')}
               loading={updateStatus.isPending}
             >
-              Cancel
+              {t('cancel')}
             </Button>
           )}
           {canReview && (
@@ -144,7 +146,7 @@ export function LeaveRequestCard({
                 onClick={() => handleAction('approve')}
                 loading={updateStatus.isPending}
               >
-                Approve
+                {t('approve')}
               </Button>
               <Button
                 size="xs"
@@ -153,7 +155,7 @@ export function LeaveRequestCard({
                 onClick={() => handleAction('reject')}
                 loading={updateStatus.isPending}
               >
-                Reject
+                {t('reject')}
               </Button>
             </>
           )}

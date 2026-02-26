@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Group,
   Title,
@@ -19,6 +19,7 @@ import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { modals } from '@mantine/modals';
+import { useTranslations } from 'next-intl';
 import { useUniforms, useLowStock, useDeleteUniform } from '@/hooks/useInventory';
 import { useFeaturePermission } from '@/hooks/usePermissions';
 import { useSystemSetting } from '@/hooks/useSystemSettings';
@@ -28,13 +29,16 @@ import { UniformItemFormModal } from '@/components/features/inventory/UniformIte
 import { AddStockModal } from '@/components/features/inventory/AddStockModal';
 import type { UniformItem, StockEntry } from '@/types/inventory';
 
-const GENDERS = [
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'unisex', label: 'Unisex' },
-];
-
 export default function InventoryItemsPage() {
+  const t = useTranslations('inventory');
+  const GENDERS = useMemo(
+    () => [
+      { value: 'male', label: t('male') },
+      { value: 'female', label: t('female') },
+      { value: 'unisex', label: t('unisex') },
+    ],
+    [t],
+  );
   const queryClient = useQueryClient();
   const { canEdit } = useFeaturePermission('inventory');
   const [page, setPage] = useState(1);
@@ -113,13 +117,13 @@ export default function InventoryItemsPage() {
 
   const handleDelete = (item: UniformItem) => {
     modals.openConfirmModal({
-      title: 'Delete uniform item',
+      title: t('deleteUniformItem'),
       children: (
         <Text size="sm">
-          Delete &quot;{item.name}&quot;? This will also remove all stock entries for this item. This cannot be undone.
+          {t('deleteUniformConfirm', { name: item.name })}
         </Text>
       ),
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      labels: { confirm: t('delete'), cancel: t('cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () => deleteMutation.mutate(item.id),
     });
@@ -129,9 +133,9 @@ export default function InventoryItemsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Uniform items</Title>
+          <Title order={1}>{t('uniformItemsTitle')}</Title>
           <Group gap="sm">
-            <Tooltip label="Refresh">
+            <Tooltip label={t('refresh')}>
               <ActionIcon
                 variant="light"
                 size="lg"
@@ -150,7 +154,7 @@ export default function InventoryItemsPage() {
                   openForm();
                 }}
               >
-                Add item
+                {t('addItem')}
               </Button>
             )}
           </Group>
@@ -176,7 +180,7 @@ export default function InventoryItemsPage() {
               <Group grow>
                 <TextInput
                   id="inventory-items-search"
-                  placeholder="Search by name, code, description..."
+                  placeholder={t('searchPlaceholder')}
                   leftSection={<IconSearch size={16} />}
                   value={search}
                   onChange={(e) => {
@@ -186,7 +190,7 @@ export default function InventoryItemsPage() {
                 />
                 <Select
                   id="inventory-items-filter-category"
-                  placeholder="Category"
+                  placeholder={t('category')}
                   data={categoryFilterOptions}
                   value={categoryFilter}
                   onChange={(v) => {
@@ -197,7 +201,7 @@ export default function InventoryItemsPage() {
                 />
                 <Select
                   id="inventory-items-filter-gender"
-                  placeholder="Gender"
+                  placeholder={t('gender')}
                   data={GENDERS}
                   value={genderFilter}
                   onChange={(v) => {
@@ -219,7 +223,7 @@ export default function InventoryItemsPage() {
           ) : isEmpty ? (
             <Paper p="xl" withBorder>
               <Text c="dimmed" ta="center">
-                No uniform items found. {canEdit && 'Create one to get started.'}
+                {t('noItemsFound')} {canEdit && t('createOneHint')}
               </Text>
             </Paper>
           ) : (
@@ -248,10 +252,10 @@ export default function InventoryItemsPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Previous
+                {t('previous')}
               </Button>
               <Text size="sm" c="dimmed">
-                Page {meta.page} of {meta.totalPages}
+                {t('pageOf', { page: meta.page, total: meta.totalPages })}
               </Text>
               <Button
                 variant="default"
@@ -259,7 +263,7 @@ export default function InventoryItemsPage() {
                 disabled={page >= meta.totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t('next')}
               </Button>
             </Group>
           )}

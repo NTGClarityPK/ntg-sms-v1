@@ -13,6 +13,7 @@ import {
   ActionIcon,
 } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { useUniforms } from '@/hooks/useInventory';
 import { useCreateUniformRequest } from '@/hooks/useUniformRequests';
 import type { UniformItem } from '@/types/inventory';
@@ -34,6 +35,7 @@ export function RequestForm({
   studentOptions,
   onSuccess,
 }: RequestFormProps) {
+  const t = useTranslations('inventory');
   const [studentId, setStudentId] = useState<string | null>(null);
   const [lines, setLines] = useState<LineItem[]>([]);
   const [notes, setNotes] = useState('');
@@ -131,15 +133,15 @@ export function RequestForm({
     <Stack gap="md">
       <Select
         id="uniform-request-student"
-        label="Student"
-        placeholder="Select student"
+        label={t('student')}
+        placeholder={t('selectStudent')}
         data={studentOptions}
         value={studentId}
         onChange={setStudentId}
         required
       />
       <Text size="sm" fw={500}>
-        Items
+        {t('itemsLabel')}
       </Text>
       {lines.map((line, index) => {
         const inStockSizes = getInStockSizesForItem(line.uniformItemId);
@@ -152,11 +154,11 @@ export function RequestForm({
             <Group align="flex-end" gap="xs">
               <Select
                 id={`uniform-request-line-${index}-item`}
-                label="Item"
-                placeholder="Select item"
+                label={t('items')}
+                placeholder={t('selectItem')}
                 data={uniforms.map((u) => ({
                   value: u.id,
-                  label: hasAnyStock(u) ? u.name : `${u.name} (Out of stock)`,
+                  label: hasAnyStock(u) ? u.name : `${u.name} (${t('outOfStock')})`,
                 }))}
                 value={line.uniformItemId}
                 onChange={(v) => {
@@ -172,16 +174,16 @@ export function RequestForm({
               />
               {isOutOfStock ? (
                 <Text size="sm" c="red" fw={500} style={{ alignSelf: 'center' }}>
-                  Out of stock – cannot request
+                  {t('outOfStockCannotRequest')}
                 </Text>
               ) : (
                 <Select
                   id={`uniform-request-line-${index}-size`}
-                  label="Size"
-                  placeholder="Size"
+                  label={t('size')}
+                  placeholder={t('size')}
                   data={inStockSizes.map((s) => ({
                     value: s.size,
-                    label: `${s.size} (${s.quantity} in stock)`,
+                    label: t('sizeInStock', { size: s.size, quantity: s.quantity }),
                   }))}
                   value={line.size}
                   onChange={(v) => updateLine(index, { size: v ?? '' })}
@@ -191,7 +193,7 @@ export function RequestForm({
               {!isOutOfStock && (
                 <NumberInput
                   id={`uniform-request-line-${index}-qty`}
-                  label="Qty"
+                  label={t('qtyLabel')}
                   min={1}
                   max={maxQty}
                   value={line.quantity}
@@ -207,7 +209,7 @@ export function RequestForm({
                 color="red"
                 variant="light"
                 onClick={() => removeLine(index)}
-                title="Remove"
+                title={t('remove')}
               >
                 <IconTrash size={16} />
               </ActionIcon>
@@ -216,18 +218,17 @@ export function RequestForm({
         );
       })}
       <Button id="uniform-request-add-item" variant="light" onClick={addLine} disabled={!firstInStockItem}>
-        Add item
+        {t('addItemLine')}
       </Button>
       {uniforms.length > 0 && !firstInStockItem && (
         <Text size="sm" c="red" fw={500}>
-          All items are currently out of stock. You cannot submit a request until
-          stock is available.
+          {t('allItemsOutOfStock')}
         </Text>
       )}
       <Textarea
         id="uniform-request-notes"
-        label="Notes (optional)"
-        placeholder="Any notes for the request"
+        label={t('notesOptional')}
+        placeholder={t('notesPlaceholder')}
         value={notes}
         onChange={(e) => setNotes(e.currentTarget.value)}
       />
@@ -237,7 +238,7 @@ export function RequestForm({
         disabled={!canSubmit}
         loading={createMutation.isPending}
       >
-        Submit request
+        {t('submitRequest')}
       </Button>
     </Stack>
   );

@@ -2,6 +2,7 @@
 
 import { Modal, Textarea, Button, Stack, Group } from '@mantine/core';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import type { UniformRequest } from '@/types/inventory';
 
 interface ApprovalModalProps {
@@ -21,6 +22,7 @@ export function ApprovalModal({
   onConfirm,
   isPending,
 }: ApprovalModalProps) {
+  const t = useTranslations('inventory');
   const [notes, setNotes] = useState('');
 
   const handleConfirm = () => {
@@ -38,24 +40,24 @@ export function ApprovalModal({
     <Modal
       opened={opened}
       onClose={handleClose}
-      title={mode === 'approve' ? 'Approve request' : 'Reject request'}
+      title={mode === 'approve' ? t('approveRequest') : t('rejectRequest')}
     >
       {request && (
         <Stack gap="md">
           <Textarea
             id="approval-modal-notes"
-            label="Notes (optional)"
+            label={t('notesOptional')}
             placeholder={
               mode === 'approve'
-                ? 'Add a note for the parent...'
-                : 'Reason for rejection...'
+                ? t('notesPlaceholderApprove')
+                : t('notesPlaceholderReject')
             }
             value={notes}
             onChange={(e) => setNotes(e.currentTarget.value)}
           />
           <Group justify="flex-end">
             <Button id="approval-modal-cancel" variant="default" onClick={handleClose}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               id={mode === 'approve' ? 'approval-modal-approve' : 'approval-modal-reject'}
@@ -63,7 +65,7 @@ export function ApprovalModal({
               loading={isPending}
               onClick={handleConfirm}
             >
-              {mode === 'approve' ? 'Approve' : 'Reject'}
+              {mode === 'approve' ? t('approve') : t('reject')}
             </Button>
           </Group>
         </Stack>

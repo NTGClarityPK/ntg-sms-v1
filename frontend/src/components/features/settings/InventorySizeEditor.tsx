@@ -11,6 +11,7 @@ import {
   TextInput,
 } from '@mantine/core';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { notifications } from '@mantine/notifications';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -31,6 +32,7 @@ function entriesToDimensions(entries: { name: string; value: string }[]): Record
 }
 
 export function InventorySizeEditor() {
+  const t = useTranslations('inventory');
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
 
@@ -122,7 +124,7 @@ export function InventorySizeEditor() {
       await updateMutation.mutateAsync(toSave);
       notifications.show({
         title: 'Success',
-        message: 'Inventory sizes saved',
+        message: t('inventorySizesSaved'),
         color: notifyColors.success,
       });
     } catch (error) {
@@ -137,7 +139,7 @@ export function InventorySizeEditor() {
 
   if (settingQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load sizes">
+      <Alert color={colors.error} title={t('failedToLoadSizes')}>
         <Text size="sm">Please try again.</Text>
       </Alert>
     );
@@ -146,14 +148,14 @@ export function InventorySizeEditor() {
   return (
     <Paper withBorder p="md">
       <Stack gap="md">
-        <Text fw={600}>Sizes and dimensions</Text>
+        <Text fw={600}>{t('sizesAndDimensions')}</Text>
         <Text size="sm" c="dimmed">
-          Define size codes (e.g. S, M, L) and optional dimensions (e.g. chest, length) used when adding stock and processing requests.
+          {t('sizesDescription')}
         </Text>
 
         {items.length === 0 ? (
           <Text c="dimmed" size="sm">
-            No sizes yet. Add sizes to use in Inventory stock and requests.
+            {t('noSizesYet')}
           </Text>
         ) : (
           <Stack gap="lg">
@@ -162,7 +164,7 @@ export function InventorySizeEditor() {
                 <Stack gap="sm">
                   <Group justify="space-between">
                     <TextInput
-                      placeholder="Size (e.g. S, M, L)"
+                      placeholder={t('sizePlaceholderShort')}
                       value={entry.size}
                       onChange={(e) => setSizeCode(index, e.currentTarget.value)}
                       size="sm"
@@ -172,26 +174,26 @@ export function InventorySizeEditor() {
                       variant="light"
                       color={colors.error}
                       onClick={() => removeSize(index)}
-                      aria-label="Remove size"
+                      aria-label={t('removeSizeAria')}
                     >
                       <IconTrash size={16} />
                     </ActionIcon>
                   </Group>
                   <Stack gap="xs">
                     <Text size="xs" c="dimmed">
-                      Dimensions (e.g. chest, length, waist)
+                      {t('dimensionsHint')}
                     </Text>
                     {(dimensionRows[index] ?? []).map((dim, dimIndex) => (
                       <Group key={dimIndex} gap="xs">
                         <TextInput
-                          placeholder="Name"
+                          placeholder={t('dimensionName')}
                           value={dim.name}
                           onChange={(e) => setDimensionEntry(index, dimIndex, 'name', e.currentTarget.value)}
                           size="xs"
                           style={{ minWidth: 100 }}
                         />
                         <TextInput
-                          placeholder="Value"
+                          placeholder={t('dimensionValue')}
                           value={dim.value}
                           onChange={(e) => setDimensionEntry(index, dimIndex, 'value', e.currentTarget.value)}
                           size="xs"
@@ -202,7 +204,7 @@ export function InventorySizeEditor() {
                           variant="subtle"
                           color={colors.error}
                           onClick={() => removeDimensionRow(index, dimIndex)}
-                          aria-label="Remove dimension"
+                          aria-label={t('removeDimensionAria')}
                         >
                           <IconTrash size={14} />
                         </ActionIcon>
@@ -214,7 +216,7 @@ export function InventorySizeEditor() {
                       leftSection={<IconPlus size={14} />}
                       onClick={() => addDimensionRow(index)}
                     >
-                      Add dimension
+                      {t('addDimension')}
                     </Button>
                   </Stack>
                 </Stack>
@@ -225,7 +227,7 @@ export function InventorySizeEditor() {
 
         <Group>
           <Button id="inventory-size-editor-add" variant="light" size="sm" leftSection={<IconPlus size={16} />} onClick={addSize}>
-            Add size
+            {t('addSize')}
           </Button>
         </Group>
 
@@ -236,7 +238,7 @@ export function InventorySizeEditor() {
             onClick={onSave}
             loading={updateMutation.isPending || settingQuery.isLoading}
           >
-            Save
+            {t('save')}
           </Button>
         </Group>
       </Stack>

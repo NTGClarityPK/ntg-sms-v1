@@ -1,6 +1,7 @@
 'use client';
 
 import { Modal, Text, Stack, Button, Group } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import type { UniformRequest } from '@/types/inventory';
 
 interface IssueModalProps {
@@ -18,6 +19,7 @@ export function IssueModal({
   onConfirm,
   isPending,
 }: IssueModalProps) {
+  const t = useTranslations('inventory');
   const handleConfirm = () => {
     if (!request) return;
     onConfirm(request.id);
@@ -28,20 +30,19 @@ export function IssueModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Mark as issued"
+      title={t('markAsIssued')}
     >
       {request && (
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            This will deduct stock for the requested items and mark the request
-            as issued. Continue?
+            {t('markAsIssuedMessage')}
           </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button loading={isPending} onClick={handleConfirm}>
-              Issue
+              {t('issue')}
             </Button>
           </Group>
         </Stack>

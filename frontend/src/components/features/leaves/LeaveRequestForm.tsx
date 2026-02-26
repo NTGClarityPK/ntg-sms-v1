@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import {
   Alert,
   Button,
@@ -18,18 +19,6 @@ import { useCreateLeaveRequest, useLeaveQuota } from '@/hooks/useLeaveRequests';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import type { Student } from '@/types/students';
 
-const schema = z
-  .object({
-    studentId: z.string().uuid(),
-    startDate: z.date(),
-    endDate: z.date(),
-    reason: z.string().min(1, 'Reason is required'),
-  })
-  .refine(
-    (values) => values.endDate >= values.startDate,
-    'End date cannot be before start date',
-  );
-
 interface LeaveRequestFormProps {
   student: Student | null;
   /** Called after a leave request is successfully submitted (e.g. switch to All requests tab). */
@@ -37,9 +26,22 @@ interface LeaveRequestFormProps {
 }
 
 export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) {
+  const t = useTranslations('leave');
   const isOnline = useOnlineStatus();
   const createLeave = useCreateLeaveRequest();
   const quotaQuery = useLeaveQuota(student?.id ?? null);
+
+  const schema = z
+    .object({
+      studentId: z.string().uuid(),
+      startDate: z.date(),
+      endDate: z.date(),
+      reason: z.string().min(1, t('reasonRequired')),
+    })
+    .refine(
+      (values) => values.endDate >= values.startDate,
+      t('endDateBeforeStart'),
+    );
 
   const form = useForm({
     initialValues: {
@@ -81,10 +83,10 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
     <Paper withBorder p="md">
       <form id="leave-request-form" key={student?.id || 'no-student'} onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
-          <Text fw={600}>Request leave</Text>
+          <Text fw={600}>{t('requestLeave')}</Text>
           {!isOnline && (
             <Alert color="red" icon={<IconWifiOff size={16} />}>
-              No internet connection. Please connect to submit your request.
+              {t('noInternetSubmit')}
             </Alert>
           )}
           {quota && (
@@ -94,35 +96,35 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
                 c={isQuotaExceeded ? 'red' : 'dimmed'}
                 fw={isQuotaExceeded ? 600 : 400}
               >
-                Leave quota used: {quota.usedDays}/{quota.totalQuota} days
-                {isQuotaExceeded ? ' (Limit exceeded)' : ` (${quota.remainingDays} remaining)`}
+                {t('leaveQuotaUsed', { used: quota.usedDays, total: quota.totalQuota })}
+                {isQuotaExceeded ? ` ${t('limitExceeded')}` : ` ${t('remainingDays', { remaining: quota.remainingDays })}`}
               </Text>
               {(quota.daysFromAbsences ?? 0) > 0 && (
                 <Text size="xs" c="dimmed">
-                  This includes {quota.daysFromAbsences} day{quota.daysFromAbsences === 1 ? '' : 's'} marked absent (counted in quota).
+                  {t('daysFromAbsences', { count: quota.daysFromAbsences })}
                 </Text>
               )}
             </Stack>
           )}
           <DatePickerInput
             id="leave-request-start-date"
-            label="Start date"
+            label={t('startDate')}
             {...form.getInputProps('startDate')}
-            placeholder="Select start date"
+            placeholder={t('selectStartDate')}
             leftSection={<IconCalendar size={16} />}
             maxDate={form.values.endDate || undefined}
           />
           <DatePickerInput
             id="leave-request-end-date"
-            label="End date"
+            label={t('endDate')}
             {...form.getInputProps('endDate')}
-            placeholder="Select end date"
+            placeholder={t('selectEndDate')}
             leftSection={<IconCalendar size={16} />}
             minDate={form.values.startDate || undefined}
           />
           <Textarea
             id="leave-request-reason"
-            label="Reason"
+            label={t('reason')}
             minRows={3}
             {...form.getInputProps('reason')}
           />
@@ -134,7 +136,7 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
               loading={createLeave.isPending}
               disabled={!isOnline || !student}
             >
-              {isOnline ? 'Submit request' : 'No Internet Connection'}
+              {isOnline ? t('submitRequest') : t('noInternetConnection')}
             </Button>
           </Group>
         </Stack>

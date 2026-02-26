@@ -1,6 +1,7 @@
 'use client';
 
 import { Table, Text, Paper } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import type { IssuanceReportRow } from '@/types/inventory';
 
 interface IssuanceReportProps {
@@ -9,11 +10,12 @@ interface IssuanceReportProps {
 }
 
 export function IssuanceReport({ rows, isLoading }: IssuanceReportProps) {
+  const t = useTranslations('inventory');
   if (isLoading) return null;
   if (!rows || rows.length === 0) {
     return (
       <Text size="sm" c="dimmed">
-        No issuances match the filters.
+        {t('noIssuancesMatch')}
       </Text>
     );
   }
@@ -23,12 +25,12 @@ export function IssuanceReport({ rows, isLoading }: IssuanceReportProps) {
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Date</Table.Th>
-            <Table.Th>Student</Table.Th>
-            <Table.Th>Item</Table.Th>
-            <Table.Th>Size</Table.Th>
-            <Table.Th>Qty</Table.Th>
-            <Table.Th>Issued by</Table.Th>
+            <Table.Th>{t('date')}</Table.Th>
+            <Table.Th>{t('student')}</Table.Th>
+            <Table.Th>{t('items')}</Table.Th>
+            <Table.Th>{t('size')}</Table.Th>
+            <Table.Th>{t('qty')}</Table.Th>
+            <Table.Th>{t('issuedBy')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>

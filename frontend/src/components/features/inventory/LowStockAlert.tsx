@@ -3,6 +3,7 @@
 import { Alert, Text, Group, Button, Badge } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import type { UniformItem } from '@/types/inventory';
 
 interface LowStockAlertProps {
@@ -11,6 +12,7 @@ interface LowStockAlertProps {
 }
 
 export function LowStockAlert({ items, isLoading }: LowStockAlertProps) {
+  const t = useTranslations('inventory');
   const router = useRouter();
 
   if (isLoading || !items || items.length === 0) return null;
@@ -30,9 +32,9 @@ export function LowStockAlert({ items, isLoading }: LowStockAlertProps) {
       icon={<IconAlertTriangle size={16} />}
       title={
         <Group gap="xs">
-          <span>Low stock</span>
+          <span>{t('lowStock')}</span>
           <Badge color="red" variant="filled" size="sm">
-            Low stock
+            {t('lowStock')}
           </Badge>
         </Group>
       }
@@ -41,8 +43,7 @@ export function LowStockAlert({ items, isLoading }: LowStockAlertProps) {
     >
       <Group justify="space-between" wrap="nowrap">
         <Text size="sm">
-          {items.length} item(s) have sizes at or below the low-stock threshold.
-          Replenish stock to avoid running out.
+          {t('lowStockMessage', { count: items.length })}
         </Text>
         <Button
           variant="light"
@@ -50,7 +51,7 @@ export function LowStockAlert({ items, isLoading }: LowStockAlertProps) {
           size="xs"
           onClick={() => router.push('/inventory/items')}
         >
-          Manage stock
+          {t('manageStock')}
         </Button>
       </Group>
     </Alert>

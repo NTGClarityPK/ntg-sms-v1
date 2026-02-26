@@ -17,6 +17,7 @@ import {
 } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudents } from '@/hooks/useStudents';
 import { useUniformRequests } from '@/hooks/useUniformRequests';
@@ -50,6 +51,7 @@ function formatItemsSummary(items: UniformRequest['items']): string {
 }
 
 export default function UniformRequestPage() {
+  const t = useTranslations('inventory');
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
@@ -112,8 +114,8 @@ export default function UniformRequestPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Request uniform</Title>
-          <Tooltip label="Refresh">
+          <Title order={1}>{t('requestUniformTitle')}</Title>
+          <Tooltip label={t('refresh')}>
             <ActionIcon
               variant="light"
               size="lg"
@@ -137,23 +139,21 @@ export default function UniformRequestPage() {
       >
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
-            <Tabs.Tab value="request">Request</Tabs.Tab>
-            <Tabs.Tab value="history">View History</Tabs.Tab>
+            <Tabs.Tab value="request">{t('tabRequest')}</Tabs.Tab>
+            <Tabs.Tab value="history">{t('tabViewHistory')}</Tabs.Tab>
           </Tabs.List>
 
           <Tabs.Panel value="request" pt="md">
             <Stack gap="md">
               <Paper p="lg" withBorder>
                 <Text size="sm" c="dimmed" mb="md">
-                  Submit a uniform request for a student. An admin will review
-                  and issue the items.
+                  {t('submitIntro')}
                 </Text>
                 {isLoading ? (
                   <Skeleton height={200} />
                 ) : studentOptions.length === 0 ? (
                   <Text c="dimmed">
-                    No students available. Parents can only request for their
-                    linked children.
+                    {t('noStudentsAvailable')}
                   </Text>
                 ) : (
                   <RequestForm studentOptions={studentOptions} />
@@ -166,24 +166,23 @@ export default function UniformRequestPage() {
             <Stack gap="md">
               <Paper p="md" withBorder>
                 <Text fw={600} mb="sm">
-                  Your past requests
+                  {t('yourPastRequests')}
                 </Text>
                 {isLoadingHistory ? (
                   <Skeleton height={200} />
                 ) : isEmptyHistory ? (
                   <Text size="sm" c="dimmed">
-                    No requests yet. Use the Request tab to submit a uniform
-                    request.
+                    {t('noRequestsYet')}
                   </Text>
                 ) : (
                   <>
                     <Table striped highlightOnHover>
                       <Table.Thead>
                         <Table.Tr>
-                          <Table.Th>Student</Table.Th>
-                          <Table.Th>Date</Table.Th>
-                          <Table.Th>Status</Table.Th>
-                          <Table.Th>Items</Table.Th>
+                          <Table.Th>{t('student')}</Table.Th>
+                          <Table.Th>{t('date')}</Table.Th>
+                          <Table.Th>{t('status')}</Table.Th>
+                          <Table.Th>{t('items')}</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
@@ -204,7 +203,7 @@ export default function UniformRequestPage() {
                                 size="sm"
                                 color={STATUS_COLOR[req.status] ?? 'gray'}
                               >
-                                {req.status}
+                                {t(req.status)}
                               </Badge>
                             </Table.Td>
                             <Table.Td>
@@ -224,10 +223,10 @@ export default function UniformRequestPage() {
                             setHistoryPage((p) => Math.max(1, p - 1))
                           }
                         >
-                          Previous
+                          {t('previous')}
                         </Button>
                         <Text size="sm" c="dimmed">
-                          Page {historyPage} of {historyMeta.totalPages}
+                          {t('pageOf', { page: historyPage, total: historyMeta.totalPages })}
                         </Text>
                         <Button
                           variant="default"
@@ -235,7 +234,7 @@ export default function UniformRequestPage() {
                           disabled={historyPage >= historyMeta.totalPages}
                           onClick={() => setHistoryPage((p) => p + 1)}
                         >
-                          Next
+                          {t('next')}
                         </Button>
                       </Group>
                     )}

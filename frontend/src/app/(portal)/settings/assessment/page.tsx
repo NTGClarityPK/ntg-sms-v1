@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Group, Tabs, Title } from '@mantine/core';
 import { AssessmentTypeList } from '@/components/features/settings/AssessmentTypeList';
 import { GradeTemplateBuilder } from '@/components/features/settings/GradeTemplateBuilder';
@@ -7,6 +8,7 @@ import { LeaveQuotaSetting } from '@/components/features/settings/LeaveQuotaSett
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 
 export default function AssessmentSettingsPage() {
+  const tLeave = useTranslations('leave');
   const activeYearQuery = useActiveAcademicYear();
   const activeYearId = activeYearQuery.data?.data?.id;
 
@@ -22,7 +24,7 @@ export default function AssessmentSettingsPage() {
         <Tabs.List>
           <Tabs.Tab value="types">Assessment types</Tabs.Tab>
           <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
-          <Tabs.Tab value="leave">Leave quota</Tabs.Tab>
+          <Tabs.Tab value="leave">{tLeave('tabLeaveQuota')}</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="types" pt="md" px="md" pb="md">

@@ -17,25 +17,10 @@ import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useCreateUniform, useUpdateUniform, useUploadUniformImage } from '@/hooks/useInventory';
 import { useSystemSetting } from '@/hooks/useSystemSettings';
 import type { UniformItem, CreateUniformItemInput } from '@/types/inventory';
-
-const GENDERS = [
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'unisex', label: 'Unisex' },
-];
-
-const itemSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  itemCode: z.string().optional(),
-  category: z.string().min(1, 'Category is required'),
-  gender: z.string().optional(),
-  description: z.string().optional(),
-  imageUrl: z.string().optional(),
-  isActive: z.boolean(),
-});
 
 interface UniformItemFormModalProps {
   opened: boolean;
@@ -48,6 +33,28 @@ export function UniformItemFormModal({
   onClose,
   item,
 }: UniformItemFormModalProps) {
+  const t = useTranslations('inventory');
+  const GENDERS = useMemo(
+    () => [
+      { value: 'male', label: t('male') },
+      { value: 'female', label: t('female') },
+      { value: 'unisex', label: t('unisex') },
+    ],
+    [t],
+  );
+  const itemSchema = useMemo(
+    () =>
+      z.object({
+        name: z.string().min(1, t('nameRequired')),
+        itemCode: z.string().optional(),
+        category: z.string().min(1, t('categoryRequired')),
+        gender: z.string().optional(),
+        description: z.string().optional(),
+        imageUrl: z.string().optional(),
+        isActive: z.boolean(),
+      }),
+    [t],
+  );
   const isEdit = !!item;
   const createMutation = useCreateUniform();
   const updateMutation = useUpdateUniform();
@@ -156,52 +163,52 @@ export function UniformItemFormModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Edit uniform item' : 'Create uniform item'}
+      title={isEdit ? t('editUniformItem') : t('createUniformItem')}
       size="md"
     >
       <form id="uniform-item-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <TextInput
             id="uniform-item-form-name"
-            label="Name"
-            placeholder="e.g. Boys Shirt, Girls Skirt"
+            label={t('name')}
+            placeholder={t('namePlaceholder')}
             required
             {...form.getInputProps('name')}
           />
           <TextInput
             id="uniform-item-form-code"
-            label="Item code"
-            placeholder="Optional code"
+            label={t('itemCode')}
+            placeholder={t('itemCodePlaceholder')}
             {...form.getInputProps('itemCode')}
           />
           <Select
             id="uniform-item-form-category"
-            label="Category"
+            label={t('category')}
             data={categoryOptions}
             placeholder={
               categoryOptions.length === 0
-                ? 'No categories. Add them in Settings → Inventory Management.'
-                : 'Select category'
+                ? t('noCategoriesHint')
+                : t('selectCategory')
             }
             required
             {...form.getInputProps('category')}
           />
           <Select
             id="uniform-item-form-gender"
-            label="Gender"
+            label={t('gender')}
             data={GENDERS}
             clearable
             {...form.getInputProps('gender')}
           />
           <Textarea
             id="uniform-item-form-description"
-            label="Description"
-            placeholder="Optional description"
+            label={t('description')}
+            placeholder={t('descriptionPlaceholder')}
             {...form.getInputProps('description')}
           />
           <Stack gap="xs">
             <Text size="sm" fw={500}>
-              Upload image
+              {t('uploadImage')}
             </Text>
             <input
               ref={fileInputRef}
@@ -229,7 +236,7 @@ export function UniformItemFormModal({
                     leftSection={<IconX size={14} />}
                     onClick={clearUpload}
                   >
-                    Remove image
+                    {t('removeImage')}
                   </Button>
                 </Group>
               </Stack>
@@ -241,25 +248,25 @@ export function UniformItemFormModal({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={hasImageUrl}
               >
-                Choose image
+                {t('chooseImage')}
               </Button>
             )}
           </Stack>
           <TextInput
-            label="Image URL"
-            placeholder="https://... (optional)"
+            label={t('imageUrl')}
+            placeholder={t('imageUrlPlaceholder')}
             {...form.getInputProps('imageUrl')}
             onChange={handleImageUrlChange}
             disabled={!!imageFile}
           />
           <Switch
             id="uniform-item-form-active"
-            label="Active"
+            label={t('active')}
             {...form.getInputProps('isActive', { type: 'checkbox' })}
           />
           <Group justify="flex-end" mt="md">
             <Button id="uniform-item-form-cancel" variant="default" onClick={onClose}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               id="uniform-item-form-submit"
@@ -270,7 +277,7 @@ export function UniformItemFormModal({
                 uploadMutation.isPending
               }
             >
-              {isEdit ? 'Update' : 'Create'}
+              {isEdit ? t('update') : t('create')}
             </Button>
           </Group>
         </Stack>

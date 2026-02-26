@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Group,
   Title,
@@ -17,6 +17,7 @@ import {
 } from '@mantine/core';
 import { IconCheck, IconX, IconTruck, IconTrash, IconRefresh } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import {
   useUniformRequests,
   useApproveUniformRequest,
@@ -29,14 +30,6 @@ import { useFeaturePermission } from '@/hooks/usePermissions';
 import { ApprovalModal } from '@/components/features/inventory/ApprovalModal';
 import { IssueModal } from '@/components/features/inventory/IssueModal';
 import type { UniformRequest } from '@/types/inventory';
-
-const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'issued', label: 'Issued' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
 
 const STATUS_COLOR: Record<string, string> = {
   pending: 'yellow',
@@ -56,10 +49,21 @@ function formatItemsSummary(items: UniformRequest['items']): string {
 }
 
 export default function InventoryRequestsPage() {
+  const t = useTranslations('inventory');
+  const STATUS_OPTIONS = useMemo(
+    () => [
+      { value: 'pending', label: t('pending') },
+      { value: 'approved', label: t('approved') },
+      { value: 'rejected', label: t('rejected') },
+      { value: 'issued', label: t('issued') },
+      { value: 'cancelled', label: t('cancelled') },
+    ],
+    [t],
+  );
+
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { canEdit } = useFeaturePermission('inventory');
-  const currentUserId = user?.id;
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
@@ -139,8 +143,8 @@ export default function InventoryRequestsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Uniform requests</Title>
-          <Tooltip label="Refresh">
+          <Title order={1}>{t('uniformRequestsTitle')}</Title>
+          <Tooltip label={t('refresh')}>
             <ActionIcon
               variant="light"
               size="lg"
@@ -166,8 +170,8 @@ export default function InventoryRequestsPage() {
           <Paper p="md" withBorder>
             <Select
               id="inventory-requests-filter-status"
-              label="Status"
-              placeholder="All statuses"
+              label={t('status')}
+              placeholder={t('allStatuses')}
               data={STATUS_OPTIONS}
               value={statusFilter}
               onChange={(v) => {
@@ -183,7 +187,7 @@ export default function InventoryRequestsPage() {
           ) : isEmpty ? (
             <Paper p="xl" withBorder>
               <Text c="dimmed" ta="center">
-                No uniform requests found.
+                {t('noRequestsFound')}
               </Text>
             </Paper>
           ) : (
@@ -191,13 +195,13 @@ export default function InventoryRequestsPage() {
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Student</Table.Th>
-                    <Table.Th>Requested by</Table.Th>
-                    <Table.Th>Date</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th>Notes</Table.Th>
-                    <Table.Th>Items</Table.Th>
-                    <Table.Th>Actions</Table.Th>
+                    <Table.Th>{t('student')}</Table.Th>
+                    <Table.Th>{t('requestedBy')}</Table.Th>
+                    <Table.Th>{t('date')}</Table.Th>
+                    <Table.Th>{t('status')}</Table.Th>
+                    <Table.Th>{t('notes')}</Table.Th>
+                    <Table.Th>{t('items')}</Table.Th>
+                    <Table.Th>{t('actions')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -228,7 +232,7 @@ export default function InventoryRequestsPage() {
                             size="sm"
                             color={STATUS_COLOR[req.status] ?? 'gray'}
                           >
-                            {req.status}
+                            {t(req.status)}
                           </Badge>
                         </Table.Td>
                         <Table.Td>
@@ -247,7 +251,7 @@ export default function InventoryRequestsPage() {
                                   <ActionIcon
                                     variant="light"
                                     color="green"
-                                    title="Approve"
+                                    title={t('approve')}
                                     onClick={() => handleApprove(req)}
                                   >
                                     <IconCheck size={16} />
@@ -255,7 +259,7 @@ export default function InventoryRequestsPage() {
                                   <ActionIcon
                                     variant="light"
                                     color="red"
-                                    title="Reject"
+                                    title={t('reject')}
                                     onClick={() => handleReject(req)}
                                   >
                                     <IconX size={16} />
@@ -266,7 +270,7 @@ export default function InventoryRequestsPage() {
                                 <ActionIcon
                                   variant="light"
                                   color="blue"
-                                  title="Mark issued"
+                                  title={t('markIssued')}
                                   onClick={() => handleIssue(req)}
                                 >
                                   <IconTruck size={16} />
@@ -276,7 +280,7 @@ export default function InventoryRequestsPage() {
                                 <ActionIcon
                                   variant="light"
                                   color="gray"
-                                  title="Cancel request"
+                                  title={t('cancelRequest')}
                                   onClick={() => handleCancel(req)}
                                 >
                                   <IconTrash size={16} />
@@ -303,10 +307,10 @@ export default function InventoryRequestsPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Previous
+                {t('previous')}
               </Button>
               <Text size="sm" c="dimmed">
-                Page {page} of {meta.totalPages}
+                {t('pageOf', { page, total: meta.totalPages })}
               </Text>
               <Button
                 variant="default"
@@ -314,7 +318,7 @@ export default function InventoryRequestsPage() {
                 disabled={page >= meta.totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t('next')}
               </Button>
             </Group>
           )}

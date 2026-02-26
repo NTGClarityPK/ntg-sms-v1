@@ -5,7 +5,8 @@ import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { useUploadLibraryFile, useCreateLibraryItem, useUpdateLibraryItem, useLibraryItem, useLibraryCategories } from '@/hooks/useLibrary';
 import { useCoreLookups } from '@/hooks/useCoreLookups';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -14,15 +15,6 @@ import { StorageQuotaBar } from './StorageQuotaBar';
 import type { LibraryItem } from '@/hooks/useLibrary';
 import type { ClassEntity } from '@/types/settings';
 
-const libraryItemSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  author: z.string().optional(),
-  description: z.string().optional(),
-  subjectId: z.string().optional(),
-  classId: z.string().optional(),
-  category: z.string().min(1, 'Category is required'),
-});
-
 interface UploadModalProps {
   opened: boolean;
   onClose: () => void;
@@ -30,11 +22,25 @@ interface UploadModalProps {
 }
 
 export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
+  const t = useTranslations('library');
   const colors = useThemeColors();
   const isEdit = !!itemId;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+
+  const libraryItemSchema = useMemo(
+    () =>
+      z.object({
+        title: z.string().min(1, t('titleRequired')),
+        author: z.string().optional(),
+        description: z.string().optional(),
+        subjectId: z.string().optional(),
+        classId: z.string().optional(),
+        category: z.string().min(1, t('categoryRequired')),
+      }),
+    [t],
+  );
 
   const { data: categoriesData } = useLibraryCategories();
   const categories = categoriesData || [];
@@ -93,7 +99,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
       onClose();
     } else {
       if (!selectedFile) {
-        form.setFieldError('file', 'Please select a file to upload');
+        form.setFieldError('file', t('pleaseSelectFile'));
         return;
       }
 
@@ -132,8 +138,8 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
       } catch (error) {
         console.error('Upload error:', error);
         notifications.show({
-          title: 'Upload Error',
-          message: error instanceof Error ? error.message : 'Failed to upload file',
+          title: t('uploadError'),
+          message: error instanceof Error ? error.message : t('uploadError'),
           color: 'red',
         });
       } finally {
@@ -152,7 +158,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Edit Library Item' : 'Upload Library Item'}
+      title={isEdit ? t('editLibraryItem') : t('uploadLibraryItem')}
       size="lg"
     >
       <form id="library-upload-form" onSubmit={form.onSubmit(handleSubmit)}>
@@ -163,7 +169,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
               <FileButton onChange={setSelectedFile} accept=".pdf,.doc,.docx,.txt,application/pdf">
                 {(props) => (
                   <Button id="library-upload-select-file" {...props} leftSection={<IconUpload size={16} />} variant="light" fullWidth>
-                    {selectedFile ? `Selected: ${selectedFile.name}` : 'Select File'}
+                    {selectedFile ? t('selectedFile', { name: selectedFile.name }) : t('selectFile')}
                   </Button>
                 )}
               </FileButton>
@@ -182,31 +188,31 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
 
           <TextInput
             id="library-upload-title"
-            label="Title"
-            placeholder="Enter title"
+            label={t('titleLabel')}
+            placeholder={t('titlePlaceholder')}
             required
             {...form.getInputProps('title')}
           />
 
           <TextInput
             id="library-upload-author"
-            label="Author"
-            placeholder="Enter author name"
+            label={t('author')}
+            placeholder={t('authorPlaceholder')}
             {...form.getInputProps('author')}
           />
 
           <Textarea
             id="library-upload-description"
-            label="Description"
-            placeholder="Enter description"
+            label={t('description')}
+            placeholder={t('descriptionPlaceholder')}
             rows={3}
             {...form.getInputProps('description')}
           />
 
           <Select
             id="library-upload-category"
-            label="Category"
-            placeholder="Select category"
+            label={t('category')}
+            placeholder={t('selectCategory')}
             required
             data={categories.map((cat) => ({ value: cat, label: cat }))}
             searchable
@@ -215,8 +221,8 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
 
           <Select
             id="library-upload-subject"
-            label="Subject"
-            placeholder="Select subject (optional)"
+            label={t('subject')}
+            placeholder={t('selectSubjectOptional')}
             data={subjects.map((s) => ({ value: s.id, label: s.name }))}
             searchable
             clearable
@@ -225,8 +231,8 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
 
           <Select
             id="library-upload-class"
-            label="Class"
-            placeholder="Select class (optional)"
+            label={t('class')}
+            placeholder={t('selectClassOptional')}
             data={classes.map((c) => {
               const classEntity = c as ClassEntity;
               return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
@@ -238,10 +244,10 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
 
           <Group justify="flex-end" mt="md">
             <Button id="library-upload-cancel" variant="subtle" onClick={onClose}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button id="library-upload-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending || uploading}>
-              {isEdit ? 'Update' : 'Upload'}
+              {isEdit ? t('update') : t('upload')}
             </Button>
           </Group>
         </Stack>

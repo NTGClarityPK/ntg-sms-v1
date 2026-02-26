@@ -14,6 +14,7 @@ import {
 } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
+import { useTranslations } from 'next-intl';
 import { useUniforms } from '@/hooks/useInventory';
 import { useStudents } from '@/hooks/useStudents';
 import {
@@ -26,6 +27,7 @@ import { IssuanceHistory } from '@/components/features/inventory/IssuanceHistory
 import { DirectIssueModal } from '@/components/features/inventory/DirectIssueModal';
 
 export default function InventoryHistoryPage() {
+  const t = useTranslations('inventory');
   const { canEdit } = useFeaturePermission('inventory');
   const [directIssueOpened, { open: openDirectIssue, close: closeDirectIssue }] =
     useDisclosure(false);
@@ -57,14 +59,14 @@ export default function InventoryHistoryPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Issuance history</Title>
+          <Title order={1}>{t('issuanceHistoryTitle')}</Title>
           {canEdit && (
             <Button
               id="inventory-history-btn-direct-issue"
               leftSection={<IconPlus size={16} />}
               onClick={openDirectIssue}
             >
-              Direct issue
+              {t('directIssue')}
             </Button>
           )}
         </Group>
@@ -82,13 +84,13 @@ export default function InventoryHistoryPage() {
         <Stack gap="md">
           <Paper p="md" withBorder>
             <Text fw={600} mb="sm">
-              Report filters
+              {t('reportFilters')}
             </Text>
             <Group align="flex-end" gap="md" wrap="wrap">
               <Select
                 id="inventory-history-filter-student"
-                label="Student"
-                placeholder="All students"
+                label={t('student')}
+                placeholder={t('allStudents')}
                 data={students.map((s) => ({
                   value: s.id,
                   label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || s.id,
@@ -100,8 +102,8 @@ export default function InventoryHistoryPage() {
               />
               <Select
                 id="inventory-history-filter-item"
-                label="Item"
-                placeholder="All items"
+                label={t('items')}
+                placeholder={t('allItems')}
                 data={uniforms.map((u) => ({ value: u.id, label: u.name }))}
                 value={itemFilter}
                 onChange={setItemFilter}
@@ -110,14 +112,14 @@ export default function InventoryHistoryPage() {
               <TextInput
                 id="inventory-history-filter-from"
                 type="date"
-                label="From date"
+                label={t('fromDate')}
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.currentTarget.value)}
               />
               <TextInput
                 id="inventory-history-filter-to"
                 type="date"
-                label="To date"
+                label={t('toDate')}
                 value={dateTo}
                 onChange={(e) => setDateTo(e.currentTarget.value)}
               />
@@ -133,11 +135,11 @@ export default function InventoryHistoryPage() {
           {canEdit && (
             <>
               <Text fw={600} mt="md">
-                History by student
+                {t('historyByStudent')}
               </Text>
               <Select
                 id="inventory-history-select-student"
-                placeholder="Select student to view history"
+                placeholder={t('selectStudentPlaceholder')}
                 data={students.map((s) => ({
                   value: s.id,
                   label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || s.id,

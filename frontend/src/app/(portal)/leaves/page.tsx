@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Card,
   Group,
@@ -45,6 +46,7 @@ interface ParentChild {
 }
 
 export default function LeavesPage() {
+  const t = useTranslations('leave');
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
@@ -168,8 +170,8 @@ export default function LeavesPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Leave</Title>
-          <Tooltip label="Refresh">
+          <Title order={1}>{t('title')}</Title>
+          <Tooltip label={t('refresh')}>
             <ActionIcon
               variant="light"
               size="lg"
@@ -200,8 +202,8 @@ export default function LeavesPage() {
           }}
         >
           <Tabs.List>
-            {isParent && <Tabs.Tab id="leaves-tab-my-requests" value="my-requests">Raise a request</Tabs.Tab>}
-            <Tabs.Tab id="leaves-tab-all-requests" value="all-requests">All requests</Tabs.Tab>
+            {isParent && <Tabs.Tab id="leaves-tab-my-requests" value="my-requests">{t('tabRaiseRequest')}</Tabs.Tab>}
+            <Tabs.Tab id="leaves-tab-all-requests" value="all-requests">{t('tabAllRequests')}</Tabs.Tab>
           </Tabs.List>
 
           {isParent && (
@@ -230,8 +232,8 @@ export default function LeavesPage() {
                         <Stack gap="sm">
                           <Select
                             id="leaves-select-student"
-                            label="Select Student"
-                            placeholder="Choose a student"
+                            label={t('selectStudent')}
+                            placeholder={t('chooseStudent')}
                             data={availableStudents.map((s) => ({
                               value: s.id,
                               label: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || s.studentId || `Student ${s.id.slice(0, 8)}`,
@@ -249,7 +251,7 @@ export default function LeavesPage() {
                                   <>
                                     <Group gap="xs">
                                       <Text size="sm" c="dimmed">
-                                        Pending:
+                                        {t('pending')}:
                                       </Text>
                                       <Badge variant="light" color="yellow" size="sm">
                                         {studentStats.data.pending}
@@ -257,7 +259,7 @@ export default function LeavesPage() {
                                     </Group>
                                     <Group gap="xs">
                                       <Text size="sm" c="dimmed">
-                                        Approved:
+                                        {t('approved')}:
                                       </Text>
                                       <Badge variant="light" color="green" size="sm">
                                         {studentStats.data.approved}
@@ -265,7 +267,7 @@ export default function LeavesPage() {
                                     </Group>
                                     <Group gap="xs">
                                       <Text size="sm" c="dimmed">
-                                        Rejected:
+                                        {t('rejected')}:
                                       </Text>
                                       <Badge variant="light" color="red" size="sm">
                                         {studentStats.data.rejected}
@@ -275,14 +277,14 @@ export default function LeavesPage() {
                                 ) : null}
                               </Group>
                               {quotaQuery.data && isQuotaExceeded && (
-                                <Alert color="red" title="Leave quota exceeded">
+                                <Alert color="red" title={t('leaveQuotaExceeded')}>
                                   <Stack gap={4}>
                                     <Text size="sm">
-                                      Leave quota used: {quotaQuery.data.usedDays}/{quotaQuery.data.totalQuota} days (Limit exceeded)
+                                      {t('leaveQuotaUsedLimit', { used: quotaQuery.data.usedDays, total: quotaQuery.data.totalQuota })}
                                     </Text>
                                     {(quotaQuery.data.daysFromAbsences ?? 0) > 0 && (
                                       <Text size="xs" c="dimmed">
-                                        This includes {quotaQuery.data.daysFromAbsences} day{quotaQuery.data.daysFromAbsences === 1 ? '' : 's'} marked absent (counted in quota).
+                                        {t('daysFromAbsences', { count: quotaQuery.data.daysFromAbsences })}
                                       </Text>
                                     )}
                                   </Stack>
@@ -302,7 +304,7 @@ export default function LeavesPage() {
                             <Group gap="md">
                               <Group gap="xs">
                                 <Text size="sm" c="dimmed">
-                                  Pending requests:
+                                  {t('pendingRequests')}
                                 </Text>
                                 <Badge variant="light" color="yellow" size="sm">
                                   {studentStats.data.pending}
@@ -310,7 +312,7 @@ export default function LeavesPage() {
                               </Group>
                               <Group gap="xs">
                                 <Text size="sm" c="dimmed">
-                                  Approved requests:
+                                  {t('approvedRequests')}
                                 </Text>
                                 <Badge variant="light" color="green" size="sm">
                                   {studentStats.data.approved}
@@ -318,7 +320,7 @@ export default function LeavesPage() {
                               </Group>
                               <Group gap="xs">
                                 <Text size="sm" c="dimmed">
-                                  Rejected requests:
+                                  {t('rejectedRequests')}
                                 </Text>
                                 <Badge variant="light" color="red" size="sm">
                                   {studentStats.data.rejected}
@@ -328,14 +330,14 @@ export default function LeavesPage() {
                           ) : null}
                         </Paper>
                         {quotaQuery.data && isQuotaExceeded && (
-                          <Alert color="red" title="Leave quota exceeded">
+                          <Alert color="red" title={t('leaveQuotaExceeded')}>
                             <Stack gap={4}>
                               <Text size="sm">
-                                Leave quota used: {quotaQuery.data.usedDays}/{quotaQuery.data.totalQuota} days (Limit exceeded)
+                                {t('leaveQuotaUsedLimit', { used: quotaQuery.data.usedDays, total: quotaQuery.data.totalQuota })}
                               </Text>
                               {(quotaQuery.data.daysFromAbsences ?? 0) > 0 && (
                                 <Text size="xs" c="dimmed">
-                                  This includes {quotaQuery.data.daysFromAbsences} day{quotaQuery.data.daysFromAbsences === 1 ? '' : 's'} marked absent (counted in quota).
+                                  {t('daysFromAbsences', { count: quotaQuery.data.daysFromAbsences })}
                                 </Text>
                               )}
                             </Stack>
@@ -345,7 +347,7 @@ export default function LeavesPage() {
                     )}
                     <Card withBorder p="md">
                       <Stack gap="sm">
-                        <Title order={3}>Request leave</Title>
+                        <Title order={3}>{t('requestLeave')}</Title>
                         <LeaveRequestForm
                           key={selectedStudent?.id || 'no-student'}
                           student={selectedStudent}
@@ -357,7 +359,7 @@ export default function LeavesPage() {
                 ) : (
                   <Card withBorder p="md">
                     <Text size="sm" c="dimmed">
-                      No student found for your account. {children.length > 0 ? `Found ${children.length} linked children, but no matching students.` : 'No children linked to your account.'}
+                      {t('noStudentForAccount')} {children.length > 0 ? t('foundLinkedNoMatch', { count: children.length }) : t('noChildrenLinked')}
                     </Text>
                   </Card>
                 )}
@@ -371,15 +373,15 @@ export default function LeavesPage() {
                 <Table striped highlightOnHover>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Date Requested</Table.Th>
-                      <Table.Th>Leave Period</Table.Th>
-                      <Table.Th>Student</Table.Th>
-                      <Table.Th>Reason</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Reviewed By</Table.Th>
-                      <Table.Th>Date Reviewed</Table.Th>
-                      <Table.Th>Review Notes</Table.Th>
-                      <Table.Th>Actions</Table.Th>
+                      <Table.Th>{t('dateRequested')}</Table.Th>
+                      <Table.Th>{t('leavePeriod')}</Table.Th>
+                      <Table.Th>{t('student')}</Table.Th>
+                      <Table.Th>{t('reason')}</Table.Th>
+                      <Table.Th>{t('status')}</Table.Th>
+                      <Table.Th>{t('reviewedBy')}</Table.Th>
+                      <Table.Th>{t('dateReviewed')}</Table.Th>
+                      <Table.Th>{t('reviewNotes')}</Table.Th>
+                      <Table.Th>{t('actions')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -400,11 +402,11 @@ export default function LeavesPage() {
                 </Table>
               ) : leaveQuery.isError ? (
                 <Text size="sm" c="red">
-                  Error loading leave requests. Please try again.
+                  {t('errorLoadingLeaveRequests')}
                 </Text>
               ) : requests.length === 0 ? (
                 <Text size="sm" c="dimmed">
-                  No leave requests found.
+                  {t('noLeaveRequestsFoundShort')}
                 </Text>
               ) : (
                 <LeaveRequestTable

@@ -1,6 +1,7 @@
 'use client';
 
 import { Table, Text, Stack } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import type { UniformIssuance } from '@/types/inventory';
 
 interface IssuanceHistoryProps {
@@ -9,11 +10,12 @@ interface IssuanceHistoryProps {
 }
 
 export function IssuanceHistory({ issuances, isLoading }: IssuanceHistoryProps) {
+  const t = useTranslations('inventory');
   if (isLoading) return null;
   if (!issuances || issuances.length === 0) {
     return (
       <Text size="sm" c="dimmed">
-        No issuance history for this student.
+        {t('noIssuanceHistory')}
       </Text>
     );
   }
@@ -23,11 +25,11 @@ export function IssuanceHistory({ issuances, isLoading }: IssuanceHistoryProps) 
       <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Date</Table.Th>
-            <Table.Th>Item</Table.Th>
-            <Table.Th>Size</Table.Th>
-            <Table.Th>Qty</Table.Th>
-            <Table.Th>Issued by</Table.Th>
+            <Table.Th>{t('date')}</Table.Th>
+            <Table.Th>{t('items')}</Table.Th>
+            <Table.Th>{t('size')}</Table.Th>
+            <Table.Th>{t('qty')}</Table.Th>
+            <Table.Th>{t('issuedBy')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
