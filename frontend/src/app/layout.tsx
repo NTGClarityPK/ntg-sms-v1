@@ -32,6 +32,9 @@ export const metadata = {
   title: 'School Management System',
   description: 'Multi-tenant school management system',
   manifest: '/manifest.json',
+  other: {
+    google: 'notranslate',
+  },
 };
 
 export const viewport = {
@@ -44,12 +47,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const cookieStore = await cookies();
-  const locale = cookieStore.get('NEXT_LOCALE')?.value ?? 'ar';
+  const locale = cookieStore.get('NEXT_LOCALE')?.value ?? 'en';
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
   const messages = await getMessages();
 
   return (
-    <html lang={locale} dir={dir}>
+    <html lang={locale} dir={dir} translate="no">
       <body className={`${primaryFont.variable} ${headingFont.variable} ${monoFont.variable}`}>
         <NextIntlClientProvider messages={messages}>
           <DirectionProvider initialDirection={dir} detectDirection={true}>

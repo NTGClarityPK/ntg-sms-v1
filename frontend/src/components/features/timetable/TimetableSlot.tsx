@@ -11,6 +11,7 @@ interface TimetableSlotProps {
   onClick?: () => void;
   showConflict?: boolean;
   height?: number; // Optional: card height in pixels to determine if compact layout needed
+  periodNumber?: number;
 }
 
 // Calculate duration in minutes from time strings
@@ -29,6 +30,7 @@ export function TimetableSlotComponent({
   onClick,
   showConflict,
   height,
+  periodNumber,
 }: TimetableSlotProps) {
   const theme = useMantineTheme();
   const colors = useThemeColors();
@@ -128,6 +130,14 @@ export function TimetableSlotComponent({
   }
 
   // Regular layout for larger slots
+  const subjectLabel = slot.subjectName
+    ? slot.subjectName
+    : slot.slotType === 'assembly'
+    ? 'Assembly'
+    : slot.slotType === 'break'
+    ? 'Break'
+    : '';
+
   return (
     <Card
       padding="xs"
@@ -135,66 +145,58 @@ export function TimetableSlotComponent({
         cursor: onClick ? 'pointer' : 'default',
         height: '100%',
         border: showConflict ? '2px solid var(--mantine-color-red-6)' : undefined,
-        backgroundColor: showConflict 
-          ? 'var(--mantine-color-red-0)' 
+        backgroundColor: showConflict
+          ? 'var(--mantine-color-red-0)'
           : cardBackgroundColor,
         transition: 'all 0.2s',
         position: 'relative',
+        padding: '4px 6px',
       }}
       onClick={onClick}
       withBorder={!showConflict}
     >
-      <Stack gap={4}>
-        <Group gap={6} wrap="nowrap" justify="flex-end" style={{ minHeight: 22 }}>
-          <Badge 
-            size="xs" 
-            variant="light" 
-            color={slotTypeColors[slot.slotType]}
-          >
-            {slot.slotType === 'class' 
-              ? 'class' 
-              : 'others'}
+      <Stack gap={2}>
+        {/* Row 1: subject name (left) + period badge (right) */}
+        <Group justify="space-between" gap={4} wrap="nowrap">
+          <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
+            {subjectLabel}
+          </Text>
+          {periodNumber && (
+            <Badge size="xs" variant="light" color="gray" style={{ flexShrink: 0 }}>
+              P{periodNumber}
+            </Badge>
+          )}
+        </Group>
+
+        {/* Row 2: class type badge + class/section name */}
+        <Group gap={4} wrap="nowrap">
+          <Badge size="xs" variant="light" color={slotTypeColors[slot.slotType]}>
+            {slot.slotType === 'class' ? 'class' : 'others'}
           </Badge>
           {slot.slotType === 'class' && (slot.className || slot.sectionName) && (
-            <Text size="xs" c="dimmed" lineClamp={1} style={{ maxWidth: '100%' }}>
+            <Text size="xs" c="dimmed" lineClamp={1} style={{ minWidth: 0 }}>
               {[slot.className, slot.sectionName].filter(Boolean).join(' ')}
             </Text>
           )}
         </Group>
-        {(slot.staffName || slot.room) && (
-          <Group gap={6} wrap="nowrap" style={{ marginBottom: 0 }}>
+
+        {/* Row 3: staff/room (left) + time range (right) */}
+        <Group justify="space-between" gap={4} wrap="nowrap">
+          <Group gap={4} wrap="nowrap" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
             {slot.staffName && (
-              <Text size="xs" c="dimmed" lineClamp={1}>
+              <Text size="xs" c="dimmed" lineClamp={1} style={{ minWidth: 0 }}>
                 {slot.staffName}
               </Text>
             )}
             {slot.room && (
-              <Text size="xs" c="dimmed" lineClamp={1}>
-                • Room: {slot.room}
+              <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                · RM {slot.room}
               </Text>
             )}
           </Group>
-        )}
-        <Group justify="space-between" gap={8} wrap="nowrap" style={{ marginTop: (slot.staffName || slot.room) ? -4 : 8 }}>
-          <Group gap={6} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-            {slot.subjectName ? (
-              <Text size="sm" fw={500} lineClamp={1}>
-                {slot.subjectName}
-              </Text>
-            ) : slot.slotType === 'assembly' ? (
-              <Text size="sm" fw={500} lineClamp={1}>
-                Assembly
-              </Text>
-            ) : slot.slotType === 'break' ? (
-              <Text size="sm" fw={500} lineClamp={1}>
-                Break
-              </Text>
-            ) : null}
-          </Group>
-
-          <Group gap={4} wrap="nowrap">
+          <Group gap={2} wrap="nowrap" style={{ flexShrink: 0 }}>
             <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-              {slot.startTime} - {slot.endTime}
+              {timeRange}
             </Text>
             {showConflict && <IconAlertCircle size={14} color="var(--mantine-color-red-6)" />}
           </Group>

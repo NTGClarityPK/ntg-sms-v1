@@ -246,18 +246,8 @@ export function TimetableGrid({
                         onClick={() => {}}
                         showConflict={hasConflict}
                         height={height}
+                        periodNumber={!isCompact ? slot.periodNumber : undefined}
                       />
-                      {/* Only show period badge for non-compact slots */}
-                      {slot.periodNumber && !isCompact && (
-                        <Badge
-                          size="xs"
-                          variant="light"
-                          color="gray"
-                          style={{ position: 'absolute', top: 4, insetInlineEnd: 4 }}
-                        >
-                          Period {slot.periodNumber}
-                        </Badge>
-                      )}
                     </div>
                   );
                 })}

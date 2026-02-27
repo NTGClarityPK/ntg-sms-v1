@@ -97,7 +97,7 @@ export default function LoginPage() {
           preferredLocale?: string;
           roles?: Array<{ roleName?: string }>;
         }>('/api/v1/auth/me');
-        const locale = userResponse.data?.preferredLocale ?? 'ar';
+        const locale = userResponse.data?.preferredLocale ?? 'en';
         document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000; SameSite=Lax`;
         localStorage.setItem('locale', locale);
 
