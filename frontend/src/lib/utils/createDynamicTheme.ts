@@ -97,18 +97,29 @@ export function createDynamicTheme(
     components: {
       Button: {
         defaultProps: { variant: 'filled' },
-        styles: (theme: MantineTheme) => {
+        styles: (theme: MantineTheme, props: Record<string, unknown>) => {
           const config = (theme.other as any) as typeof themeConfig;
+          // Only force the theme background/text colour on filled buttons.
+          // outline, subtle, transparent, light, etc. keep Mantine's own styles.
+          if (!props.variant || props.variant === 'filled') {
+            return {
+              root: {
+                backgroundColor: config.components.button.backgroundColor,
+                color: config.components.button.textColor,
+                fontFamily: config.typography.fontFamily.primary,
+                fontWeight: config.typography.fontWeight.medium,
+                '&:hover:not(:disabled)': {
+                  backgroundColor: config.components.button.hoverColor,
+                  color: config.components.button.hoverTextColor ?? config.components.button.textColor,
+                },
+              },
+            };
+          }
+          // For all other variants only carry over font settings
           return {
             root: {
-              backgroundColor: config.components.button.backgroundColor,
-              color: config.components.button.textColor,
               fontFamily: config.typography.fontFamily.primary,
               fontWeight: config.typography.fontWeight.medium,
-              '&:hover:not(:disabled)': {
-                backgroundColor: config.components.button.hoverColor,
-                color: config.components.button.hoverTextColor ?? config.components.button.textColor,
-              },
             },
           };
         },

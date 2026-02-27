@@ -6,7 +6,6 @@ import { IconLanguage, IconCheck } from '@tabler/icons-react';
 import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
-
 const LOCALE_COOKIE = 'NEXT_LOCALE';
 const COOKIE_MAX_AGE = 31536000; // 1 year
 
@@ -48,10 +47,12 @@ export function LanguageSwitcher() {
     <Menu shadow="md" width={200} position="bottom-end" zIndex={2000}>
       <Menu.Target>
         <Button
-          variant="subtle"
           leftSection={<IconLanguage size={16} />}
           size="sm"
-          style={{ fontWeight: 500, color: DEFAULT_THEME_COLOR }}
+          style={{
+            backgroundColor: DEFAULT_THEME_COLOR,
+            color: 'white',
+          }}
         >
           {currentLanguage.nativeName}
         </Button>
