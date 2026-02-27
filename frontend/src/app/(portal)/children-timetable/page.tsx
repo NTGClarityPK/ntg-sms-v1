@@ -13,6 +13,7 @@ import {
 } from '@mantine/core';
 import { IconAlertCircle, IconUser } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useStudentTimetable, useTimingTemplateInfo } from '@/hooks/useTimetable';
@@ -31,6 +32,7 @@ interface Child {
 
 export default function ChildrenTimetablePage() {
   const colors = useThemeColors();
+  const t = useTranslations('timetable');
   const { user } = useAuth();
   const userId = (user as User | undefined)?.id;
   const { data: activeYear } = useActiveAcademicYear();
@@ -94,7 +96,7 @@ export default function ChildrenTimetablePage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Child Timetable</Title>
+          <Title order={1}>{t('childTimetable')}</Title>
         </Group>
       </div>
 
@@ -114,17 +116,21 @@ export default function ChildrenTimetablePage() {
               <Skeleton height={360} />
             </Stack>
           ) : children.length === 0 ? (
-            <Alert icon={<IconAlertCircle size={16} />} color={colors.warning} title="No children linked">
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              color={colors.warning}
+              title={t('noChildrenLinked')}
+            >
               <Text size="sm">
-                No children are linked to your account yet. Please contact the school administrator.
+                {t('noChildrenLinkedMessage')}
               </Text>
             </Alert>
           ) : (
             <>
               <Paper withBorder p="md">
                 <Select
-                  label="Select Child"
-                  placeholder="Choose a child"
+                  label={t('selectChild')}
+                  placeholder={t('chooseChild')}
                   data={children.map((child) => ({
                     value: child.studentId,
                     label: child.studentName || child.studentStudentId || child.studentId,
@@ -140,22 +146,24 @@ export default function ChildrenTimetablePage() {
                 <Paper withBorder p="md">
                   <Stack gap={4}>
                     <Text size="sm">
-                      Showing timetable for{' '}
+                      {t('showingTimetableFor')}{' '}
                       <Text component="span" fw={600}>
                         {selectedChild.studentName || selectedChild.studentStudentId || selectedChild.studentId}
                       </Text>
                       .
                     </Text>
                     <Text size="sm" c="dimmed">
-                      Subject Template Group:{' '}
+                      {t('subjectTemplateGroup')}{' '}
                       <Text component="span" fw={600}>
-                        {subjectTemplate?.name || 'Not assigned'}
+                        {subjectTemplate?.name || t('notAssigned')}
                       </Text>
                     </Text>
                     <Text size="sm" c="dimmed">
-                      Class Section:{' '}
+                      {t('classSection')}{' '}
                       <Text component="span" fw={600}>
-                        {timetable ? `${timetable.className} - ${timetable.sectionName}` : 'Not available'}
+                        {timetable
+                          ? `${timetable.className} - ${timetable.sectionName}`
+                          : t('notAvailable')}
                       </Text>
                     </Text>
                   </Stack>
@@ -168,15 +176,19 @@ export default function ChildrenTimetablePage() {
                 <Alert
                   icon={<IconAlertCircle size={16} />}
                   color={colors.warning}
-                  title="No subject template assigned"
+                  title={t('noSubjectTemplateAssigned')}
                 >
                   <Text size="sm">
-                    The selected child does not have a subject template assigned for the active academic year.
+                    {t('noSubjectTemplateMessage')}
                   </Text>
                 </Alert>
               ) : !timetable ? (
-                <Alert icon={<IconAlertCircle size={16} />} color={colors.info} title="No timetable available">
-                  <Text size="sm">No timetable has been created for the selected child yet.</Text>
+                <Alert
+                  icon={<IconAlertCircle size={16} />}
+                  color={colors.info}
+                  title={t('noTimetableAvailable')}
+                >
+                  <Text size="sm">{t('noTimetableForChild')}</Text>
                 </Alert>
               ) : (
                 <TimetableGrid

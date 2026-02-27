@@ -9,10 +9,13 @@ import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { useState } from 'react';
 import type { Level } from '@/types/settings';
+import { useTranslations } from 'next-intl';
 
 export function LevelManager() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [editLevel, setEditLevel] = useState<Level | null>(null);
   const levelsQuery = useLevels();
@@ -23,7 +26,7 @@ export function LevelManager() {
   const form = useForm<{ name: string; classIds: string[] }>({
     initialValues: { name: '', classIds: [] },
     validate: {
-      name: (v) => (v.trim().length === 0 ? 'Name is required' : null),
+      name: (v) => (v.trim().length === 0 ? tSettings('levelNameRequired') : null),
     },
     transformValues: (v) => ({ name: v.name.trim(), classIds: v.classIds }),
   });
@@ -53,15 +56,15 @@ export function LevelManager() {
           id: editLevel.id,
           payload: { name: values.name },
         });
-        notifications.show({ title: 'Success', message: 'Level updated', color: notifyColors.success });
+        notifications.show({ title: tCommon('success'), message: tSettings('levelUpdated'), color: notifyColors.success });
       } else {
         await createMutation.mutateAsync(values);
-        notifications.show({ title: 'Success', message: 'Level created', color: notifyColors.success });
+        notifications.show({ title: tCommon('success'), message: tSettings('levelCreated'), color: notifyColors.success });
       }
       handleClose();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   });
 
@@ -77,9 +80,9 @@ export function LevelManager() {
 
   if (levelsQuery.error || classesQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load levels">
+      <Alert color={colors.error} title={tSettings('levelLoadError')}>
         <Group justify="space-between" mt="sm">
-          <Text size="sm">Please try again.</Text>
+          <Text size="sm">{tSettings('genericPleaseTryAgain')}</Text>
           <Button
             id="level-manager-retry"
             variant="light"
@@ -89,7 +92,7 @@ export function LevelManager() {
               void classesQuery.refetch();
             }}
           >
-            Retry
+            {tCommon('retry')}
           </Button>
         </Group>
       </Alert>
@@ -99,7 +102,6 @@ export function LevelManager() {
   const levels = levelsQuery.data?.data ?? [];
   const classes = classesQuery.data?.data ?? [];
 
-  // Build a map of which classes are already assigned to levels (for create: disable assigned; for edit: allow current level's classes)
   const assignedClassIds = new Set<string>();
   const classToLevelMap = new Map<string, string>();
   levels.forEach((level) => {
@@ -112,7 +114,6 @@ export function LevelManager() {
   const editingLevelId = editLevel?.id;
   const editingLevelClassIds = editLevel ? new Set(editLevel.classes.map((c) => c.id)) : new Set<string>();
 
-  // Create options: when editing, only disable classes assigned to *other* levels; when creating, disable all assigned
   const classOptions = classes.map((c) => {
     const isAssigned = assignedClassIds.has(c.id);
     const levelName = classToLevelMap.get(c.id);
@@ -120,7 +121,10 @@ export function LevelManager() {
     const disabled = isAssigned && !isInEditingLevel;
     return {
       value: c.id,
-      label: isAssigned && !isInEditingLevel ? `${c.displayName} (in ${levelName})` : c.displayName,
+      label:
+        isAssigned && !isInEditingLevel
+          ? `${c.displayName} (${tSettings('levelClassesInLabel', { levelName: levelName ?? '' })})`
+          : c.displayName,
       disabled,
     };
   });
@@ -128,29 +132,27 @@ export function LevelManager() {
   return (
     <>
       <Group justify="space-between" mb="xs">
-        <Text size="lg" fw={500}>Levels</Text>
+        <Text size="lg" fw={500}>{tSettings('levelTitle')}</Text>
         <Button id="level-manager-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          Add level
+          {tSettings('levelAddButton')}
         </Button>
       </Group>
       <Text size="sm" c="dimmed" mb="md">
-        Levels help organise classes into groups such as Primary, Secondary, or Foundation. 
-        Each level can contain multiple classes, making it easier to manage academic structures 
-        and assign subject templates across related classes.
+        {tSettings('levelDescription')}
       </Text>
 
       <Paper withBorder p="md">
         {levels.length === 0 ? (
           <Text c="dimmed" size="sm">
-            No levels yet.
+            {tSettings('levelNoData')}
           </Text>
         ) : (
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Name</Table.Th>
-                <Table.Th>Classes</Table.Th>
-                <Table.Th style={{ width: 80 }}>Actions</Table.Th>
+                <Table.Th>{tCommon('name')}</Table.Th>
+                <Table.Th>{tSettings('levelColClasses')}</Table.Th>
+                <Table.Th style={{ width: 80 }}>{tCommon('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -174,15 +176,20 @@ export function LevelManager() {
         )}
       </Paper>
 
-      <Modal opened={opened} onClose={handleClose} title={editLevel ? 'Edit level' : 'Add level'} size="md">
+      <Modal
+        opened={opened}
+        onClose={handleClose}
+        title={editLevel ? tSettings('levelModalEdit') : tSettings('levelModalAdd')}
+        size="md"
+      >
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput id="level-form-name" label="Name" placeholder="Primary" {...form.getInputProps('name')} />
+            <TextInput id="level-form-name" label={tCommon('name')} placeholder="Primary" {...form.getInputProps('name')} />
             {!editLevel && (
               <MultiSelect
                 id="level-form-classes"
-                label="Classes"
-                placeholder="Select classes"
+                label={tSettings('levelClassesLabel')}
+                placeholder={tSettings('levelClassesPlaceholder')}
                 data={classOptions}
                 searchable
                 {...form.getInputProps('classIds')}
@@ -190,10 +197,10 @@ export function LevelManager() {
             )}
             <Group justify="flex-end" mt="md">
               <Button id="level-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
-                Cancel
+                {tCommon('cancel')}
               </Button>
               <Button id="level-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
-                Save
+                {tCommon('save')}
               </Button>
             </Group>
           </Stack>
@@ -202,5 +209,3 @@ export function LevelManager() {
     </>
   );
 }
-
-

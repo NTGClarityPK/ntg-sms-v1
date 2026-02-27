@@ -4,6 +4,7 @@ import { Badge, Button, Card, Group, MultiSelect, Stack, Text } from '@mantine/c
 import type { ClassEntity, TimingTemplate } from '@/types/settings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 interface TimingTemplateCardProps {
   template: TimingTemplate;
@@ -21,6 +22,7 @@ export function TimingTemplateCard({
   onAssignClasses,
 }: TimingTemplateCardProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
   const [selected, setSelected] = useState<string[]>(template.assignedClassIds);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function TimingTemplateCard({
 
   const options = useMemo(() => {
     const unavailableSet = new Set(unavailableClassIds);
-    const sortedClasses = [...classes].sort((a, b) => 
+    const sortedClasses = [...classes].sort((a, b) =>
       a.displayName.localeCompare(b.displayName)
     );
     return sortedClasses
@@ -72,19 +74,19 @@ export function TimingTemplateCard({
           )}
         </Stack>
         <Badge variant="light" color={colors.info}>
-          {template.assignedClassIds.length} classes
+          {tSettings('scheduleTimingClassesBadge', { count: template.assignedClassIds.length })}
         </Badge>
       </Group>
 
       <Stack gap="sm" mt="md">
         <MultiSelect
           id={`timing-template-card-${template.id}-classes`}
-          label="Assigned classes"
+          label={tSettings('scheduleTimingAssignedClassesLabel')}
           data={options}
           value={selected}
           onChange={handleSelectionChange}
           searchable
-          placeholder="Select classes"
+          placeholder={tSettings('scheduleTimingClassesPlaceholder')}
         />
         <Group justify="flex-end">
           <Button
@@ -94,12 +96,10 @@ export function TimingTemplateCard({
             loading={isSavingAssignments}
             onClick={() => onAssignClasses(template.id, selected)}
           >
-            Save assignments
+            {tSettings('scheduleTimingSaveAssignments')}
           </Button>
         </Group>
       </Stack>
     </Card>
   );
 }
-
-

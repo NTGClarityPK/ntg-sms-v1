@@ -284,7 +284,9 @@ export default function LeavesPage() {
                                     </Text>
                                     {(quotaQuery.data.daysFromAbsences ?? 0) > 0 && (
                                       <Text size="xs" c="dimmed">
-                                        {t('daysFromAbsences', { count: quotaQuery.data.daysFromAbsences })}
+                                        {t('daysFromAbsences', {
+                                          count: quotaQuery.data.daysFromAbsences ?? 0,
+                                        })}
                                       </Text>
                                     )}
                                   </Stack>
@@ -337,7 +339,9 @@ export default function LeavesPage() {
                               </Text>
                               {(quotaQuery.data.daysFromAbsences ?? 0) > 0 && (
                                 <Text size="xs" c="dimmed">
-                                  {t('daysFromAbsences', { count: quotaQuery.data.daysFromAbsences })}
+                                  {t('daysFromAbsences', {
+                                    count: quotaQuery.data.daysFromAbsences ?? 0,
+                                  })}
                                 </Text>
                               )}
                             </Stack>

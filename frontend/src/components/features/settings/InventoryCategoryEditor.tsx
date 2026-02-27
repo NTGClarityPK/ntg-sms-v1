@@ -20,6 +20,7 @@ import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSetti
 
 export function InventoryCategoryEditor() {
   const t = useTranslations('inventory');
+  const tCommon = useTranslations('common');
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
 
@@ -47,7 +48,7 @@ export function InventoryCategoryEditor() {
     if (!next) return;
     if (normalizedItems.includes(next)) {
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message: t('categoryAlreadyExists'),
         color: notifyColors.error,
       });
@@ -67,7 +68,7 @@ export function InventoryCategoryEditor() {
     const trimmedValue = editValue.trim();
     if (!trimmedValue) {
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message: t('categoryNameEmpty'),
         color: notifyColors.error,
       });
@@ -78,7 +79,7 @@ export function InventoryCategoryEditor() {
       updated.some((item, idx) => item === trimmedValue && idx !== editingIndex)
     ) {
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message: t('categoryAlreadyExists'),
         color: notifyColors.error,
       });
@@ -105,15 +106,15 @@ export function InventoryCategoryEditor() {
     try {
       await updateMutation.mutateAsync(normalizedItems);
       notifications.show({
-        title: 'Success',
+        title: tCommon('success'),
         message: t('inventoryCategoriesSaved'),
         color: notifyColors.success,
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Unknown error';
+        error instanceof Error ? error.message : tCommon('errors.generic');
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message,
         color: notifyColors.error,
       });

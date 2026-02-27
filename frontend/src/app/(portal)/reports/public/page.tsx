@@ -1,16 +1,18 @@
 'use client';
 
 import { Group, Title, Table, Paper, Skeleton, Stack, Text } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import { usePublicClassCounts } from '@/hooks/useReports';
 
 export default function PublicClassCountsPage() {
   const { data: counts, isLoading } = usePublicClassCounts();
+  const t = useTranslations('reports');
 
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Class Student Count</Title>
+          <Title order={1}>{t('publicStudentCountsTitle')}</Title>
         </Group>
       </div>
       <div
@@ -24,7 +26,7 @@ export default function PublicClassCountsPage() {
       >
         <Stack gap="md">
           <Paper withBorder p="md">
-            <Text fw={600} mb="md">Student Counts by Class</Text>
+            <Text fw={600} mb="md">{t('publicStudentCountsTitle')}</Text>
             {isLoading ? (
               <Stack gap="sm">
                 <Skeleton height={40} />
@@ -35,11 +37,11 @@ export default function PublicClassCountsPage() {
               <Table withTableBorder withColumnBorders>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Class</Table.Th>
-                    <Table.Th>Section</Table.Th>
-                    <Table.Th>Total Students</Table.Th>
-                    <Table.Th>Boys</Table.Th>
-                    <Table.Th>Girls</Table.Th>
+                    <Table.Th>{t('publicTableClass')}</Table.Th>
+                    <Table.Th>{t('publicTableSection')}</Table.Th>
+                    <Table.Th>{t('publicTableTotalStudents')}</Table.Th>
+                    <Table.Th>{t('publicTableBoys')}</Table.Th>
+                    <Table.Th>{t('publicTableGirls')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -55,7 +57,7 @@ export default function PublicClassCountsPage() {
                 </Table.Tbody>
               </Table>
             ) : (
-              <Text c="dimmed" size="sm">No class data available.</Text>
+              <Text c="dimmed" size="sm">{t('publicNoData')}</Text>
             )}
           </Paper>
         </Stack>

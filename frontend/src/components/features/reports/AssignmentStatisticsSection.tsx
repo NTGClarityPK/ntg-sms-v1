@@ -1,6 +1,7 @@
 'use client';
 
 import { Paper, Title, Group, Text, RingProgress, Grid, Stack } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import type { AssignmentStatistics } from '@/types/reports';
 
 interface AssignmentStatisticsSectionProps {
@@ -8,43 +9,58 @@ interface AssignmentStatisticsSectionProps {
 }
 
 export function AssignmentStatisticsSection({ data }: AssignmentStatisticsSectionProps) {
+  const t = useTranslations('reports');
   return (
     <Paper withBorder p="md">
-      <Title order={3} mb="md">Assignment Statistics</Title>
+      <Title order={3} mb="md">
+        {t('assignmentStatsTitle')}
+      </Title>
       <Grid>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">Total Assignments</Text>
+            <Text size="sm" c="dimmed">
+              {t('assignmentStatsTotal')}
+            </Text>
             <Text size="xl" fw={700}>{data.totalAssignments}</Text>
           </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">Viewed</Text>
+            <Text size="sm" c="dimmed">
+              {t('assignmentStatsViewed')}
+            </Text>
             <Text size="xl" fw={700} c="blue">{data.viewedAssignments}</Text>
           </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">Not Viewed</Text>
+            <Text size="sm" c="dimmed">
+              {t('assignmentStatsNotViewed')}
+            </Text>
             <Text size="xl" fw={700} c="red">{data.notViewedAssignments}</Text>
           </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">Submitted</Text>
+            <Text size="sm" c="dimmed">
+              {t('assignmentStatsSubmitted')}
+            </Text>
             <Text size="xl" fw={700} c="green">{data.submittedAssignments}</Text>
           </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">In Progress</Text>
+            <Text size="sm" c="dimmed">
+              {t('assignmentStatsInProgress')}
+            </Text>
             <Text size="xl" fw={700} c="yellow">{data.inProgressAssignments}</Text>
           </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">Not Started</Text>
+            <Text size="sm" c="dimmed">
+              {t('assignmentStatsNotStarted')}
+            </Text>
             <Text size="xl" fw={700} c="gray">{data.notStartedAssignments}</Text>
           </Stack>
         </Grid.Col>
@@ -61,9 +77,14 @@ export function AssignmentStatisticsSection({ data }: AssignmentStatisticsSectio
               }
             />
             <Stack gap="xs">
-              <Text size="sm" fw={600}>Viewing Rate</Text>
+              <Text size="sm" fw={600}>
+                {t('assignmentStatsViewingRate')}
+              </Text>
               <Text size="xs" c="dimmed">
-                {data.viewedAssignments} of {data.totalAssignments} assignments viewed
+                {t('assignmentStatsViewingSummary', {
+                  viewed: data.viewedAssignments,
+                  total: data.totalAssignments,
+                })}
               </Text>
             </Stack>
           </Group>
@@ -81,9 +102,14 @@ export function AssignmentStatisticsSection({ data }: AssignmentStatisticsSectio
               }
             />
             <Stack gap="xs">
-              <Text size="sm" fw={600}>Submission Rate</Text>
+              <Text size="sm" fw={600}>
+                {t('assignmentStatsSubmissionRate')}
+              </Text>
               <Text size="xs" c="dimmed">
-                {data.submittedAssignments} of {data.totalAssignments} assignments submitted
+                {t('assignmentStatsSubmissionSummary', {
+                  submitted: data.submittedAssignments,
+                  total: data.totalAssignments,
+                })}
               </Text>
             </Stack>
           </Group>

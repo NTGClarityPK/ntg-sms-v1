@@ -19,6 +19,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
       }
     : null;
 }
+import { useTranslations } from 'next-intl';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { TimetableGrid } from '@/components/features/timetable/TimetableGrid';
 import { useMyStudent } from '@/hooks/useStudents';
@@ -29,6 +30,7 @@ import type { TimetableSlot } from '@/types/timetable';
 import { IconX, IconClock } from '@tabler/icons-react';
 
 export default function MyTimetablePage() {
+  const t = useTranslations('timetable');
   const colors = useThemeColors();
   const { themeVersion } = useThemeStore();
   const { user } = useAuth();
@@ -277,7 +279,7 @@ export default function MyTimetablePage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>My Timetable</Title>
+            <Title order={1}>{t('myTimetable')}</Title>
           </Group>
         </div>
         <div
@@ -304,7 +306,7 @@ export default function MyTimetablePage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>My Timetable</Title>
+            <Title order={1}>{t('myTimetable')}</Title>
           </Group>
         </div>
         <div
@@ -316,9 +318,9 @@ export default function MyTimetablePage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Alert color={colors.warning} title="Student Not Found">
+          <Alert color={colors.warning} title={t('student')}>
             <Text size="sm">
-              Unable to retrieve your student information. Please contact your administrator.
+              {t('noTimetableSlotsMessage')}
             </Text>
           </Alert>
         </div>
@@ -332,7 +334,7 @@ export default function MyTimetablePage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>My Timetable</Title>
+            <Title order={1}>{t('myTimetable')}</Title>
           </Group>
         </div>
         <div
@@ -344,10 +346,9 @@ export default function MyTimetablePage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Alert color={colors.warning} title="No Subject Template Assigned">
+          <Alert color={colors.warning} title={t('noSubjectTemplatesAssigned')}>
             <Text size="sm">
-              No subject template has been assigned to you for this academic year. Please contact
-              your administrator.
+              {t('noSubjectTemplateMessage')}
             </Text>
           </Alert>
         </div>
@@ -361,7 +362,7 @@ export default function MyTimetablePage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>My Timetable</Title>
+            <Title order={1}>{t('myTimetable')}</Title>
           </Group>
         </div>
         <div
@@ -373,8 +374,8 @@ export default function MyTimetablePage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Alert color={colors.info} title="No Timetable Available">
-            <Text size="sm">No timetable has been created for your class-section yet.</Text>
+          <Alert color={colors.info} title={t('noTimetableAvailable')}>
+            <Text size="sm">{t('noTimetableForClassSection')}</Text>
           </Alert>
         </div>
       </>
@@ -385,7 +386,7 @@ export default function MyTimetablePage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>My Timetable</Title>
+          <Title order={1}>{t('myTimetable')}</Title>
           {/* Next Period Badge */}
           {nextPeriod && nextPeriod.status !== 'none' && (
             <Badge
@@ -400,12 +401,12 @@ export default function MyTimetablePage() {
             >
               {nextPeriod.status === 'current' ? (
                 <Text size="sm" fw={500}>
-                  Currently: {nextPeriod.slot?.subjectName || 'Free Period'}
+                  {t('currently')} {nextPeriod.slot?.subjectName || t('freePeriod')}
                 </Text>
               ) : (
                 nextPeriod.slot && nextPeriod.timeUntil && (
                   <Text size="sm" fw={500}>
-                    Upcoming: {nextPeriod.slot.subjectName || 'Free Period'} in{' '}
+                    {t('upcoming')} {nextPeriod.slot.subjectName || t('freePeriod')}{' '}
                     {nextPeriod.timeUntil.hours > 0
                       ? `${nextPeriod.timeUntil.hours} hour${nextPeriod.timeUntil.hours > 1 ? 's' : ''} `
                       : ''}
@@ -430,10 +431,10 @@ export default function MyTimetablePage() {
           {/* Student Info Banner */}
           <Paper p="md" withBorder style={{ backgroundColor: bannerBackgroundColor }}>
             <Text size="sm" fw={500}>
-              Showing Timetable for <Text component="span" fw={600}>{[myStudentData.data.firstName, myStudentData.data.lastName].filter(Boolean).join(' ') || 'Student'}</Text> of{' '}
-              <Text component="span" fw={600}>{subjectTemplate?.name || 'Unknown Template'}</Text> for{' '}
+              {t('showingTimetableFor')} <Text component="span" fw={600}>{[myStudentData.data.firstName, myStudentData.data.lastName].filter(Boolean).join(' ') || t('student')}</Text>{' '}
+              <Text component="span" fw={600}>{subjectTemplate?.name || t('unknownTemplate')}</Text>{' '}
               <Text component="span" fw={600}>
-                {timetable ? `${timetable.className} - ${timetable.sectionName}` : 'Unknown Class'}
+                {timetable ? `${timetable.className} - ${timetable.sectionName}` : t('unknownClass')}
               </Text>
             </Text>
           </Paper>
@@ -455,9 +456,9 @@ export default function MyTimetablePage() {
           )}
 
           {timetable && timetable.slots.length === 0 && (
-            <Alert color={colors.info} title="No Timetable Slots">
+            <Alert color={colors.info} title={t('noTimetableSlots')}>
               <Text size="sm">
-                No timetable slots have been created for your class-section yet.
+                {t('noSlotsForClassSection')}
               </Text>
             </Alert>
           )}
@@ -468,7 +469,7 @@ export default function MyTimetablePage() {
       <Modal
         opened={slotModalOpened}
         onClose={closeSlotModal}
-        title="Timetable Slot Details"
+        title={t('slotDetailsTitle')}
         size="md"
       >
         {selectedSlot && (
@@ -476,7 +477,7 @@ export default function MyTimetablePage() {
             <Group justify="space-between" align="flex-start" wrap="nowrap">
               <Stack gap={2} style={{ flex: 1 }}>
                 <Text size="lg" fw={600} lineClamp={1}>
-                  {selectedSlot.subjectName || 'Free Period'}
+                  {selectedSlot.subjectName || t('freePeriod')}
                 </Text>
                 <Text size="sm" c="dimmed">
                   {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
@@ -485,7 +486,7 @@ export default function MyTimetablePage() {
 
               {selectedSlot.periodNumber && (
                 <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                  Period {selectedSlot.periodNumber}
+                  {t('period')} {selectedSlot.periodNumber}
                 </Text>
               )}
             </Group>
@@ -504,14 +505,14 @@ export default function MyTimetablePage() {
                         : 'gray'
                 }
               >
-                {selectedSlot.slotType.charAt(0).toUpperCase() + selectedSlot.slotType.slice(1)}
+                {t(`slotType_${selectedSlot.slotType}` as 'slotType_class' | 'slotType_assembly' | 'slotType_break')}
               </Badge>
             </Group>
 
             {selectedSlot.staffName && (
               <div>
                 <Text size="xs" c="dimmed" mb={4}>
-                  Teacher
+                  {t('teacher')}
                 </Text>
                 <Text size="sm" fw={500}>
                   {selectedSlot.staffName}
@@ -522,7 +523,7 @@ export default function MyTimetablePage() {
             {selectedSlot.room && (
               <div>
                 <Text size="xs" c="dimmed" mb={4}>
-                  Room
+                  {t('room')}
                 </Text>
                 <Text size="sm" fw={500}>
                   {selectedSlot.room}
@@ -532,7 +533,7 @@ export default function MyTimetablePage() {
 
             <div>
               <Text size="xs" c="dimmed" mb={4}>
-                Day
+                {t('day')}
               </Text>
               <Text size="sm" fw={500}>
                 {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][selectedSlot.dayOfWeek]}
@@ -542,7 +543,7 @@ export default function MyTimetablePage() {
             {selectedSlot.className && selectedSlot.sectionName && (
               <div>
                 <Text size="xs" c="dimmed" mb={4}>
-                  Class
+                  {t('class')}
                 </Text>
                 <Text size="sm" fw={500}>
                   {selectedSlot.className} - {selectedSlot.sectionName}

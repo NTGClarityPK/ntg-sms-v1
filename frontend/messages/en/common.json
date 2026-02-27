@@ -37,5 +37,17 @@
     "generic": "An error occurred. Please try again.",
     "notFound": "Not found",
     "studentNotFound": "Student not found"
+  },
+  "roleName": {
+    "school_admin": "School Admin",
+    "super_admin": "Super Admin",
+    "principal": "Principal",
+    "academic_coordinator": "Academic Coordinator",
+    "class_teacher": "Class Teacher",
+    "subject_teacher": "Subject Teacher",
+    "guidance_counselor": "Guidance Counselor",
+    "parent": "Parent",
+    "student": "Student",
+    "admin_assistant": "Admin Assistant"
   }
 }

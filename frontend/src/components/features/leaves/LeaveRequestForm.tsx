@@ -101,7 +101,7 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
               </Text>
               {(quota.daysFromAbsences ?? 0) > 0 && (
                 <Text size="xs" c="dimmed">
-                  {t('daysFromAbsences', { count: quota.daysFromAbsences })}
+                  {t('daysFromAbsences', { count: quota.daysFromAbsences ?? 0 })}
                 </Text>
               )}
             </Stack>

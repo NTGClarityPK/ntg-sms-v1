@@ -1,12 +1,13 @@
 'use client';
 
-import { Button, Group, Modal, MultiSelect, Stack, Text, Textarea, TextInput } from '@mantine/core';
+import { Button, Group, Modal, MultiSelect, Stack, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useEffect } from 'react';
 import { useSubjects } from '@/hooks/useCoreLookups';
 import { useClasses } from '@/hooks/useCoreLookups';
 import { useLevels } from '@/hooks/useCoreLookups';
 import type { SubjectTemplate } from '@/types/subject-templates';
+import { useTranslations } from 'next-intl';
 
 export interface SubjectTemplateFormValues {
   name: string;
@@ -31,6 +32,9 @@ export function SubjectTemplateForm({
   isSubmitting,
   entity,
 }: SubjectTemplateFormProps) {
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
+
   const form = useForm<SubjectTemplateFormValues>({
     initialValues: {
       name: '',
@@ -40,19 +44,18 @@ export function SubjectTemplateForm({
       levelIds: [],
     },
     validate: {
-      name: (v) => (v.trim().length === 0 ? 'Name is required' : null),
+      name: (v) => (v.trim().length === 0 ? tSettings('subjectTemplateFormNameRequired') : null),
       classIds: (_, values) =>
         (values.classIds?.length ?? 0) === 0 && (values.levelIds?.length ?? 0) === 0
-          ? 'Assign to at least one class or one level'
+          ? tSettings('subjectTemplateFormAssignRequired')
           : null,
       levelIds: (_, values) =>
         (values.classIds?.length ?? 0) === 0 && (values.levelIds?.length ?? 0) === 0
-          ? 'Assign to at least one class or one level'
+          ? tSettings('subjectTemplateFormAssignRequired')
           : null,
     },
   });
 
-  // Sync form when entity changes (for edit mode)
   useEffect(() => {
     if (entity) {
       form.setValues({
@@ -99,23 +102,29 @@ export function SubjectTemplateForm({
     <Modal
       opened={opened}
       onClose={onClose}
-      title={entity ? 'Edit Subject Template' : 'Create Subject Template'}
+      title={entity ? tSettings('subjectTemplateFormModalEdit') : tSettings('subjectTemplateFormModalCreate')}
       size="lg"
     >
       <form id="subject-template-form" onSubmit={submit}>
         <Stack gap="md">
-          <TextInput id="subject-template-form-name" label="Name" placeholder="Science Group" required {...form.getInputProps('name')} />
+          <TextInput
+            id="subject-template-form-name"
+            label={tCommon('name')}
+            placeholder={tSettings('subjectTemplateFormNamePlaceholder')}
+            required
+            {...form.getInputProps('name')}
+          />
           <Textarea
             id="subject-template-form-description"
-            label="Description"
-            placeholder="Template for science stream students"
+            label={tSettings('subjectTemplateFormDescLabel')}
+            placeholder={tSettings('subjectTemplateFormDescPlaceholder')}
             {...form.getInputProps('description')}
           />
 
           <MultiSelect
             id="subject-template-form-subjects"
-            label="Subjects"
-            placeholder="Select subjects"
+            label={tSettings('subjectTemplateFormSubjectsLabel')}
+            placeholder={tSettings('subjectTemplateFormSubjectsPlaceholder')}
             data={subjectOptions}
             {...form.getInputProps('subjectIds')}
             searchable
@@ -123,8 +132,8 @@ export function SubjectTemplateForm({
 
           <MultiSelect
             id="subject-template-form-classes"
-            label="Assign to Classes"
-            placeholder="Select classes"
+            label={tSettings('subjectTemplateFormClassesLabel')}
+            placeholder={tSettings('subjectTemplateFormClassesPlaceholder')}
             data={classOptions}
             disabled={classesDisabled}
             value={form.values.classIds}
@@ -140,8 +149,8 @@ export function SubjectTemplateForm({
 
           <MultiSelect
             id="subject-template-form-levels"
-            label="Assign to Levels"
-            placeholder="Select levels"
+            label={tSettings('subjectTemplateFormLevelsLabel')}
+            placeholder={tSettings('subjectTemplateFormLevelsPlaceholder')}
             data={levelOptions}
             disabled={levelsDisabled}
             value={form.values.levelIds}
@@ -157,10 +166,10 @@ export function SubjectTemplateForm({
 
           <Group justify="flex-end" mt="md">
             <Button id="subject-template-form-cancel" variant="light" onClick={onClose} disabled={isSubmitting}>
-              Cancel
+              {tCommon('cancel')}
             </Button>
             <Button id="subject-template-form-submit" type="submit" loading={isSubmitting}>
-              {entity ? 'Update' : 'Create'}
+              {entity ? tCommon('update') : tCommon('create')}
             </Button>
           </Group>
         </Stack>
@@ -168,4 +177,3 @@ export function SubjectTemplateForm({
     </Modal>
   );
 }
-

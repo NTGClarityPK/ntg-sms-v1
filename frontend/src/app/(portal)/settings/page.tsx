@@ -166,6 +166,7 @@ const getTimezones = () => {
 export default function SettingsPage() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
   const { user, isLoading: isLoadingAuth } = useAuth();
   const [wizardOpened, { open: openWizard, close: closeWizard }] = useDisclosure(false);
   const [copyModalOpened, { open: openCopyModal, close: closeCopyModal }] = useDisclosure(false);
@@ -203,15 +204,13 @@ export default function SettingsPage() {
       <>
         <div className="page-title-bar">
           <Group justify="space-between" w="100%">
-            <Title order={1}>Settings</Title>
+            <Title order={1}>{tSettings('title')}</Title>
           </Group>
         </div>
         <div className="page-sub-title-bar"></div>
         <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
-          <Alert color={colors.warning} title="No Branch Selected">
-            <Text size="sm">
-              Please select a branch from the branch switcher in the header to access settings.
-            </Text>
+          <Alert color={colors.warning} title={tSettings('noBranchSelectedTitle')}>
+            <Text size="sm">{tSettings('noBranchSelectedMessage')}</Text>
           </Alert>
         </div>
       </>
@@ -225,7 +224,7 @@ export default function SettingsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Settings</Title>
+          <Title order={1}>{tSettings('title')}</Title>
         </Group>
       </div>
 
@@ -233,8 +232,8 @@ export default function SettingsPage() {
 
       <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
         {hasError && (
-          <Alert color={colors.error} title="Failed to load settings status" mb="md">
-            <Text size="sm">Please try again. If the issue persists, ensure you have access to the selected branch.</Text>
+          <Alert color={colors.error} title={tSettings('loadStatusErrorTitle')} mb="md">
+            <Text size="sm">{tSettings('loadStatusErrorMessage')}</Text>
           </Alert>
         )}
 
@@ -254,39 +253,39 @@ export default function SettingsPage() {
             <Tabs value={activeTab} onChange={setActiveTab}>
               <Tabs.List>
                 <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
-                  Permissions
+                  {tSettings('tabPermissions')}
                 </Tabs.Tab>
                 <Tabs.Tab value="business-information" leftSection={<IconBuilding size={16} />}>
-                  Business Information
+                  {tSettings('tabBusinessInformation')}
                 </Tabs.Tab>
                 <Tabs.Tab value="academic-years" leftSection={<IconCalendar size={16} />}>
-                  Academic Years
+                  {tSettings('tabAcademicYears')}
                 </Tabs.Tab>
                 <Tabs.Tab value="academic" leftSection={<IconSchool size={16} />}>
-                  Academic
+                  {tSettings('tabAcademic')}
                 </Tabs.Tab>
                 <Tabs.Tab value="schedule" leftSection={<IconClock size={16} />}>
-                  Schedule
+                  {tSettings('tabSchedule')}
                 </Tabs.Tab>
                 <Tabs.Tab value="assessment" leftSection={<IconClipboardList size={16} />}>
-                  Assessment
+                  {tSettings('tabAssessment')}
                 </Tabs.Tab>
                 <Tabs.Tab value="communication" leftSection={<IconMessage size={16} />}>
-                  Communication
+                  {tSettings('tabCommunication')}
                 </Tabs.Tab>
                 <Tabs.Tab value="behavior" leftSection={<IconMoodHappy size={16} />}>
-                  Behavior
+                  {tSettings('tabBehavior')}
                 </Tabs.Tab>
                 <Tabs.Tab value="inventory-management" leftSection={<IconPackage size={16} />}>
-                  Inventory Management
+                  {tSettings('tabInventoryManagement')}
                 </Tabs.Tab>
                 {isSchoolAdmin && (
                   <>
                     <Tabs.Tab value="public-statistics" leftSection={<IconChartBar size={16} />}>
-                      Public statistics
+                      {tSettings('tabPublicStatistics')}
                     </Tabs.Tab>
                     <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
-                      Theme Settings
+                      {tSettings('tabThemeSettings')}
                     </Tabs.Tab>
                   </>
                 )}
@@ -374,6 +373,7 @@ interface StartSchoolSetupViewProps {
 }
 
 function StartSchoolSetupView({ onStartSetup, onCopyFromBranch, colors }: StartSchoolSetupViewProps) {
+  const tSettings = useTranslations('settings');
   return (
     <Stack align="center" gap="xl" py="xl" maw={520} mx="auto">
       <Paper withBorder shadow="sm" p="xl" radius="md" style={{ width: '100%', textAlign: 'center' }}>
@@ -392,9 +392,9 @@ function StartSchoolSetupView({ onStartSetup, onCopyFromBranch, colors }: StartS
             <IconSchool size={40} style={{ color: colors.primary ? `var(--mantine-color-${colors.primary}-6)` : 'var(--mantine-color-blue-6)' }} />
           </div>
           <Stack gap="xs" align="center">
-            <Title order={2}>School setup required</Title>
+            <Title order={2}>{tSettings('setupRequiredTitle')}</Title>
             <Text size="sm" c="dimmed" maw={400}>
-              Configure your school settings before using the rest of the system. Run the guided setup once to create academic years, classes, schedule, and more. You can change these later in Settings.
+              {tSettings('setupRequiredDescription')}
             </Text>
           </Stack>
           <Stack gap="sm" w="100%" maw={320}>
@@ -405,7 +405,7 @@ function StartSchoolSetupView({ onStartSetup, onCopyFromBranch, colors }: StartS
               onClick={onStartSetup}
               color={colors.primary}
             >
-              Start school setup
+              {tSettings('setupStartButton')}
             </Button>
             {onCopyFromBranch && (
               <Button
@@ -415,7 +415,7 @@ function StartSchoolSetupView({ onStartSetup, onCopyFromBranch, colors }: StartS
                 leftSection={<IconCopy size={18} />}
                 onClick={onCopyFromBranch}
               >
-                Copy settings from another branch
+                {tSettings('setupCopyFromBranchButton')}
               </Button>
             )}
           </Stack>
@@ -428,6 +428,7 @@ function StartSchoolSetupView({ onStartSetup, onCopyFromBranch, colors }: StartS
 // Tab Content Components
 function PermissionsTabContent() {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
   const { permissions, isLoading, error, refetch } = usePermissions();
   const { data: rolesData } = useRoles();
   const { data: featuresData } = useFeatures();
@@ -460,8 +461,8 @@ function PermissionsTabContent() {
   return (
     <Tabs defaultValue="matrix">
       <Tabs.List>
-        <Tabs.Tab value="matrix">Assign Access</Tabs.Tab>
-        <Tabs.Tab value="role-access">Role Access View</Tabs.Tab>
+        <Tabs.Tab value="matrix">{tSettings('permissionsAssignAccessTab')}</Tabs.Tab>
+        <Tabs.Tab value="role-access">{tSettings('permissionsRoleAccessTab')}</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="matrix" pt="md">
@@ -477,6 +478,8 @@ function PermissionsTabContent() {
 
 function AcademicYearsTabContent() {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const notifyColors = useNotificationColors();
   const [opened, { open, close }] = useDisclosure(false);
 
@@ -492,10 +495,18 @@ function AcademicYearsTabContent() {
   const handleActivate = async (id: string) => {
     try {
       await activateMutation.mutateAsync(id);
-      notifications.show({ title: 'Success', message: 'Academic year activated', color: notifyColors.success });
+      notifications.show({
+        title: tCommon('success'),
+        message: tSettings('academicYearActivated'),
+        color: notifyColors.success,
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({
+        title: tCommon('error'),
+        message,
+        color: notifyColors.error,
+      });
     }
   };
 
@@ -503,24 +514,30 @@ function AcademicYearsTabContent() {
     // Check if this is the active year
     if (year.isActive) {
       modals.openConfirmModal({
-        title: 'Lock Active Academic Year',
+        title: tSettings('academicYearLockActiveTitle'),
         children: (
-          <Text size="sm">
-            You are about to lock the <strong>active</strong> academic year. This will make it read-only and prevent all modifications.
-            <br />
-            <br />
-            <strong>Warning:</strong> Once locked, this action cannot be undone. If you need to revert this change, please contact Super Admin Support.
-          </Text>
+          <Text size="sm">{tSettings('academicYearLockActiveMessage')}</Text>
         ),
-        labels: { confirm: 'Lock Year', cancel: 'Cancel' },
+        labels: {
+          confirm: tSettings('academicYearLockConfirm'),
+          cancel: tCommon('cancel'),
+        },
         confirmProps: { color: 'orange' },
         onConfirm: async () => {
           try {
             await lockMutation.mutateAsync(year.id);
-            notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
+            notifications.show({
+              title: tCommon('success'),
+              message: tSettings('academicYearLocked'),
+              color: notifyColors.success,
+            });
           } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            notifications.show({ title: 'Error', message, color: notifyColors.error });
+            const message = error instanceof Error ? error.message : tCommon('errors.generic');
+            notifications.show({
+              title: tCommon('error'),
+              message,
+              color: notifyColors.error,
+            });
           }
         },
       });
@@ -528,10 +545,18 @@ function AcademicYearsTabContent() {
       // For non-active years, proceed directly
       try {
         await lockMutation.mutateAsync(year.id);
-        notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
+        notifications.show({
+          title: tCommon('success'),
+          message: tSettings('academicYearLocked'),
+          color: notifyColors.success,
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        notifications.show({ title: 'Error', message, color: notifyColors.error });
+        const message = error instanceof Error ? error.message : tCommon('errors.generic');
+        notifications.show({
+          title: tCommon('error'),
+          message,
+          color: notifyColors.error,
+        });
       }
     }
   };
@@ -539,9 +564,9 @@ function AcademicYearsTabContent() {
   return (
     <>
       <Group justify="space-between" mb="md">
-        <Title order={2}>Academic Years</Title>
+        <Title order={2}>{tSettings('academicYearsHeaderTitle')}</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={open}>
-          Create
+          {tSettings('academicYearsCreateButton')}
         </Button>
       </Group>
 
@@ -552,17 +577,17 @@ function AcademicYearsTabContent() {
           <Skeleton height={200} />
         </Stack>
       ) : listQuery.error ? (
-        <Alert color={colors.error} title="Failed to load academic years">
+        <Alert color={colors.error} title={tSettings('academicYearsLoadErrorTitle')}>
           <Group justify="space-between" mt="sm">
-            <Text size="sm">Please try again.</Text>
+            <Text size="sm">{tSettings('genericPleaseTryAgain')}</Text>
             <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
-              Retry
+              {tSettings('retry')}
             </Button>
           </Group>
         </Alert>
       ) : (listQuery.data?.data?.length ?? 0) === 0 ? (
-        <Alert color={colors.info} title="No academic years yet">
-          <Text size="sm">Create your first academic year to start configuring the system.</Text>
+        <Alert color={colors.info} title={tSettings('academicYearsNoDataTitle')}>
+          <Text size="sm">{tSettings('academicYearsNoDataMessage')}</Text>
         </Alert>
       ) : (
         <Stack gap="md">
@@ -592,6 +617,7 @@ function AcademicYearsTabContent() {
 function BusinessInformationTabContent() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
   const { user } = useAuth();
   const tenantQuery = useTenantMe();
   const updateTenant = useUpdateTenantMe();
@@ -685,8 +711,8 @@ function BusinessInformationTabContent() {
 
   if (tenantQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load school information">
-        <Text size="sm">Please try again.</Text>
+      <Alert color={colors.error} title={tSettings('businessLoadSchoolErrorTitle')}>
+        <Text size="sm">{tSettings('genericPleaseTryAgain')}</Text>
       </Alert>
     );
   }
@@ -699,8 +725,8 @@ function BusinessInformationTabContent() {
     const trimmedName = name.trim();
     if (trimmedName.length === 0) {
       notifications.show({
-        title: 'Validation error',
-        message: 'School name is required.',
+        title: tSettings('validationErrorTitle'),
+        message: tSettings('validationSchoolNameRequired'),
         color: notifyColors.error,
       });
       return;
@@ -711,8 +737,8 @@ function BusinessInformationTabContent() {
         (branchNameTranslations.en ?? '').trim() || (branchNameTranslations.ar ?? '').trim();
       if (!branchNamePrimary) {
         notifications.show({
-          title: 'Validation error',
-          message: 'Branch name (EN or AR) is required.',
+          title: tSettings('validationErrorTitle'),
+          message: tSettings('validationBranchNameRequired'),
           color: notifyColors.error,
         });
         return;
@@ -750,12 +776,12 @@ function BusinessInformationTabContent() {
       }
 
       notifications.show({
-        title: 'Success',
-        message: 'Business information updated successfully.',
+        title: tSettings('businessUpdateSuccessTitle'),
+        message: tSettings('businessUpdateSuccessMessage'),
         color: notifyColors.success,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : tSettings('businessUpdateUnknownError');
       notifications.show({
         title: 'Error',
         message,
@@ -771,13 +797,13 @@ function BusinessInformationTabContent() {
       <Stack gap="lg">
         <Paper withBorder p="md">
           <Title order={3} mb="md">
-            Basic Details
+            {tSettings('businessBasicDetailsTitle')}
           </Title>
           <Grid>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <TextInput
-                label="School Name"
-                placeholder="Enter school name"
+                label={tSettings('businessSchoolNameLabel')}
+                placeholder={tSettings('businessSchoolNamePlaceholder')}
                 required
                 value={name}
                 onChange={(e) => setName(e.currentTarget.value)}
@@ -785,7 +811,7 @@ function BusinessInformationTabContent() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <TextInput
-                label="School Code"
+                label={tSettings('businessSchoolCodeLabel')}
                 value={code}
                 disabled
                 readOnly
@@ -793,25 +819,25 @@ function BusinessInformationTabContent() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <TextInput
-                label="Domain"
-                placeholder="Enter domain (e.g., alekaf.edu)"
+                label={tSettings('businessDomainLabel')}
+                placeholder={tSettings('businessDomainPlaceholder')}
                 value={domain}
                 onChange={(e) => setDomain(e.currentTarget.value)}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <TextInput
-                label="Email"
+                label={tSettings('businessEmailLabel')}
                 type="email"
-                placeholder="Enter contact email"
+                placeholder={tSettings('businessEmailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.currentTarget.value)}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <TextInput
-                label="Phone"
-                placeholder="Enter contact phone"
+                label={tSettings('businessPhoneLabel')}
+                placeholder={tSettings('businessPhonePlaceholder')}
                 value={phone}
                 onChange={(e) => setPhone(e.currentTarget.value)}
               />
@@ -821,12 +847,12 @@ function BusinessInformationTabContent() {
 
         <Paper withBorder p="md">
           <Title order={3} mb="md">
-            Business Settings
+            {tSettings('businessSettingsTitle')}
           </Title>
           <Grid>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <Select
-                label="Timezone"
+                label={tSettings('businessTimezoneLabel')}
                 data={getTimezones().map(tz => ({
                   value: tz.value,
                   label: tz.label
@@ -838,7 +864,7 @@ function BusinessInformationTabContent() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <TextInput
-                label="Fiscal Year Start"
+                label={tSettings('businessFiscalYearStartLabel')}
                 type="date"
                 value={fiscalYearStart}
                 onChange={(e) => setFiscalYearStart(e.currentTarget.value)}
@@ -846,8 +872,8 @@ function BusinessInformationTabContent() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <TextInput
-                label="VAT Number"
-                placeholder="Enter VAT/Tax identification number"
+                label={tSettings('businessVatNumberLabel')}
+                placeholder={tSettings('businessVatNumberPlaceholder')}
                 value={vatNumber}
                 onChange={(e) => setVatNumber(e.currentTarget.value)}
               />
@@ -858,12 +884,17 @@ function BusinessInformationTabContent() {
         {currentBranchId && (
           <Paper withBorder p="md">
             <Title order={3} mb="md">
-              Branch Details
+              {tSettings('branchDetailsTitle')}
             </Title>
             {branchError && (
-              <Alert color={colors.error} mb="md" title="Failed to load branch information">
-                <Text size="sm">Branch ID: {currentBranchId}</Text>
-                <Text size="sm">Error: {branchError instanceof Error ? branchError.message : 'Unknown error'}</Text>
+              <Alert color={colors.error} mb="md" title={tSettings('branchLoadErrorTitle')}>
+                <Text size="sm">
+                  {tSettings('branchIdLabel')} {currentBranchId}
+                </Text>
+                <Text size="sm">
+                  {tSettings('branchErrorLabel')}{' '}
+                  {branchError instanceof Error ? branchError.message : 'Unknown error'}
+                </Text>
               </Alert>
             )}
             {isLoadingBranch ? (
@@ -877,16 +908,16 @@ function BusinessInformationTabContent() {
                 <Grid.Col span={{ base: 12, md: 6 }}>
                   <TranslatableInput
                     id="settings-branch-name"
-                    label="Branch Name"
+                    label={tSettings('branchNameLabel')}
                     value={branchNameTranslations}
                     onChange={setBranchNameTranslations}
                     required
-                    placeholder={{ en: 'Enter branch name', ar: 'أدخل اسم الفرع' }}
+                    placeholder={{ en: tSettings('branchNamePlaceholder'), ar: '' }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
                   <TextInput
-                    label="Branch Code"
+                    label={tSettings('branchCodeLabel')}
                     value={branchCode}
                     disabled
                     readOnly
@@ -894,25 +925,25 @@ function BusinessInformationTabContent() {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
                   <TextInput
-                    label="Address"
-                    placeholder="Enter branch address"
+                    label={tSettings('branchAddressLabel')}
+                    placeholder={tSettings('branchAddressPlaceholder')}
                     value={branchAddress}
                     onChange={(e) => setBranchAddress(e.currentTarget.value)}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
                   <TextInput
-                    label="Phone"
-                    placeholder="Enter branch phone"
+                    label={tSettings('branchPhoneLabel')}
+                    placeholder={tSettings('branchPhonePlaceholder')}
                     value={branchPhone}
                     onChange={(e) => setBranchPhone(e.currentTarget.value)}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
                   <TextInput
-                    label="Email"
+                    label={tSettings('branchEmailLabel')}
                     type="email"
-                    placeholder="Enter branch email"
+                    placeholder={tSettings('branchEmailPlaceholder')}
                     value={branchEmail}
                     onChange={(e) => setBranchEmail(e.currentTarget.value)}
                   />
@@ -924,7 +955,7 @@ function BusinessInformationTabContent() {
 
         <Group justify="flex-end" mt="xl">
           <Button type="submit" loading={saving || updateTenant.isPending || updateBranch.isPending}>
-            Save Changes
+            {tSettings('saveChanges')}
           </Button>
         </Group>
       </Stack>
@@ -933,14 +964,15 @@ function BusinessInformationTabContent() {
 }
 
 function AcademicTabContent() {
+  const tSettings = useTranslations('settings');
   return (
     <Tabs defaultValue="subjects">
       <Tabs.List>
-        <Tabs.Tab value="subjects">Subjects</Tabs.Tab>
-        <Tabs.Tab value="classes">Classes</Tabs.Tab>
-        <Tabs.Tab value="sections">Sections</Tabs.Tab>
-        <Tabs.Tab value="levels">Levels</Tabs.Tab>
-        <Tabs.Tab value="subject-templates">Subject Templates</Tabs.Tab>
+        <Tabs.Tab value="subjects">{tSettings('academicTabSubjects')}</Tabs.Tab>
+        <Tabs.Tab value="classes">{tSettings('academicTabClasses')}</Tabs.Tab>
+        <Tabs.Tab value="sections">{tSettings('academicTabSections')}</Tabs.Tab>
+        <Tabs.Tab value="levels">{tSettings('academicTabLevels')}</Tabs.Tab>
+        <Tabs.Tab value="subject-templates">{tSettings('academicTabSubjectTemplates')}</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="subjects" pt="md">
@@ -965,6 +997,8 @@ function AcademicTabContent() {
 function ScheduleTabContent() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
 
   const schoolDaysQuery = useSchoolDays();
@@ -1003,31 +1037,31 @@ function ScheduleTabContent() {
         periodDurationMinutes: values.periodDurationMinutes,
         slots: values.slots,
       });
-      notifications.show({ title: 'Success', message: 'Timing template created', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('scheduleTimingTemplatesNewButton'), color: notifyColors.success });
       closeCreate();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   const handleAssignClasses = async (templateId: string, classIds: string[]) => {
     try {
       await assignClasses.mutateAsync({ templateId, classIds });
-      notifications.show({ title: 'Success', message: 'Assignments updated', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('scheduleTimingSaveAssignments'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   const handleCreateHoliday = async (values: { name: string; startDate: string; endDate: string; academicYearId: string }) => {
     try {
       await createHoliday.mutateAsync(values);
-      notifications.show({ title: 'Success', message: 'Holiday created', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('scheduleHolidayModalAdd'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
@@ -1037,10 +1071,10 @@ function ScheduleTabContent() {
   ) => {
     try {
       await updateHoliday.mutateAsync({ id, ...values });
-      notifications.show({ title: 'Success', message: 'Holiday updated', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('scheduleHolidayModalEdit'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
@@ -1048,10 +1082,10 @@ function ScheduleTabContent() {
     if (!activeYearId) return;
     try {
       await deleteHoliday.mutateAsync({ id, academicYearId: activeYearId });
-      notifications.show({ title: 'Success', message: 'Holiday deleted', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('schedulePublicHolidaysTitle'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
@@ -1088,7 +1122,7 @@ function ScheduleTabContent() {
 
   if (hasError) {
     return (
-      <Alert color={colors.error} title="Failed to load schedule settings">
+      <Alert color={colors.error} title={tSettings('scheduleLoadErrorTitle')}>
         <Group justify="flex-end" mt="sm">
           <Button
             variant="light"
@@ -1101,7 +1135,7 @@ function ScheduleTabContent() {
               void holidaysQuery.refetch();
             }}
           >
-            Retry
+            {tCommon('retry')}
           </Button>
         </Group>
       </Alert>
@@ -1119,20 +1153,17 @@ function ScheduleTabContent() {
 
         <Stack gap="md">
           <Group justify="space-between" align="center">
-            <Title order={2}>Timing templates</Title>
+            <Title order={2}>{tSettings('scheduleTimingTemplatesTitle')}</Title>
             <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-              New template
+              {tSettings('scheduleTimingTemplatesNewButton')}
             </Button>
           </Group>
           <Text size="sm" c="dimmed">
-            Timing templates define the daily schedule structure for your school, including school start and end times, 
-            period duration, and special slots like assembly and breaks. Assign templates to classes to establish 
-            their timetable framework.
+            {tSettings('scheduleTimingTemplatesDescription')}
           </Text>
           {(templatesQuery.data?.data ?? []).length === 0 && (
-            <Alert color={colors.warning} title="School start and end times are set in timing templates">
-              Create at least one timing template and provide <strong>school start time</strong> and{' '}
-              <strong>school end time</strong>.
+            <Alert color={colors.warning} title={tSettings('scheduleTimingTemplatesWarningTitle')}>
+              {tSettings('scheduleTimingTemplatesWarningMessage')}
             </Alert>
           )}
           <Stack gap="md">
@@ -1150,10 +1181,10 @@ function ScheduleTabContent() {
         </Stack>
 
         <Stack gap="md">
-          <Title order={2}>Public holidays</Title>
+          <Title order={2}>{tSettings('schedulePublicHolidaysTitle')}</Title>
           {!activeYearId ? (
-            <Alert color={colors.warning} title="No active academic year">
-              Create and activate an academic year to manage holidays.
+            <Alert color={colors.warning} title={tSettings('scheduleNoActiveYearTitle')}>
+              {tSettings('scheduleNoActiveYearMessage')}
             </Alert>
           ) : (
             <HolidayCalendar
@@ -1184,14 +1215,15 @@ function ScheduleTabContent() {
 
 function AssessmentTabContent() {
   const tLeave = useTranslations('leave');
+  const tSettings = useTranslations('settings');
   const activeYearQuery = useActiveAcademicYear();
   const activeYearId = activeYearQuery.data?.data?.id;
 
   return (
     <Tabs defaultValue="types">
       <Tabs.List>
-        <Tabs.Tab value="types">Assessment types</Tabs.Tab>
-        <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
+        <Tabs.Tab value="types">{tSettings('assessmentTabTypes')}</Tabs.Tab>
+        <Tabs.Tab value="templates">{tSettings('assessmentTabTemplates')}</Tabs.Tab>
         <Tabs.Tab value="leave">{tLeave('tabLeaveQuota')}</Tabs.Tab>
       </Tabs.List>
 

@@ -21,6 +21,8 @@ import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useTenantMe, useUpdateTenantMe, useUploadTenantLogo } from '@/hooks/useTenant';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
+import { useTranslations } from 'next-intl';
+
 const COLOR_SWATCHES = [
   DEFAULT_THEME_COLOR,
   '#4caf50',
@@ -38,6 +40,8 @@ type ThemeSettingsPanelProps = {
 
 export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps) {
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const { primaryColor, setPrimaryColor } = useThemeStore();
   const { setBranding } = useTenantBrandingStore();
   const tenantQuery = useTenantMe();
@@ -75,17 +79,13 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
       setLogoPreview(response.data?.logoUrl || null);
       await tenantQuery.refetch();
       notifications.show({
-        title: 'Success',
-        message: 'Logo updated successfully',
+        title: tCommon('success'),
+        message: tSettings('themeLogoSaved'),
         color: notifyColors.success,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to upload logo';
-      notifications.show({
-        title: 'Error',
-        message,
-        color: notifyColors.error,
-      });
+      const message = error instanceof Error ? error.message : tSettings('themeLogoUploadError');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
@@ -96,18 +96,14 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
       setPrimaryColor(response.data?.primaryColor || draftColor);
       await tenantQuery.refetch();
       notifications.show({
-        title: 'Success',
-        message: 'Theme settings saved successfully',
+        title: tCommon('success'),
+        message: tSettings('themeSettingsSaved'),
         color: notifyColors.success,
         icon: <IconCheck size={16} />,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save theme settings';
-      notifications.show({
-        title: 'Error',
-        message,
-        color: notifyColors.error,
-      });
+      const message = error instanceof Error ? error.message : tSettings('themeSettingsSaveError');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     } finally {
       setSaving(false);
     }
@@ -117,7 +113,7 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
     <Stack gap="lg">
       <Paper withBorder p="md">
         <Stack gap="md">
-          {showTitle && <Title order={3}>Logo</Title>}
+          {showTitle && <Title order={3}>{tSettings('themeLogoTitle')}</Title>}
           <Box
             style={{
               width: '150px',
@@ -134,7 +130,7 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
             {logoPreview ? (
               <Image
                 src={logoPreview}
-                alt="Logo preview"
+                alt={tSettings('themeLogoTitle')}
                 width="100%"
                 height="100%"
                 fit="contain"
@@ -152,27 +148,27 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
                 style={{ width: 'fit-content' }}
                 loading={uploadLogoMutation.isPending}
               >
-                Upload logo
+                {tSettings('themeUploadButton')}
               </Button>
             )}
           </FileButton>
           <Text c="dimmed" size="sm">
-            Upload your school logo (PNG/JPG/WebP). The file is stored in Supabase Storage.
+            {tSettings('themeLogoDescription')}
           </Text>
         </Stack>
       </Paper>
 
       <Paper withBorder p="md">
         <Stack gap="md">
-          <Title order={3}>Theme Colour</Title>
+          <Title order={3}>{tSettings('themeColourTitle')}</Title>
           <Text c="dimmed" size="sm">
-            Choose your school brand colour. This updates the central theme configuration immediately after save.
+            {tSettings('themeColourDescription')}
           </Text>
           <Grid>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <ColorInput
-                label="Primary colour"
-                description="Choose brand colour"
+                label={tSettings('themePrimaryColourLabel')}
+                description={tSettings('themePrimaryColourDescription')}
                 format="hex"
                 swatches={COLOR_SWATCHES}
                 value={draftColor}
@@ -189,12 +185,8 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
                   textAlign: 'center',
                 }}
               >
-                <Text fw={500} size="lg">
-                  Preview
-                </Text>
-                <Text size="sm" opacity={0.9}>
-                  This is how your primary theme colour will look.
-                </Text>
+                <Text fw={500} size="lg">{tSettings('themePreviewTitle')}</Text>
+                <Text size="sm" opacity={0.9}>{tSettings('themePreviewDescription')}</Text>
               </Paper>
             </Grid.Col>
           </Grid>
@@ -203,10 +195,9 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
 
       <Group justify="flex-end">
         <Button onClick={handleSave} loading={saving}>
-          Save changes
+          {tSettings('themeSaveButton')}
         </Button>
       </Group>
     </Stack>
   );
 }
-

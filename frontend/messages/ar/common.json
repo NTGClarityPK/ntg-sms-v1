@@ -37,5 +37,17 @@
     "generic": "حدث خطأ. يرجى المحاولة مرة أخرى.",
     "notFound": "غير موجود",
     "studentNotFound": "الطالب غير موجود"
+  },
+  "roleName": {
+    "school_admin": "مسؤول المدرسة",
+    "super_admin": "المسؤول الأعلى",
+    "principal": "المدير",
+    "academic_coordinator": "المنسق الأكاديمي",
+    "class_teacher": "معلم الصف",
+    "subject_teacher": "معلم المادة",
+    "guidance_counselor": "المرشد التربوي",
+    "parent": "ولي الأمر",
+    "student": "الطالب",
+    "admin_assistant": "مساعد إداري"
   }
 }

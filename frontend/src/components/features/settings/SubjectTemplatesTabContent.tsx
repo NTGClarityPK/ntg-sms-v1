@@ -19,10 +19,13 @@ import { SubjectTemplateCard } from '@/components/features/settings/SubjectTempl
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { SubjectTemplate } from '@/types/subject-templates';
 import { Pagination } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 
 export function SubjectTemplatesTabContent() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
 
@@ -50,34 +53,27 @@ export function SubjectTemplatesTabContent() {
         subjectIds: values.subjectIds,
       });
 
-      // Assign classes and levels if provided
       if (values.classIds.length > 0 || values.levelIds.length > 0) {
         const templateId = created.data?.id;
         if (templateId) {
           if (values.classIds.length > 0) {
-            await assignClasses.mutateAsync({
-              templateId,
-              classIds: values.classIds,
-            });
+            await assignClasses.mutateAsync({ templateId, classIds: values.classIds });
           }
           if (values.levelIds.length > 0) {
-            await assignLevels.mutateAsync({
-              templateId,
-              levelIds: values.levelIds,
-            });
+            await assignLevels.mutateAsync({ templateId, levelIds: values.levelIds });
           }
         }
       }
 
       notifications.show({
-        title: 'Success',
-        message: 'Subject template created',
+        title: tCommon('success'),
+        message: tSettings('subjectTemplateCreated'),
         color: notifyColors.success,
       });
       closeCreate();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
@@ -99,45 +95,35 @@ export function SubjectTemplatesTabContent() {
         },
       });
 
-      // Always update class and level assignments
-      // Call assignClasses even if classIds is empty (to clear assignments)
-      await assignClasses.mutateAsync({
-        templateId: editEntity.id,
-        classIds: values.classIds,
-      });
-      
-      // Call assignLevels even if levelIds is empty (to clear assignments)
-      await assignLevels.mutateAsync({
-        templateId: editEntity.id,
-        levelIds: values.levelIds,
-      });
+      await assignClasses.mutateAsync({ templateId: editEntity.id, classIds: values.classIds });
+      await assignLevels.mutateAsync({ templateId: editEntity.id, levelIds: values.levelIds });
 
       notifications.show({
-        title: 'Success',
-        message: 'Subject template updated',
+        title: tCommon('success'),
+        message: tSettings('subjectTemplateUpdated'),
         color: notifyColors.success,
       });
       setEditEntity(null);
       closeCreate();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   const handleDelete = async (template: SubjectTemplate) => {
-    if (!confirm(`Are you sure you want to delete "${template.name}"?`)) return;
+    if (!confirm(tSettings('subjectTemplateDeleteConfirm', { name: template.name }))) return;
 
     try {
       await deleteTemplate.mutateAsync(template.id);
       notifications.show({
-        title: 'Success',
-        message: 'Subject template deleted',
+        title: tCommon('success'),
+        message: tSettings('subjectTemplateDeleted'),
         color: notifyColors.success,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
@@ -149,15 +135,13 @@ export function SubjectTemplatesTabContent() {
   return (
     <>
       <Group justify="space-between" mb="xs">
-        <Text size="lg" fw={500}>Subject Templates</Text>
+        <Text size="lg" fw={500}>{tSettings('subjectTemplateTitle')}</Text>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          New Template
+          {tSettings('subjectTemplateNewButton')}
         </Button>
       </Group>
       <Text size="sm" c="dimmed" mb="md">
-        Subject templates allow you to group subjects together and assign them to classes or levels. 
-        They help streamline timetable creation and assessment management by defining which subjects 
-        are available for specific class groups.
+        {tSettings('subjectTemplateDescription')}
       </Text>
 
       {isLoading ? (
@@ -167,21 +151,21 @@ export function SubjectTemplatesTabContent() {
           <Skeleton height={200} />
         </Stack>
       ) : hasError ? (
-        <Alert color={colors.error} title="Failed to load subject templates">
+        <Alert color={colors.error} title={tSettings('subjectTemplateLoadError')}>
           <Group justify="flex-end" mt="sm">
             <Button
               variant="light"
               leftSection={<IconRefresh size={16} />}
               onClick={() => templatesQuery.refetch()}
             >
-              Retry
+              {tCommon('retry')}
             </Button>
           </Group>
         </Alert>
       ) : (
         <Stack gap="md">
           <TextInput
-            placeholder="Search templates..."
+            placeholder={tSettings('subjectTemplateSearchPlaceholder')}
             leftSection={<IconSearch size={16} />}
             value={searchValue}
             onChange={(e) => {
@@ -193,9 +177,9 @@ export function SubjectTemplatesTabContent() {
           {(templatesQuery.data?.data ?? []).length === 0 ? (
             <Paper p="xl" withBorder>
               <Stack align="center" gap="sm">
-                <Text c="dimmed">No subject templates found</Text>
+                <Text c="dimmed">{tSettings('subjectTemplateNoData')}</Text>
                 <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-                  Create First Template
+                  {tSettings('subjectTemplateCreateFirstButton')}
                 </Button>
               </Stack>
             </Paper>
@@ -237,4 +221,3 @@ export function SubjectTemplatesTabContent() {
     </>
   );
 }
-

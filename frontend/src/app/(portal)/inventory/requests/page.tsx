@@ -64,6 +64,7 @@ export default function InventoryRequestsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { canEdit } = useFeaturePermission('inventory');
+  const currentUserId = user?.id;
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [approveModalOpen, setApproveModalOpen] = useState(false);

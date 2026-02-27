@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Table, Paper, Text } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import type { TimetableSlot, FreePeriod } from '@/types/timetable';
 import { TimetableSlotComponent } from './TimetableSlot';
 
@@ -35,6 +36,7 @@ export function TeacherWeekView({
   freePeriods,
   isLoading,
 }: TeacherWeekViewProps) {
+  const t = useTranslations('timetable');
   // Group slots by day and time range (time-range primary approach)
   const slotMap = useMemo(() => {
     const map = new Map<string, TimetableSlot>();
@@ -73,7 +75,7 @@ export function TeacherWeekView({
       <Table>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Time</Table.Th>
+            <Table.Th>{t('time')}</Table.Th>
             {activeDays.map((day) => (
               <Table.Th key={day}>{dayNames[day]}</Table.Th>
             ))}

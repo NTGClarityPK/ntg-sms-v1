@@ -1,6 +1,7 @@
 'use client';
 
 import { Paper, Title, Table, Badge, Progress, Text } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import type { AssignmentEngagement } from '@/types/reports';
 
 interface AssignmentEngagementSectionProps {
@@ -8,17 +9,18 @@ interface AssignmentEngagementSectionProps {
 }
 
 export function AssignmentEngagementSection({ data }: AssignmentEngagementSectionProps) {
+  const t = useTranslations('reports');
   const getStatusBadge = (status: string, isViewed: boolean) => {
     if (status === 'submitted') {
-      return <Badge color="green">Submitted</Badge>;
+      return <Badge color="green">{t('assignmentEngagementStatusSubmitted')}</Badge>;
     }
     if (status === 'in_progress') {
-      return <Badge color="yellow">In Progress</Badge>;
+      return <Badge color="yellow">{t('assignmentEngagementStatusInProgress')}</Badge>;
     }
     if (isViewed) {
-      return <Badge color="blue">Viewed</Badge>;
+      return <Badge color="blue">{t('assignmentEngagementStatusViewed')}</Badge>;
     }
-    return <Badge color="gray">Not Started</Badge>;
+    return <Badge color="gray">{t('assignmentEngagementStatusNotStarted')}</Badge>;
   };
 
   const formatDate = (dateStr?: string) => {
@@ -35,19 +37,23 @@ export function AssignmentEngagementSection({ data }: AssignmentEngagementSectio
 
   return (
     <Paper withBorder p="md">
-      <Title order={3} mb="md">Assignment Engagement</Title>
+      <Title order={3} mb="md">
+        {t('assignmentEngagementTitle')}
+      </Title>
       {data.length === 0 ? (
-        <Text c="dimmed" size="sm">No assignments found.</Text>
+        <Text c="dimmed" size="sm">
+          {t('assignmentEngagementNoAssignments')}
+        </Text>
       ) : (
         <Table withTableBorder withColumnBorders>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Assignment</Table.Th>
-              <Table.Th>Subject</Table.Th>
-              <Table.Th>Due Date</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Engagement</Table.Th>
-              <Table.Th>Days Until Due</Table.Th>
+              <Table.Th>{t('assignmentEngagementAssignment')}</Table.Th>
+              <Table.Th>{t('assignmentEngagementSubject')}</Table.Th>
+              <Table.Th>{t('assignmentEngagementDueDate')}</Table.Th>
+              <Table.Th>{t('assignmentEngagementStatus')}</Table.Th>
+              <Table.Th>{t('assignmentEngagementEngagement')}</Table.Th>
+              <Table.Th>{t('assignmentEngagementDaysUntilDue')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -79,8 +85,12 @@ export function AssignmentEngagementSection({ data }: AssignmentEngagementSectio
                   {assignment.daysUntilDue !== undefined ? (
                     <Text c={getDaysUntilDueColor(assignment.daysUntilDue)} size="sm">
                       {assignment.daysUntilDue < 0
-                        ? `${Math.abs(assignment.daysUntilDue)} days overdue`
-                        : `${assignment.daysUntilDue} days left`}
+                        ? t('assignmentEngagementDaysOverdue', {
+                            days: Math.abs(assignment.daysUntilDue),
+                          })
+                        : t('assignmentEngagementDaysLeft', {
+                            days: assignment.daysUntilDue,
+                          })}
                     </Text>
                   ) : (
                     '—'

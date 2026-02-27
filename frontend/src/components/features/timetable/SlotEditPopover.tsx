@@ -17,42 +17,50 @@ import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useSubjectTemplate } from '@/hooks/useSubjectTemplates';
 import { useSchoolDays } from '@/hooks/useScheduleSettings';
 import { MultiSelect } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 
-const slotSchema = z
-  .object({
-    subjectId: z.string().optional(),
-    staffId: z.string().optional(),
-    room: z.string().optional(),
-    periodNumber: z
-      .string()
-      .optional()
-      .refine(
-        (val) => !val || (!Number.isNaN(Number(val)) && Number(val) >= 1),
-        'Period number must be a positive number',
-      ),
-    startTime: z.string().min(1, 'Start time is required'),
-    endTime: z.string().min(1, 'End time is required'),
-    slotType: z.enum(['class', 'assembly', 'break']),
-  })
-  .refine((data) => {
-    if (data.slotType === 'class' && !data.subjectId) {
-      return false;
-    }
-    return true;
-  }, {
-    message: 'Subject is required for class slots',
-    path: ['subjectId'],
-  })
-  .refine((data) => {
-    const start = data.startTime.split(':').map(Number);
-    const end = data.endTime.split(':').map(Number);
-    const startMinutes = start[0] * 60 + start[1];
-    const endMinutes = end[0] * 60 + end[1];
-    return startMinutes < endMinutes;
-  }, {
-    message: 'Start time must be before end time',
-    path: ['endTime'],
-  });
+const createSlotSchema = (t: (key: string) => string) =>
+  z
+    .object({
+      subjectId: z.string().optional(),
+      staffId: z.string().optional(),
+      room: z.string().optional(),
+      periodNumber: z
+        .string()
+        .optional()
+        .refine(
+          (val) => !val || (!Number.isNaN(Number(val)) && Number(val) >= 1),
+          t('validationPeriodPositive'),
+        ),
+      startTime: z.string().min(1, t('validationStartTimeRequired')),
+      endTime: z.string().min(1, t('validationEndTimeRequired')),
+      slotType: z.enum(['class', 'assembly', 'break']),
+    })
+    .refine(
+      (data) => {
+        if (data.slotType === 'class' && !data.subjectId) {
+          return false;
+        }
+        return true;
+      },
+      {
+        message: t('validationSubjectRequired'),
+        path: ['subjectId'],
+      },
+    )
+    .refine(
+      (data) => {
+        const start = data.startTime.split(':').map(Number);
+        const end = data.endTime.split(':').map(Number);
+        const startMinutes = start[0]! * 60 + start[1]!;
+        const endMinutes = end[0]! * 60 + end[1]!;
+        return startMinutes < endMinutes;
+      },
+      {
+        message: t('validationStartBeforeEnd'),
+        path: ['endTime'],
+      },
+    );
 
 interface SlotEditPopoverProps {
   opened: boolean;
@@ -92,6 +100,8 @@ export function SlotEditPopover({
   subjectTemplateId,
   onConflictCheck,
 }: SlotEditPopoverProps) {
+  const t = useTranslations('timetable');
+  const tCommon = useTranslations('common');
   const isEdit = !!slot;
   const colors = useThemeColors();
   const { user } = useAuth();
@@ -138,7 +148,7 @@ export function SlotEditPopover({
     .filter((d) => d !== dayOfWeek) // Exclude current day
     .map((d) => ({
       value: String(d),
-      label: dayNames[d] || `Day ${d}`,
+      label: dayNames[d] || t('dayNumber', { number: d }),
     }));
 
   const form = useForm({
@@ -152,7 +162,7 @@ export function SlotEditPopover({
       slotType: 'class' as TimetableSlotType,
       additionalDays: [] as string[], // For multi-day creation
     },
-    validate: zodResolver(slotSchema),
+    validate: zodResolver(createSlotSchema(t)),
   });
 
   // When subject has exactly one assigned teacher, fix that teacher (no dropdown)
@@ -228,7 +238,7 @@ export function SlotEditPopover({
         
         const hasConflict = await onConflictCheck(slotInput);
         if (hasConflict) {
-          setConflictWarning('This slot may conflict with existing timetable entries. Please review.');
+          setConflictWarning(t('conflictWarningMessage'));
         } else {
           setConflictWarning(null);
         }
@@ -306,13 +316,13 @@ export function SlotEditPopover({
       if (!s.isActive) return false;
       if (form.values.subjectId && !teacherIds.has(s.id)) return false;
       const hasTeacherRole = s.roles?.some(
-        (r: any) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher',
+        (r: { roleName: string }) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher',
       );
       return hasTeacherRole;
     })
     .map((s) => ({
       value: s.id,
-      label: s.fullName || s.employeeId || 'Unknown',
+      label: s.fullName || s.employeeId || t('unknown'),
     }));
 
   if (!opened) return null;
@@ -348,7 +358,7 @@ export function SlotEditPopover({
           <Stack gap="sm">
             <Group justify="space-between" align="center">
               <Text size="sm" fw={500}>
-                {isEdit ? 'Edit Slot' : 'Create Slot'}
+                {isEdit ? t('editSlot') : t('createSlot')}
               </Text>
               <Button
                 variant="subtle"
@@ -364,7 +374,7 @@ export function SlotEditPopover({
             {conflictWarning && (
               <Alert
                 icon={<IconAlertCircle size={16} />}
-                title="Conflict Warning"
+                title={t('conflictWarning')}
                 color="orange"
                 p="xs"
               >
@@ -373,12 +383,12 @@ export function SlotEditPopover({
             )}
 
             <Select
-              label="Slot Type"
+              label={t('slotType')}
               size="xs"
               data={[
-                { value: 'class', label: 'Class' },
-                { value: 'assembly', label: 'Assembly' },
-                { value: 'break', label: 'Break' },
+                { value: 'class', label: t('slotType_class') },
+                { value: 'assembly', label: t('slotType_assembly') },
+                { value: 'break', label: t('slotType_break') },
               ]}
               required
               comboboxProps={{ zIndex: 1002 }}
@@ -388,9 +398,9 @@ export function SlotEditPopover({
             {form.values.slotType === 'class' && (
               <>
                 <Select
-                  label="Subject"
+                  label={t('subject')}
                   size="xs"
-                  placeholder={subjectOptions.length === 0 ? 'No subjects assigned to this class' : 'Select subject'}
+                  placeholder={subjectOptions.length === 0 ? t('noSubjectsAssigned') : t('selectSubject')}
                   data={subjectOptions}
                   required
                   allowDeselect={false}
@@ -404,31 +414,31 @@ export function SlotEditPopover({
                     {staffOptions.length === 0 ? (
                       <>
                         <Select
-                          label="Teacher"
+                          label={t('teacher')}
                           size="xs"
-                          placeholder="No teacher assigned to this subject"
+                          placeholder={t('noTeacherAssigned')}
                           data={[]}
                           disabled
                           comboboxProps={{ zIndex: 1002 }}
                           {...form.getInputProps('staffId')}
                         />
                         <Text size="xs" c="dimmed">
-                          Assign a teacher to this subject in Academic → Teacher Mapping first.
+                          {t('assignTeacherFirst')}
                         </Text>
                       </>
                     ) : staffOptions.length === 1 ? (
                       <TextInput
-                        label="Teacher"
+                        label={t('teacher')}
                         size="xs"
-                        value={staffOptions[0].label}
+                        value={staffOptions[0]!.label}
                         readOnly
                         styles={{ input: { backgroundColor: 'var(--mantine-color-default-hover)' } }}
                       />
                     ) : (
                       <Select
-                        label="Teacher"
+                        label={t('teacher')}
                         size="xs"
-                        placeholder="Select teacher"
+                        placeholder={t('selectTeacher')}
                         data={staffOptions}
                         searchable
                         comboboxProps={{ zIndex: 1002 }}
@@ -441,22 +451,22 @@ export function SlotEditPopover({
             )}
 
             <TextInput
-              label="Room"
+              label={t('room')}
               size="xs"
-              placeholder="Optional"
+              placeholder={t('roomOptional')}
               {...form.getInputProps('room')}
             />
 
             <TextInput
-              label="Period number"
+              label={t('periodNumber')}
               size="xs"
-              placeholder="Optional (e.g. 1, 2, 3)"
+              placeholder={t('periodNumberPlaceholder')}
               {...form.getInputProps('periodNumber')}
             />
 
             <Group gap="xs">
               <TextInput
-                label="Start Time"
+                label={t('startTime')}
                 type="time"
                 size="xs"
                 required
@@ -464,7 +474,7 @@ export function SlotEditPopover({
                 {...form.getInputProps('startTime')}
               />
               <TextInput
-                label="End Time"
+                label={t('endTime')}
                 type="time"
                 size="xs"
                 required
@@ -475,8 +485,8 @@ export function SlotEditPopover({
 
             {!isEdit && dayOptions.length > 0 && (
               <MultiSelect
-                label="Also assign to other days"
-                placeholder="Select additional days (optional)"
+                label={t('alsoAssignToOtherDays')}
+                placeholder={t('selectAdditionalDays')}
                 size="xs"
                 data={dayOptions}
                 comboboxProps={{ zIndex: 1002 }}
@@ -493,7 +503,7 @@ export function SlotEditPopover({
                   onClick={handleDelete}
                   loading={deleteSlot.isPending}
                 >
-                  Delete
+                  {tCommon('delete')}
                 </Button>
               )}
               <Button
@@ -501,14 +511,14 @@ export function SlotEditPopover({
                 size="xs"
                 onClick={onClose}
               >
-                Cancel
+                {t('cancel')}
               </Button>
               <Button
                 type="submit"
                 size="xs"
                 loading={createOrUpdate.isPending || isCheckingConflict}
               >
-                {isEdit ? 'Update' : 'Create'}
+                {isEdit ? t('update') : t('create')}
               </Button>
             </Group>
           </Stack>

@@ -11,12 +11,14 @@ import {
   Group,
   Alert,
 } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useAcademicYears } from '@/hooks/useAcademicYears';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ClassTimetableContent } from '@/components/features/timetable/ClassTimetableContent';
 
 export default function TimetablePage() {
+  const t = useTranslations('timetable');
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
   const colors = useThemeColors();
   const { data: classSectionsData, isLoading: isLoadingClassSections } = useClassSections({
@@ -41,14 +43,14 @@ export default function TimetablePage() {
     })
     .map((cs) => ({
       value: cs.id,
-      label: `${cs.className || cs.classDisplayName || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
+      label: `${cs.className || cs.classDisplayName || t('unknown')} - ${cs.sectionName || t('unknown')}`,
     }));
 
   if (isLoadingClassSections || !classSectionsData) {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Timetable</Title>
+          <Title order={1}>{t('title')}</Title>
         </div>
         <div
           style={{
@@ -72,7 +74,7 @@ export default function TimetablePage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Timetable</Title>
+          <Title order={1}>{t('title')}</Title>
         </div>
         <div
           style={{
@@ -85,7 +87,7 @@ export default function TimetablePage() {
         >
           <Paper p="md" withBorder>
             <Text c="dimmed" ta="center">
-              No active class-sections found. Please create class-sections first.
+              {t('noActiveClassSections')}
             </Text>
           </Paper>
         </div>
@@ -96,7 +98,7 @@ export default function TimetablePage() {
   return (
     <>
       <div className="page-title-bar">
-        <Title order={1}>Timetable</Title>
+        <Title order={1}>{t('title')}</Title>
       </div>
       <div className="page-sub-title-bar" />
       <div
@@ -113,12 +115,12 @@ export default function TimetablePage() {
             <Stack gap="md">
               {activeYear && (
                 <Text size="sm" c="dimmed">
-                  Active Academic Year: <strong>{activeYear.name}</strong>
+                  {t('activeAcademicYear')} <strong>{activeYear.name}</strong>
                 </Text>
               )}
               <Select
-                label="Select Class Section"
-                placeholder="Choose a class-section"
+                label={t('selectClassSection')}
+                placeholder={t('chooseClassSection')}
                 data={classSectionOptions}
                 value={selectedClassSectionId}
                 onChange={setSelectedClassSectionId}
@@ -135,9 +137,7 @@ export default function TimetablePage() {
             />
           ) : (
             <Alert color={colors.primary}>
-              Select a class-section to view and manage its timetable. You can create, edit, and
-              delete timetable slots, generate timetables from templates, and check for scheduling
-              conflicts.
+              {t('selectClassSectionPrompt')}
             </Alert>
           )}
         </Stack>

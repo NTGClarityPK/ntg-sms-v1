@@ -10,12 +10,15 @@ import { useForm } from '@mantine/form';
 import { useState } from 'react';
 import type { AssessmentType } from '@/types/settings';
 import { TranslatableInput, type TranslatableValue } from '@/components/common/TranslatableInput';
+import { useTranslations } from 'next-intl';
 
 const emptyTranslations: TranslatableValue = { en: '', ar: '' };
 
 export function AssessmentTypeList() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [editType, setEditType] = useState<AssessmentType | null>(null);
   const listQuery = useAssessmentTypes();
@@ -26,7 +29,7 @@ export function AssessmentTypeList() {
     initialValues: { nameTranslations: { ...emptyTranslations } },
     validate: {
       nameTranslations: (v) =>
-        (!(v.en ?? '').trim() && !(v.ar ?? '').trim()) ? 'Name (EN or AR) is required' : null,
+        (!(v.en ?? '').trim() && !(v.ar ?? '').trim()) ? tSettings('assessmentTypeNameRequired') : null,
     },
     transformValues: (v) => ({
       nameTranslations: { en: (v.nameTranslations.en ?? '').trim(), ar: (v.nameTranslations.ar ?? '').trim() },
@@ -57,15 +60,15 @@ export function AssessmentTypeList() {
     try {
       if (editType) {
         await updateMutation.mutateAsync({ id: editType.id, ...payload });
-        notifications.show({ title: 'Success', message: 'Assessment type updated', color: notifyColors.success });
+        notifications.show({ title: tCommon('success'), message: tSettings('assessmentTypeUpdated'), color: notifyColors.success });
       } else {
         await createMutation.mutateAsync(payload);
-        notifications.show({ title: 'Success', message: 'Assessment type created', color: notifyColors.success });
+        notifications.show({ title: tCommon('success'), message: tSettings('assessmentTypeCreated'), color: notifyColors.success });
       }
       handleClose();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   });
 
@@ -81,11 +84,11 @@ export function AssessmentTypeList() {
 
   if (listQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load assessment types">
+      <Alert color={colors.error} title={tSettings('assessmentTypeLoadError')}>
         <Group justify="space-between" mt="sm">
-          <Text size="sm">Please try again.</Text>
+          <Text size="sm">{tSettings('genericPleaseTryAgain')}</Text>
           <Button id="assessment-type-list-retry" variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
-            Retry
+            {tCommon('retry')}
           </Button>
         </Group>
       </Alert>
@@ -97,27 +100,24 @@ export function AssessmentTypeList() {
   return (
     <>
       <Group justify="space-between" mb="xs">
-        <Text size="lg" fw={500}>Assessment Types</Text>
+        <Text size="lg" fw={500}>{tSettings('assessmentTypeListTitle')}</Text>
         <Button id="assessment-type-list-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          Add type
+          {tSettings('assessmentTypeAddButton')}
         </Button>
       </Group>
       <Text size="sm" c="dimmed" mb="md">
-        Assessment types categorise different forms of evaluation such as quizzes, assignments, exams, and projects. 
-        These types help organise and track student performance across various assessment methods throughout the academic year.
+        {tSettings('assessmentTypeDescription')}
       </Text>
 
       <Paper withBorder p="md">
         {types.length === 0 ? (
-          <Text c="dimmed" size="sm">
-            No assessment types yet.
-          </Text>
+          <Text c="dimmed" size="sm">{tSettings('assessmentTypeNoData')}</Text>
         ) : (
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Name</Table.Th>
-                <Table.Th w={80}>Actions</Table.Th>
+                <Table.Th>{tCommon('name')}</Table.Th>
+                <Table.Th w={80}>{tCommon('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -139,14 +139,14 @@ export function AssessmentTypeList() {
       <Modal
         opened={opened}
         onClose={handleClose}
-        title={editType ? 'Edit assessment type' : 'Add assessment type'}
+        title={editType ? tSettings('assessmentTypeModalEdit') : tSettings('assessmentTypeModalAdd')}
         size="md"
       >
         <form onSubmit={onSubmit}>
           <Stack gap="md">
             <TranslatableInput
               id="assessment-type-form-name"
-              label="Name"
+              label={tCommon('name')}
               value={form.values.nameTranslations}
               onChange={(v) => form.setFieldValue('nameTranslations', v)}
               required
@@ -154,10 +154,10 @@ export function AssessmentTypeList() {
             />
             <Group justify="flex-end" mt="md">
               <Button id="assessment-type-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
-                Cancel
+                {tCommon('cancel')}
               </Button>
               <Button id="assessment-type-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
-                Save
+                {tCommon('save')}
               </Button>
             </Group>
           </Stack>
@@ -166,5 +166,3 @@ export function AssessmentTypeList() {
     </>
   );
 }
-
-

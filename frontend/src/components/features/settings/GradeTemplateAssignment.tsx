@@ -6,10 +6,13 @@ import { notifications } from '@mantine/notifications';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useAssignGradeTemplateToClass, useClassGradeAssignments, useGradeTemplates } from '@/hooks/useAssessmentSettings';
 import { useClasses } from '@/hooks/useCoreLookups';
+import { useTranslations } from 'next-intl';
 
 export function GradeTemplateAssignment() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const assignMutation = useAssignGradeTemplateToClass();
 
   const templatesQuery = useGradeTemplates();
@@ -38,17 +41,17 @@ export function GradeTemplateAssignment() {
     if (!gradeTemplateId || !classId || !minimumPassingGrade) return;
     try {
       await assignMutation.mutateAsync({ gradeTemplateId, classId, minimumPassingGrade });
-      notifications.show({ title: 'Success', message: 'Grade template assigned', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('gradeAssignSuccess'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   if (templatesQuery.error || classesQuery.error || assignmentsQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load data">
-        <Text size="sm">Please try again.</Text>
+      <Alert color={colors.error} title={tSettings('gradeAssignLoadError')}>
+        <Text size="sm">{tSettings('genericPleaseTryAgain')}</Text>
       </Alert>
     );
   }
@@ -57,42 +60,35 @@ export function GradeTemplateAssignment() {
     <Stack gap="md">
       <Paper withBorder p="md">
         <Stack gap="md">
-          <Text fw={600}>Assign Grade template to class</Text>
-
+          <Text fw={600}>{tSettings('gradeAssignTitle')}</Text>
           <Select
             id="grade-template-assign-template"
-            label="Grade template"
-            placeholder="Select template"
+            label={tSettings('gradeAssignTemplateLabel')}
+            placeholder={tSettings('gradeAssignTemplatePlaceholder')}
             data={templateOptions}
             value={gradeTemplateId}
-            onChange={(v) => {
-              setGradeTemplateId(v);
-              setMinimumPassingGrade(null);
-            }}
+            onChange={(v) => { setGradeTemplateId(v); setMinimumPassingGrade(null); }}
           />
-
           <Select
             id="grade-template-assign-class"
-            label="Class"
-            placeholder="Select class"
+            label={tSettings('gradeAssignClassLabel')}
+            placeholder={tSettings('gradeAssignClassPlaceholder')}
             data={classOptions}
             value={classId}
             onChange={setClassId}
           />
-
           <Select
             id="grade-template-assign-passing-grade"
-            label="Minimum passing grade"
-            placeholder="Select grade"
+            label={tSettings('gradeAssignPassingGradeLabel')}
+            placeholder={tSettings('gradeAssignPassingGradePlaceholder')}
             data={gradeOptions}
             disabled={!gradeTemplateId}
             value={minimumPassingGrade}
             onChange={setMinimumPassingGrade}
           />
-
           <Group justify="flex-end">
             <Button id="grade-template-assign-submit" variant="light" onClick={onAssign} disabled={!canSubmit} loading={assignMutation.isPending}>
-              Save
+              {tCommon('save')}
             </Button>
           </Group>
         </Stack>
@@ -100,18 +96,16 @@ export function GradeTemplateAssignment() {
 
       <Paper withBorder p="md">
         <Stack gap="md">
-          <Text fw={600}>Existing assignments</Text>
+          <Text fw={600}>{tSettings('gradeAssignExistingTitle')}</Text>
           {(assignmentsQuery.data?.data ?? []).length === 0 ? (
-            <Text size="sm" c="dimmed">
-              No assignments yet.
-            </Text>
+            <Text size="sm" c="dimmed">{tSettings('gradeAssignNoData')}</Text>
           ) : (
             <Table>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Class</Table.Th>
-                  <Table.Th>Grade template</Table.Th>
-                  <Table.Th>Minimum passing grade</Table.Th>
+                  <Table.Th>{tSettings('gradeAssignColClass')}</Table.Th>
+                  <Table.Th>{tSettings('gradeAssignColTemplate')}</Table.Th>
+                  <Table.Th>{tSettings('gradeAssignColPassingGrade')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -130,5 +124,3 @@ export function GradeTemplateAssignment() {
     </Stack>
   );
 }
-
-

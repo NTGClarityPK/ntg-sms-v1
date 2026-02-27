@@ -9,6 +9,7 @@ import { useCreateVacation, useDeleteVacation, useUpdateVacation, useVacations }
 import { useThemeColors, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import type { Vacation } from '@/types/settings';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 interface VacationFormValues {
   name: string;
@@ -20,6 +21,8 @@ interface VacationFormValues {
 export function VacationManager({ academicYearId }: { academicYearId?: string }) {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [editingVacation, setEditingVacation] = useState<Vacation | null>(null);
 
@@ -31,11 +34,11 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
   const form = useForm<VacationFormValues>({
     initialValues: { name: '', nameAr: '', startDate: '', endDate: '' },
     validate: {
-      name: (v) => (v.trim() ? null : 'Name is required'),
-      startDate: (v) => (v ? null : 'Start date is required'),
+      name: (v) => (v.trim() ? null : tSettings('scheduleVacationsNameRequired')),
+      startDate: (v) => (v ? null : tSettings('scheduleVacationsStartDateRequired')),
       endDate: (v, values) => {
-        if (!v) return 'End date is required';
-        if (values.startDate && v < values.startDate) return 'End date must be after start date';
+        if (!v) return tSettings('scheduleVacationsEndDateRequired');
+        if (values.startDate && v < values.startDate) return tSettings('scheduleVacationsEndDateAfterStart');
         return null;
       },
     },
@@ -62,53 +65,34 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
     if (!academicYearId) return;
     try {
       if (editingVacation) {
-        await updateMutation.mutateAsync({
-          id: editingVacation.id,
-          academicYearId,
-          ...values,
-        });
-        notifications.show({
-          title: 'Success',
-          message: 'Vacation updated',
-          color: notifyColors.success,
-        });
+        await updateMutation.mutateAsync({ id: editingVacation.id, academicYearId, ...values });
+        notifications.show({ title: tCommon('success'), message: tSettings('scheduleVacationUpdated'), color: notifyColors.success });
       } else {
-        await createMutation.mutateAsync({
-          ...values,
-          academicYearId,
-        });
-        notifications.show({
-          title: 'Success',
-          message: 'Vacation created',
-          color: notifyColors.success,
-        });
+        await createMutation.mutateAsync({ ...values, academicYearId });
+        notifications.show({ title: tCommon('success'), message: tSettings('scheduleVacationCreated'), color: notifyColors.success });
       }
       close();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   });
 
   const handleDelete = async (vacation: Vacation) => {
-    if (!confirm(`Delete "${vacation.name}"?`)) return;
+    if (!confirm(tSettings('scheduleVacationsDeleteConfirm', { name: vacation.name }))) return;
     try {
       await deleteMutation.mutateAsync({ id: vacation.id, academicYearId: vacation.academicYearId });
-      notifications.show({
-        title: 'Success',
-        message: 'Vacation deleted',
-        color: notifyColors.success,
-      });
+      notifications.show({ title: tCommon('success'), message: tSettings('scheduleVacationDeleted'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   if (!academicYearId) {
     return (
-      <Alert color={colors.warning} title="No active academic year">
-        Create and activate an academic year to manage vacations.
+      <Alert color={colors.warning} title={tSettings('scheduleNoActiveYearTitle')}>
+        {tSettings('scheduleVacationsNoActiveYearMessage')}
       </Alert>
     );
   }
@@ -119,25 +103,25 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
     <>
       <Stack gap="md">
         <Group justify="space-between">
-          <Text fw={600}>Vacations</Text>
+          <Text fw={600}>{tSettings('scheduleVacationsTitle')}</Text>
           <Button id="vacation-manager-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
-            Add vacation
+            {tSettings('scheduleVacationsAddButton')}
           </Button>
         </Group>
 
         <Paper withBorder p="md">
           {vacations.length === 0 ? (
             <Text c="dimmed" size="sm">
-              No vacations scheduled yet.
+              {tSettings('scheduleVacationsNoData')}
             </Text>
           ) : (
             <Table>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th>Start date</Table.Th>
-                  <Table.Th>End date</Table.Th>
-                  <Table.Th>Actions</Table.Th>
+                  <Table.Th>{tCommon('name')}</Table.Th>
+                  <Table.Th>{tSettings('scheduleVacationsColStartDate')}</Table.Th>
+                  <Table.Th>{tSettings('scheduleVacationsColEndDate')}</Table.Th>
+                  <Table.Th>{tCommon('actions')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -155,7 +139,7 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
                           leftSection={<IconPencil size={14} />}
                           onClick={() => openEdit(v)}
                         >
-                          Edit
+                          {tCommon('edit')}
                         </Button>
                         <Button
                           id={`vacation-row-${v.id}-delete`}
@@ -165,7 +149,7 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
                           onClick={() => handleDelete(v)}
                           color={colors.error}
                         >
-                          Delete
+                          {tCommon('delete')}
                         </Button>
                       </Group>
                     </Table.Td>
@@ -177,18 +161,44 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
         </Paper>
       </Stack>
 
-      <Modal opened={opened} onClose={close} title={editingVacation ? 'Edit vacation' : 'Add vacation'} size="md">
+      <Modal
+        opened={opened}
+        onClose={close}
+        title={editingVacation ? tSettings('scheduleVacationsModalEdit') : tSettings('scheduleVacationsModalAdd')}
+        size="md"
+      >
         <form id="vacation-form" onSubmit={handleSubmit}>
           <Stack gap="md">
-            <TextInput id="vacation-form-name" label="Name" placeholder="Summer Vacation" {...form.getInputProps('name')} />
-            <TextInput id="vacation-form-name-ar" label="Name (Arabic)" placeholder="إجازة الصيف" {...form.getInputProps('nameAr')} />
-            <TextInput id="vacation-form-start" label="Start date" type="date" {...form.getInputProps('startDate')} />
-            <TextInput id="vacation-form-end" label="End date" type="date" {...form.getInputProps('endDate')} />
-            
+            <TextInput
+              id="vacation-form-name"
+              label={tCommon('name')}
+              placeholder={tSettings('scheduleVacationsNamePlaceholder')}
+              {...form.getInputProps('name')}
+            />
+            <TextInput
+              id="vacation-form-name-ar"
+              label={tSettings('scheduleVacationsNameArLabel')}
+              placeholder="إجازة الصيف"
+              {...form.getInputProps('nameAr')}
+            />
+            <TextInput
+              id="vacation-form-start"
+              label={tSettings('scheduleVacationsColStartDate')}
+              type="date"
+              {...form.getInputProps('startDate')}
+            />
+            <TextInput
+              id="vacation-form-end"
+              label={tSettings('scheduleVacationsColEndDate')}
+              type="date"
+              {...form.getInputProps('endDate')}
+            />
             <Group justify="flex-end" mt="md">
-              <Button id="vacation-form-cancel" variant="light" onClick={close}>Cancel</Button>
+              <Button id="vacation-form-cancel" variant="light" onClick={close}>
+                {tCommon('cancel')}
+              </Button>
               <Button id="vacation-form-submit" type="submit" loading={createMutation.isPending || updateMutation.isPending}>
-                {editingVacation ? 'Update' : 'Save'}
+                {editingVacation ? tCommon('update') : tCommon('save')}
               </Button>
             </Group>
           </Stack>
@@ -197,4 +207,3 @@ export function VacationManager({ academicYearId }: { academicYearId?: string })
     </>
   );
 }
-

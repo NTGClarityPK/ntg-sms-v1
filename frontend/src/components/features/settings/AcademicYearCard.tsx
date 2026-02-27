@@ -3,6 +3,7 @@
 import { Badge, Button, Card, Group, Stack, Text } from '@mantine/core';
 import type { AcademicYear } from '@/types/settings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTranslations } from 'next-intl';
 
 interface AcademicYearCardProps {
   year: AcademicYear;
@@ -14,8 +15,13 @@ interface AcademicYearCardProps {
 
 export function AcademicYearCard({ year, onActivate, onLock, isActivating, isLocking }: AcademicYearCardProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
 
-  const status = year.isLocked ? 'Locked' : year.isActive ? 'Active' : 'Inactive';
+  const status = year.isLocked
+    ? tSettings('academicYearStatusLocked')
+    : year.isActive
+      ? tSettings('academicYearStatusActive')
+      : tSettings('academicYearStatusInactive');
   const statusColor = year.isLocked ? colors.warning : year.isActive ? colors.success : colors.info;
 
   return (
@@ -41,7 +47,7 @@ export function AcademicYearCard({ year, onActivate, onLock, isActivating, isLoc
           loading={isActivating}
           onClick={() => onActivate(year.id)}
         >
-          Activate
+          {tSettings('academicYearActivateButton')}
         </Button>
         <Button
           id={`academic-year-card-${year.id}-lock`}
@@ -50,7 +56,7 @@ export function AcademicYearCard({ year, onActivate, onLock, isActivating, isLoc
           loading={isLocking}
           onClick={() => onLock(year)}
         >
-          Lock
+          {tSettings('academicYearLockButton')}
         </Button>
       </Group>
     </Card>

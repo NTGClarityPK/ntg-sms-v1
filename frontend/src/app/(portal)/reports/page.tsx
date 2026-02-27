@@ -18,6 +18,7 @@ import {
   Skeleton,
 } from '@mantine/core';
 import { IconUser, IconUsersGroup, IconChartBar, IconReportAnalytics } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStudents, useMyStudent } from '@/hooks/useStudents';
 import { useAuth } from '@/hooks/useAuth';
@@ -77,6 +78,7 @@ export default function ReportsPage() {
 
   const searchParams = useSearchParams();
   const router = useRouter();
+  const t = useTranslations('reports');
   const { user } = useAuth();
   const isStudent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'student') ?? false;
   const isParent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'parent') ?? false;
@@ -160,7 +162,7 @@ export default function ReportsPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Report</Title>
+          <Title order={1}>{t('title')}</Title>
         </Group>
       </div>
       <div className="page-sub-title-bar" />
@@ -177,17 +179,17 @@ export default function ReportsPage() {
         <Tabs value={activeTab} onChange={handleTabChange}>
           <Tabs.List>
             <Tabs.Tab value="student" leftSection={<IconUser size={16} />}>
-              Student report
+              {t('studentTab')}
             </Tabs.Tab>
             <Tabs.Tab value="class" leftSection={<IconUsersGroup size={16} />}>
-              Class report
+              {t('classTab')}
             </Tabs.Tab>
             <Tabs.Tab value="public" leftSection={<IconChartBar size={16} />}>
-              Public report
+              {t('publicTab')}
             </Tabs.Tab>
             {showAdministrativeTab && (
               <Tabs.Tab value="administrative" leftSection={<IconReportAnalytics size={16} />}>
-                Administrative
+                {t('administrativeTab')}
               </Tabs.Tab>
             )}
           </Tabs.List>
@@ -198,7 +200,7 @@ export default function ReportsPage() {
                 <Stack gap="md">
                   <Group justify="space-between" wrap="wrap" gap="sm">
                     <Text size="sm" fw={500}>
-                      Report period
+                      {t('reportPeriodLabel')}
                     </Text>
                     {studentId && (
                       <ExportButton variant="student" studentId={studentId} />
@@ -220,16 +222,16 @@ export default function ReportsPage() {
                   >
                     <Group gap="xs">
                       <Chip value="year" variant="filled">
-                        Year to date
+                        {t('chipYearToDate')}
                       </Chip>
                       <Chip value="week" variant="filled">
-                        This week
+                        {t('chipThisWeek')}
                       </Chip>
                       <Chip value="month" variant="filled">
-                        This month
+                        {t('chipThisMonth')}
                       </Chip>
                       <Chip value="custom" variant="filled">
-                        Custom range
+                        {t('chipCustomRange')}
                       </Chip>
                     </Group>
                   </Chip.Group>
@@ -247,13 +249,13 @@ export default function ReportsPage() {
                   )}
                   {isStudent ? (
                     <Alert color="blue">
-                      <Text fw={600}>Your report</Text>
-                      <Text size="sm">Viewing your own report.</Text>
+                      <Text fw={600}>{t('studentSelfTitle')}</Text>
+                      <Text size="sm">{t('studentSelfDescription')}</Text>
                     </Alert>
                   ) : (
                     <Select
-                      label="Student"
-                      placeholder="Choose a student"
+                      label={t('studentSelectLabel')}
+                      placeholder={t('studentSelectPlaceholder')}
                       data={studentOptions}
                       value={studentId}
                       onChange={setStudentId}
@@ -265,7 +267,9 @@ export default function ReportsPage() {
                 </Stack>
               </Paper>
               {!studentId ? (
-                <Text c="dimmed" size="sm">Select a student to view their report.</Text>
+                <Text c="dimmed" size="sm">
+                  {t('studentSelectHint')}
+                </Text>
               ) : (
                 <StudentReportCard
                   report={reportQuery.data ?? null}
@@ -281,7 +285,7 @@ export default function ReportsPage() {
                 <Stack gap="md">
                   <Group justify="space-between" wrap="wrap" gap="sm">
                     <Text size="sm" fw={500}>
-                      Class section
+                      {t('classSectionLabel')}
                     </Text>
                     {classSectionId && (
                       <ExportButton variant="class" classSectionId={classSectionId} />
@@ -289,7 +293,7 @@ export default function ReportsPage() {
                   </Group>
                   <Box style={{ maxWidth: 400 }}>
                     <Select
-                      placeholder="Choose a class section"
+                      placeholder={t('classSelectPlaceholder')}
                       data={classOptions}
                       value={classSectionId}
                       onChange={setClassSectionId}
@@ -300,28 +304,32 @@ export default function ReportsPage() {
                 </Stack>
               </Paper>
               {!classSectionId ? (
-                <Text c="dimmed" size="sm">Select a class section to view the report.</Text>
+                <Text c="dimmed" size="sm">
+                  {t('classSelectHint')}
+                </Text>
               ) : classReportQuery.isLoading ? (
                 <Skeleton height={200} radius="sm" />
               ) : !report ? (
-                <Text c="dimmed">No report data.</Text>
+                <Text c="dimmed">{t('classNoReportData')}</Text>
               ) : (
                 <>
                   <Text fw={600}>
                     {report.className} {report.sectionName}
                   </Text>
                   <Paper withBorder p="md">
-                    <Text fw={600} mb="md">Attendance</Text>
+                    <Text fw={600} mb="md">
+                      {t('classAttendanceTitle')}
+                    </Text>
                     <Table withTableBorder withColumnBorders>
                       <Table.Thead>
                         <Table.Tr>
-                          <Table.Th>Student</Table.Th>
-                          <Table.Th>Present</Table.Th>
-                          <Table.Th>Total days</Table.Th>
-                          <Table.Th>Attendance %</Table.Th>
-                          <Table.Th>Average Grade %</Table.Th>
-                          <Table.Th>Assignment Viewing</Table.Th>
-                          <Table.Th>Assignment Submission</Table.Th>
+                          <Table.Th>{t('tableStudent')}</Table.Th>
+                          <Table.Th>{t('tablePresent')}</Table.Th>
+                          <Table.Th>{t('tableTotalDays')}</Table.Th>
+                          <Table.Th>{t('tableAttendancePercent')}</Table.Th>
+                          <Table.Th>{t('tableAverageGradePercent')}</Table.Th>
+                          <Table.Th>{t('tableAssignmentViewing')}</Table.Th>
+                          <Table.Th>{t('tableAssignmentSubmission')}</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
                       <Table.Tbody>
@@ -347,7 +355,7 @@ export default function ReportsPage() {
                                   {s.averagePercentage}%
                                 </Badge>
                               ) : (
-                                <Text c="dimmed">—</Text>
+                                <Text c="dimmed">{t('tableDash')}</Text>
                               )}
                             </Table.Td>
                             <Table.Td>
@@ -356,7 +364,9 @@ export default function ReportsPage() {
                                   {s.assignmentStatistics.viewedAssignments}/{s.assignmentStatistics.totalAssignments} ({s.assignmentStatistics.viewingRate}%)
                                 </Text>
                               ) : (
-                                <Text c="dimmed" size="sm">—</Text>
+                                <Text c="dimmed" size="sm">
+                                  {t('tableDash')}
+                                </Text>
                               )}
                             </Table.Td>
                             <Table.Td>
@@ -365,7 +375,9 @@ export default function ReportsPage() {
                                   {s.assignmentStatistics.submittedAssignments}/{s.assignmentStatistics.totalAssignments} ({s.assignmentStatistics.submissionRate}%)
                                 </Text>
                               ) : (
-                                <Text c="dimmed" size="sm">—</Text>
+                                <Text c="dimmed" size="sm">
+                                  {t('tableDash')}
+                                </Text>
                               )}
                             </Table.Td>
                           </Table.Tr>
@@ -381,7 +393,9 @@ export default function ReportsPage() {
           <Tabs.Panel value="public" pt="md" px="md" pb="md">
             <Stack gap="md">
               <Paper withBorder p="md">
-                <Text fw={600} mb="md">Student counts by class</Text>
+                <Text fw={600} mb="md">
+                  {t('publicStudentCountsTitle')}
+                </Text>
                 {publicLoading ? (
                   <Stack gap="sm">
                     <Skeleton height={40} />
@@ -392,11 +406,11 @@ export default function ReportsPage() {
                   <Table withTableBorder withColumnBorders>
                     <Table.Thead>
                       <Table.Tr>
-                        <Table.Th>Class</Table.Th>
-                        <Table.Th>Section</Table.Th>
-                        <Table.Th>Total Students</Table.Th>
-                        <Table.Th>Boys</Table.Th>
-                        <Table.Th>Girls</Table.Th>
+                          <Table.Th>{t('publicTableClass')}</Table.Th>
+                          <Table.Th>{t('publicTableSection')}</Table.Th>
+                          <Table.Th>{t('publicTableTotalStudents')}</Table.Th>
+                          <Table.Th>{t('publicTableBoys')}</Table.Th>
+                          <Table.Th>{t('publicTableGirls')}</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -412,7 +426,9 @@ export default function ReportsPage() {
                     </Table.Tbody>
                   </Table>
                 ) : (
-                  <Text c="dimmed" size="sm">No class data available.</Text>
+                  <Text c="dimmed" size="sm">
+                    {t('publicNoData')}
+                  </Text>
                 )}
               </Paper>
             </Stack>

@@ -24,6 +24,7 @@ import { useForm } from '@mantine/form';
 import type { GradeTemplate } from '@/types/settings';
 import { useState } from 'react';
 import { GradeTemplateAssignment } from './GradeTemplateAssignment';
+import { useTranslations } from 'next-intl';
 
 interface RangeInput {
   letter: string;
@@ -35,6 +36,8 @@ interface RangeInput {
 export function GradeTemplateBuilder() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [editingTemplate, setEditingTemplate] = useState<GradeTemplate | null>(null);
   const listQuery = useGradeTemplates();
@@ -48,8 +51,8 @@ export function GradeTemplateBuilder() {
       ranges: [{ letter: 'A', minPercentage: 90, maxPercentage: 100, sortOrder: 0 }],
     },
     validate: {
-      name: (v) => (v.trim().length === 0 ? 'Name is required' : null),
-      ranges: (ranges) => (ranges.length === 0 ? 'At least one range is required' : null),
+      name: (v) => (v.trim().length === 0 ? tSettings('gradeTemplateFormNameRequired') : null),
+      ranges: (ranges) => (ranges.length === 0 ? tSettings('gradeTemplateFormRangesRequired') : null),
     },
     transformValues: (v) => ({
       name: v.name.trim(),
@@ -105,35 +108,30 @@ export function GradeTemplateBuilder() {
   const handleSubmit = form.onSubmit(async (values) => {
     try {
       if (editingTemplate) {
-        await updateMutation.mutateAsync({
-          id: editingTemplate.id,
-          name: values.name,
-          ranges: values.ranges,
-        });
-        notifications.show({ title: 'Success', message: 'Grade template updated', color: notifyColors.success });
+        await updateMutation.mutateAsync({ id: editingTemplate.id, name: values.name, ranges: values.ranges });
+        notifications.show({ title: tCommon('success'), message: tSettings('gradeTemplateUpdated'), color: notifyColors.success });
       } else {
         await createMutation.mutateAsync(values);
-        notifications.show({ title: 'Success', message: 'Grade template created', color: notifyColors.success });
+        notifications.show({ title: tCommon('success'), message: tSettings('gradeTemplateCreated'), color: notifyColors.success });
       }
       form.reset();
       setEditingTemplate(null);
       close();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   });
 
   const handleDelete = async (template: GradeTemplate) => {
-    const confirmed = window.confirm(`Delete grade template "${template.name}"? This cannot be undone.`);
+    const confirmed = window.confirm(tSettings('gradeTemplateDeleteConfirm', { name: template.name }));
     if (!confirmed) return;
-
     try {
       await deleteMutation.mutateAsync(template.id);
-      notifications.show({ title: 'Success', message: 'Grade template deleted', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('gradeTemplateDeleted'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
@@ -149,11 +147,11 @@ export function GradeTemplateBuilder() {
 
   if (listQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load grade templates">
+      <Alert color={colors.error} title={tSettings('gradeTemplateLoadError')}>
         <Group justify="space-between" mt="sm">
-          <Text size="sm">Please try again.</Text>
+          <Text size="sm">{tSettings('genericPleaseTryAgain')}</Text>
           <Button id="grade-template-retry" variant="light" leftSection={<IconRefresh size={16} />} onClick={() => listQuery.refetch()}>
-            Retry
+            {tCommon('retry')}
           </Button>
         </Group>
       </Alert>
@@ -165,29 +163,25 @@ export function GradeTemplateBuilder() {
   return (
     <>
       <Group justify="space-between" mb="xs">
-        <Text size="lg" fw={500}>Grade Templates</Text>
+        <Text size="lg" fw={500}>{tSettings('gradeTemplateTitle')}</Text>
         <Button id="grade-template-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          Add template
+          {tSettings('gradeTemplateAddButton')}
         </Button>
       </Group>
       <Text size="sm" c="dimmed" mb="md">
-        Grade templates define the grading scale used to evaluate student performance. Each template consists of grade ranges 
-        (e.g., A, B, C) with corresponding percentage thresholds. Create different templates for different academic levels 
-        or assessment types.
+        {tSettings('gradeTemplateDescription')}
       </Text>
 
       <Paper withBorder p="md">
         {templates.length === 0 ? (
-          <Text c="dimmed" size="sm">
-            No grade templates yet.
-          </Text>
+          <Text c="dimmed" size="sm">{tSettings('gradeTemplateNoData')}</Text>
         ) : (
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Name</Table.Th>
-                <Table.Th>Ranges</Table.Th>
-                <Table.Th w={80}>Actions</Table.Th>
+                <Table.Th>{tCommon('name')}</Table.Th>
+                <Table.Th>{tSettings('gradeTemplateColRanges')}</Table.Th>
+                <Table.Th w={80}>{tCommon('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -198,31 +192,20 @@ export function GradeTemplateBuilder() {
                     <Text size="sm" c="dimmed">
                       {t.ranges.length === 0
                         ? '-'
-                        : t.ranges
-                            .map((r) => `${r.letter} (${r.minPercentage}-${r.maxPercentage})`)
-                            .join(', ')}
+                        : t.ranges.map((r) => `${r.letter} (${r.minPercentage}-${r.maxPercentage})`).join(', ')}
                     </Text>
                   </Table.Td>
                   <Table.Td>
                     <Menu withinPortal position="bottom-end">
                       <Menu.Target>
-                        <ActionIcon variant="subtle">
-                          <IconDotsVertical size={16} />
-                        </ActionIcon>
+                        <ActionIcon variant="subtle"><IconDotsVertical size={16} /></ActionIcon>
                       </Menu.Target>
                       <Menu.Dropdown>
-                        <Menu.Item
-                          leftSection={<IconPencil size={14} />}
-                          onClick={() => openEdit(t)}
-                        >
-                          Edit
+                        <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openEdit(t)}>
+                          {tCommon('edit')}
                         </Menu.Item>
-                        <Menu.Item
-                          leftSection={<IconTrash size={14} />}
-                          color={colors.error}
-                          onClick={() => handleDelete(t)}
-                        >
-                          Delete
+                        <Menu.Item leftSection={<IconTrash size={14} />} color={colors.error} onClick={() => handleDelete(t)}>
+                          {tCommon('delete')}
                         </Menu.Item>
                       </Menu.Dropdown>
                     </Menu>
@@ -235,34 +218,34 @@ export function GradeTemplateBuilder() {
       </Paper>
 
       <Stack gap="md" mt="xl">
-        <Text size="lg" fw={500}>Grading Config</Text>
-        <Text size="sm" c="dimmed" mb="md">
-          Assign grade templates to classes and set the minimum passing grade for each class. This configuration determines 
-          how student assessments are graded and which grade threshold students must achieve to pass.
-        </Text>
+        <Text size="lg" fw={500}>{tSettings('gradingConfigTitle')}</Text>
+        <Text size="sm" c="dimmed" mb="md">{tSettings('gradingConfigDescription')}</Text>
         <GradeTemplateAssignment />
       </Stack>
 
-      <Modal opened={opened} onClose={close} title={editingTemplate ? 'Edit grade template' : 'Create grade template'} size="lg">
+      <Modal opened={opened} onClose={close} title={editingTemplate ? tSettings('gradeTemplateModalEdit') : tSettings('gradeTemplateModalCreate')} size="lg">
         <form onSubmit={handleSubmit}>
           <Stack gap="md">
-            <TextInput id="grade-template-form-name" label="Template name" placeholder="Primary grading" {...form.getInputProps('name')} />
-
+            <TextInput
+              id="grade-template-form-name"
+              label={tSettings('gradeTemplateFormNameLabel')}
+              placeholder={tSettings('gradeTemplateFormNamePlaceholder')}
+              {...form.getInputProps('name')}
+            />
             <Paper withBorder p="md">
               <Stack gap="md">
                 <Group justify="space-between">
-                  <Text fw={600}>Ranges</Text>
+                  <Text fw={600}>{tSettings('gradeTemplateFormRangesTitle')}</Text>
                   <Button id="grade-template-form-add-range" variant="light" leftSection={<IconPlus size={16} />} onClick={addRange}>
-                    Add range
+                    {tSettings('gradeTemplateFormAddRange')}
                   </Button>
                 </Group>
-
                 {form.values.ranges.map((_, idx) => (
                   <Group key={idx} align="flex-end" grow>
-                    <TextInput id={`grade-template-range-${idx}-letter`} label="Letter" {...form.getInputProps(`ranges.${idx}.letter`)} />
-                    <NumberInput id={`grade-template-range-${idx}-min`} label="Min %" min={0} max={100} {...form.getInputProps(`ranges.${idx}.minPercentage`)} />
-                    <NumberInput id={`grade-template-range-${idx}-max`} label="Max %" min={0} max={100} {...form.getInputProps(`ranges.${idx}.maxPercentage`)} />
-                    <NumberInput id={`grade-template-range-${idx}-sort`} label="Sort" min={0} {...form.getInputProps(`ranges.${idx}.sortOrder`)} />
+                    <TextInput id={`grade-template-range-${idx}-letter`} label={tSettings('gradeTemplateFormRangeLetter')} {...form.getInputProps(`ranges.${idx}.letter`)} />
+                    <NumberInput id={`grade-template-range-${idx}-min`} label={tSettings('gradeTemplateFormRangeMin')} min={0} max={100} {...form.getInputProps(`ranges.${idx}.minPercentage`)} />
+                    <NumberInput id={`grade-template-range-${idx}-max`} label={tSettings('gradeTemplateFormRangeMax')} min={0} max={100} {...form.getInputProps(`ranges.${idx}.maxPercentage`)} />
+                    <NumberInput id={`grade-template-range-${idx}-sort`} label={tSettings('gradeTemplateFormRangeSort')} min={0} {...form.getInputProps(`ranges.${idx}.sortOrder`)} />
                     <Button
                       id={`grade-template-range-${idx}-remove`}
                       variant="light"
@@ -270,19 +253,18 @@ export function GradeTemplateBuilder() {
                       disabled={form.values.ranges.length <= 1}
                       leftSection={<IconTrash size={16} />}
                     >
-                      Remove
+                      {tSettings('gradeTemplateFormRangeRemove')}
                     </Button>
                   </Group>
                 ))}
               </Stack>
             </Paper>
-
             <Group justify="flex-end" mt="md">
               <Button id="grade-template-form-cancel" variant="light" onClick={close} disabled={createMutation.isPending}>
-                Cancel
+                {tCommon('cancel')}
               </Button>
               <Button id="grade-template-form-submit" type="submit" loading={createMutation.isPending}>
-                Save
+                {tCommon('save')}
               </Button>
             </Group>
           </Stack>
@@ -291,5 +273,3 @@ export function GradeTemplateBuilder() {
     </>
   );
 }
-
-

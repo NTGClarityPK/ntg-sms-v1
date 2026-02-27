@@ -112,8 +112,8 @@ export function TeacherMappingList({
       children: (
         <Text size="sm">
           {t('deleteConfirm', {
-            subjectName: assignment.subjectName,
-            classSectionName: assignment.classSectionName,
+            subjectName: assignment.subjectName ?? '',
+            classSectionName: assignment.classSectionName ?? '',
           })}
         </Text>
       ),

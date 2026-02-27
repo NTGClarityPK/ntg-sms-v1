@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Group, Title, Select, Stack, Skeleton, Alert, Text } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import { useStudents, useMyStudent } from '@/hooks/useStudents';
 import { StudentReportCard } from '@/components/features/reports/StudentReportCard';
 import { ReportPeriodSelector } from '@/components/features/reports/ReportPeriodSelector';
@@ -22,6 +23,7 @@ function periodFromQuery(param: string | null): ReportPeriodType | null {
 export default function StudentReportSelectPage() {
   const searchParams = useSearchParams();
   const periodParam = searchParams.get('period');
+  const t = useTranslations('reports');
   const { user } = useAuth();
   const isStudent = user?.roles?.some((r) => r.roleName.toLowerCase() === 'student');
   const myStudentQuery = useMyStudent();
@@ -52,7 +54,7 @@ export default function StudentReportSelectPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Student report</Title>
+          <Title order={1}>{t('studentTab')}</Title>
           {studentId && (
             <ExportButton variant="student" studentId={studentId} />
           )}
@@ -81,14 +83,14 @@ export default function StudentReportSelectPage() {
 
           {isStudent ? (
             <Alert color="blue">
-              <Text fw={600}>Your Report</Text>
-              <Text size="sm">Viewing your own report.</Text>
+              <Text fw={600}>{t('studentSelfTitle')}</Text>
+              <Text size="sm">{t('studentSelfDescription')}</Text>
             </Alert>
           ) : (
             <Select
               id="reports-student-select"
-              label="Select student"
-              placeholder="Choose a student"
+              label={t('studentSelectLabel')}
+              placeholder={t('studentSelectPlaceholder')}
               data={studentOptions}
               value={studentId}
               onChange={setStudentId}
@@ -99,7 +101,7 @@ export default function StudentReportSelectPage() {
           )}
 
           {!studentId ? (
-            <Alert color="blue">Select a student to view their report.</Alert>
+            <Alert color="blue">{t('studentSelectHint')}</Alert>
           ) : (
             <StudentReportCard
               report={reportQuery.data ?? null}

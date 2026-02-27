@@ -1,0 +1,150 @@
+{
+  "title": "التقارير",
+
+  "studentTab": "تقرير الطالب",
+  "classTab": "تقرير الصف",
+  "publicTab": "تقرير عام",
+  "administrativeTab": "إداري",
+
+  "reportPeriodLabel": "فترة التقرير",
+  "chipYearToDate": "من بداية السنة حتى الآن",
+  "chipThisWeek": "هذا الأسبوع",
+  "chipThisMonth": "هذا الشهر",
+  "chipCustomRange": "فترة مخصصة",
+
+  "studentSelfTitle": "تقريرك",
+  "studentSelfDescription": "أنت تعرض تقريرك الخاص.",
+
+  "studentSelectLabel": "الطالب",
+  "studentSelectPlaceholder": "اختر طالبًا",
+  "studentSelectHint": "اختر طالبًا لعرض تقريره.",
+
+  "classSectionLabel": "الصف-الشعبة",
+  "classSelectPlaceholder": "اختر صفًا-شعبة",
+  "classSelectHint": "اختر صفًا-شعبة لعرض التقرير.",
+
+  "classNoReportData": "لا توجد بيانات للتقرير.",
+
+  "classAttendanceTitle": "الحضور",
+  "tableStudent": "الطالب",
+  "tablePresent": "حاضر",
+  "tableTotalDays": "إجمالي الأيام",
+  "tableAttendancePercent": "نسبة الحضور %",
+  "tableAverageGradePercent": "متوسط الدرجة %",
+  "tableAssignmentViewing": "عرض الواجب",
+  "tableAssignmentSubmission": "تسليم الواجب",
+  "tableDash": "—",
+
+  "publicStudentCountsTitle": "أعداد الطلاب حسب الصف",
+  "publicTableClass": "الصف",
+  "publicTableSection": "الشعبة",
+  "publicTableTotalStudents": "إجمالي الطلاب",
+  "publicTableBoys": "الأولاد",
+  "publicTableGirls": "البنات",
+  "publicNoData": "لا توجد بيانات صفوف متاحة.",
+
+  "adminAttendanceTab": "الحضور",
+  "adminAcademicTab": "الأكاديمي",
+
+  "adminPeriodLabel": "الفترة:",
+  "adminChipWeek": "أسبوع",
+  "adminChipMonth": "شهر",
+  "adminChipYear": "سنة",
+
+  "adminExport": "تصدير",
+  "adminExportPdf": "PDF",
+  "adminExportExcel": "Excel",
+  "adminSavePdfOffline": "حفظ PDF للاستخدام بدون اتصال",
+  "adminSaveExcelOffline": "حفظ Excel للاستخدام بدون اتصال",
+
+  "adminLowThresholdLabel": "حد الحضور المنخفض:",
+  "adminChipBelowThreshold": "أقل من {threshold}%",
+  "adminClassSectionOptional": "الصف-الشعبة (اختياري)",
+  "adminAllClasses": "جميع الصفوف",
+
+  "adminBranchSummaryTitle": "ملخص الفرع",
+  "adminStudentsBelowThresholdTitle": "الطلاب أقل من الحد",
+  "adminNoStudentsBelowThreshold": "لا يوجد طلاب أقل من {threshold}%.",
+
+  "adminAcademicTitle": "تقرير أكاديمي",
+  "adminClassSectionLabel": "الصف-الشعبة",
+  "adminClassSectionPlaceholder": "اختر صفًا",
+  "adminSubjectLabel": "المادة",
+  "adminSubjectPlaceholder": "اختر مادة",
+
+  "adminAttendanceTableStudent": "الطالب",
+  "adminAttendanceTablePresent": "حاضر",
+  "adminAttendanceTableAbsent": "غائب",
+  "adminAttendanceTableLate": "متأخر",
+  "adminAttendanceTablePercent": "%",
+
+  "adminClassTableClass": "الصف",
+  "adminClassTableSection": "الشعبة",
+  "adminClassTableAvgPercent": "متوسط %",
+  "adminClassTableStudents": "الطلاب",
+
+  "adminAcademicClassTableStudent": "الطالب",
+  "adminAcademicClassTableAttendancePercent": "نسبة الحضور %",
+  "adminAcademicClassTableAveragePercent": "متوسط %",
+
+  "adminBranchSummaryLine": "{startDate} إلى {endDate} · المتوسط العام: {overallAverage}% · إجمالي الطلاب: {totalStudents}",
+  "adminPresentTotal": "حاضر / الإجمالي",
+
+  "adminSelectClassOrSubjectHint": "اختر صفًا-شعبة أو مادة لعرض التقرير.",
+
+  "studentNoReportData": "لا توجد بيانات تقرير متاحة.",
+
+  "periodSelectLabel": "فترة التقرير",
+  "periodSelectPlaceholder": "اختر الفترة",
+  "periodStartLabel": "تاريخ البداية",
+  "periodStartPlaceholder": "اختر تاريخ البداية",
+  "periodEndLabel": "تاريخ النهاية",
+  "periodEndPlaceholder": "اختر تاريخ النهاية",
+  "periodSummaryPrefix": "الفترة:",
+
+  "academicSectionTitle": "أكاديمي",
+  "academicNoGrades": "لا توجد درجات مسجلة.",
+  "academicTableSubject": "المادة",
+  "academicTableAssessment": "التقييم",
+  "academicTableMarks": "الدرجات",
+  "academicTableGrade": "الدرجة",
+  "academicTableRankPercentile": "الترتيب / النسبة المئوية",
+
+  "attendanceSectionTitle": "الحضور",
+  "attendanceNoData": "لا توجد بيانات حضور.",
+  "attendancePresent": "حاضر",
+  "attendanceAbsent": "غائب",
+  "attendanceLate": "متأخر",
+  "attendanceExcused": "معذور",
+  "attendanceTotalDays": "إجمالي الأيام",
+  "attendanceAttendanceLabel": "الحضور",
+
+  "assignmentStatsTitle": "إحصائيات الواجبات",
+  "assignmentStatsTotal": "إجمالي الواجبات",
+  "assignmentStatsViewed": "تمت مشاهدته",
+  "assignmentStatsNotViewed": "لم تتم مشاهدته",
+  "assignmentStatsSubmitted": "تم التسليم",
+  "assignmentStatsInProgress": "قيد التقدم",
+  "assignmentStatsNotStarted": "لم يبدأ",
+  "assignmentStatsViewingRate": "معدل المشاهدة",
+  "assignmentStatsViewingSummary": "{viewed} من {total} واجبًا تمّت مشاهدته",
+  "assignmentStatsSubmissionRate": "معدل التسليم",
+  "assignmentStatsSubmissionSummary": "{submitted} من {total} واجبًا تمّ تسليمه",
+
+  "assignmentEngagementTitle": "تفاعل الواجبات",
+  "assignmentEngagementNoAssignments": "لم يتم العثور على واجبات.",
+  "assignmentEngagementAssignment": "الواجب",
+  "assignmentEngagementSubject": "المادة",
+  "assignmentEngagementDueDate": "تاريخ الاستحقاق",
+  "assignmentEngagementStatus": "الحالة",
+  "assignmentEngagementEngagement": "التفاعل",
+  "assignmentEngagementDaysUntilDue": "الأيام المتبقية",
+  "assignmentEngagementStatusSubmitted": "تم التسليم",
+  "assignmentEngagementStatusInProgress": "قيد التقدم",
+  "assignmentEngagementStatusViewed": "تمت المشاهدة",
+  "assignmentEngagementStatusNotStarted": "لم يبدأ",
+  "assignmentEngagementDaysOverdue": "{days} يومًا متأخرًا",
+  "assignmentEngagementDaysLeft": "متبقي {days} يومًا",
+
+  "exportFailed": "فشل التصدير. يرجى المحاولة مرة أخرى."
+}

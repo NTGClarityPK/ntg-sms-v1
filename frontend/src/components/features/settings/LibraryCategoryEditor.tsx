@@ -10,6 +10,7 @@ import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSetti
 
 export function LibraryCategoryEditor() {
   const t = useTranslations('library');
+  const tCommon = useTranslations('common');
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
 
@@ -32,7 +33,7 @@ export function LibraryCategoryEditor() {
     if (!next) return;
     if (normalizedItems.includes(next)) {
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message: t('categoryAlreadyExists'),
         color: notifyColors.error,
       });
@@ -52,7 +53,7 @@ export function LibraryCategoryEditor() {
     const trimmedValue = editValue.trim();
     if (!trimmedValue) {
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message: t('categoryNameEmpty'),
         color: notifyColors.error,
       });
@@ -62,7 +63,7 @@ export function LibraryCategoryEditor() {
     // Check if the new name already exists (excluding the current item)
     if (updated.some((item, idx) => item === trimmedValue && idx !== editingIndex)) {
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message: t('categoryAlreadyExists'),
         color: notifyColors.error,
       });
@@ -88,10 +89,10 @@ export function LibraryCategoryEditor() {
   const onSave = async () => {
     try {
       await updateMutation.mutateAsync(normalizedItems);
-      notifications.show({ title: 'Success', message: t('categoriesSaved'), color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: t('categoriesSaved'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 

@@ -28,6 +28,7 @@ interface UserTableProps {
 
 export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: UserTableProps) {
   const t = useTranslations('user');
+  const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { data: rolesData } = useRoles();
@@ -58,15 +59,21 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
 
   const getRoleBadges = (userRoles?: User['roles']) => {
     if (!userRoles || userRoles.length === 0) return <Text c="dimmed" size="sm">{t('noRoles')}</Text>;
-    
-    const roleMap = new Map(roles.map((r) => [r.id, r.displayName]));
+
+    const roleObjMap = new Map(roles.map((r) => [r.id, r]));
     return (
       <Group gap="xs">
-        {userRoles.map((ur) => (
-          <Badge key={ur.roleId} size="sm" variant="light">
-            {roleMap.get(ur.roleId) || ur.roleName}
-          </Badge>
-        ))}
+        {userRoles.map((ur) => {
+          const roleObj = roleObjMap.get(ur.roleId);
+          const label = roleObj
+            ? (tCommon(`roleName.${roleObj.name}` as any) || roleObj.displayName)
+            : ur.roleName;
+          return (
+            <Badge key={ur.roleId} size="sm" variant="light">
+              {label}
+            </Badge>
+          );
+        })}
       </Group>
     );
   };

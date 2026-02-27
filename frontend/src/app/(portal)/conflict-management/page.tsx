@@ -20,6 +20,7 @@ import {
 } from '@mantine/core';
 import { IconAlertTriangle, IconExternalLink, IconRefresh } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { useConflicts } from '@/hooks/useTimetable';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStaff } from '@/hooks/useStaff';
@@ -28,21 +29,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { Conflict } from '@/types/timetable';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-function getConflictTypeLabel(type: string): string {
-  switch (type) {
-    case 'teacher_double_booking':
-      return 'Teacher Double Booking';
-    case 'invalid_school_day':
-      return 'Invalid School Day';
-    case 'class_section_slot_overlap':
-      return 'Class-Section Slot Overlap';
-    case 'timing_mismatch':
-      return 'Timing Mismatch';
-    default:
-      return type;
-  }
-}
 
 function getConflictTypeColor(type: string): string {
   switch (type) {
@@ -60,6 +46,7 @@ function getConflictTypeColor(type: string): string {
 }
 
 export default function ConflictManagementPage() {
+  const t = useTranslations('timetable');
   const queryClient = useQueryClient();
   const router = useRouter();
   const colors = useThemeColors();
@@ -103,12 +90,12 @@ export default function ConflictManagementPage() {
     })
     .map((cs) => ({
       value: cs.id,
-      label: `${cs.className || cs.classDisplayName || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
+      label: `${cs.className || cs.classDisplayName || t('unknown')} - ${cs.sectionName || t('unknown')}`,
     }));
 
   const staffOptions = staff.map((s) => ({
     value: s.id,
-    label: s.fullName || 'Unknown',
+    label: s.fullName || t('unknown'),
   }));
 
   const academicYearOptions = academicYears.map((ay) => ({
@@ -143,7 +130,7 @@ export default function ConflictManagementPage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>Conflict Management</Title>
+          <Title order={1}>{t('conflictManagement')}</Title>
         </div>
         <div
           style={{
@@ -167,8 +154,8 @@ export default function ConflictManagementPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Conflict Management</Title>
-          <Tooltip label="Refresh">
+          <Title order={1}>{t('conflictManagement')}</Title>
+          <Tooltip label={t('refresh')}>
             <ActionIcon
               variant="light"
               size="lg"
@@ -191,8 +178,7 @@ export default function ConflictManagementPage() {
       >
         <Stack gap="xl">
           <Text c="dimmed">
-            View and manage scheduling conflicts for student courses and teacher timings. Conflicts
-            can occur within a class-section or across multiple class-sections.
+            {t('viewAndManageDescription')}
           </Text>
 
           {/* Filters */}
@@ -200,8 +186,8 @@ export default function ConflictManagementPage() {
             <Stack gap="md">
               <Group grow>
                 <Select
-                  label="Academic Year"
-                  placeholder="Select academic year"
+                  label={t('academicYear')}
+                  placeholder={t('selectAcademicYear')}
                   data={academicYearOptions}
                   value={selectedAcademicYearId}
                   onChange={(value) => setSelectedAcademicYearId(value)}
@@ -209,8 +195,8 @@ export default function ConflictManagementPage() {
                   searchable
                 />
                 <Select
-                  label="Class Section"
-                  placeholder="Filter by class-section"
+                  label={t('selectClassSection')}
+                  placeholder={t('filterByClassSection')}
                   data={classSectionOptions}
                   value={selectedClassSectionId}
                   onChange={(value) => setSelectedClassSectionId(value)}
@@ -218,8 +204,8 @@ export default function ConflictManagementPage() {
                   searchable
                 />
                 <Select
-                  label="Staff Member"
-                  placeholder="Filter by staff"
+                  label={t('staffMember')}
+                  placeholder={t('filterByStaff')}
                   data={staffOptions}
                   value={selectedStaffId}
                   onChange={(value) => setSelectedStaffId(value)}
@@ -230,7 +216,7 @@ export default function ConflictManagementPage() {
               {(selectedClassSectionId || selectedStaffId || selectedAcademicYearId) && (
                 <Group justify="flex-end">
                   <Button variant="subtle" size="xs" onClick={handleClearFilters}>
-                    Clear Filters
+                    {t('clearFilters')}
                   </Button>
                 </Group>
               )}
@@ -242,7 +228,7 @@ export default function ConflictManagementPage() {
             <Paper p="md" withBorder>
               <Stack gap="sm">
                 <Text fw={500} size="sm">
-                  Conflict Summary
+                  {t('conflictSummary')}
                 </Text>
                 <Group gap="xs">
                   {Object.entries(conflictSummary).map(([type, count]) => (
@@ -252,7 +238,7 @@ export default function ConflictManagementPage() {
                       size="lg"
                       variant="light"
                     >
-                      {getConflictTypeLabel(type)}: {count}
+                      {t(`conflictType_${type}` as 'conflictType_teacher_double_booking' | 'conflictType_invalid_school_day' | 'conflictType_class_section_slot_overlap' | 'conflictType_timing_mismatch', { defaultValue: type })}: {count}
                     </Badge>
                   ))}
                 </Group>
@@ -270,7 +256,7 @@ export default function ConflictManagementPage() {
           ) : conflicts.length === 0 ? (
             <Paper p="xl" withBorder>
               <Text c="dimmed" ta="center">
-                No conflicts found. All timetables are properly scheduled.
+                {t('noConflictsFound')}
               </Text>
             </Paper>
           ) : (
@@ -281,10 +267,10 @@ export default function ConflictManagementPage() {
                     <Group justify="space-between">
                       <Group gap="xs">
                         <Badge color={getConflictTypeColor(conflict.type)} variant="light">
-                          {getConflictTypeLabel(conflict.type)}
+                          {t(`conflictType_${conflict.type}` as 'conflictType_teacher_double_booking' | 'conflictType_invalid_school_day' | 'conflictType_class_section_slot_overlap' | 'conflictType_timing_mismatch', { defaultValue: conflict.type })}
                         </Badge>
                         <Text size="sm" c="dimmed">
-                          Day: {DAY_NAMES[conflict.dayOfWeek] || `Day ${conflict.dayOfWeek}`}
+                          {t('day')}: {DAY_NAMES[conflict.dayOfWeek] || t('dayNumber', { number: conflict.dayOfWeek })}
                         </Text>
                         {conflict.subjectTemplateName && (
                           <Badge color="blue" variant="light" size="sm">
@@ -302,7 +288,7 @@ export default function ConflictManagementPage() {
                         <Divider />
                         <Stack gap="xs">
                           <Text size="xs" fw={500} c="dimmed">
-                            Conflicting Slots:
+                            {t('conflictingSlots')}
                           </Text>
                           {conflict.conflictingSlots.map((slot, slotIndex) => (
                             <Group key={slotIndex} justify="space-between" wrap="nowrap">
@@ -316,7 +302,7 @@ export default function ConflictManagementPage() {
                                 leftSection={<IconExternalLink size={14} />}
                                 onClick={() => handleViewClassTimetable(slot.classSectionId)}
                               >
-                                View Timetable
+                                {t('viewTimetable')}
                               </Button>
                             </Group>
                           ))}
@@ -329,7 +315,7 @@ export default function ConflictManagementPage() {
                         <Divider />
                         <Group justify="space-between">
                           <Text size="sm" c="dimmed">
-                            Affected Staff
+                            {t('affectedStaff')}
                           </Text>
                           <Button
                             size="xs"
@@ -337,7 +323,7 @@ export default function ConflictManagementPage() {
                             leftSection={<IconExternalLink size={14} />}
                             onClick={() => handleViewStaffSchedule(conflict.staffId!)}
                           >
-                            View Staff Schedule
+                            {t('viewStaffSchedule')}
                           </Button>
                         </Group>
                       </>

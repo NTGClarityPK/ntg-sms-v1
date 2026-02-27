@@ -33,6 +33,7 @@ function entriesToDimensions(entries: { name: string; value: string }[]): Record
 
 export function InventorySizeEditor() {
   const t = useTranslations('inventory');
+  const tCommon = useTranslations('common');
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
 
@@ -123,14 +124,14 @@ export function InventorySizeEditor() {
     try {
       await updateMutation.mutateAsync(toSave);
       notifications.show({
-        title: 'Success',
+        title: tCommon('success'),
         message: t('inventorySizesSaved'),
         color: notifyColors.success,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message,
         color: notifyColors.error,
       });

@@ -4,16 +4,7 @@ import { Button, Checkbox, Group, Paper, Stack, Text } from '@mantine/core';
 import { useEffect, useMemo, useState } from 'react';
 import { useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { notifications } from '@mantine/notifications';
-
-const days: Array<{ value: number; label: string }> = [
-  { value: 0, label: 'Sunday' },
-  { value: 1, label: 'Monday' },
-  { value: 2, label: 'Tuesday' },
-  { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday' },
-  { value: 5, label: 'Friday' },
-  { value: 6, label: 'Saturday' },
-];
+import { useTranslations } from 'next-intl';
 
 interface SchoolDaysSelectorProps {
   initialActiveDays: number[];
@@ -23,6 +14,8 @@ interface SchoolDaysSelectorProps {
 
 export function SchoolDaysSelector({ initialActiveDays, isSaving, onSave }: SchoolDaysSelectorProps) {
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const [selected, setSelected] = useState<number[]>([]);
 
   useEffect(() => {
@@ -30,12 +23,16 @@ export function SchoolDaysSelector({ initialActiveDays, isSaving, onSave }: Scho
   }, [initialActiveDays]);
 
   const items = useMemo(
-    () =>
-      days.map((d) => ({
-        value: String(d.value),
-        label: d.label,
-      })),
-    [],
+    () => [
+      { value: '0', label: tSettings('scheduleSchoolDaySunday') },
+      { value: '1', label: tSettings('scheduleSchoolDayMonday') },
+      { value: '2', label: tSettings('scheduleSchoolDayTuesday') },
+      { value: '3', label: tSettings('scheduleSchoolDayWednesday') },
+      { value: '4', label: tSettings('scheduleSchoolDayThursday') },
+      { value: '5', label: tSettings('scheduleSchoolDayFriday') },
+      { value: '6', label: tSettings('scheduleSchoolDaySaturday') },
+    ],
+    [tSettings],
   );
 
   const value = selected.map(String);
@@ -43,17 +40,17 @@ export function SchoolDaysSelector({ initialActiveDays, isSaving, onSave }: Scho
   const handleSave = async () => {
     try {
       await onSave(selected);
-      notifications.show({ title: 'Success', message: 'School days updated', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('scheduleSchoolDaySaved'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   return (
     <Paper withBorder p="md">
       <Stack gap="md">
-        <Text fw={600}>School days</Text>
+        <Text fw={600}>{tSettings('scheduleSchoolDaysTitle')}</Text>
         <Checkbox.Group
           id="school-days-group"
           value={value}
@@ -68,12 +65,10 @@ export function SchoolDaysSelector({ initialActiveDays, isSaving, onSave }: Scho
 
         <Group justify="flex-end">
           <Button id="school-days-save" variant="light" onClick={handleSave} loading={isSaving}>
-            Save
+            {tCommon('save')}
           </Button>
         </Group>
       </Stack>
     </Paper>
   );
 }
-
-

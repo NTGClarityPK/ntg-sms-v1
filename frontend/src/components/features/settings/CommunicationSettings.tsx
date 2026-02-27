@@ -5,6 +5,7 @@ import { notifications } from '@mantine/notifications';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 type Direction = 'both' | 'teacher_only';
 
@@ -21,6 +22,8 @@ const DEFAULT_VALUE: CommunicationDirectionValue = {
 export function CommunicationSettings() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
 
   const settingQuery = useSystemSetting<CommunicationDirectionValue>('communication_direction');
   const updateMutation = useUpdateSystemSetting<CommunicationDirectionValue>('communication_direction');
@@ -50,17 +53,17 @@ export function CommunicationSettings() {
     if (!value) return;
     try {
       await updateMutation.mutateAsync(value);
-      notifications.show({ title: 'Success', message: 'Communication settings saved', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('commSaved'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   if (settingQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load settings">
-        <Text size="sm">Please try again.</Text>
+      <Alert color={colors.error} title={tSettings('commLoadError')}>
+        <Text size="sm">{tSettings('genericPleaseTryAgain')}</Text>
       </Alert>
     );
   }
@@ -69,7 +72,7 @@ export function CommunicationSettings() {
     return (
       <Paper withBorder p="md">
         <Group justify="center" py="md">
-          <Text size="sm" c="dimmed">Loading communication settings...</Text>
+          <Text size="sm" c="dimmed">{tSettings('commLoading')}</Text>
         </Group>
       </Paper>
     );
@@ -78,14 +81,14 @@ export function CommunicationSettings() {
   return (
     <Paper withBorder p="md">
       <Stack gap="md">
-        <Text fw={600}>Messaging direction</Text>
+        <Text fw={600}>{tSettings('commMessagingDirection')}</Text>
 
         <Stack gap="sm">
-          <Text fw={500}>Teacher ↔ Student</Text>
+          <Text fw={500}>{tSettings('commTeacherStudent')}</Text>
           <Group gap="md" wrap="wrap">
             <Checkbox
               id="communication-settings-teacher-student-both"
-              label="Both ways"
+              label={tSettings('commBothWays')}
               checked={value.teacher_student === 'both'}
               onChange={() =>
                 setValue((prev) => ({
@@ -96,7 +99,7 @@ export function CommunicationSettings() {
             />
             <Checkbox
               id="communication-settings-teacher-student-teacher-only"
-              label="Teacher can send only"
+              label={tSettings('commTeacherOnly')}
               checked={value.teacher_student === 'teacher_only'}
               onChange={() =>
                 setValue((prev) => ({
@@ -109,11 +112,11 @@ export function CommunicationSettings() {
         </Stack>
 
         <Stack gap="sm">
-          <Text fw={500}>Teacher ↔ Parent</Text>
+          <Text fw={500}>{tSettings('commTeacherParent')}</Text>
           <Group gap="md" wrap="wrap">
             <Checkbox
               id="communication-settings-teacher-parent-both"
-              label="Both ways"
+              label={tSettings('commBothWays')}
               checked={value.teacher_parent === 'both'}
               onChange={() =>
                 setValue((prev) => ({
@@ -124,7 +127,7 @@ export function CommunicationSettings() {
             />
             <Checkbox
               id="communication-settings-teacher-parent-teacher-only"
-              label="Teacher can send only"
+              label={tSettings('commTeacherOnly')}
               checked={value.teacher_parent === 'teacher_only'}
               onChange={() =>
                 setValue((prev) => ({
@@ -138,12 +141,10 @@ export function CommunicationSettings() {
 
         <Group justify="flex-end">
           <Button id="communication-settings-save" variant="light" onClick={onSave} loading={updateMutation.isPending || settingQuery.isLoading}>
-            Save
+            {tCommon('save')}
           </Button>
         </Group>
       </Stack>
     </Paper>
   );
 }
-
-

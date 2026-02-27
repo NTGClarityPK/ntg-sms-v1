@@ -4,9 +4,13 @@ import { useState, useEffect } from 'react';
 import { Paper, Stack, Switch, TextInput, Button, Text, Alert, Anchor, Title } from '@mantine/core';
 import { useBranchById, useUpdatePublicStats } from '@/hooks/useBranches';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslations } from 'next-intl';
+
 
 export function PublicStatsSettings() {
   const { user } = useAuth();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const currentBranchId = user?.currentBranch?.id ?? null;
   const branchQuery = useBranchById(currentBranchId);
   const updatePublicStats = useUpdatePublicStats();
@@ -37,7 +41,7 @@ export function PublicStatsSettings() {
       },
       {
         onSuccess: () => {
-          setSuccessMessage('Public statistics settings saved.');
+          setSuccessMessage(tSettings('publicStatsSavedMessage'));
           setPassword('');
         },
         onError: () => {},
@@ -53,9 +57,7 @@ export function PublicStatsSettings() {
   if (!currentBranchId) {
     return (
       <Paper p="md" withBorder>
-        <Text size="sm" c="dimmed">
-          Select a branch to configure public statistics.
-        </Text>
+        <Text size="sm" c="dimmed">{tSettings('publicStatsNoBranch')}</Text>
       </Paper>
     );
   }
@@ -63,56 +65,54 @@ export function PublicStatsSettings() {
   return (
     <Paper p="md" withBorder>
       <Title order={4} mb="md">
-        Public statistics
+        {tSettings('publicStatsTitle')}
       </Title>
       <Text size="sm" c="dimmed" mb="md">
-        Allow anyone with the password to view anonymised student counts per class (no login, no individual data).
+        {tSettings('publicStatsDescription')}
       </Text>
 
       <form id="public-stats-settings-form" onSubmit={handleSubmit}>
         <Stack gap="md">
           <Switch
             id="public-stats-settings-enabled"
-            label="Enable public statistics page"
-            description="When enabled, users can view class-wise student counts at a public URL after entering the password."
+            label={tSettings('publicStatsEnableLabel')}
+            description={tSettings('publicStatsEnableDescription')}
             checked={localEnabled}
             onChange={(e) => setLocalEnabled(e.currentTarget.checked)}
           />
 
           <TextInput
             id="public-stats-settings-password"
-            label="Password (optional)"
-            description="Leave blank to keep the existing password. Set a new value to change it."
+            label={tSettings('publicStatsPasswordLabel')}
+            description={tSettings('publicStatsPasswordDescription')}
             type="password"
-            placeholder="Set or change password"
+            placeholder={tSettings('publicStatsPasswordPlaceholder')}
             value={password}
             onChange={(e) => setPassword(e.currentTarget.value)}
             autoComplete="new-password"
           />
 
           {successMessage && (
-            <Alert color="green" title="Saved">
+            <Alert color="green" title={tSettings('publicStatsSavedTitle')}>
               {successMessage}
             </Alert>
           )}
 
           {updatePublicStats.isError && (
-            <Alert color="red" title="Error">
+            <Alert color="red" title={tCommon('error')}>
               {updatePublicStats.error instanceof Error
                 ? updatePublicStats.error.message
-                : 'Failed to save settings'}
+                : tSettings('publicStatsErrorFallback')}
             </Alert>
           )}
 
           <Button id="public-stats-settings-submit" type="submit" loading={updatePublicStats.isPending}>
-            Save changes
+            {tSettings('publicStatsSaveButton')}
           </Button>
 
           {localEnabled && branchCode && publicUrl && (
             <Stack gap="xs">
-              <Text size="sm" fw={500}>
-                Public page link
-              </Text>
+              <Text size="sm" fw={500}>{tSettings('publicStatsLinkTitle')}</Text>
               <Anchor id="public-stats-settings-link" href={publicUrl} target="_blank" rel="noopener noreferrer" size="sm">
                 {publicUrl}
               </Anchor>

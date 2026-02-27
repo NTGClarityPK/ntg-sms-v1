@@ -12,6 +12,7 @@ import {
   Alert as MantineAlert,
 } from '@mantine/core';
 import { IconArrowLeft, IconPlus, IconCopy, IconCopyCheck, IconCopyOff } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { useClassSection, useClassSections } from '@/hooks/useClassSections';
@@ -56,6 +57,7 @@ export function ClassTimetableContent({
 }: ClassTimetableContentProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useTranslations('timetable');
   const [selectedSlot, setSelectedSlot] = useState<TimetableSlot | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('');
@@ -237,8 +239,8 @@ export function ClassTimetableContent({
   const handleReplicateDay = async () => {
     if (!classSectionId || !sourceDay || targetDays.length === 0) {
       notifications.show({
-        title: 'Error',
-        message: 'Please select source day and at least one target day',
+        title: t('error'),
+        message: t('pleaseSelectSourceAndTarget'),
         color: colors.error,
       });
       return;
@@ -287,8 +289,8 @@ export function ClassTimetableContent({
   const handleReplicateAcrossSections = async () => {
     if (!classSectionId || targetSectionIds.length === 0) {
       notifications.show({
-        title: 'Error',
-        message: 'Please select at least one target section',
+        title: t('error'),
+        message: t('pleaseSelectTargetSection'),
         color: colors.error,
       });
       return;
@@ -303,32 +305,32 @@ export function ClassTimetableContent({
       .join(', ');
 
     modals.openConfirmModal({
-      title: 'Confirm Replication Across Sections',
+      title: t('confirmReplicationAcrossSections'),
       children: (
         <Stack gap="md">
           <Text size="sm">
-            This will copy all timetable slots from <strong>{sourceSectionName}</strong>
-            {selectedTemplateId ? ' (for the currently selected subject template)' : ' (all slots)'} to the following section(s):{' '}
-            <strong>{targetSectionNames}</strong>.
+            {t('confirmReplicationAcrossMessage', {
+              sourceSectionName,
+              targetSectionNames,
+            })}
           </Text>
           <MantineAlert
             icon={<IconAlertTriangle size={16} />}
             color="yellow"
             variant="light"
-            title="Warning"
+            title={t('warning')}
           >
             <Text size="sm">
-              Any existing timetable slots in the target sections that match the same day, time
-              range{selectedTemplateId ? ', and subject template' : ''} will be <strong>replaced</strong>. If you have already
-              assigned subjects or teachers to those slots, they will be overwritten.
+              {t('confirmReplicationAcrossMessage', {
+                sourceSectionName,
+                targetSectionNames,
+              })}
             </Text>
           </MantineAlert>
-          <Text size="sm">
-            Are you sure you want to proceed?
-          </Text>
+          <Text size="sm">{t('areYouSureProceed')}</Text>
         </Stack>
       ),
-      labels: { confirm: 'Replicate', cancel: 'Cancel' },
+      labels: { confirm: t('replicate'), cancel: t('cancel') },
       confirmProps: { color: colors.primary },
       onConfirm: () => {
         replicateAcrossSectionsMutation.mutate(
@@ -352,8 +354,8 @@ export function ClassTimetableContent({
   const handleReplicateFromSection = async () => {
     if (!classSectionId || !sourceSectionId) {
       notifications.show({
-        title: 'Error',
-        message: 'Please select a source class section',
+        title: t('error'),
+        message: t('pleaseSelectSourceSection'),
         color: colors.error,
       });
       return;
@@ -377,32 +379,32 @@ export function ClassTimetableContent({
       : null;
 
     modals.openConfirmModal({
-      title: 'Confirm Copy from Section',
+      title: t('confirmCopyFromSection'),
       children: (
         <Stack gap="md">
           <Text size="sm">
-            This will copy all timetable slots from <strong>{sourceSectionName}</strong>
-            {effectiveTemplateId ? ` (for subject template: ${templateName})` : ' (all slots)'} to{' '}
-            <strong>{targetSectionName}</strong>.
+            {t('confirmCopyFromSectionMessage', {
+              sourceSectionName,
+              targetSectionName,
+            })}
           </Text>
           <MantineAlert
             icon={<IconAlertTriangle size={16} />}
             color="yellow"
             variant="light"
-            title="Warning"
+            title={t('warning')}
           >
             <Text size="sm">
-              Any existing timetable slots in <strong>{targetSectionName}</strong> that match the same day, time
-              range{effectiveTemplateId ? ', and subject template' : ''} will be <strong>replaced</strong>. If you have already
-              assigned subjects or teachers to those slots, they will be overwritten.
+              {t('confirmCopyFromSectionMessage', {
+                sourceSectionName,
+                targetSectionName,
+              })}
             </Text>
           </MantineAlert>
-          <Text size="sm">
-            Are you sure you want to proceed?
-          </Text>
+          <Text size="sm">{t('areYouSureProceed')}</Text>
         </Stack>
       ),
-      labels: { confirm: 'Copy', cancel: 'Cancel' },
+      labels: { confirm: t('copy'), cancel: t('cancel') },
       confirmProps: { color: colors.primary },
       onConfirm: () => {
         replicateFromSectionMutation.mutate(
@@ -472,7 +474,7 @@ export function ClassTimetableContent({
               disabled={!classId || !timetable || timetable.slots.length === 0}
               variant="light"
             >
-              Replicate Day
+              {t('replicateDay')}
             </Button>
             <Button
               leftSection={<IconCopyCheck size={18} />}
@@ -485,7 +487,7 @@ export function ClassTimetableContent({
               }
               variant="light"
             >
-              Replicate to other sections
+              {t('replicateToOtherSections')}
             </Button>
             <Button
               leftSection={<IconCopyOff size={18} />}
@@ -493,14 +495,14 @@ export function ClassTimetableContent({
               disabled={!classId || availableSourceSections.length === 0}
               variant="light"
             >
-              Copy from other section
+              {t('copyFromOtherSection')}
             </Button>
             <Button
               leftSection={<IconPlus size={18} />}
               onClick={openGenerateModal}
               disabled={!classId}
             >
-              Generate from Template
+              {t('generateFromTemplate')}
             </Button>
           </Group>
         </Group>
@@ -512,19 +514,20 @@ export function ClassTimetableContent({
         {classId && templatesLoading && <Skeleton height={36} />}
 
         {!templatesLoading && classId && availableTemplates.length === 0 && (
-          <Alert color={colors.info} title="No Subject Templates Assigned">
+          <Alert color={colors.info} title={t('noSubjectTemplatesAssigned')}>
             <Text size="sm">
-              This class is not assigned to any subject template. You can assign any subject to timetable slots.
+              {t('noSubjectTemplatesMessage')}
               {classId && (
                 <>
-                  {' '}To create subject templates, go to{' '}
+                  {' '}
+                  {t('toCreateTemplates')}{' '}
                   <Text
                     component="span"
                     fw={500}
                     style={{ cursor: 'pointer', textDecoration: 'underline' }}
                     onClick={() => router.push('/settings/subject-templates')}
                   >
-                    Settings → Subject Templates
+                    {t('settingsSubjectTemplates')}
                   </Text>
                   .
                 </>
@@ -550,7 +553,7 @@ export function ClassTimetableContent({
                 disabled={!classId || !timetable || timetable.slots.length === 0}
                 variant="light"
               >
-                Replicate Day
+                {t('replicateDay')}
               </Button>
               <Button
                 leftSection={<IconCopyCheck size={18} />}
@@ -563,7 +566,7 @@ export function ClassTimetableContent({
                 }
                 variant="light"
               >
-                Replicate to other sections
+                {t('replicateToOtherSections')}
               </Button>
               <Button
                 leftSection={<IconCopyOff size={18} />}
@@ -571,14 +574,14 @@ export function ClassTimetableContent({
                 disabled={!classId || availableSourceSections.length === 0}
                 variant="light"
               >
-                Copy from other section
+                {t('copyFromOtherSection')}
               </Button>
               <Button
                 leftSection={<IconPlus size={18} />}
                 onClick={openGenerateModal}
                 disabled={!classId}
               >
-                Generate from Template
+                {t('generateFromTemplate')}
               </Button>
             </Group>
           </Group>
@@ -609,23 +612,16 @@ export function ClassTimetableContent({
                 />
 
                 {timetable.slots.length === 0 && (
-                  <Alert color={colors.info} title="No Timetable Slots">
-                    <Text size="sm">
-                      No timetable slots have been created for this template yet. Click on empty
-                      cells to create slots, or use the "Generate from Template" button to create
-                      slots from the timing template.
-                    </Text>
+                  <Alert color={colors.info} title={t('noTimetableSlots')}>
+                    <Text size="sm">{t('noSlotsClickOrGenerate')}</Text>
                   </Alert>
                 )}
               </>
             )}
 
             {!timetableLoading && !timetable && !timetableError && (
-              <Alert color={colors.info} title="No Timetable Data">
-                <Text size="sm">
-                  Timetable data is not available. Try refreshing the page or generating a new
-                  timetable.
-                </Text>
+              <Alert color={colors.info} title={t('noTimetableData')}>
+                <Text size="sm">{t('noTimetableDataMessage')}</Text>
               </Alert>
             )}
           </>
@@ -653,51 +649,28 @@ export function ClassTimetableContent({
       <Modal
         opened={generateModalOpened}
         onClose={closeGenerateModal}
-        title="Generate from Timing Template"
+        title={t('generateModalTitle')}
         size="md"
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            This will create timetable slots from the <strong>timing template</strong> assigned to
-            this class (configured in Settings → Schedule / Timing template). That template defines
-            the structure of each day (e.g. periods, break, assembly).
-          </Text>
-          <Text size="sm">
-            {selectedTemplateId ? (
-              <>
-                For the <strong>currently selected subject template</strong>, one slot will be created
-                for each timing slot (period, break, assembly, etc.) on every active school day. Class
-                periods will start as empty placeholders; you can then assign subjects and teachers to
-                them.
-              </>
-            ) : (
-              <>
-                One slot will be created for each timing slot (period, break, assembly, etc.) on every active school day.
-                Class periods will start as empty placeholders; you can then assign any subject and teachers to
-                them.
-              </>
-            )}
+            {t('generateModalDescription')}
           </Text>
           {timetable?.slots?.length ? (
-            <Alert color="yellow" variant="light" title="Warning">
-              <Text size="sm">
-                Any existing timetable slots for this class{selectedTemplateId ? ' and subject template' : ''} that match the
-                same day and time will be <strong>replaced</strong>. If you have already assigned
-                subjects or teachers, they will be overwritten by empty slots (you can reassign them
-                afterwards).
-              </Text>
+            <Alert color="yellow" variant="light" title={t('warning')}>
+              <Text size="sm">{t('generateModalWarning')}</Text>
             </Alert>
           ) : null}
           <Group justify="flex-end" gap="xs" mt="md">
             <Button variant="subtle" onClick={closeGenerateModal}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={() => handleGenerate()}
               loading={generateMutation.isPending}
             >
-              Generate
+              {t('generate')}
             </Button>
           </Group>
         </Stack>
@@ -706,21 +679,21 @@ export function ClassTimetableContent({
       <Modal
         opened={replicateModalOpened}
         onClose={closeReplicateModal}
-        title="Replicate Day to Other Days"
+        title={t('replicateDayModalTitle')}
         size="md"
       >
         <Stack gap="md">
           <Select
-            label="Source Day (Day to copy from)"
-            placeholder="Select a day"
+            label={t('sourceDay')}
+            placeholder={t('selectDay')}
             data={dayOptions}
             value={sourceDay !== null ? String(sourceDay) : null}
             onChange={(value) => setSourceDay(value ? Number(value) : null)}
             required
           />
           <MultiSelect
-            label="Target Days (Days to copy to)"
-            placeholder="Select one or more days"
+            label={t('targetDays')}
+            placeholder={t('selectOneOrMoreDays')}
             data={dayOptions.filter((d) => d.value !== String(sourceDay))}
             value={targetDays.map(String)}
             onChange={(values) => setTargetDays(values.map(Number))}
@@ -728,14 +701,14 @@ export function ClassTimetableContent({
           />
           <Group justify="flex-end" gap="xs" mt="md">
             <Button variant="subtle" onClick={closeReplicateModal}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleReplicateDay}
               loading={replicateDayMutation.isPending}
               disabled={!sourceDay || targetDays.length === 0}
             >
-              Replicate
+              {t('replicate')}
             </Button>
           </Group>
         </Stack>
@@ -748,32 +721,35 @@ export function ClassTimetableContent({
           setSourceSectionId(null);
           setSourceTemplateId(null);
         }}
-        title="Copy from Other Section"
+        title={t('copyFromSectionModalTitle')}
         size="md"
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            Select a class section to copy the timetable from. The timetable will be copied to{' '}
-            <strong>
-              {classSection
-                ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
-                : 'this section'}
-            </strong>
-            .
+            {t('confirmCopyFromSectionMessage', {
+              sourceSectionName:
+                classSection
+                  ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
+                  : t('classSection'),
+              targetSectionName:
+                classSection
+                  ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
+                  : t('classSection'),
+            })}
           </Text>
           {availableSourceSections.length === 0 ? (
             <Alert color={colors.info}>
               <Text size="sm">
                 {candidateSourceSections.length === 0
-                  ? 'No other class sections found. All active class sections will appear here.'
-                  : 'No class sections with timetable slots found. Only sections that have at least one timetable slot can be used as a source.'}
+                  ? t('noOtherSections')
+                  : t('noSectionsWithSlots')}
               </Text>
             </Alert>
           ) : (
             <>
               <Select
-                label="Source Section"
-                placeholder="Select a class section to copy from"
+                label={t('sourceSection')}
+                placeholder={t('selectSourceSection')}
                 data={availableSourceSections.map((cs) => ({
                   value: cs.id,
                   label: `${cs.classDisplayName || cs.className || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
@@ -786,17 +762,15 @@ export function ClassTimetableContent({
                 searchable
                 required
               />
-              {sourceSectionId && sourceTemplatesLoading && (
-                <Skeleton height={36} />
-              )}
+              {sourceSectionId && sourceTemplatesLoading && <Skeleton height={36} />}
               {sourceSectionId && !sourceTemplatesLoading && sourceTemplates.length > 0 && (
                 <Select
-                  label="Subject Template (Optional)"
-                  placeholder="Select a subject template to copy"
-                  description="If a template is selected, only slots for that template will be copied. Leave empty to copy all slots."
-                  data={sourceTemplates.map((t) => ({
-                    value: t.id,
-                    label: t.name,
+                  label={t('subjectTemplateOptional')}
+                  placeholder={t('selectSubjectTemplateToCopy')}
+                  description={t('copyAllSlots')}
+                  data={sourceTemplates.map((tpl) => ({
+                    value: tpl.id,
+                    label: tpl.name,
                   }))}
                   value={sourceTemplateId}
                   onChange={(value) => setSourceTemplateId(value)}
@@ -806,39 +780,40 @@ export function ClassTimetableContent({
               )}
               {sourceSectionId && !sourceTemplatesLoading && sourceTemplates.length === 0 && (
                 <Alert color={colors.info} variant="light">
-                  <Text size="sm">
-                    The selected source section's class has no subject templates assigned. All timetable slots will be copied.
-                  </Text>
+                  <Text size="sm">{t('sourceHasNoTemplates')}</Text>
                 </Alert>
               )}
               <MantineAlert
                 icon={<IconAlertTriangle size={16} />}
                 color="yellow"
                 variant="light"
-                title="Warning"
+                title={t('warning')}
               >
                 <Text size="sm">
-                  Any existing timetable slots in <strong>
-                    {classSection
-                      ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
-                      : 'this section'}
-                  </strong> that match the same day, time
-                  range{sourceTemplateId ? ', and subject template' : ''} will be <strong>replaced</strong>. If you have already
-                  assigned subjects or teachers to those slots, they will be overwritten.
+                  {t('confirmCopyFromSectionMessage', {
+                    sourceSectionName:
+                      classSection
+                        ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
+                        : t('classSection'),
+                    targetSectionName:
+                      classSection
+                        ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
+                        : t('classSection'),
+                  })}
                 </Text>
               </MantineAlert>
             </>
           )}
           <Group justify="flex-end" gap="xs" mt="md">
             <Button variant="subtle" onClick={closeReplicateFromSectionModal}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleReplicateFromSection}
               loading={replicateFromSectionMutation.isPending}
               disabled={!sourceSectionId || availableSourceSections.length === 0}
             >
-              Copy
+              {t('copy')}
             </Button>
           </Group>
         </Stack>
@@ -847,31 +822,28 @@ export function ClassTimetableContent({
       <Modal
         opened={replicateAcrossSectionsModalOpened}
         onClose={closeReplicateAcrossSectionsModal}
-        title="Replicate to Other Sections"
+        title={t('replicateAcrossModalTitle')}
         size="md"
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
-            Select the class sections to copy the timetable to. The timetable from{' '}
-            <strong>
-              {classSection
-                ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
-                : 'this section'}
-            </strong>{' '}
-            {selectedTemplateId ? '(for the currently selected subject template)' : '(all slots)'} will be replicated to the selected sections.
+            {t('confirmReplicationAcrossMessage', {
+              sourceSectionName:
+                classSection
+                  ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
+                  : t('classSection'),
+              targetSectionNames: t('selectTargetSections'),
+            })}
           </Text>
           {otherSections.length === 0 ? (
             <Alert color={colors.info}>
-              <Text size="sm">
-                No other sections found for this class. All sections of the same class will appear
-                here.
-              </Text>
+              <Text size="sm">{t('noOtherSectionsForClass')}</Text>
             </Alert>
           ) : (
             <>
               <MultiSelect
-                label="Target Sections"
-                placeholder="Select one or more sections"
+                label={t('selectTargetSections')}
+                placeholder={t('selectOneOrMoreDays')}
                 data={otherSections.map((cs) => ({
                   value: cs.id,
                   label: `${cs.classDisplayName || cs.className || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
@@ -885,26 +857,30 @@ export function ClassTimetableContent({
                 icon={<IconAlertTriangle size={16} />}
                 color="yellow"
                 variant="light"
-                title="Warning"
+                title={t('warning')}
               >
                 <Text size="sm">
-                  Any existing timetable slots in the target sections that match the same day, time
-                  range{selectedTemplateId ? ', and subject template' : ''} will be <strong>replaced</strong>. If you have already
-                  assigned subjects or teachers to those slots, they will be overwritten.
+                  {t('confirmReplicationAcrossMessage', {
+                    sourceSectionName:
+                      classSection
+                        ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
+                        : t('classSection'),
+                    targetSectionNames: t('selectTargetSections'),
+                  })}
                 </Text>
               </MantineAlert>
             </>
           )}
           <Group justify="flex-end" gap="xs" mt="md">
             <Button variant="subtle" onClick={closeReplicateAcrossSectionsModal}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleReplicateAcrossSections}
               loading={replicateAcrossSectionsMutation.isPending}
               disabled={targetSectionIds.length === 0 || otherSections.length === 0}
             >
-              Replicate
+              {t('replicate')}
             </Button>
           </Group>
         </Stack>

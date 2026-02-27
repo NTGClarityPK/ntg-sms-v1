@@ -2,6 +2,7 @@
 
 import { Table, Paper, Text, Skeleton } from '@mantine/core';
 import { RankBadge } from './RankBadge';
+import { useTranslations } from 'next-intl';
 import type { AcademicSection as AcademicSectionType } from '@/types/reports';
 
 interface AcademicSectionProps {
@@ -10,6 +11,7 @@ interface AcademicSectionProps {
 }
 
 export function AcademicSection({ data, isLoading }: AcademicSectionProps) {
+  const t = useTranslations('reports');
   if (isLoading) {
     return (
       <Paper withBorder p="md">
@@ -21,23 +23,29 @@ export function AcademicSection({ data, isLoading }: AcademicSectionProps) {
   if (!data || !data.entries || data.entries.length === 0) {
     return (
       <Paper withBorder p="md">
-        <Text fw={600} mb="xs">Academic</Text>
-        <Text c="dimmed" size="sm">No grades recorded.</Text>
+        <Text fw={600} mb="xs">
+          {t('academicSectionTitle')}
+        </Text>
+        <Text c="dimmed" size="sm">
+          {t('academicNoGrades')}
+        </Text>
       </Paper>
     );
   }
 
   return (
     <Paper withBorder p="md">
-      <Text fw={600} mb="md">Academic</Text>
+      <Text fw={600} mb="md">
+        {t('academicSectionTitle')}
+      </Text>
       <Table withTableBorder withColumnBorders>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Subject</Table.Th>
-            <Table.Th>Assessment</Table.Th>
-            <Table.Th>Marks</Table.Th>
-            <Table.Th>Grade</Table.Th>
-            <Table.Th>Rank / Percentile</Table.Th>
+            <Table.Th>{t('academicTableSubject')}</Table.Th>
+            <Table.Th>{t('academicTableAssessment')}</Table.Th>
+            <Table.Th>{t('academicTableMarks')}</Table.Th>
+            <Table.Th>{t('academicTableGrade')}</Table.Th>
+            <Table.Th>{t('academicTableRankPercentile')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>

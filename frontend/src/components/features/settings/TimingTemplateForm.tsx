@@ -4,6 +4,7 @@ import { ActionIcon, Button, Divider, Group, Modal, NumberInput, Paper, Stack, T
 import { useForm } from '@mantine/form';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTranslations } from 'next-intl';
 
 export interface TimingSlotFormValue {
   name: string;
@@ -29,7 +30,9 @@ interface TimingTemplateFormProps {
 
 export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: TimingTemplateFormProps) {
   const colors = useThemeColors();
-  
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
+
   const form = useForm<TimingTemplateFormValues>({
     initialValues: {
       name: '',
@@ -39,15 +42,15 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
       slots: [],
     },
     validate: {
-      name: (v) => (v.trim().length === 0 ? 'Name is required' : null),
-      startTime: (v) => (!v ? 'Start time is required' : null),
+      name: (v) => (v.trim().length === 0 ? tSettings('scheduleTimingNameRequired') : null),
+      startTime: (v) => (!v ? tSettings('scheduleTimingStartTimeRequired') : null),
       endTime: (v, values) => {
-        if (!v) return 'End time is required';
-        if (values.startTime && v && values.startTime >= v) return 'End time must be after start time';
+        if (!v) return tSettings('scheduleTimingEndTimeRequired');
+        if (values.startTime && v && values.startTime >= v) return tSettings('scheduleTimingEndTimeAfterStart');
         return null;
       },
       slots: {
-        name: (v) => (v && v.trim().length === 0 ? 'Slot name is required' : null),
+        name: (v) => (v && v.trim().length === 0 ? tSettings('scheduleTimingSlotNameRequired') : null),
       },
     },
   });
@@ -61,7 +64,6 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
   };
 
   const submit = form.onSubmit(async (values) => {
-    // Transform values: convert slots with sortOrder
     const transformedValues = {
       ...values,
       name: values.name.trim(),
@@ -78,28 +80,54 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
   });
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Create timing template" size="lg">
+    <Modal opened={opened} onClose={onClose} title={tSettings('scheduleTimingFormTitle')} size="lg">
       <form onSubmit={submit}>
         <Stack gap="md">
-          <TextInput id="timing-template-name" label="Name" placeholder="Primary Morning Schedule" {...form.getInputProps('name')} />
+          <TextInput
+            id="timing-template-name"
+            label={tCommon('name')}
+            placeholder={tSettings('scheduleTimingFormNamePlaceholder')}
+            {...form.getInputProps('name')}
+          />
           <Group grow>
-            <TextInput id="timing-template-start-time" label="School start time" type="time" {...form.getInputProps('startTime')} />
-            <TextInput id="timing-template-end-time" label="School end time" type="time" {...form.getInputProps('endTime')} />
+            <TextInput
+              id="timing-template-start-time"
+              label={tSettings('scheduleTimingFormStartTimeLabel')}
+              type="time"
+              {...form.getInputProps('startTime')}
+            />
+            <TextInput
+              id="timing-template-end-time"
+              label={tSettings('scheduleTimingFormEndTimeLabel')}
+              type="time"
+              {...form.getInputProps('endTime')}
+            />
           </Group>
-          <NumberInput id="timing-template-period-duration" label="Period duration (minutes)" min={1} {...form.getInputProps('periodDurationMinutes')} />
+          <NumberInput
+            id="timing-template-period-duration"
+            label={tSettings('scheduleTimingFormPeriodDurationLabel')}
+            min={1}
+            {...form.getInputProps('periodDurationMinutes')}
+          />
 
           <Divider my="sm" />
 
           <Group justify="space-between" align="center">
-            <Text fw={500}>Slots (Assembly, Break, etc.)</Text>
-            <Button id="timing-template-add-slot" size="compact-sm" leftSection={<IconPlus size={16} />} onClick={addSlot} variant="light">
-              Add Slot
+            <Text fw={500}>{tSettings('scheduleTimingFormSlotsTitle')}</Text>
+            <Button
+              id="timing-template-add-slot"
+              size="compact-sm"
+              leftSection={<IconPlus size={16} />}
+              onClick={addSlot}
+              variant="light"
+            >
+              {tSettings('scheduleTimingFormAddSlotButton')}
             </Button>
           </Group>
 
           {form.values.slots.length === 0 ? (
             <Text size="sm" c="dimmed">
-              No slots added yet. Click "Add Slot" to add custom slots like Assembly, Break, Lunch, etc.
+              {tSettings('scheduleTimingFormNoSlotsText')}
             </Text>
           ) : (
             <Stack gap="sm">
@@ -107,7 +135,9 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
                 <Paper key={index} withBorder p="sm">
                   <Stack gap="xs">
                     <Group justify="space-between">
-                      <Text size="sm" fw={500}>Slot {index + 1}</Text>
+                      <Text size="sm" fw={500}>
+                        {tSettings('scheduleTimingFormSlotLabel', { number: index + 1 })}
+                      </Text>
                       <ActionIcon
                         variant="subtle"
                         color={colors.error}
@@ -119,20 +149,20 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
                     </Group>
                     <TextInput
                       id={`timing-template-slot-${index}-name`}
-                      label="Slot name"
-                      placeholder="e.g., Assembly, Break, Lunch"
+                      label={tSettings('scheduleTimingFormSlotNameLabel')}
+                      placeholder={tSettings('scheduleTimingFormSlotNamePlaceholder')}
                       {...form.getInputProps(`slots.${index}.name`)}
                     />
                     <Group grow>
                       <TextInput
                         id={`timing-template-slot-${index}-start`}
-                        label="Start time (optional)"
+                        label={tSettings('scheduleTimingFormSlotStartLabel')}
                         type="time"
                         {...form.getInputProps(`slots.${index}.startTime`)}
                       />
                       <TextInput
                         id={`timing-template-slot-${index}-end`}
-                        label="End time (optional)"
+                        label={tSettings('scheduleTimingFormSlotEndLabel')}
                         type="time"
                         {...form.getInputProps(`slots.${index}.endTime`)}
                       />
@@ -145,10 +175,10 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
 
           <Group justify="flex-end" mt="md">
             <Button id="timing-template-cancel" variant="light" onClick={onClose} disabled={isSubmitting}>
-              Cancel
+              {tCommon('cancel')}
             </Button>
             <Button id="timing-template-submit" type="submit" loading={isSubmitting}>
-              Save
+              {tCommon('save')}
             </Button>
           </Group>
         </Stack>
@@ -156,5 +186,3 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
     </Modal>
   );
 }
-
-

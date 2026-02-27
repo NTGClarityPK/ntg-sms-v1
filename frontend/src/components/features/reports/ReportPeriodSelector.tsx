@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Group, Select, Text, Stack } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
+import { useTranslations } from 'next-intl';
 import { ReportPeriodType } from '@/types/reports';
 
 export interface ReportPeriodSelectorProps {
@@ -25,6 +26,7 @@ export function ReportPeriodSelector({
   const [customEndDate, setCustomEndDate] = useState<Date | null>(
     endDate ? new Date(endDate) : null,
   );
+  const t = useTranslations('reports');
 
   const handlePeriodTypeChange = (newType: string | null) => {
     if (!newType || newType === 'year') {
@@ -105,15 +107,15 @@ export function ReportPeriodSelector({
     <Stack gap="sm">
       <Select
         id="report-period-select"
-        label="Report Period"
-        placeholder="Select period"
+        label={t('periodSelectLabel')}
+        placeholder={t('periodSelectPlaceholder')}
         value={value || 'year'}
         onChange={handlePeriodTypeChange}
         data={[
-          { value: 'week', label: 'This Week' },
-          { value: 'month', label: 'This Month' },
-          { value: 'year', label: 'Year to Date' },
-          { value: 'custom', label: 'Custom Range' },
+          { value: 'week', label: t('chipThisWeek') },
+          { value: 'month', label: t('chipThisMonth') },
+          { value: 'year', label: t('chipYearToDate') },
+          { value: 'custom', label: t('chipCustomRange') },
         ]}
         style={{ maxWidth: 300 }}
       />
@@ -122,8 +124,8 @@ export function ReportPeriodSelector({
         <Group gap="md">
           <DatePickerInput
             id="report-period-start-date"
-            label="Start Date"
-            placeholder="Select start date"
+            label={t('periodStartLabel')}
+            placeholder={t('periodStartPlaceholder')}
             value={customStartDate}
             onChange={handleStartDateChange}
             clearable
@@ -131,8 +133,8 @@ export function ReportPeriodSelector({
           />
           <DatePickerInput
             id="report-period-end-date"
-            label="End Date"
-            placeholder="Select end date"
+            label={t('periodEndLabel')}
+            placeholder={t('periodEndPlaceholder')}
             value={customEndDate}
             onChange={handleEndDateChange}
             clearable
@@ -144,7 +146,8 @@ export function ReportPeriodSelector({
 
       {value && value !== ReportPeriodType.CUSTOM && startDate && endDate && (
         <Text size="sm" c="dimmed">
-          Period: {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
+          {t('periodSummaryPrefix')}{' '}
+          {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
         </Text>
       )}
     </Stack>

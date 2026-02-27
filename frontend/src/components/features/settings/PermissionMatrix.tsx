@@ -7,6 +7,7 @@ import { notifications } from '@mantine/notifications';
 import type { Role, Feature, PermissionMatrix, Permission, UpdatePermissionsPayload } from '@/types/permissions';
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import type { User } from '@/types/auth';
 
 const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
@@ -25,6 +26,9 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   const queryClient = useQueryClient();
 
   const rolesInMatrix = roles.filter((r) => r.name !== SCHOOL_ADMIN_ROLE_NAME);
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
+  const tNav = useTranslations('navigation');
 
   // Hide deprecated legacy codes and keep explicit personal/management split.
   const managementFeatures = features.filter(
@@ -49,8 +53,89 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
       ? managementFeatures
       : managementFeatures.filter((f) => selectedFeatureIds.includes(f.id));
 
-  const featureOptions = managementFeatures.map((f) => ({ value: f.id, label: f.name }));
-  const roleOptions = rolesInMatrix.map((r) => ({ value: r.id, label: r.displayName }));
+  const getFeatureLabel = (feature: Feature): string => {
+    switch (feature.code) {
+      // Core navigation features
+      case 'dashboard':
+        return tNav('dashboard');
+      case 'students':
+        return tNav('students');
+      case 'user_management':
+        return tNav('users');
+      case 'class_sections':
+        return tNav('classSections');
+      case 'teacher_mapping':
+        return tNav('teacherMapping');
+      case 'parent_associations':
+        return tNav('parentAssociations');
+
+      // Timetable / schedule
+      case 'timetable_management':
+      case 'timetable':
+        return tNav('timetable');
+      case 'timetable_personal':
+      case 'my_timetable':
+        return tNav('myTimetable');
+      case 'my_schedule':
+        return tNav('mySchedule');
+
+      // Attendance / behavioural / assessment
+      case 'attendance':
+        return tNav('attendance');
+      case 'behavioral':
+        return tNav('behavioral');
+      case 'assessment':
+        return tNav('assessments');
+      case 'my_assessments':
+        return tNav('myAssessments');
+
+      // Leaves / early departure
+      case 'leaves':
+        return tNav('leaves');
+      case 'early_departure':
+        return tNav('earlyDeparture');
+
+      // Communication (notifications + messages)
+      case 'communication':
+        return tNav('messages');
+
+      // Events
+      case 'events_management':
+      case 'events':
+        return tNav('events');
+      case 'events_personal':
+      case 'my_events':
+        return tNav('myEvents');
+
+      // Reports / settings
+      case 'reports':
+        return tNav('reports');
+      case 'settings':
+        return tNav('settings');
+
+      // Library / inventory / staff
+      case 'library':
+        return tNav('library');
+      case 'inventory':
+        return tNav('inventory');
+      case 'staff':
+        // No dedicated nav key; reuse Users
+        return tNav('users');
+
+      // Fallback to backend-provided name
+      default:
+        return feature.name;
+    }
+  };
+
+  const featureOptions = managementFeatures.map((f) => ({
+    value: f.id,
+    label: getFeatureLabel(f),
+  }));
+  const roleOptions = rolesInMatrix.map((r) => ({
+    value: r.id,
+    label: tCommon(`roleName.${r.name}` as any),
+  }));
   const visibleRoles =
     selectedRoleIds.length === 0
       ? rolesInMatrix
@@ -91,14 +176,14 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
       setHasChanges(false);
       notifications.show({
         title: 'Success',
-        message: 'Permissions updated successfully',
+        message: tSettings('permissionsUpdatedSuccess', { defaultMessage: 'Permissions updated successfully' } as any),
         color: 'green',
       });
     },
     onError: (error: Error) => {
       notifications.show({
         title: 'Error',
-        message: error.message || 'Failed to update permissions',
+        message: error.message || tSettings('permissionsUpdatedError', { defaultMessage: 'Failed to update permissions' } as any),
         color: 'red',
       });
     },
@@ -129,27 +214,27 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
     <Stack gap="md">
       <Group justify="space-between" wrap="wrap">
         <Text size="sm" c="dimmed">
-          Configure permissions for each role and feature. School Admin has full access and is not shown. Changes apply to the current branch.
+          {tSettings('permissionsIntroMain')}
           <br />
           <Text size="xs" c="dimmed" mt={4}>
-            Use explicit split permissions: Events (Management) vs Events (Personal), and Timetable (Management) vs Timetable (Personal).
+            {tSettings('permissionsIntroHint')}
           </Text>
         </Text>
         {hasChanges && (
           <Button onClick={handleSave} loading={updateMutation.isPending}>
-            Save Changes
+            {tSettings('permissionsSaveChanges')}
           </Button>
         )}
       </Group>
 
       <MultiSelect
-        label="Show tabs"
+        label={tSettings('permissionsTabsLabel')}
         placeholder={
           selectedFeatureIds.length === 0
-            ? 'All tabs'
-            : `${selectedFeatureIds.length} tab${selectedFeatureIds.length === 1 ? '' : 's'} selected`
+            ? tSettings('permissionsTabsPlaceholderAll')
+            : tSettings('permissionsTabsPlaceholderSome', { count: selectedFeatureIds.length })
         }
-        description="Select which tabs to show in the matrix. Five tabs are shown by default. Clear selection to show all."
+        description={tSettings('permissionsTabsDescription')}
         data={featureOptions}
         value={selectedFeatureIds}
         onChange={setSelectedFeatureIds}
@@ -158,13 +243,13 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
       />
 
       <MultiSelect
-        label="Show roles"
+        label={tSettings('permissionsRolesLabel')}
         placeholder={
           selectedRoleIds.length === 0
-            ? 'All roles'
-            : `${selectedRoleIds.length} role${selectedRoleIds.length === 1 ? '' : 's'} selected`
+            ? tSettings('permissionsRolesPlaceholderAll')
+            : tSettings('permissionsRolesPlaceholderSome', { count: selectedRoleIds.length })
         }
-        description="Select which roles to show on the left side. Clear selection to show all."
+        description={tSettings('permissionsRolesDescription')}
         data={roleOptions}
         value={selectedRoleIds}
         onChange={setSelectedRoleIds}
@@ -176,9 +261,9 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Role</Table.Th>
+              <Table.Th>{tSettings('permissionsRoleColumn')}</Table.Th>
               {visibleFeatures.map((feature) => (
-                <Table.Th key={feature.id}>{feature.name}</Table.Th>
+                <Table.Th key={feature.id}>{getFeatureLabel(feature)}</Table.Th>
               ))}
             </Table.Tr>
           </Table.Thead>
@@ -186,7 +271,7 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
             {visibleRoles.map((role) => (
               <Table.Tr key={role.id}>
                 <Table.Td>
-                  <Text fw={500}>{role.displayName}</Text>
+                  <Text fw={500}>{tCommon(`roleName.${role.name}` as any)}</Text>
                 </Table.Td>
                 {visibleFeatures.map((feature) => {
                   const key = `${role.id}-${feature.id}`;
@@ -200,9 +285,9 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
                           handlePermissionChange(role.id, feature.id, value as Permission)
                         }
                         data={[
-                          { value: 'none', label: 'None' },
-                          { value: 'view', label: 'View' },
-                          { value: 'edit', label: 'Edit' },
+                          { value: 'none', label: tSettings('permissionsOptionNone') },
+                          { value: 'view', label: tSettings('permissionsOptionView') },
+                          { value: 'edit', label: tSettings('permissionsOptionEdit') },
                         ]}
                         size="xs"
                         w={100}

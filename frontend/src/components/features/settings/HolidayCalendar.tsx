@@ -7,6 +7,7 @@ import type { PublicHoliday } from '@/types/settings';
 import { useForm } from '@mantine/form';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 export interface CreateHolidayValues {
   name: string;
@@ -25,17 +26,19 @@ interface HolidayCalendarProps {
 
 export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, onDelete, isCreating }: HolidayCalendarProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const form = useForm<CreateHolidayValues>({
     initialValues: { name: '', startDate: '', endDate: '' },
     validate: {
-      name: (v) => (v.trim().length === 0 ? 'Name is required' : null),
-      startDate: (v) => (!v ? 'Start date is required' : null),
+      name: (v) => (v.trim().length === 0 ? tSettings('scheduleHolidayNameRequired') : null),
+      startDate: (v) => (!v ? tSettings('scheduleHolidayStartDateRequired') : null),
       endDate: (v, values) => {
-        if (!v) return 'End date is required';
-        if (values.startDate && values.startDate > v) return 'End date must be on or after start date';
+        if (!v) return tSettings('scheduleHolidayEndDateRequired');
+        if (values.startDate && values.startDate > v) return tSettings('scheduleHolidayEndDateAfterStart');
         return null;
       },
     },
@@ -70,7 +73,7 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, 
   });
 
   const handleDelete = async (id: string, name: string) => {
-    const confirmed = window.confirm(`Delete holiday "${name}"?`);
+    const confirmed = window.confirm(tSettings('scheduleHolidayDeleteConfirm', { name }));
     if (!confirmed) return;
     await onDelete(id);
   };
@@ -79,23 +82,23 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, 
     <>
       <Group justify="flex-end" mb="md">
         <Button id="holiday-calendar-add" leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          Add holiday
+          {tSettings('scheduleHolidayAddButton')}
         </Button>
       </Group>
 
       <Paper withBorder p="md">
         {holidays.length === 0 ? (
-          <Alert title="No holidays yet">
-            <Text size="sm">Create holidays for the selected academic year.</Text>
+          <Alert title={tSettings('scheduleHolidayNoDataTitle')}>
+            <Text size="sm">{tSettings('scheduleHolidayNoDataText')}</Text>
           </Alert>
         ) : (
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Name</Table.Th>
-                <Table.Th>Start</Table.Th>
-                <Table.Th>End</Table.Th>
-                <Table.Th w={80}>Actions</Table.Th>
+                <Table.Th>{tCommon('name')}</Table.Th>
+                <Table.Th>{tSettings('scheduleHolidayColStart')}</Table.Th>
+                <Table.Th>{tSettings('scheduleHolidayColEnd')}</Table.Th>
+                <Table.Th w={80}>{tCommon('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -113,14 +116,14 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, 
                       </Menu.Target>
                       <Menu.Dropdown>
                         <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openEdit(h)}>
-                          Edit
+                          {tCommon('edit')}
                         </Menu.Item>
                         <Menu.Item
                           leftSection={<IconTrash size={14} />}
                           color={colors.error}
                           onClick={() => handleDelete(h.id, h.name)}
                         >
-                          Delete
+                          {tCommon('delete')}
                         </Menu.Item>
                       </Menu.Dropdown>
                     </Menu>
@@ -132,20 +135,40 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, 
         )}
       </Paper>
 
-      <Modal opened={opened} onClose={close} title={editingId ? 'Edit holiday' : 'Add holiday'} size="md">
+      <Modal
+        opened={opened}
+        onClose={close}
+        title={editingId ? tSettings('scheduleHolidayModalEdit') : tSettings('scheduleHolidayModalAdd')}
+        size="md"
+      >
         <form id="holiday-form" onSubmit={submit}>
           <Stack gap="md">
-            <TextInput id="holiday-form-name" label="Name" placeholder="National Day" {...form.getInputProps('name')} />
+            <TextInput
+              id="holiday-form-name"
+              label={tCommon('name')}
+              placeholder={tSettings('scheduleHolidayNamePlaceholder')}
+              {...form.getInputProps('name')}
+            />
             <Group grow>
-              <TextInput id="holiday-form-start" label="Start date" type="date" {...form.getInputProps('startDate')} />
-              <TextInput id="holiday-form-end" label="End date" type="date" {...form.getInputProps('endDate')} />
+              <TextInput
+                id="holiday-form-start"
+                label={tSettings('scheduleHolidayStartDateLabel')}
+                type="date"
+                {...form.getInputProps('startDate')}
+              />
+              <TextInput
+                id="holiday-form-end"
+                label={tSettings('scheduleHolidayEndDateLabel')}
+                type="date"
+                {...form.getInputProps('endDate')}
+              />
             </Group>
             <Group justify="flex-end" mt="md">
               <Button id="holiday-form-cancel" variant="light" onClick={close} disabled={isCreating}>
-                Cancel
+                {tCommon('cancel')}
               </Button>
               <Button id="holiday-form-submit" type="submit" loading={isCreating}>
-                Save
+                {tCommon('save')}
               </Button>
             </Group>
           </Stack>
@@ -154,5 +177,3 @@ export function HolidayCalendar({ holidays, academicYearId, onCreate, onUpdate, 
     </>
   );
 }
-
-

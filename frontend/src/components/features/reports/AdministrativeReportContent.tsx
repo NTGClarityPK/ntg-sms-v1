@@ -24,6 +24,7 @@ import {
   IconFileSpreadsheet,
   IconFolderOff,
 } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { useSubjects } from '@/hooks/useCoreLookups';
 import {
   useAttendanceSummary,
@@ -95,6 +96,7 @@ export function AdministrativeReportContent({
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
+  const t = useTranslations('reports');
 
   const { startDate, endDate } = useMemo(() => getPeriodDates(periodChip), [periodChip]);
 
@@ -193,10 +195,10 @@ export function AdministrativeReportContent({
     <Tabs value={activeTab} onChange={setActiveTab}>
       <Tabs.List>
         <Tabs.Tab value="attendance" leftSection={<IconCalendar size={16} />}>
-          Attendance
+          {t('adminAttendanceTab')}
         </Tabs.Tab>
         <Tabs.Tab value="academic" leftSection={<IconSchool size={16} />}>
-          Academic
+          {t('adminAcademicTab')}
         </Tabs.Tab>
       </Tabs.List>
 
@@ -207,13 +209,19 @@ export function AdministrativeReportContent({
               <Group justify="space-between" wrap="wrap" gap="sm" align="center">
                 <Group gap="xs" wrap="wrap" className="filter-chip-group">
                   <Text size="sm" fw={500}>
-                    Period:
+                    {t('adminPeriodLabel')}
                   </Text>
                   <Chip.Group value={periodChip} onChange={(v) => setPeriodChip(Array.isArray(v) ? v[0] ?? 'month' : (v ?? 'month'))}>
                     <Group gap="xs">
-                      <Chip value="week" variant="filled">Week</Chip>
-                      <Chip value="month" variant="filled">Month</Chip>
-                      <Chip value="year" variant="filled">Year</Chip>
+                      <Chip value="week" variant="filled">
+                        {t('adminChipWeek')}
+                      </Chip>
+                      <Chip value="month" variant="filled">
+                        {t('adminChipMonth')}
+                      </Chip>
+                      <Chip value="year" variant="filled">
+                        {t('adminChipYear')}
+                      </Chip>
                     </Group>
                   </Chip.Group>
                 </Group>
@@ -224,7 +232,7 @@ export function AdministrativeReportContent({
                       variant="light"
                       loading={exportLoading}
                     >
-                      Export
+                      {t('adminExport')}
                     </Button>
                   </Menu.Target>
                   <Menu.Dropdown>
@@ -232,45 +240,54 @@ export function AdministrativeReportContent({
                       leftSection={<IconFileTypePdf size={14} />}
                       onClick={() => handleAttendanceExport('pdf')}
                     >
-                      PDF
+                      {t('adminExportPdf')}
                     </Menu.Item>
                     <Menu.Item
                       leftSection={<IconFileSpreadsheet size={14} />}
                       onClick={() => handleAttendanceExport('excel')}
                     >
-                      Excel
+                      {t('adminExportExcel')}
                     </Menu.Item>
                     <Menu.Divider />
                     <Menu.Item
                       leftSection={<IconFolderOff size={14} />}
                       onClick={() => handleSaveAttendanceOffline('pdf')}
                     >
-                      Save PDF for offline
+                      {t('adminSavePdfOffline')}
                     </Menu.Item>
                     <Menu.Item
                       leftSection={<IconFolderOff size={14} />}
                       onClick={() => handleSaveAttendanceOffline('excel')}
                     >
-                      Save Excel for offline
+                      {t('adminSaveExcelOffline')}
                     </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
               </Group>
               <Group gap="xs" wrap="wrap" className="filter-chip-group">
                 <Text size="sm" fw={500}>
-                  Low attendance threshold:
+                  {t('adminLowThresholdLabel')}
                 </Text>
-                <Chip.Group value={thresholdChip} onChange={(v) => setThresholdChip(Array.isArray(v) ? v[0] ?? '80' : (v ?? '80'))}>
+                <Chip.Group
+                  value={thresholdChip}
+                  onChange={(v) => setThresholdChip(Array.isArray(v) ? v[0] ?? '80' : (v ?? '80'))}
+                >
                   <Group gap="xs">
-                    <Chip value="70" variant="filled">Below 70%</Chip>
-                    <Chip value="80" variant="filled">Below 80%</Chip>
-                    <Chip value="90" variant="filled">Below 90%</Chip>
+                    <Chip value="70" variant="filled">
+                      {t('adminChipBelowThreshold', { threshold: 70 })}
+                    </Chip>
+                    <Chip value="80" variant="filled">
+                      {t('adminChipBelowThreshold', { threshold: 80 })}
+                    </Chip>
+                    <Chip value="90" variant="filled">
+                      {t('adminChipBelowThreshold', { threshold: 90 })}
+                    </Chip>
                   </Group>
                 </Chip.Group>
               </Group>
               <Select
-                label="Class section (optional)"
-                placeholder="All classes"
+                label={t('adminClassSectionOptional')}
+                placeholder={t('adminAllClasses')}
                 data={classOptions}
                 value={classSectionId}
                 onChange={setClassSectionId}
@@ -287,20 +304,25 @@ export function AdministrativeReportContent({
             <Alert color="red">{String(summaryQuery.error?.message ?? 'Failed to load summary')}</Alert>
           ) : summaryQuery.data && !classSectionId ? (
             <Paper p="md" withBorder>
-              <Text fw={600} mb="sm">Branch summary</Text>
+              <Text fw={600} mb="sm">
+                {t('adminBranchSummaryTitle')}
+              </Text>
               <Text size="sm" c="dimmed">
-                {summaryQuery.data.startDate} to {summaryQuery.data.endDate} · Overall average:{' '}
-                {summaryQuery.data.overall.averageAttendance}% · Total students:{' '}
-                {summaryQuery.data.overall.totalStudents}
+                {t('adminBranchSummaryLine', {
+                  startDate: summaryQuery.data.startDate,
+                  endDate: summaryQuery.data.endDate,
+                  overallAverage: summaryQuery.data.overall.averageAttendance,
+                  totalStudents: summaryQuery.data.overall.totalStudents,
+                })}
               </Text>
               {summaryQuery.data.byClass.length > 0 && (
                 <Table mt="md" withTableBorder withColumnBorders>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Class</Table.Th>
-                      <Table.Th>Section</Table.Th>
-                      <Table.Th>Avg %</Table.Th>
-                      <Table.Th>Students</Table.Th>
+                      <Table.Th>{t('adminClassTableClass')}</Table.Th>
+                      <Table.Th>{t('adminClassTableSection')}</Table.Th>
+                      <Table.Th>{t('adminClassTableAvgPercent')}</Table.Th>
+                      <Table.Th>{t('adminClassTableStudents')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -351,19 +373,25 @@ export function AdministrativeReportContent({
           ) : null}
 
           <Paper p="md" withBorder>
-            <Text fw={600} mb="sm">Students below threshold</Text>
+            <Text fw={600} mb="sm">
+              {t('adminStudentsBelowThresholdTitle')}
+            </Text>
             {lowQuery.isLoading ? (
               <Skeleton height={120} />
             ) : lowQuery.data?.students.length === 0 ? (
-              <Text size="sm" c="dimmed">No students below {lowQuery.data?.threshold ?? 80}%.</Text>
+              <Text size="sm" c="dimmed">
+                {t('adminNoStudentsBelowThreshold', {
+                  threshold: lowQuery.data?.threshold ?? 80,
+                })}
+              </Text>
             ) : lowQuery.data?.students.length ? (
               <Table withTableBorder withColumnBorders>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Student</Table.Th>
-                    <Table.Th>Class</Table.Th>
-                    <Table.Th>%</Table.Th>
-                    <Table.Th>Present / Total</Table.Th>
+                      <Table.Th>{t('adminAttendanceTableStudent')}</Table.Th>
+                      <Table.Th>{t('adminClassTableClass')}</Table.Th>
+                      <Table.Th>{t('adminAttendanceTablePercent')}</Table.Th>
+                      <Table.Th>{t('adminPresentTotal')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -390,7 +418,7 @@ export function AdministrativeReportContent({
             <Stack gap="md">
               <Group justify="space-between" wrap="wrap" gap="sm">
                 <Text size="sm" fw={500}>
-                  Academic report
+                  {t('adminAcademicTitle')}
                 </Text>
                 <Menu shadow="md" width={160} disabled={exportLoading}>
                   <Menu.Target>
@@ -400,7 +428,7 @@ export function AdministrativeReportContent({
                       loading={exportLoading}
                       disabled={!classSectionId && !subjectId}
                     >
-                      Export
+                      {t('adminExport')}
                     </Button>
                   </Menu.Target>
                   <Menu.Dropdown>
@@ -409,14 +437,14 @@ export function AdministrativeReportContent({
                       onClick={() => handleAcademicExport('pdf')}
                       disabled={!classSectionId && !subjectId}
                     >
-                      PDF
+                      {t('adminExportPdf')}
                     </Menu.Item>
                     <Menu.Item
                       leftSection={<IconFileSpreadsheet size={14} />}
                       onClick={() => handleAcademicExport('excel')}
                       disabled={!classSectionId && !subjectId}
                     >
-                      Excel
+                      {t('adminExportExcel')}
                     </Menu.Item>
                     <Menu.Divider />
                     <Menu.Item
@@ -424,21 +452,21 @@ export function AdministrativeReportContent({
                       onClick={() => handleSaveAcademicOffline('pdf')}
                       disabled={!classSectionId && !subjectId}
                     >
-                      Save PDF for offline
+                      {t('adminSavePdfOffline')}
                     </Menu.Item>
                     <Menu.Item
                       leftSection={<IconFolderOff size={14} />}
                       onClick={() => handleSaveAcademicOffline('excel')}
                       disabled={!classSectionId && !subjectId}
                     >
-                      Save Excel for offline
+                      {t('adminSaveExcelOffline')}
                     </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
               </Group>
               <Select
-                label="Class section"
-                placeholder="Choose class"
+                label={t('adminClassSectionLabel')}
+                placeholder={t('adminClassSectionPlaceholder')}
                 data={classOptions}
                 value={classSectionId}
                 onChange={(v) => {
@@ -450,8 +478,8 @@ export function AdministrativeReportContent({
                 style={{ maxWidth: 320 }}
               />
               <Select
-                label="Subject"
-                placeholder="Choose subject"
+                label={t('adminSubjectLabel')}
+                placeholder={t('adminSubjectPlaceholder')}
                 data={subjectOptions}
                 value={subjectId}
                 onChange={(v) => {
@@ -478,9 +506,9 @@ export function AdministrativeReportContent({
                 <Table withTableBorder withColumnBorders>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Student</Table.Th>
-                      <Table.Th>Attendance %</Table.Th>
-                      <Table.Th>Average %</Table.Th>
+                      <Table.Th>{t('adminAcademicClassTableStudent')}</Table.Th>
+                      <Table.Th>{t('adminAcademicClassTableAttendancePercent')}</Table.Th>
+                      <Table.Th>{t('adminAcademicClassTableAveragePercent')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -508,10 +536,10 @@ export function AdministrativeReportContent({
                 <Table withTableBorder withColumnBorders>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Class</Table.Th>
-                      <Table.Th>Section</Table.Th>
-                      <Table.Th>Avg %</Table.Th>
-                      <Table.Th>Students</Table.Th>
+                      <Table.Th>{t('adminClassTableClass')}</Table.Th>
+                      <Table.Th>{t('adminClassTableSection')}</Table.Th>
+                      <Table.Th>{t('adminClassTableAvgPercent')}</Table.Th>
+                      <Table.Th>{t('adminClassTableStudents')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -530,7 +558,9 @@ export function AdministrativeReportContent({
           )}
 
           {!classSectionId && !subjectId && (
-            <Text size="sm" c="dimmed">Select a class section or subject to view the report.</Text>
+            <Text size="sm" c="dimmed">
+              {t('adminSelectClassOrSubjectHint')}
+            </Text>
           )}
         </Stack>
       </Tabs.Panel>

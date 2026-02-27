@@ -2,6 +2,7 @@
 
 import { Badge, Group, Paper, Select, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import type { Feature, Role, PermissionMatrix, Permission } from '@/types/permissions';
 
 const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
@@ -16,6 +17,9 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [accessFilter, setAccessFilter] = useState<Permission | 'all'>('all');
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
+  const tNav = useTranslations('navigation');
 
   const matrixRoles = useMemo(
     () => roles.filter((r) => r.name !== SCHOOL_ADMIN_ROLE_NAME),
@@ -24,7 +28,7 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
 
   const roleOptions = matrixRoles.map((r) => ({
     value: r.id,
-    label: r.displayName,
+    label: tCommon(`roleName.${r.name}` as any),
   }));
 
   const rolePermissionMap = useMemo(() => {
@@ -37,9 +41,82 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
   }, [permissions, selectedRoleId]);
 
   const filteredRows = useMemo(() => {
+    const getFeatureLabel = (feature: Feature): string => {
+      switch (feature.code) {
+        // Core navigation features
+        case 'dashboard':
+          return tNav('dashboard');
+        case 'students':
+          return tNav('students');
+        case 'user_management':
+          return tNav('users');
+        case 'class_sections':
+          return tNav('classSections');
+        case 'teacher_mapping':
+          return tNav('teacherMapping');
+        case 'parent_associations':
+          return tNav('parentAssociations');
+
+        // Timetable / schedule
+        case 'timetable_management':
+        case 'timetable':
+          return tNav('timetable');
+        case 'timetable_personal':
+        case 'my_timetable':
+          return tNav('myTimetable');
+        case 'my_schedule':
+          return tNav('mySchedule');
+
+        // Attendance / behavioural / assessment
+        case 'attendance':
+          return tNav('attendance');
+        case 'behavioral':
+          return tNav('behavioral');
+        case 'assessment':
+          return tNav('assessments');
+        case 'my_assessments':
+          return tNav('myAssessments');
+
+        // Leaves / early departure
+        case 'leaves':
+          return tNav('leaves');
+        case 'early_departure':
+          return tNav('earlyDeparture');
+
+        // Communication (notifications + messages)
+        case 'communication':
+          return tNav('messages');
+
+        // Events
+        case 'events_management':
+        case 'events':
+          return tNav('events');
+        case 'events_personal':
+        case 'my_events':
+          return tNav('myEvents');
+
+        // Reports / settings
+        case 'reports':
+          return tNav('reports');
+        case 'settings':
+          return tNav('settings');
+
+        // Library / inventory / staff
+        case 'library':
+          return tNav('library');
+        case 'inventory':
+          return tNav('inventory');
+        case 'staff':
+          return tNav('users');
+
+        default:
+          return feature.name;
+      }
+    };
+
     let rows = features.map((feature) => ({
       featureId: feature.id,
-      featureName: feature.name,
+      featureName: getFeatureLabel(feature),
       permission: rolePermissionMap.get(feature.id) || 'none',
     }));
 
@@ -75,8 +152,8 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
     <Stack gap="md">
       <Group grow align="flex-end">
         <Select
-          label="Role"
-          placeholder="Select a role"
+          label={tSettings('roleFilterLabel')}
+          placeholder={tSettings('roleFilterPlaceholder')}
           data={roleOptions}
           value={selectedRoleId}
           onChange={setSelectedRoleId}
@@ -84,18 +161,18 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
           clearable
         />
         <TextInput
-          label="Search tabs"
-          placeholder="Search by tab name"
+          label={tSettings('roleSearchTabsLabel')}
+          placeholder={tSettings('roleSearchTabsPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
         />
         <Select
-          label="Access filter"
+          label={tSettings('roleAccessFilterLabel')}
           data={[
-            { value: 'all', label: 'All' },
-            { value: 'none', label: 'None' },
-            { value: 'view', label: 'View' },
-            { value: 'edit', label: 'Edit' },
+            { value: 'all', label: tSettings('roleAccessFilterAll') },
+            { value: 'none', label: tSettings('roleAccessFilterNone') },
+            { value: 'view', label: tSettings('roleAccessFilterView') },
+            { value: 'edit', label: tSettings('roleAccessFilterEdit') },
           ]}
           value={accessFilter}
           onChange={(value) => setAccessFilter((value as Permission | 'all') || 'all')}
@@ -106,17 +183,17 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
         <>
           <Paper withBorder p="sm">
             <Group gap="md">
-              <Text size="sm">Edit: {counts.edit}</Text>
-              <Text size="sm">View: {counts.view}</Text>
-              <Text size="sm">None: {counts.none}</Text>
+              <Text size="sm">{tSettings('roleAccessCountEdit', { count: counts.edit })}</Text>
+              <Text size="sm">{tSettings('roleAccessCountView', { count: counts.view })}</Text>
+              <Text size="sm">{tSettings('roleAccessCountNone', { count: counts.none })}</Text>
             </Group>
           </Paper>
 
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Tab</Table.Th>
-                <Table.Th>Assigned Access</Table.Th>
+                <Table.Th>{tSettings('roleAccessTabColumn')}</Table.Th>
+                <Table.Th>{tSettings('roleAccessAssignedAccessColumn')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -126,10 +203,10 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
                   <Table.Td>
                     <Badge variant="light" color={getBadgeColor(row.permission)}>
                       {row.permission === 'edit'
-                        ? 'Edit'
+                        ? tSettings('permissionsOptionEdit')
                         : row.permission === 'view'
-                          ? 'View'
-                          : 'None'}
+                          ? tSettings('permissionsOptionView')
+                          : tSettings('permissionsOptionNone')}
                     </Badge>
                   </Table.Td>
                 </Table.Tr>
@@ -140,7 +217,7 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
       ) : (
         <Paper withBorder p="md">
           <Text size="sm" c="dimmed">
-            Select a role to see all assigned access levels.
+            {tSettings('roleAccessEmptyState')}
           </Text>
         </Paper>
       )}

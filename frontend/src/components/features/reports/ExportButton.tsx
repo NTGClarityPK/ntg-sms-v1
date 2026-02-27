@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button, Group, Menu, Text } from '@mantine/core';
 import { IconFileExport, IconFileTypePdf, IconFileSpreadsheet } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 
 export type ExportVariant = 'student' | 'class';
@@ -41,6 +42,7 @@ export function ExportButton({
 }: ExportButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useTranslations('reports');
 
   const buildUrl = (path: string): string => {
     const base = path.startsWith('/') ? path : `/${path}`;
@@ -69,19 +71,19 @@ export function ExportButton({
         triggerDownload(blob, `class-report-${classSectionId}.xlsx`);
       }
     } catch {
-      setError('Export failed. Please try again.');
+      setError(t('exportFailed'));
     } finally {
       setLoading(false);
     }
   };
 
   const studentOptions = [
-    { format: 'pdf' as const, label: 'PDF', icon: IconFileTypePdf },
-    { format: 'excel' as const, label: 'Excel', icon: IconFileSpreadsheet },
+    { format: 'pdf' as const, label: t('adminExportPdf'), icon: IconFileTypePdf },
+    { format: 'excel' as const, label: t('adminExportExcel'), icon: IconFileSpreadsheet },
   ];
 
   const classOptions = [
-    { format: 'excel' as const, label: 'Excel', icon: IconFileSpreadsheet },
+    { format: 'excel' as const, label: t('adminExportExcel'), icon: IconFileSpreadsheet },
   ];
 
   const options = variant === 'student' ? studentOptions : classOptions;
@@ -98,7 +100,7 @@ export function ExportButton({
             loading={loading}
             disabled={!canExport}
           >
-            Export
+            {t('adminExport')}
           </Button>
         </Menu.Target>
         <Menu.Dropdown>

@@ -4,6 +4,7 @@ import { Button, Group, Modal, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useNotificationColors } from '@/lib/hooks/use-theme-colors';
+import { useTranslations } from 'next-intl';
 
 export interface AcademicYearFormValues {
   name: string;
@@ -20,6 +21,8 @@ interface AcademicYearFormProps {
 
 export function AcademicYearForm({ opened, onClose, onSubmit, isSubmitting }: AcademicYearFormProps) {
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
 
   const form = useForm<AcademicYearFormValues>({
     initialValues: {
@@ -28,11 +31,13 @@ export function AcademicYearForm({ opened, onClose, onSubmit, isSubmitting }: Ac
       endDate: '',
     },
     validate: {
-      name: (value) => (value.trim().length === 0 ? 'Name is required' : null),
-      startDate: (value) => (!value ? 'Start date is required' : null),
+      name: (value) => (value.trim().length === 0 ? tSettings('academicYearNameRequired') : null),
+      startDate: (value) => (!value ? tSettings('academicYearStartDateRequired') : null),
       endDate: (value, values) => {
-        if (!value) return 'End date is required';
-        if (values.startDate && value && values.startDate >= value) return 'End date must be after start date';
+        if (!value) return tSettings('academicYearEndDateRequired');
+        if (values.startDate && value && values.startDate >= value) {
+          return tSettings('academicYearEndDateAfterStart');
+        }
         return null;
       },
     },
@@ -49,14 +54,14 @@ export function AcademicYearForm({ opened, onClose, onSubmit, isSubmitting }: Ac
       form.reset();
       onClose();
       notifications.show({
-        title: 'Success',
-        message: 'Academic year created',
+        title: tCommon('success'),
+        message: tSettings('academicYearCreated'),
         color: notifyColors.success,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
       notifications.show({
-        title: 'Error',
+        title: tCommon('error'),
         message,
         color: notifyColors.error,
       });
@@ -64,20 +69,35 @@ export function AcademicYearForm({ opened, onClose, onSubmit, isSubmitting }: Ac
   });
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Create academic year" size="md">
+    <Modal opened={opened} onClose={onClose} title={tSettings('academicYearFormTitle')} size="md">
       <form id="academic-year-form" onSubmit={handleSubmit}>
         <Stack gap="md">
-          <TextInput id="academic-year-form-name" label="Name" placeholder="2025-2026" {...form.getInputProps('name')} />
-          <TextInput id="academic-year-form-start-date" label="Start date" type="date" {...form.getInputProps('startDate')} />
-          <TextInput id="academic-year-form-end-date" label="End date" type="date" {...form.getInputProps('endDate')} />
+          <TextInput
+            id="academic-year-form-name"
+            label={tCommon('name')}
+            placeholder={tSettings('academicYearNamePlaceholder')}
+            {...form.getInputProps('name')}
+          />
+          <TextInput
+            id="academic-year-form-start-date"
+            label={tSettings('academicYearStartDateLabel')}
+            type="date"
+            {...form.getInputProps('startDate')}
+          />
+          <TextInput
+            id="academic-year-form-end-date"
+            label={tSettings('academicYearEndDateLabel')}
+            type="date"
+            {...form.getInputProps('endDate')}
+          />
         </Stack>
 
         <Group justify="flex-end" mt="md">
           <Button id="academic-year-form-cancel" variant="light" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button id="academic-year-form-submit" type="submit" loading={isSubmitting}>
-            Save
+            {tCommon('save')}
           </Button>
         </Group>
       </form>

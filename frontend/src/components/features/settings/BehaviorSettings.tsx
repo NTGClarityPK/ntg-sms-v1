@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
+import { useTranslations } from 'next-intl';
 
 interface BehavioralAssessmentValue {
   enabled: boolean;
@@ -21,6 +22,8 @@ const DEFAULT_VALUE: BehavioralAssessmentValue = {
 export function BehaviorSettings() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
 
   const settingQuery = useSystemSetting<BehavioralAssessmentValue>('behavioral_assessment');
   const updateMutation = useUpdateSystemSetting<BehavioralAssessmentValue>('behavioral_assessment');
@@ -30,7 +33,6 @@ export function BehaviorSettings() {
 
   useEffect(() => {
     const remote = settingQuery.data?.data?.value;
-    // Initialize from backend once when we don't yet have a local value
     if (!value && remote && typeof remote === 'object') {
       setValue({
         enabled: remote.enabled ?? DEFAULT_VALUE.enabled,
@@ -39,8 +41,6 @@ export function BehaviorSettings() {
       });
       return;
     }
-
-    // If no remote setting exists at all, initialize once with defaults
     if (!value && !remote) {
       setValue(DEFAULT_VALUE);
     }
@@ -74,17 +74,17 @@ export function BehaviorSettings() {
     if (!value) return;
     try {
       await updateMutation.mutateAsync({ ...value, attributes: attrs });
-      notifications.show({ title: 'Success', message: 'Behavior settings saved', color: notifyColors.success });
+      notifications.show({ title: tCommon('success'), message: tSettings('behaviorSaved'), color: notifyColors.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
   if (settingQuery.error) {
     return (
-      <Alert color={colors.error} title="Failed to load settings">
-        <Text size="sm">Please try again.</Text>
+      <Alert color={colors.error} title={tSettings('behaviorLoadError')}>
+        <Text size="sm">{tSettings('genericPleaseTryAgain')}</Text>
       </Alert>
     );
   }
@@ -93,9 +93,7 @@ export function BehaviorSettings() {
     return (
       <Paper withBorder p="md">
         <Group justify="center" py="md">
-          <Text size="sm" c="dimmed">
-            Loading behavior settings...
-          </Text>
+          <Text size="sm" c="dimmed">{tSettings('behaviorLoading')}</Text>
         </Group>
       </Paper>
     );
@@ -104,24 +102,23 @@ export function BehaviorSettings() {
   return (
     <Paper withBorder p="md">
       <Stack gap="md">
-        <Text fw={600}>Behavioral assessment</Text>
+        <Text fw={600}>{tSettings('behaviorTitle')}</Text>
 
         <Switch
           id="behavior-settings-enabled"
-          label="Enable behavioral assessment"
+          label={tSettings('behaviorEnableSwitch')}
           checked={value.enabled}
           onChange={() =>
             setValue((prev) => ({
               ...(prev ?? DEFAULT_VALUE),
               enabled: !(prev ?? DEFAULT_VALUE).enabled,
-              // When disabling, keep other fields but they will be ignored by UI
             }))
           }
         />
 
         <Checkbox
           id="behavior-settings-mandatory"
-          label="Mandatory"
+          label={tSettings('behaviorMandatory')}
           checked={value.mandatory}
           disabled={!value.enabled}
           onChange={() =>
@@ -135,28 +132,31 @@ export function BehaviorSettings() {
         <Group align="flex-end">
           <TextInput
             id="behavior-settings-attribute-input"
-            label="Add attribute"
-            placeholder="Discipline"
+            label={tSettings('behaviorAddAttributeLabel')}
+            placeholder={tSettings('behaviorAddAttributePlaceholder')}
             value={newAttr}
             onChange={(e) => setNewAttr(e.currentTarget.value)}
             disabled={!value.enabled}
           />
           <Button id="behavior-settings-add-attribute" variant="light" onClick={addAttr} disabled={!value.enabled}>
-            Add
+            {tCommon('add')}
           </Button>
         </Group>
 
         <Stack gap="xs">
           {attrs.length === 0 ? (
-            <Text c="dimmed" size="sm">
-              No attributes yet.
-            </Text>
+            <Text c="dimmed" size="sm">{tSettings('behaviorNoAttributes')}</Text>
           ) : (
             attrs.map((a) => (
               <Group key={a} justify="space-between">
                 <Text size="sm">{a}</Text>
-                <Button id={`behavior-settings-remove-${a.replace(/\s+/g, '-').toLowerCase()}`} variant="light" onClick={() => removeAttr(a)} disabled={!value.enabled}>
-                  Remove
+                <Button
+                  id={`behavior-settings-remove-${a.replace(/\s+/g, '-').toLowerCase()}`}
+                  variant="light"
+                  onClick={() => removeAttr(a)}
+                  disabled={!value.enabled}
+                >
+                  {tCommon('remove')}
                 </Button>
               </Group>
             ))
@@ -165,12 +165,10 @@ export function BehaviorSettings() {
 
         <Group justify="flex-end">
           <Button id="behavior-settings-save" variant="light" onClick={onSave} loading={updateMutation.isPending || settingQuery.isLoading}>
-            Save
+            {tCommon('save')}
           </Button>
         </Group>
       </Stack>
     </Paper>
   );
 }
-
-

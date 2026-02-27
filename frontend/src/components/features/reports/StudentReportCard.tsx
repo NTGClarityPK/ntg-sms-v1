@@ -6,6 +6,7 @@ import { AttendanceSection } from './AttendanceSection';
 import { BehavioralSectionReport } from './BehavioralSection';
 import { AssignmentStatisticsSection } from './AssignmentStatisticsSection';
 import { AssignmentEngagementSection } from './AssignmentEngagementSection';
+import { useTranslations } from 'next-intl';
 import type { StudentReport as StudentReportType } from '@/types/reports';
 
 interface StudentReportCardProps {
@@ -14,6 +15,7 @@ interface StudentReportCardProps {
 }
 
 export function StudentReportCard({ report, isLoading }: StudentReportCardProps) {
+  const t = useTranslations('reports');
   if (isLoading) {
     return (
       <Stack gap="md">
@@ -25,7 +27,7 @@ export function StudentReportCard({ report, isLoading }: StudentReportCardProps)
 
   if (!report) {
     return (
-      <Text c="dimmed">No report data available.</Text>
+      <Text c="dimmed">{t('studentNoReportData')}</Text>
     );
   }
 

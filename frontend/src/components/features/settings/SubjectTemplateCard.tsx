@@ -7,6 +7,7 @@ import { useClasses } from '@/hooks/useCoreLookups';
 import { useLevels } from '@/hooks/useCoreLookups';
 import type { SubjectTemplate } from '@/types/subject-templates';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTranslations } from 'next-intl';
 
 interface SubjectTemplateCardProps {
   template: SubjectTemplate;
@@ -22,6 +23,7 @@ export function SubjectTemplateCard({
   isDeleting,
 }: SubjectTemplateCardProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
   const subjectsQuery = useSubjects();
   const classesQuery = useClasses();
   const levelsQuery = useLevels();
@@ -66,7 +68,7 @@ export function SubjectTemplateCard({
               leftSection={<IconEdit size={16} />}
               onClick={() => onEdit(template)}
             >
-              Edit
+              {tSettings('subjectTemplateEditButton')}
             </Button>
             <Button
               id={`subject-template-card-${template.id}-delete`}
@@ -77,7 +79,7 @@ export function SubjectTemplateCard({
               onClick={() => onDelete(template)}
               loading={isDeleting}
             >
-              Delete
+              {tSettings('subjectTemplateDeleteButton')}
             </Button>
           </Group>
         </Group>
@@ -85,7 +87,7 @@ export function SubjectTemplateCard({
         {subjectNames.length > 0 && (
           <Stack gap={4}>
             <Text size="sm" fw={500}>
-              Subjects ({subjectNames.length}):
+              {tSettings('subjectTemplateSubjectsLabel', { count: subjectNames.length })}
             </Text>
             <Group gap="xs">
               {subjectNames.map((name) => (
@@ -100,12 +102,12 @@ export function SubjectTemplateCard({
         {(classNames.length > 0 || levelNames.length > 0) && (
           <Stack gap={4}>
             <Text size="sm" fw={500}>
-              Assigned to:
+              {tSettings('subjectTemplateAssignedTo')}
             </Text>
             {classNames.length > 0 && (
               <Group gap="xs">
                 <Text size="xs" c="dimmed">
-                  Classes:
+                  {tSettings('subjectTemplateAssignedClasses')}
                 </Text>
                 {classNames.map((name) => (
                   <Badge key={name} variant="light" color="blue" size="sm">
@@ -117,7 +119,7 @@ export function SubjectTemplateCard({
             {levelNames.length > 0 && (
               <Group gap="xs">
                 <Text size="xs" c="dimmed">
-                  Levels:
+                  {tSettings('subjectTemplateAssignedLevels')}
                 </Text>
                 {levelNames.map((name) => (
                   <Badge key={name} variant="light" color="green" size="sm">
@@ -132,4 +134,3 @@ export function SubjectTemplateCard({
     </Card>
   );
 }
-
