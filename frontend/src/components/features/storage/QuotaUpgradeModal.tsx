@@ -1,6 +1,7 @@
 'use client';
 
 import { Modal, Text, Button, Stack } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 
 interface QuotaUpgradeModalProps {
   opened: boolean;
@@ -8,15 +9,16 @@ interface QuotaUpgradeModalProps {
 }
 
 export function QuotaUpgradeModal({ opened, onClose }: QuotaUpgradeModalProps) {
+  const t = useTranslations('storage');
+
   return (
-    <Modal opened={opened} onClose={onClose} title="Request more storage" size="sm">
+    <Modal opened={opened} onClose={onClose} title={t('quotaModalTitle')} size="sm">
       <Stack gap="md">
         <Text size="sm" c="dimmed">
-          To request additional storage for your branch, please contact your system administrator or
-          support. Include your branch name and the amount of storage you need.
+          {t('quotaModalDescription')}
         </Text>
         <Button variant="light" onClick={onClose}>
-          Close
+          {t('quotaModalCloseButton')}
         </Button>
       </Stack>
     </Modal>

@@ -102,7 +102,7 @@ export default function UsersPage() {
   const { data: rolesData } = useRoles();
   const roles = rolesData?.data || [];
   const staffRoles = useMemo(
-    () => roles.filter((role) => role.name !== 'student'),
+    () => roles.filter((role) => role.name !== 'student' && role.name !== 'super_admin'),
     [roles],
   );
 

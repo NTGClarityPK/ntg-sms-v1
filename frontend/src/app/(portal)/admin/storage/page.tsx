@@ -8,12 +8,14 @@ import {
   IconFile,
   IconAlertTriangle,
 } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { StorageOverview } from '@/components/features/storage/StorageOverview';
 import { CategoryBreakdown } from '@/components/features/storage/CategoryBreakdown';
 import { LargestFiles } from '@/components/features/storage/LargestFiles';
 import { StorageAlerts } from '@/components/features/storage/StorageAlerts';
 
 export default function StoragePage() {
+  const t = useTranslations('storage');
   const [activeTab, setActiveTab] = useState<string | null>('overview');
   const [categoryChip, setCategoryChip] = useState<string>('all');
   const [sourceChip, setSourceChip] = useState<string>('all');
@@ -22,7 +24,7 @@ export default function StoragePage() {
   return (
     <>
       <div className="page-title-bar">
-        <Title order={1}>Storage</Title>
+        <Title order={1}>{t('pageTitle')}</Title>
         <Group />
       </div>
       <div
@@ -37,16 +39,16 @@ export default function StoragePage() {
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="overview" leftSection={<IconDatabase size={16} />}>
-              Overview
+              {t('tabOverview')}
             </Tabs.Tab>
             <Tabs.Tab value="breakdown" leftSection={<IconChartPie size={16} />}>
-              Breakdown
+              {t('tabBreakdown')}
             </Tabs.Tab>
             <Tabs.Tab value="files" leftSection={<IconFile size={16} />}>
-              Largest files
+              {t('tabLargestFiles')}
             </Tabs.Tab>
             <Tabs.Tab value="alerts" leftSection={<IconAlertTriangle size={16} />}>
-              Alerts
+              {t('tabAlerts')}
             </Tabs.Tab>
           </Tabs.List>
 

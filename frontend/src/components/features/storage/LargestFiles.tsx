@@ -14,8 +14,10 @@ import {
 } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
 import { useStorageFiles, useDeleteStorageFile } from '@/hooks/useStorage';
+import { useTranslations } from 'next-intl';
 
 const SOURCE_CHIPS = ['all', 'library', 'assessment', 'uniform'] as const;
+type SourceChip = typeof SOURCE_CHIPS[number];
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
@@ -30,10 +32,21 @@ interface LargestFilesProps {
 }
 
 export function LargestFiles({ sourceChip, onSourceChipChange }: LargestFilesProps) {
+  const t = useTranslations('storage');
   const source =
     sourceChip === 'all' ? undefined : (sourceChip as 'library' | 'assessment' | 'uniform');
   const { data: files, isLoading, error } = useStorageFiles({ limit: 50, source });
   const deleteFile = useDeleteStorageFile();
+
+  const getSourceLabel = (c: SourceChip): string => {
+    const map: Record<SourceChip, string> = {
+      all: t('sourceAll'),
+      library: t('sourceLibrary'),
+      assessment: t('sourceAssessment'),
+      uniform: t('sourceUniform'),
+    };
+    return map[c];
+  };
 
   if (isLoading || !files) {
     return (
@@ -45,8 +58,8 @@ export function LargestFiles({ sourceChip, onSourceChipChange }: LargestFilesPro
 
   if (error) {
     return (
-      <Alert color="red" title="Error">
-        {error instanceof Error ? error.message : 'Failed to load files'}
+      <Alert color="red" title={t('largestFilesLoadError')}>
+        {error instanceof Error ? error.message : t('largestFilesLoadError')}
       </Alert>
     );
   }
@@ -55,9 +68,7 @@ export function LargestFiles({ sourceChip, onSourceChipChange }: LargestFilesPro
     <Stack gap="md">
       <Paper p="md" withBorder>
         <Group gap="xs" wrap="wrap">
-          <Text size="sm" fw={500}>
-            Source:
-          </Text>
+          <Text size="sm" fw={500}>{t('sourceFilterLabel')}</Text>
           <Chip.Group
             value={sourceChip}
             onChange={(v) => onSourceChipChange(Array.isArray(v) ? v[0] ?? 'all' : v ?? 'all')}
@@ -65,7 +76,7 @@ export function LargestFiles({ sourceChip, onSourceChipChange }: LargestFilesPro
             <Group gap="xs">
               {SOURCE_CHIPS.map((c) => (
                 <Chip key={c} value={c} variant="filled">
-                  {c === 'all' ? 'All' : c.charAt(0).toUpperCase() + c.slice(1)}
+                  {getSourceLabel(c)}
                 </Chip>
               ))}
             </Group>
@@ -74,21 +85,17 @@ export function LargestFiles({ sourceChip, onSourceChipChange }: LargestFilesPro
       </Paper>
 
       <Paper p="md" withBorder>
-        <Text fw={600} mb="sm">
-          Largest files
-        </Text>
+        <Text fw={600} mb="sm">{t('largestFilesTitle')}</Text>
         {files.length === 0 ? (
-          <Text size="sm" c="dimmed">
-            No files found.
-          </Text>
+          <Text size="sm" c="dimmed">{t('largestFilesNoData')}</Text>
         ) : (
           <Table withTableBorder withColumnBorders>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>File name</Table.Th>
-                <Table.Th>Source</Table.Th>
-                <Table.Th>Size</Table.Th>
-                <Table.Th>Actions</Table.Th>
+                <Table.Th>{t('largestFilesColName')}</Table.Th>
+                <Table.Th>{t('largestFilesColSource')}</Table.Th>
+                <Table.Th>{t('largestFilesColSize')}</Table.Th>
+                <Table.Th>{t('largestFilesColActions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -113,12 +120,12 @@ export function LargestFiles({ sourceChip, onSourceChipChange }: LargestFilesPro
                           color="red"
                           leftSection={<IconTrash size={14} />}
                           onClick={() => {
-                            if (confirm('Delete this file? This cannot be undone.')) {
+                            if (confirm(t('deleteFileConfirm'))) {
                               deleteFile.mutate({ id: f.id, source: f.source });
                             }
                           }}
                         >
-                          Delete file
+                          {t('deleteFileMenuItem')}
                         </Menu.Item>
                       </Menu.Dropdown>
                     </Menu>

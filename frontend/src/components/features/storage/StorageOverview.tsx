@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { Progress, Text, Group, Paper, Stack, Skeleton, Alert, Button, Chip } from '@mantine/core';
 import { useStorageOverview } from '@/hooks/useStorage';
 import { IconAlertTriangle, IconCloudUpload } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import { QuotaUpgradeModal } from './QuotaUpgradeModal';
 
 type StorageUnit = 'mb' | 'gb';
 
 export function StorageOverview() {
+  const t = useTranslations('storage');
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [unit, setUnit] = useState<StorageUnit>('mb');
   const { data, isLoading, error } = useStorageOverview();
@@ -27,8 +29,8 @@ export function StorageOverview() {
 
   if (error) {
     return (
-      <Alert color="red" title="Error">
-        {error instanceof Error ? error.message : 'Failed to load storage overview'}
+      <Alert color="red" title={t('overviewLoadError')}>
+        {error instanceof Error ? error.message : t('overviewLoadError')}
       </Alert>
     );
   }
@@ -56,18 +58,14 @@ export function StorageOverview() {
         <Stack gap="md">
           <Group justify="space-between" wrap="wrap">
             <Group gap="md">
-              <Text fw={600}>Branch storage</Text>
+              <Text fw={600}>{t('branchStorage')}</Text>
               <Chip.Group
                 value={unit}
                 onChange={(v) => setUnit((Array.isArray(v) ? v[0] : v) as StorageUnit ?? 'mb')}
               >
                 <Group gap="xs">
-                  <Chip value="mb" variant="filled" size="xs">
-                    MB
-                  </Chip>
-                  <Chip value="gb" variant="filled" size="xs">
-                    GB
-                  </Chip>
+                  <Chip value="mb" variant="filled" size="xs">MB</Chip>
+                  <Chip value="gb" variant="filled" size="xs">GB</Chip>
                 </Group>
               </Chip.Group>
             </Group>
@@ -78,11 +76,9 @@ export function StorageOverview() {
                 leftSection={<IconCloudUpload size={14} />}
                 onClick={() => setUpgradeModalOpen(true)}
               >
-                Request more storage
+                {t('requestMoreStorage')}
               </Button>
-              <Text size="sm" c="dimmed">
-                {formatUsage()}
-              </Text>
+              <Text size="sm" c="dimmed">{formatUsage()}</Text>
             </Group>
           </Group>
           <Progress value={data.usedPercentage} color={getColor()} size="lg" radius="xl" />
@@ -90,8 +86,8 @@ export function StorageOverview() {
             <Alert color={data.usedPercentage >= 95 ? 'red' : 'yellow'} icon={<IconAlertTriangle size={16} />}>
               <Text size="sm">
                 {data.usedPercentage >= 95
-                  ? 'Storage quota critical. New uploads may be blocked.'
-                  : 'Storage quota warning. Consider freeing space or requesting more.'}
+                  ? t('quotaCriticalMessage')
+                  : t('quotaWarningMessage')}
               </Text>
             </Alert>
           )}

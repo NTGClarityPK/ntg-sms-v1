@@ -3,8 +3,10 @@
 import { Paper, Table, Text, Group, Chip, Stack, Skeleton, Alert, Button } from '@mantine/core';
 import { useStorageBreakdown, useRefreshStorageBreakdown } from '@/hooks/useStorage';
 import { IconRefresh } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 
 const CATEGORY_CHIPS = ['all', 'library', 'images', 'pdfs', 'attachments', 'other'] as const;
+type CategoryChip = typeof CATEGORY_CHIPS[number];
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
@@ -19,8 +21,21 @@ interface CategoryBreakdownProps {
 }
 
 export function CategoryBreakdown({ categoryChip, onCategoryChipChange }: CategoryBreakdownProps) {
+  const t = useTranslations('storage');
   const { data, isLoading, error } = useStorageBreakdown();
   const refreshMutation = useRefreshStorageBreakdown();
+
+  const getCategoryLabel = (c: CategoryChip): string => {
+    const map: Record<CategoryChip, string> = {
+      all: t('categoryAll'),
+      library: t('categoryLibrary'),
+      images: t('categoryImages'),
+      pdfs: t('categoryPdfs'),
+      attachments: t('categoryAttachments'),
+      other: t('categoryOther'),
+    };
+    return map[c];
+  };
 
   if (isLoading || !data) {
     return (
@@ -35,8 +50,8 @@ export function CategoryBreakdown({ categoryChip, onCategoryChipChange }: Catego
 
   if (error) {
     return (
-      <Alert color="red" title="Error">
-        {error instanceof Error ? error.message : 'Failed to load breakdown'}
+      <Alert color="red" title={t('breakdownLoadError')}>
+        {error instanceof Error ? error.message : t('breakdownLoadError')}
       </Alert>
     );
   }
@@ -52,9 +67,7 @@ export function CategoryBreakdown({ categoryChip, onCategoryChipChange }: Catego
         <Stack gap="md">
           <Group justify="space-between" wrap="wrap">
             <Group gap="xs" wrap="wrap">
-              <Text size="sm" fw={500}>
-                Category:
-              </Text>
+              <Text size="sm" fw={500}>{t('categoryFilterLabel')}</Text>
               <Chip.Group
                 value={categoryChip}
                 onChange={(v) => onCategoryChipChange(Array.isArray(v) ? v[0] ?? 'all' : v ?? 'all')}
@@ -62,7 +75,7 @@ export function CategoryBreakdown({ categoryChip, onCategoryChipChange }: Catego
                 <Group gap="xs">
                   {CATEGORY_CHIPS.map((c) => (
                     <Chip key={c} value={c} variant="filled">
-                      {c === 'all' ? 'All' : c.charAt(0).toUpperCase() + c.slice(1)}
+                      {getCategoryLabel(c)}
                     </Chip>
                   ))}
                 </Group>
@@ -75,28 +88,23 @@ export function CategoryBreakdown({ categoryChip, onCategoryChipChange }: Catego
               loading={refreshMutation.isPending}
               onClick={() => refreshMutation.mutate()}
             >
-              Refresh breakdown
+              {t('refreshBreakdownButton')}
             </Button>
           </Group>
         </Stack>
       </Paper>
 
       <Paper p="md" withBorder>
-        <Text fw={600} mb="sm">
-          Usage by category
-        </Text>
+        <Text fw={600} mb="sm">{t('usageByCategoryTitle')}</Text>
         {filtered.length === 0 ? (
-          <Text size="sm" c="dimmed">
-            No data for this category. Click &quot;Refresh breakdown&quot; to recalculate from library and
-            attachments.
-          </Text>
+          <Text size="sm" c="dimmed">{t('breakdownNoData')}</Text>
         ) : (
           <Table withTableBorder withColumnBorders>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Category</Table.Th>
-                <Table.Th>Size</Table.Th>
-                <Table.Th>File count</Table.Th>
+                <Table.Th>{t('breakdownColCategory')}</Table.Th>
+                <Table.Th>{t('breakdownColSize')}</Table.Th>
+                <Table.Th>{t('breakdownColFileCount')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -112,7 +120,7 @@ export function CategoryBreakdown({ categoryChip, onCategoryChipChange }: Catego
         )}
         {data.categories.length > 0 && (
           <Text size="sm" c="dimmed" mt="sm">
-            Total: {formatBytes(data.totalBytes)} · {data.totalFiles} files
+            {t('breakdownTotal', { size: formatBytes(data.totalBytes), count: data.totalFiles })}
           </Text>
         )}
       </Paper>

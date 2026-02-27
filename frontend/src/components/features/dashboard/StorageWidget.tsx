@@ -3,15 +3,17 @@
 import { Stack, Text, Progress, Skeleton, Alert } from '@mantine/core';
 import { useStorageOverview } from '@/hooks/useStorage';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTranslations } from 'next-intl';
 
 export function StorageWidget() {
+  const t = useTranslations('storage');
   const colors = useThemeColors();
   const { data: overview, isLoading, error } = useStorageOverview();
 
   if (error) {
     return (
-      <Alert color={colors.error} title="Error">
-        {error instanceof Error ? error.message : 'Failed to load storage'}
+      <Alert color={colors.error} title={t('widgetLoadError')}>
+        {error instanceof Error ? error.message : t('widgetLoadError')}
       </Alert>
     );
   }
@@ -32,7 +34,7 @@ export function StorageWidget() {
   return (
     <Stack gap="sm">
       <Text size="sm" c="dimmed">
-        {usedGb} GB of {quotaGb} GB used
+        {t('widgetUsage', { usedGb, quotaGb })}
       </Text>
       <Progress value={Math.min(usedPct, 100)} color={usedPct > 90 ? colors.error : colors.info} />
     </Stack>

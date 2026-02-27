@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useStorageAlerts } from '@/hooks/useStorage';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslations } from 'next-intl';
 
 const canManageStorage = (roles: { roleName?: string }[] = []): boolean =>
   roles.some((r) => {
@@ -13,6 +14,7 @@ const canManageStorage = (roles: { roleName?: string }[] = []): boolean =>
   });
 
 export function StorageWarningBanner() {
+  const t = useTranslations('storage');
   const { user } = useAuth();
   const { data: alerts, isLoading } = useStorageAlerts('unacknowledged');
 
@@ -27,12 +29,12 @@ export function StorageWarningBanner() {
       color={color}
       icon={<IconAlertTriangle size={20} />}
       mb="md"
-      title={critical ? 'Storage quota critical' : 'Storage quota warning'}
+      title={critical ? t('warningBannerCriticalTitle') : t('warningBannerWarningTitle')}
     >
       <Text size="sm" component="span">
-        Branch storage usage is high.{' '}
+        {t('warningBannerBody')}{' '}
         <Link id="storage-warning-link-dashboard" href="/admin/storage" style={{ fontWeight: 600 }}>
-          View storage dashboard
+          {t('warningBannerLink')}
         </Link>
       </Text>
     </Alert>

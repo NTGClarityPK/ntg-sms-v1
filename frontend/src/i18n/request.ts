@@ -32,6 +32,7 @@ export default getRequestConfig(async () => {
     timetable,
     reports,
     settings,
+    storage,
   ] =
     await Promise.all([
       load('common.json'),
@@ -55,6 +56,7 @@ export default getRequestConfig(async () => {
       load('timetable.json'),
       load('reports.json'),
       load('settings.json'),
+      load('storage.json'),
     ]);
 
   return {
@@ -81,6 +83,7 @@ export default getRequestConfig(async () => {
       timetable,
       reports,
       settings,
+      storage,
     },
   };
 });

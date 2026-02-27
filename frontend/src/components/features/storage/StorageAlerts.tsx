@@ -1,10 +1,11 @@
 'use client';
 
-import { Paper, Table, Text, Group, Chip, Stack, Skeleton, Alert, Button } from '@mantine/core';
+import { Paper, Table, Text, Group, Chip, Stack, Skeleton, Alert, Button, Badge } from '@mantine/core';
 import { useStorageAlerts, useAcknowledgeStorageAlert } from '@/hooks/useStorage';
-import { Badge } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 
 const ALERT_FILTER_CHIPS = ['all', 'unacknowledged', 'warning', 'critical', 'exceeded'] as const;
+type AlertFilterChip = typeof ALERT_FILTER_CHIPS[number];
 
 interface StorageAlertsProps {
   filterChip: string;
@@ -12,12 +13,31 @@ interface StorageAlertsProps {
 }
 
 export function StorageAlerts({ filterChip, onFilterChipChange }: StorageAlertsProps) {
+  const t = useTranslations('storage');
   const filter =
     filterChip === 'all'
       ? undefined
       : (filterChip as 'warning' | 'critical' | 'exceeded' | 'unacknowledged');
   const { data: alerts, isLoading, error } = useStorageAlerts(filter);
   const acknowledgeAlert = useAcknowledgeStorageAlert();
+
+  const getFilterLabel = (c: AlertFilterChip): string => {
+    const map: Record<AlertFilterChip, string> = {
+      all: t('alertFilterAll'),
+      unacknowledged: t('alertFilterUnacknowledged'),
+      warning: t('alertFilterWarning'),
+      critical: t('alertFilterCritical'),
+      exceeded: t('alertFilterExceeded'),
+    };
+    return map[c];
+  };
+
+  const getAlertTypeLabel = (alertType: string): string => {
+    if (alertType === 'warning') return t('alertTypeWarning');
+    if (alertType === 'critical') return t('alertTypeCritical');
+    if (alertType === 'exceeded') return t('alertTypeExceeded');
+    return alertType;
+  };
 
   if (isLoading || !alerts) {
     return (
@@ -29,8 +49,8 @@ export function StorageAlerts({ filterChip, onFilterChipChange }: StorageAlertsP
 
   if (error) {
     return (
-      <Alert color="red" title="Error">
-        {error instanceof Error ? error.message : 'Failed to load alerts'}
+      <Alert color="red" title={t('alertsLoadError')}>
+        {error instanceof Error ? error.message : t('alertsLoadError')}
       </Alert>
     );
   }
@@ -39,9 +59,7 @@ export function StorageAlerts({ filterChip, onFilterChipChange }: StorageAlertsP
     <Stack gap="md">
       <Paper p="md" withBorder>
         <Group gap="xs" wrap="wrap">
-          <Text size="sm" fw={500}>
-            Filter:
-          </Text>
+          <Text size="sm" fw={500}>{t('alertFilterLabel')}</Text>
           <Chip.Group
             value={filterChip}
             onChange={(v) =>
@@ -51,7 +69,7 @@ export function StorageAlerts({ filterChip, onFilterChipChange }: StorageAlertsP
             <Group gap="xs">
               {ALERT_FILTER_CHIPS.map((c) => (
                 <Chip key={c} value={c} variant="filled">
-                  {c === 'all' ? 'All' : c.charAt(0).toUpperCase() + c.slice(1)}
+                  {getFilterLabel(c)}
                 </Chip>
               ))}
             </Group>
@@ -60,22 +78,18 @@ export function StorageAlerts({ filterChip, onFilterChipChange }: StorageAlertsP
       </Paper>
 
       <Paper p="md" withBorder>
-        <Text fw={600} mb="sm">
-          Storage alerts
-        </Text>
+        <Text fw={600} mb="sm">{t('alertsTitle')}</Text>
         {alerts.length === 0 ? (
-          <Text size="sm" c="dimmed">
-            No alerts.
-          </Text>
+          <Text size="sm" c="dimmed">{t('alertsNoData')}</Text>
         ) : (
           <Table withTableBorder withColumnBorders>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Type</Table.Th>
-                <Table.Th>Percentage used</Table.Th>
-                <Table.Th>Date</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Actions</Table.Th>
+                <Table.Th>{t('alertsColType')}</Table.Th>
+                <Table.Th>{t('alertsColPercentage')}</Table.Th>
+                <Table.Th>{t('alertsColDate')}</Table.Th>
+                <Table.Th>{t('alertsColStatus')}</Table.Th>
+                <Table.Th>{t('alertsColActions') ?? ''}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -92,14 +106,16 @@ export function StorageAlerts({ filterChip, onFilterChipChange }: StorageAlertsP
                       }
                       variant="light"
                     >
-                      {a.alertType}
+                      {getAlertTypeLabel(a.alertType)}
                     </Badge>
                   </Table.Td>
                   <Table.Td>{a.percentageUsed}%</Table.Td>
                   <Table.Td>
                     <Text size="sm">{new Date(a.createdAt).toLocaleString()}</Text>
                   </Table.Td>
-                  <Table.Td>{a.acknowledged ? 'Acknowledged' : 'Active'}</Table.Td>
+                  <Table.Td>
+                    {a.acknowledged ? t('alertStatusAcknowledged') : t('alertStatusActive')}
+                  </Table.Td>
                   <Table.Td>
                     {!a.acknowledged && (
                       <Button
@@ -108,7 +124,7 @@ export function StorageAlerts({ filterChip, onFilterChipChange }: StorageAlertsP
                         onClick={() => acknowledgeAlert.mutate(a.id)}
                         loading={acknowledgeAlert.isPending}
                       >
-                        Acknowledge
+                        {t('acknowledgeButton')}
                       </Button>
                     )}
                   </Table.Td>

@@ -19,6 +19,7 @@ interface UserFormProps {
 
 export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
   const t = useTranslations('user');
+  const tCommon = useTranslations('common');
   const createUserSchema = useMemo(
     () =>
       z.object({
@@ -202,7 +203,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
           <MultiSelect
             id="user-form-roles"
             label={t('roles')}
-            data={roles.map((r) => ({ value: r.id, label: r.displayName }))}
+            data={roles.map((r) => ({ value: r.id, label: tCommon(`roleName.${r.name}` as any) || r.displayName }))}
             {...form.getInputProps('roleIds')}
           />
 
