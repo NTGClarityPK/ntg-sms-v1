@@ -134,7 +134,7 @@ export default function BulkImportStudentsPage() {
       { key: 'Phone', label: 'Phone (optional)', example: '+9647701234567' },
       { key: 'Date of Birth', label: 'Date of Birth (optional)', example: '2010-05-15' },
       { key: 'Gender', label: 'Gender', example: 'male' },
-      { key: 'Student ID', label: 'Student ID (optional)', example: 'STU-2024-0001' },
+      { key: 'Student ID', label: 'Student ID (optional, leave blank for auto e.g. 0001)', example: '0001' },
       { key: 'Class', label: 'Class name or ID (optional)', example: 'Grade 1' },
       { key: 'Section', label: 'Section name or ID (optional)', example: 'A' },
       { key: 'Subject Template', label: 'Subject Template name or ID (optional)', example: 'Primary Curriculum' },

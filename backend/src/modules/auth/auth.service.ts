@@ -392,6 +392,41 @@ export class AuthService {
     });
   }
 
+  async verifyChildEmail(parentUserId: string, studentId: string, email: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('user_id')
+      .eq('id', studentId)
+      .maybeSingle();
+
+    if (studentError) {
+      throw new BadRequestException('Failed to verify child credentials.');
+    }
+
+    const studentRow = student as { user_id: string | null } | null;
+    if (!studentRow || !studentRow.user_id) {
+      throw new BadRequestException('Failed to verify child credentials.');
+    }
+
+    const { data: userResult, error: userError } = await supabase.auth.admin.getUserById(
+      studentRow.user_id,
+    );
+
+    const actualEmail = userResult?.user?.email;
+    if (userError || !actualEmail) {
+      throw new BadRequestException('Failed to verify child credentials.');
+    }
+
+    const normalizedProvided = email.trim().toLowerCase();
+    const normalizedActual = actualEmail.trim().toLowerCase();
+
+    if (normalizedProvided !== normalizedActual) {
+      throw new BadRequestException('Failed to verify child credentials.');
+    }
+  }
+
   async switchChild(userId: string, studentId: string): Promise<{
     token: string;
     student: {

@@ -11,7 +11,6 @@ import { StudentDto } from './dto/student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
-import { GenerateStudentIdDto } from './dto/generate-student-id.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 
@@ -345,11 +344,9 @@ export class StudentsService {
     });
   }
 
-  async generateStudentId(
-    input: GenerateStudentIdDto,
-    branchId: string,
-  ): Promise<{ studentId: string }> {
+  async createStudent(input: CreateStudentDto, branchId: string, userEmail: string): Promise<StudentDto> {
     const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
 
     // Get active academic year if not provided
     let academicYearId = input.academicYearId;
@@ -359,105 +356,6 @@ export class StudentsService {
         throw new BadRequestException('No active academic year found');
       }
       academicYearId = activeYear.id;
-    }
-
-    // Get academic year name (e.g., "2024-2025" -> "2024")
-    const { data: year } = await supabase
-      .from('academic_years')
-      .select('name')
-      .eq('id', academicYearId)
-      .single();
-
-    if (!year) {
-      throw new NotFoundException('Academic year not found');
-    }
-
-    const yearPrefix = year.name.split('-')[0] || year.name.substring(0, 4);
-
-    // Get class and section codes
-    let classCode = '';
-    let sectionCode = '';
-
-    if (input.classId) {
-      const { data: classData } = await supabase
-        .from('classes')
-        .select('name')
-        .eq('id', input.classId)
-        .single();
-
-      if (classData) {
-        classCode = classData.name;
-      }
-    }
-
-    if (input.sectionId) {
-      const { data: sectionData } = await supabase
-        .from('sections')
-        .select('name')
-        .eq('id', input.sectionId)
-        .single();
-
-      if (sectionData) {
-        sectionCode = sectionData.name;
-      }
-    }
-
-    // Find the highest sequence number for this pattern
-    const pattern = `${yearPrefix}-${classCode}-${sectionCode}-%`;
-    const { data: existing } = await supabase
-      .from('students')
-      .select('student_id')
-      .eq('branch_id', branchId)
-      .ilike('student_id', pattern)
-      .order('student_id', { ascending: false })
-      .limit(1);
-
-    let sequence = 1;
-    if (existing && existing.length > 0) {
-      const lastId = existing[0].student_id;
-      const parts = lastId.split('-');
-      const lastSeq = parseInt(parts[parts.length - 1] || '0', 10);
-      sequence = lastSeq + 1;
-    }
-
-    const studentId = `${yearPrefix}-${classCode}-${sectionCode}-${sequence.toString().padStart(3, '0')}`;
-
-    return { studentId };
-  }
-
-  async createStudent(input: CreateStudentDto, branchId: string, userEmail: string): Promise<StudentDto> {
-    const supabase = this.supabaseConfig.getClient();
-    const username = extractUsernameFromEmail(userEmail);
-
-    // Get active academic year if not provided (needed for both generation and insert)
-    let academicYearId = input.academicYearId;
-    if (!academicYearId) {
-      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
-      if (!activeYear) {
-        throw new BadRequestException('No active academic year found');
-      }
-      academicYearId = activeYear.id;
-    }
-
-    // Resolve student ID: use provided or auto-generate
-    let studentId: string;
-    if (input.studentId?.trim()) {
-      const { data: existing } = await supabase
-        .from('students')
-        .select('id')
-        .eq('student_id', input.studentId.trim())
-        .eq('branch_id', branchId)
-        .maybeSingle();
-      if (existing) {
-        throw new ConflictException(`Student ID ${input.studentId} already exists in this branch`);
-      }
-      studentId = input.studentId.trim();
-    } else {
-      const gen = await this.generateStudentId(
-        { academicYearId, classId: input.classId, sectionId: input.sectionId },
-        branchId,
-      );
-      studentId = gen.studentId;
     }
 
     // Create auth user
@@ -532,7 +430,6 @@ export class StudentsService {
         .insert({
           user_id: user.id,
           branch_id: branchId,
-          student_id: studentId,
           first_name: input.firstName.trim(),
           last_name: input.lastName.trim(),
           class_id: input.classId ?? null,

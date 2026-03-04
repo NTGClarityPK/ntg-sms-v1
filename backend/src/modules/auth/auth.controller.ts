@@ -94,6 +94,16 @@ export class AuthController {
     return { data: children };
   }
 
+  @Post('verify-child-email')
+  @UseGuards(JwtAuthGuard)
+  async verifyChildEmail(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() body: { studentId: string; email: string },
+  ): Promise<{ data: { valid: boolean } }> {
+    await this.authService.verifyChildEmail(user.id, body.studentId, body.email);
+    return { data: { valid: true } };
+  }
+
   @Post('switch-child')
   @UseGuards(JwtAuthGuard)
   async switchChild(

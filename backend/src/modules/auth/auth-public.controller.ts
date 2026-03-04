@@ -7,6 +7,7 @@ export class AuthPublicController {
 
   /**
    * Resolve a student roll number to their email address.
+   * Students are assigned to one branch; lookup is by roll number only.
    * This endpoint is intentionally minimal and unauthenticated, and must be rate-limited at the edge.
    */
   @Post('resolve-student-roll')
@@ -20,19 +21,20 @@ export class AuthPublicController {
 
     const supabase = this.supabaseConfig.getClient();
 
-    // Find the student row by roll number (student_id)
-    const { data: student, error: studentError } = await supabase
+    // Find the student row by roll number (student_id). Students belong to one branch.
+    // Use limit(1) and handle array result explicitly to avoid errors when multiple rows exist.
+    const { data: students, error: studentError } = await supabase
       .from('students')
       .select('id, user_id')
       .eq('student_id', rollNumber)
-      .maybeSingle();
+      .limit(1);
 
-    if (studentError || !student) {
+    if (studentError || !students || students.length === 0) {
       // Deliberately generic message to avoid enumeration
       throw new BadRequestException('No student found');
     }
 
-    const studentRow = student as { id: string; user_id: string | null };
+    const studentRow = students[0] as { id: string; user_id: string | null };
     if (!studentRow.user_id) {
       throw new BadRequestException('No student found');
     }

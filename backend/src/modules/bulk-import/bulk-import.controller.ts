@@ -92,8 +92,8 @@ export class BulkImportController {
           { key: 'gender', label: 'Gender', example: 'male' },
           {
             key: 'student_id',
-            label: 'Student ID (optional)',
-            example: 'STU-2024-0001',
+            label: 'Student ID (optional, leave blank for auto e.g. 0001)',
+            example: '0001',
           },
           {
             key: 'class_name_or_id',

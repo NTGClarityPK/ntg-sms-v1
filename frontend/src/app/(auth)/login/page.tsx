@@ -106,7 +106,7 @@ export default function LoginPage() {
   }, []);
 
   const completeLoginAfterSupabaseSession = async () => {
-    // Get user (for locale sync and super admin check)
+    // Get user (for locale sync and role-based redirects)
     try {
       const userResponse = await apiClient.get<{
         preferredLocale?: string;
@@ -116,19 +116,32 @@ export default function LoginPage() {
       document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000; SameSite=Lax`;
       localStorage.setItem('locale', locale);
 
-      const isSuperAdmin = userResponse.data?.roles?.some(
-        (r) => r.roleName?.toLowerCase() === 'super_admin',
-      );
+      const roles = userResponse.data?.roles ?? [];
+      const normalisedRoleNames = roles
+        .map((r) => r.roleName?.toLowerCase())
+        .filter((name): name is string => !!name);
+
+      const isSuperAdmin = normalisedRoleNames.includes('super_admin');
       if (isSuperAdmin) {
         window.location.href = '/adminportal';
         return;
       }
+
+      const isSchoolAdmin = normalisedRoleNames.includes('school_admin');
+
+      // Only school admins should be prompted to select a branch.
+      // All other users (students, parents, etc.) skip branch selection and go straight to dashboard.
+      if (!isSchoolAdmin) {
+        window.location.href = '/dashboard';
+        return;
+      }
     } catch (userError: unknown) {
       console.error('Failed to check user role:', userError);
-      // Continue with normal flow if check fails
+      // If we cannot determine the role, fall back to branch selection behaviour
+      // so school admins are still able to choose a branch.
     }
 
-    // Fetch user's branches for regular users
+    // Fetch user's branches for school admins
     try {
       const response = await apiClient.get<Branch[]>('/api/v1/auth/my-branches');
       const userBranches = response.data || [];

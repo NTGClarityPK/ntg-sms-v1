@@ -351,6 +351,11 @@ export default function ParentPinManagementPage() {
         if (error || !data.session?.refresh_token) {
           throw new Error('Invalid child credentials. Please check email and password.');
         }
+        // Ensure the email belongs to the selected child
+        await apiClient.post('/api/v1/auth/verify-child-email', {
+          studentId: child.id,
+          email: childEmailInput,
+        });
         const refreshToken = data.session.refresh_token;
         const email = childEmailInput.toLowerCase().trim();
         childPinFlowRef.current = { refreshToken, email };
@@ -360,8 +365,17 @@ export default function ParentPinManagementPage() {
           refresh_token: parentSession.refresh_token,
         });
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to verify child credentials.';
+        let message = 'Failed to verify child credentials.';
+        if (err && typeof err === 'object' && 'response' in err) {
+          const resp = (err as any).response;
+          const data = resp?.data as { message?: string; error?: { message?: string } } | undefined;
+          const backendMessage = data?.error?.message ?? data?.message;
+          if (backendMessage && typeof backendMessage === 'string') {
+            message = backendMessage;
+          }
+        } else if (err instanceof Error && err.message) {
+          message = err.message;
+        }
         setModalError(message);
       } finally {
         setModalLoading(false);

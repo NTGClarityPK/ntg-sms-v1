@@ -20,7 +20,6 @@ import {
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
-import { GenerateStudentIdDto } from './dto/generate-student-id.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @Controller('api/v1/students')
@@ -85,15 +84,6 @@ export class StudentsController {
     @CurrentUser() user: { id: string; roles?: string[] },
   ) {
     return this.studentsService.listStudents(query, branch.branchId, user.id, user.roles);
-  }
-
-  @Get('generate-id')
-  async generateStudentId(
-    @Query() query: GenerateStudentIdDto,
-    @CurrentBranch() branch: { branchId: string },
-  ) {
-    const data = await this.studentsService.generateStudentId(query, branch.branchId);
-    return { data };
   }
 
   @Get(':id')

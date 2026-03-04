@@ -338,7 +338,6 @@ export class BulkImportService {
         const studentRecords: Array<{
           user_id: string;
           branch_id: string;
-          student_id: string;
           first_name: string;
           last_name: string;
           class_id: string | null;
@@ -442,8 +441,6 @@ export class BulkImportService {
           studentRecords.push({
             user_id: userId,
             branch_id: branchId,
-            student_id:
-              row.student_id?.trim() || this.generateStudentId(),
             first_name: row.first_name,
             last_name: row.last_name,
             class_id: classId,
@@ -678,14 +675,6 @@ export class BulkImportService {
       updated_by: 'bulk-import',
     });
     return data.user.id;
-  }
-
-  private generateStudentId(): string {
-    const year = new Date().getFullYear();
-    const random = Math.floor(Math.random() * 10000)
-      .toString()
-      .padStart(4, '0');
-    return `STU-${year}-${random}`;
   }
 
   private generateTempPassword(): string {
