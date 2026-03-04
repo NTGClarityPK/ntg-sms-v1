@@ -38,10 +38,12 @@ import {
   IconClipboardList,
   IconDatabase,
   IconFolderOff,
+  IconKey,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { getFeatureCodeForPath } from '@/lib/permission/navFeatureMap';
 
@@ -64,6 +66,7 @@ const allNavItems: NavItem[] = [
   { key: 'teacherMapping', label: 'Teacher', href: '/academic/teacher-mapping', icon: IconBook },
   { key: 'parentAssociations', label: 'Parent', href: '/parent-associations', icon: IconUsersGroup },
   { key: 'myChildren', label: 'My Child', href: '/my-children', icon: IconUsersGroup },
+  { key: 'parentPinManagement', label: 'PIN Management', href: '/parent/pin-management', icon: IconKey },
   { key: 'childrenTimetable', label: 'Child Timetable', href: '/children-timetable', icon: IconCalendarClock },
   { key: 'attendance', label: 'Attendance', href: '/attendance', icon: IconCalendar },
   {
@@ -210,6 +213,9 @@ export function Sidebar({
   const tNav = useTranslations('navigation');
   const { user } = useAuth();
   const { canView } = usePermissions();
+  const { studentToken } = useStudentSessionStore();
+  // When a parent is acting as a child, treat the sidebar as student mode
+  const isActingAsStudent = !!studentToken;
 
   // Get theme config for navbar styling
   const themeConfig = (theme.other as any) as ThemeConfig | undefined;
@@ -228,11 +234,11 @@ export function Sidebar({
     return roleName === 'subject_teacher' || roleName === 'class_teacher';
   }) || false;
   
-  // Check if user is a student
-  const isStudent = user?.roles?.some((r) => {
+  // Check if user is a student — also true when a parent is acting as a child
+  const isStudent = isActingAsStudent || (user?.roles?.some((r) => {
     const roleName = r.roleName?.toLowerCase();
     return roleName === 'student';
-  }) || false;
+  }) || false);
   
   // Check if user has admin/coordinator role for timetable management
   const canManageTimetable = user?.roles?.some((r) => {
@@ -240,11 +246,11 @@ export function Sidebar({
     return roleName === 'school_admin' || roleName === 'principal' || roleName === 'academic_coordinator';
   }) || false;
 
-  // Check if user is a parent
-  const isParent = user?.roles?.some((r) => {
+  // Check if user is a parent — suppressed in child mode so parent items disappear
+  const isParent = !isActingAsStudent && (user?.roles?.some((r) => {
     const roleName = r.roleName?.toLowerCase();
     return roleName === 'parent';
-  }) || false;
+  }) || false);
 
   // Check if user can manage events (admin/coordinator)
   const canManageEvents = user?.roles?.some((r) => {
@@ -272,13 +278,21 @@ export function Sidebar({
     // Super admin sees everything - bypass all filters
     if (isSuperAdmin) return true;
 
+    // Hide dashboard in child mode — students use My Assessments as home
+    if (item.href === '/dashboard' && isActingAsStudent) return false;
+
     // Request uniform: only for parents
     if (item.href === '/uniform-request') {
       return isParent;
     }
 
     const featureCode = getFeatureCodeForPath(item.href);
-    if (featureCode && !canView(featureCode)) return false;
+    // In student mode, items that have a showCondition control their own visibility
+    // (e.g. /my-assessments checks isStudent). Skip the role-permission check for
+    // those items so the parent's lack of my_assessments permission doesn't hide them.
+    if (featureCode && !canView(featureCode)) {
+      if (!isActingAsStudent || !item.showCondition) return false;
+    }
 
     // Check showCondition if it exists
     if (item.showCondition) {
@@ -330,6 +344,9 @@ export function Sidebar({
       if (item.href === '/my-children') {
         return isParent;
       }
+      if (item.href === '/parent/pin-management') {
+        return isParent;
+      }
       // Parent-facing children timetable page
       if (item.href === '/children-timetable') {
         return isParent;
@@ -346,6 +363,9 @@ export function Sidebar({
     }
     // Parent-facing view only page
     if (item.href === '/my-children') {
+      return isParent;
+    }
+    if (item.href === '/parent/pin-management') {
       return isParent;
     }
     // Parent-facing children timetable page
@@ -375,6 +395,7 @@ export function Sidebar({
       item.href === '/my-timetable' ||
       item.href === '/my-events' ||
       item.href === '/my-children' ||
+      item.href === '/parent/pin-management' ||
       item.href === '/children-timetable'
   );
   const managementItems = navItems.filter(

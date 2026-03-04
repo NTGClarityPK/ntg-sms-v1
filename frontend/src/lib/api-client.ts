@@ -3,6 +3,8 @@ import { notifications } from '@mantine/notifications';
 import { ApiResponse } from '@/types/api';
 import { supabase } from './supabase/client';
 
+const STUDENT_TOKEN_STORAGE_KEY = 'studentToken';
+
 const LOCAL_API = 'http://localhost:3001';
 
 /**
@@ -63,11 +65,27 @@ class ApiClient {
         }
 
         try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            config.headers.Authorization = `Bearer ${session.access_token}`;
+          const url = config.url || '';
+          // Must match /api/v1/student/ (with trailing slash) to avoid catching /api/v1/students/...
+          const isStudentApi =
+            typeof url === 'string' && url.startsWith('/api/v1/student/');
+
+          const studentToken =
+            typeof window !== 'undefined'
+              ? window.localStorage.getItem(STUDENT_TOKEN_STORAGE_KEY)
+              : null;
+
+          if (isStudentApi && studentToken) {
+            // Student-only APIs: use custom student JWT
+            config.headers.Authorization = `Bearer ${studentToken}`;
+          } else {
+            // All other APIs: use Supabase session (multi-role auth)
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              config.headers.Authorization = `Bearer ${session.access_token}`;
+            }
           }
         } catch {
           // Supabase slow/unavailable on first load; send request without auth (backend will 401 if needed)

@@ -6,6 +6,7 @@
   "teacherMapping": "Teacher",
   "parentAssociations": "Parent",
   "myChildren": "My Child",
+  "parentPinManagement": "PIN Management",
   "childrenTimetable": "Child Timetable",
   "attendance": "Attendance",
   "assessments": "Assessment",

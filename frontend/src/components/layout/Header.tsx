@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { Group, Text, Badge, Tooltip, Box, Image, Menu } from '@mantine/core';
 import { IconCircle, IconSchool, IconCrown } from '@tabler/icons-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { UserMenu } from './UserMenu';
 import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranchBadge';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
@@ -18,6 +18,9 @@ import { useMyStudent } from '@/hooks/useStudents';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
+import { useStudentSessionStore } from '@/lib/store/student-session-store';
 
 const headerBadgeStyle = {
   cursor: 'default' as const,
@@ -41,6 +44,8 @@ export function Header() {
   const { setPrimaryColor } = useThemeStore();
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const queryClient = useQueryClient();
   
   // Check if user is super admin
   const isSuperAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'super_admin') || false;
@@ -51,6 +56,32 @@ export function Header() {
   const studentClassName = myStudentData?.data?.className && myStudentData?.data?.sectionName
     ? `${myStudentData.data.className} - ${myStudentData.data.sectionName}`
     : null;
+
+  const isParent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'parent') || false;
+
+  const { data: childrenData, refetch: refetchChildren } = useQuery({
+    queryKey: ['auth', 'my-children'],
+    queryFn: async () => {
+      if (!isParent) return [];
+      const response = await apiClient.get<
+        Array<{
+          id: string;
+          studentId: string;
+          firstName: string;
+          lastName: string;
+          branchId: string | null;
+          isCurrent: boolean;
+        }>
+      >('/api/v1/auth/my-children');
+      return response.data || [];
+    },
+    enabled: isParent,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const children = Array.isArray(childrenData) ? childrenData : [];
+  const { studentToken, setStudentToken, clearStudentToken } = useStudentSessionStore();
+  const hasStudentToken = !!studentToken;
 
   useEffect(() => {
     const data = tenantQuery.data?.data;
@@ -173,6 +204,112 @@ export function Header() {
             style={{ objectFit: 'contain' }}
           />
         </Box>
+
+        {isParent && children.length > 0 && (
+          <Menu shadow="md" width={260}>
+            <Menu.Target>
+              <Badge
+                id="header-child-switcher"
+                variant="light"
+                color={colors.primary}
+                size="lg"
+                leftSection={<IconSchool size={14} />}
+                style={{
+                  ...headerBadgeStyle,
+                  cursor: 'pointer',
+                }}
+              >
+                {hasStudentToken
+                  ? `Acting as ${
+                      children.find((c) => c.isCurrent)?.firstName ||
+                      children[0]?.firstName ||
+                      'Child'
+                    }`
+                  : 'Select child'}
+              </Badge>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {children.map((child) => (
+                <Menu.Item
+                  key={child.id}
+                  id={`header-child-${child.id}`}
+                  onClick={async () => {
+                    try {
+                      const response = await apiClient.post<{
+                        token: string;
+                        student: {
+                          id: string;
+                          studentId: string;
+                          firstName: string;
+                          lastName: string;
+                          branchId: string | null;
+                        };
+                      }>('/api/v1/auth/switch-child', { studentId: child.id });
+                      const token = response.data?.token;
+                      const student = response.data?.student;
+                      // Drop old child's cached data BEFORE updating the token so the
+                      // next render starts with a clean loading state for the new child
+                      queryClient.removeQueries({
+                        predicate: (query) =>
+                          typeof query.queryKey[0] === 'string' &&
+                          (query.queryKey[0] as string).startsWith('student'),
+                      });
+                      if (token) {
+                        setStudentToken(token);
+                      }
+                      if (student?.branchId) {
+                        window.localStorage.setItem('currentBranchId', student.branchId);
+                      }
+                      await refetchChildren();
+                      // Dashboard is hidden in child mode — redirect away if currently there
+                      if (pathname === '/dashboard' || pathname === '/') {
+                        router.push('/my-assessments');
+                      }
+                    } catch {
+                      // errors handled by apiClient notifications / interceptors
+                    }
+                  }}
+                >
+                  <Group justify="space-between" gap="xs">
+                    <Box>
+                      <Text size="sm" fw={500}>
+                        {child.firstName} {child.lastName}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {child.studentId}
+                      </Text>
+                    </Box>
+                    {hasStudentToken && child.isCurrent && (
+                      <Badge size="xs" color="green">
+                        Current
+                      </Badge>
+                    )}
+                  </Group>
+                </Menu.Item>
+              ))}
+              {hasStudentToken && (
+                <>
+                  <Menu.Divider />
+                  <Menu.Item
+                    id="header-child-exit"
+                    onClick={() => {
+                      clearStudentToken();
+                      queryClient.removeQueries({
+                        predicate: (query) =>
+                          typeof query.queryKey[0] === 'string' &&
+                          (query.queryKey[0] as string).startsWith('student'),
+                      });
+                      refetchChildren().catch(() => {});
+                      router.push('/dashboard');
+                    }}
+                  >
+                    Exit child mode
+                  </Menu.Item>
+                </>
+              )}
+            </Menu.Dropdown>
+          </Menu>
+        )}
 
         <LanguageSwitcher />
         <Group gap="xs" align="center" wrap="nowrap" visibleFrom="sm">

@@ -1197,6 +1197,215 @@ export class AssessmentsService {
   }
 
   /**
+   * Get assessments for a student identified directly by their student UUID (from custom JWT).
+   * Used by StudentSelfController when a parent is acting as a child or a student logs in via PIN.
+   */
+  async getMyAssessmentsForStudentById(
+    studentId: string,
+    branchId: string,
+  ): Promise<
+    Array<{
+      assessment: AssessmentDto;
+      status?: StudentAssessmentStatusDto;
+      attachments: {
+        id: string;
+        fileName: string;
+        fileUrl: string;
+        mimeType?: string;
+        createdAt: string;
+      }[];
+    }>
+  > {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, class_id, section_id, academic_year_id, branch_id')
+      .eq('id', studentId)
+      .eq('branch_id', branchId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    throwIfDbError(studentError);
+    if (!student) {
+      throw new BadRequestException('No active student record found');
+    }
+
+    const { data: classSection, error: csError } = await supabase
+      .from('class_sections')
+      .select('id')
+      .eq('class_id', student.class_id)
+      .eq('section_id', student.section_id)
+      .eq('academic_year_id', student.academic_year_id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    throwIfDbError(csError);
+    if (!classSection) return [];
+
+    const { data: assessments, error: assessmentsError } = await supabase
+      .from('assessments')
+      .select(
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+      )
+      .eq('class_section_id', classSection.id)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', student.academic_year_id)
+      .eq('is_published', true)
+      .order('due_date', { ascending: true });
+
+    throwIfDbError(assessmentsError);
+
+    const assessmentRows = (assessments ?? []) as AssessmentRow[];
+    if (assessmentRows.length === 0) return [];
+
+    const { data: studentTemplate, error: templateError } = await supabase
+      .from('student_subject_template_assignments')
+      .select('subject_template_id')
+      .eq('student_id', student.id)
+      .eq('academic_year_id', student.academic_year_id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    throwIfDbError(templateError);
+    const studentTemplateId = studentTemplate?.subject_template_id || null;
+
+    let filteredAssessments = assessmentRows;
+    if (studentTemplateId) {
+      const { data: templateSubjects, error: tsError } = await supabase
+        .from('subject_template_subjects')
+        .select('subject_id')
+        .eq('subject_template_id', studentTemplateId);
+
+      throwIfDbError(tsError);
+      const templateSubjectIds = new Set(
+        (templateSubjects || []).map((ts: { subject_id: string }) => ts.subject_id),
+      );
+
+      const { data: allTemplateSubjects, error: atsError } = await supabase
+        .from('subject_template_subjects')
+        .select('subject_id');
+
+      throwIfDbError(atsError);
+      const allTemplateSubjectIds = new Set(
+        (allTemplateSubjects || []).map((ts: { subject_id: string }) => ts.subject_id),
+      );
+
+      filteredAssessments = assessmentRows.filter((assessment) => {
+        const inAnyTemplate = allTemplateSubjectIds.has(assessment.subject_id);
+        return inAnyTemplate ? templateSubjectIds.has(assessment.subject_id) : true;
+      });
+    }
+
+    const assessmentIds = filteredAssessments.map((a) => a.id);
+
+    const { data: attachments, error: attachmentsError } = await supabase
+      .from('assessment_attachments')
+      .select('id, assessment_id, file_name, file_url, mime_type, created_at')
+      .in('assessment_id', assessmentIds);
+
+    throwIfDbError(attachmentsError);
+
+    const attachmentsByAssessment = new Map<
+      string,
+      { id: string; fileName: string; fileUrl: string; mimeType?: string; createdAt: string }[]
+    >();
+    for (const att of attachments ?? []) {
+      const key = (att as any).assessment_id as string;
+      const list = attachmentsByAssessment.get(key) ?? [];
+      list.push({
+        id: (att as any).id,
+        fileName: (att as any).file_name,
+        fileUrl: (att as any).file_url,
+        mimeType: (att as any).mime_type ?? undefined,
+        createdAt: (att as any).created_at,
+      });
+      attachmentsByAssessment.set(key, list);
+    }
+
+    const { data: statuses, error: statusesError } = await supabase
+      .from('student_assessment_statuses')
+      .select('assessment_id, student_id, status, is_read, updated_at')
+      .eq('student_id', student.id)
+      .eq('branch_id', branchId)
+      .in('assessment_id', assessmentIds);
+
+    throwIfDbError(statusesError);
+    const statusMap = new Map<string, StudentAssessmentStatusDto>();
+    for (const row of statuses ?? []) {
+      const dto = mapStudentStatusRow(row as StudentAssessmentStatusRow);
+      statusMap.set(dto.assessmentId, dto);
+    }
+
+    return filteredAssessments.map((row) => {
+      const assessment = mapAssessment(row);
+      return {
+        assessment,
+        status: statusMap.get(assessment.id),
+        attachments: attachmentsByAssessment.get(assessment.id) ?? [],
+      };
+    });
+  }
+
+  /**
+   * Update assessment status for a student identified directly by student UUID (from custom JWT).
+   */
+  async updateMyAssessmentStatusByStudentId(
+    assessmentId: string,
+    studentId: string,
+    branchId: string,
+    dto: UpdateStudentAssessmentStatusDto,
+  ): Promise<StudentAssessmentStatusDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: assessment, error: assessmentError } = await supabase
+      .from('assessments')
+      .select('id, title, class_section_id, academic_year_id, branch_id, created_by')
+      .eq('id', assessmentId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    throwIfDbError(assessmentError);
+    if (!assessment) throw new NotFoundException('Assessment not found');
+
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, academic_year_id, branch_id')
+      .eq('id', studentId)
+      .eq('branch_id', branchId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    throwIfDbError(studentError);
+    if (!student) throw new BadRequestException('No active student record found');
+
+    const { data, error } = await supabase
+      .from('student_assessment_statuses')
+      .upsert(
+        {
+          assessment_id: assessmentId,
+          student_id: student.id,
+          branch_id: branchId,
+          academic_year_id: assessment.academic_year_id,
+          status: dto.status ?? 'in_progress',
+          is_read: dto.isRead ?? true,
+        },
+        { onConflict: 'assessment_id,student_id' },
+      )
+      .select('assessment_id, student_id, status, is_read, updated_at')
+      .single();
+
+    throwIfDbError(error);
+    const statusDto = mapStudentStatusRow(data as StudentAssessmentStatusRow);
+
+    if (dto.isRead) {
+      await this.notifyAssessmentRead(assessment, student, branchId);
+    }
+
+    return statusDto;
+  }
+
+  /**
    * Update current student's status for a given assessment
    */
   async updateMyAssessmentStatus(

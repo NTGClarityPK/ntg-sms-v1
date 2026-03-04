@@ -27,14 +27,27 @@ import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMyAssessments, useUpdateMyAssessmentStatus } from '@/hooks/api/useMyAssessments';
+import { useStudentAssessments, useUpdateStudentAssessmentStatus } from '@/hooks/api/useStudentAssessments';
+import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { MyAssessmentAttachment } from '@/hooks/api/useMyAssessments';
 
 export default function MyAssessmentsPage() {
   const t = useTranslations('assessment');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
-  const { data, isLoading, error, isRefetching } = useMyAssessments();
-  const updateStatus = useUpdateMyAssessmentStatus();
+
+  const { studentToken } = useStudentSessionStore();
+  const isStudentMode = !!studentToken;
+
+  const parentQuery = useMyAssessments(!isStudentMode);
+  const studentQuery = useStudentAssessments(isStudentMode);
+  const { data, isLoading, error, isRefetching } = isStudentMode ? studentQuery : parentQuery;
+
+  const updateParentStatus = useUpdateMyAssessmentStatus();
+  const updateStudentStatus = useUpdateStudentAssessmentStatus();
+  const updateStatus = isStudentMode ? updateStudentStatus : updateParentStatus;
+
+  const activeQueryKey = isStudentMode ? 'student-assessments' : 'my-assessments';
   const [previewAttachment, setPreviewAttachment] = useState<MyAssessmentAttachment | null>(null);
 
   const previewType = useMemo(() => {
@@ -130,7 +143,7 @@ export default function MyAssessmentsPage() {
               variant="light"
               size="lg"
               loading={isRefetching}
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['my-assessments'] })}
+              onClick={() => queryClient.invalidateQueries({ queryKey: [activeQueryKey] })}
             >
               <IconRefresh size={18} />
             </ActionIcon>

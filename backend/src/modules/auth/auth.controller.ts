@@ -75,5 +75,43 @@ export class AuthController {
     const current = await this.authService.getCurrentChild(user.id);
     return { data: current };
   }
-}
 
+  @Get('my-children')
+  @UseGuards(JwtAuthGuard)
+  async myChildren(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{
+    data: Array<{
+      id: string;
+      studentId: string;
+      firstName: string;
+      lastName: string;
+      branchId: string | null;
+      isCurrent: boolean;
+    }>;
+  }> {
+    const children = await this.authService.listMyChildren(user.id);
+    return { data: children };
+  }
+
+  @Post('switch-child')
+  @UseGuards(JwtAuthGuard)
+  async switchChild(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() body: { studentId: string },
+  ): Promise<{
+    data: {
+      token: string;
+      student: {
+        id: string;
+        studentId: string;
+        firstName: string;
+        lastName: string;
+        branchId: string | null;
+      };
+    };
+  }> {
+    const result = await this.authService.switchChild(user.id, body.studentId);
+    return { data: result };
+  }
+}

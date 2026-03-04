@@ -50,7 +50,7 @@ export interface MyAssessment {
 /**
  * Get assessments for the current student
  */
-export function useMyAssessments() {
+export function useMyAssessments(enabled = true) {
   return useQuery({
     queryKey: ['my-assessments'],
     queryFn: async (): Promise<MyAssessment[]> => {
@@ -59,7 +59,8 @@ export function useMyAssessments() {
       );
       return response.data;
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes - assessments can change
+    staleTime: 2 * 60 * 1000,
+    enabled,
   });
 }
 

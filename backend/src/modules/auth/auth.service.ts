@@ -2,10 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { UserResponseDto } from './dto/user-response.dto';
 import { BranchSummaryDto } from './dto/branch-summary.dto';
+import { StudentTokenService } from '../../common/modules/student-token/student-token.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly studentTokenService: StudentTokenService,
+  ) {}
 
   private async listUserBranches(userId: string): Promise<BranchSummaryDto[]> {
     const supabase = this.supabaseConfig.getClient();
@@ -323,5 +327,136 @@ export class AuthService {
       lastName: row.last_name ?? '',
     };
   }
-}
 
+  async listMyChildren(userId: string): Promise<
+    Array<{
+      id: string;
+      studentId: string;
+      firstName: string;
+      lastName: string;
+      branchId: string | null;
+      isCurrent: boolean;
+    }>
+  > {
+    const supabase = this.supabaseConfig.getClient();
+
+    const [{ data: profile }, { data: links, error: linksError }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('current_student_id')
+        .eq('id', userId)
+        .maybeSingle(),
+      supabase
+        .from('parent_students')
+        .select('student_id')
+        .eq('parent_user_id', userId),
+    ]);
+
+    if (linksError) {
+      throw new BadRequestException(`Failed to fetch children: ${linksError.message}`);
+    }
+
+    const studentIds = (links || []).map((l) => (l as { student_id: string }).student_id);
+    if (studentIds.length === 0) {
+      return [];
+    }
+
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('id, student_id, first_name, last_name, branch_id')
+      .in('id', studentIds);
+
+    if (studentsError) {
+      throw new BadRequestException(`Failed to fetch students: ${studentsError.message}`);
+    }
+
+    const currentStudentId =
+      (profile as { current_student_id: string | null } | null)?.current_student_id ?? null;
+
+    return (students || []).map((s) => {
+      const row = s as {
+        id: string;
+        student_id: string;
+        first_name: string | null;
+        last_name: string | null;
+        branch_id: string | null;
+      };
+      return {
+        id: row.id,
+        studentId: row.student_id,
+        firstName: row.first_name ?? '',
+        lastName: row.last_name ?? '',
+        branchId: row.branch_id,
+        isCurrent: currentStudentId === row.id,
+      };
+    });
+  }
+
+  async switchChild(userId: string, studentId: string): Promise<{
+    token: string;
+    student: {
+      id: string;
+      studentId: string;
+      firstName: string;
+      lastName: string;
+      branchId: string | null;
+    };
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: link } = await supabase
+      .from('parent_students')
+      .select('student_id')
+      .eq('parent_user_id', userId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    if (!link) {
+      throw new BadRequestException('You do not have access to this student');
+    }
+
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, student_id, first_name, last_name, branch_id')
+      .eq('id', studentId)
+      .maybeSingle();
+
+    if (studentError || !student) {
+      throw new BadRequestException('Student not found');
+    }
+
+    const row = student as {
+      id: string;
+      student_id: string;
+      first_name: string | null;
+      last_name: string | null;
+      branch_id: string | null;
+    };
+
+    // Keep existing behaviour of storing current_student_id for convenience
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ current_student_id: row.id })
+      .eq('id', userId);
+
+    if (updateError) {
+      throw new BadRequestException(updateError.message);
+    }
+
+    const token = this.studentTokenService.mintStudentToken({
+      studentId: row.id,
+      branchId: row.branch_id ?? '',
+    });
+
+    return {
+      token,
+      student: {
+        id: row.id,
+        studentId: row.student_id,
+        firstName: row.first_name ?? '',
+        lastName: row.last_name ?? '',
+        branchId: row.branch_id,
+      },
+    };
+  }
+}
