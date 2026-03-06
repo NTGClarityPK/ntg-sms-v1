@@ -1,6 +1,7 @@
  'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import {
   Alert,
@@ -101,6 +102,7 @@ function createEphemeralSupabaseClient() {
 }
 
 export default function ParentPinManagementPage() {
+  const tAuth = useTranslations('auth');
   const colors = useThemeColors();
   const { user } = useAuth();
 
@@ -262,11 +264,11 @@ export default function ParentPinManagementPage() {
   const handleParentPinSave = async () => {
     if (!user?.email) return;
     if (pin.length < 4 || pin.length > 6 || !/^\d{4,6}$/.test(pin)) {
-      setModalError('PIN must be a 4–6 digit number.');
+      setModalError(tAuth('pinMgmtErrorInvalidPinFormat'));
       return;
     }
     if (pin !== confirmPin) {
-      setModalError('PIN confirmation does not match.');
+      setModalError(tAuth('pinMgmtErrorPinMismatch'));
       return;
     }
 
@@ -277,7 +279,7 @@ export default function ParentPinManagementPage() {
       const session = await getSession();
       const refreshToken = session?.refresh_token;
       if (!refreshToken) {
-        throw new Error('No active session. Please sign in again as the parent.');
+        throw new Error(tAuth('pinMgmtErrorParentNoSession'));
       }
       await pinAuth.setupPinAuth(pin, refreshToken, user.email);
       const available = await pinAuth.isPinAuthAvailable(user.email);
@@ -310,7 +312,7 @@ export default function ParentPinManagementPage() {
     const childId = modalState.child.id;
     const storedEmail = getStoredChildEmail(childId);
     if (!storedEmail) {
-      setModalError('No PIN is set on this device for this child.');
+      setModalError(tAuth('pinMgmtErrorParentRemoveMissing'));
       return;
     }
     try {
@@ -333,7 +335,7 @@ export default function ParentPinManagementPage() {
 
     if (modalStep === 'login') {
       if (!childEmailInput || !childPasswordInput) {
-        setModalError('Please enter the child email and password.');
+        setModalError(tAuth('pinMgmtErrorChildCredentialsMissing'));
         return;
       }
       setModalLoading(true);
@@ -386,15 +388,15 @@ export default function ParentPinManagementPage() {
     if (modalStep === 'pin') {
       const flowData = childPinFlowRef.current;
       if (!flowData) {
-        setModalError('Session expired. Please close this dialog and try again from the login step.');
+        setModalError(tAuth('pinMgmtErrorChildSessionExpired'));
         return;
       }
       if (pin.length < 4 || pin.length > 6 || !/^\d{4,6}$/.test(pin)) {
-        setModalError('PIN must be a 4–6 digit number.');
+        setModalError(tAuth('pinMgmtErrorInvalidPinFormat'));
         return;
       }
       if (pin !== confirmPin) {
-        setModalError('PIN confirmation does not match.');
+        setModalError(tAuth('pinMgmtErrorPinMismatch'));
         return;
       }
       setModalLoading(true);
@@ -434,7 +436,7 @@ export default function ParentPinManagementPage() {
               </Text>
             </Group>
             <Text size="sm" c="dimmed">
-              This is your own account PIN for this device.
+              {tAuth('pinMgmtParentRowDescription')}
             </Text>
           </Stack>
           <Group gap="xs">
@@ -443,17 +445,21 @@ export default function ParentPinManagementPage() {
               color={parentHasPin ? 'green' : 'gray'}
               leftSection={<IconKey size={14} />}
             >
-              {parentChecking ? 'Checking…' : parentHasPin ? 'PIN set on this device' : 'No PIN on this device'}
+              {parentChecking
+                ? tAuth('pinMgmtParentStatusChecking')
+                : parentHasPin
+                ? tAuth('pinMgmtParentStatusSet')
+                : tAuth('pinMgmtParentStatusNotSet')}
             </Badge>
             <Group gap="xs">
               {!parentHasPin ? (
                 <Button id="parent-pin-set" size="xs" onClick={openParentSetModal}>
-                  Set PIN
+                  {tAuth('pinMgmtParentSet')}
                 </Button>
               ) : (
                 <>
                   <Button id="parent-pin-change" size="xs" variant="light" onClick={openParentChangeModal}>
-                    Change PIN
+                    {tAuth('pinMgmtParentChange')}
                   </Button>
                   <Button
                     id="parent-pin-remove"
@@ -462,7 +468,7 @@ export default function ParentPinManagementPage() {
                     color="red"
                     onClick={openParentRemoveModal}
                   >
-                    Remove PIN
+                    {tAuth('pinMgmtParentRemove')}
                   </Button>
                 </>
               )}
@@ -497,7 +503,7 @@ export default function ParentPinManagementPage() {
               </Text>
             </Group>
             <Text size="sm" c="dimmed">
-              Roll number: {child.studentId}
+              {tAuth('pinMgmtChildRollLabel', { roll: child.studentId })}
             </Text>
           </Stack>
           <Group gap="xs">
@@ -507,10 +513,10 @@ export default function ParentPinManagementPage() {
               leftSection={<IconKey size={14} />}
             >
               {state.checking
-                ? 'Checking…'
+                ? tAuth('pinMgmtChildStatusChecking')
                 : state.hasPin
-                ? 'PIN set on this device'
-                : 'No PIN on this device'}
+                ? tAuth('pinMgmtChildStatusSet')
+                : tAuth('pinMgmtChildStatusNotSet')}
             </Badge>
             <Group gap="xs">
               {!state.hasPin ? (
@@ -519,7 +525,7 @@ export default function ParentPinManagementPage() {
                   size="xs"
                   onClick={() => openChildSetModal(child)}
                 >
-                  Set PIN
+                  {tAuth('pinMgmtChildSet')}
                 </Button>
               ) : (
                 <>
@@ -529,7 +535,7 @@ export default function ParentPinManagementPage() {
                     variant="light"
                     onClick={() => openChildChangeModal(child)}
                   >
-                    Change PIN
+                    {tAuth('pinMgmtChildChange')}
                   </Button>
                   <Button
                     id={`child-pin-remove-${child.id}`}
@@ -538,7 +544,7 @@ export default function ParentPinManagementPage() {
                     color="red"
                     onClick={() => openChildRemoveModal(child)}
                   >
-                    Remove PIN
+                    {tAuth('pinMgmtChildRemove')}
                   </Button>
                 </>
               )}
@@ -556,19 +562,19 @@ export default function ParentPinManagementPage() {
 
   const modalTitle = (() => {
     if (!modalState) return '';
-    if (modalState.mode === 'parent-set') return 'Set parent PIN';
-    if (modalState.mode === 'parent-change') return 'Change parent PIN';
-    if (modalState.mode === 'parent-remove') return 'Remove parent PIN';
-    if (modalState.mode === 'child-set') return 'Set child PIN';
-    if (modalState.mode === 'child-change') return 'Change child PIN';
-    return 'Remove child PIN';
+    if (modalState.mode === 'parent-set') return tAuth('pinMgmtModalTitleParentSet');
+    if (modalState.mode === 'parent-change') return tAuth('pinMgmtModalTitleParentChange');
+    if (modalState.mode === 'parent-remove') return tAuth('pinMgmtModalTitleParentRemove');
+    if (modalState.mode === 'child-set') return tAuth('pinMgmtModalTitleChildSet');
+    if (modalState.mode === 'child-change') return tAuth('pinMgmtModalTitleChildChange');
+    return tAuth('pinMgmtModalTitleChildRemove');
   })();
 
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>PIN Management</Title>
+          <Title order={1}>{tAuth('pinMgmtPageTitle')}</Title>
         </Group>
       </div>
 
@@ -585,7 +591,7 @@ export default function ParentPinManagementPage() {
           {renderParentRow()}
 
           <Title order={3} mt="md">
-            Children
+            {tAuth('pinMgmtChildrenTitle')}
           </Title>
 
           {childrenLoading ? (
@@ -597,19 +603,18 @@ export default function ParentPinManagementPage() {
             <Alert
               icon={<IconAlertCircle size={16} />}
               color={colors.error}
-              title="Failed to load children"
+              title={tAuth('pinMgmtChildrenLoadingErrorTitle')}
             >
-              <Text size="sm">Please try again.</Text>
+              <Text size="sm">{tAuth('pinMgmtChildrenLoadingErrorBody')}</Text>
             </Alert>
           ) : children.length === 0 ? (
             <Alert
               icon={<IconUsersGroup size={16} />}
               color={colors.info}
-              title="No children linked"
+              title={tAuth('pinMgmtChildrenEmptyTitle')}
             >
               <Text size="sm">
-                No children are linked to your account yet. Please contact the school
-                administrator.
+                {tAuth('pinMgmtChildrenEmptyBody')}
               </Text>
             </Alert>
           ) : (
@@ -634,13 +639,10 @@ export default function ParentPinManagementPage() {
 
             {modalState.mode === 'parent-remove' && (
               <>
-                <Text size="sm">
-                  Remove PIN for your own account on this device? You will no longer be able to log
-                  in with PIN here until you set a new one.
-                </Text>
+                <Text size="sm">{tAuth('pinMgmtParentRemoveBody')}</Text>
                 <Group justify="flex-end">
                   <Button variant="light" onClick={resetModalState}>
-                    Cancel
+                    {tAuth('pinMgmtModalCancel')}
                   </Button>
                   <Button
                     id="parent-pin-confirm-remove"
@@ -648,7 +650,7 @@ export default function ParentPinManagementPage() {
                     loading={modalLoading}
                     onClick={handleParentPinRemove}
                   >
-                    Remove PIN
+                    {tAuth('pinMgmtModalRemoveConfirm')}
                   </Button>
                 </Group>
               </>
@@ -656,14 +658,11 @@ export default function ParentPinManagementPage() {
 
             {(modalState.mode === 'parent-set' || modalState.mode === 'parent-change') && (
               <>
-                <Text size="sm">
-                  Choose a 4–6 digit PIN for your own account on this device. This will encrypt your
-                  current session so you can log in with PIN next time.
-                </Text>
+                <Text size="sm">{tAuth('pinMgmtParentSetBody')}</Text>
                 <PasswordInput
                   id="parent-pin-input"
-                  label="PIN"
-                  placeholder="4–6 digits"
+                  label={tAuth('pinMgmtParentPinLabel')}
+                  placeholder={tAuth('pinMgmtParentPinPlaceholder')}
                   value={pin}
                   onChange={(e) => setPin(e.currentTarget.value.replace(/\D/g, '').slice(0, 6))}
                   maxLength={6}
@@ -671,8 +670,8 @@ export default function ParentPinManagementPage() {
                 />
                 <PasswordInput
                   id="parent-pin-confirm-input"
-                  label="Confirm PIN"
-                  placeholder="Re-enter PIN"
+                  label={tAuth('pinMgmtParentConfirmPinLabel')}
+                  placeholder={tAuth('pinMgmtParentConfirmPinPlaceholder')}
                   value={confirmPin}
                   onChange={(e) =>
                     setConfirmPin(e.currentTarget.value.replace(/\D/g, '').slice(0, 6))
@@ -682,14 +681,14 @@ export default function ParentPinManagementPage() {
                 />
                 <Group justify="flex-end">
                   <Button variant="light" onClick={resetModalState} disabled={modalLoading}>
-                    Cancel
+                    {tAuth('pinMgmtModalCancel')}
                   </Button>
                   <Button
                     id="parent-pin-confirm-save"
                     loading={modalLoading}
                     onClick={handleParentPinSave}
                   >
-                    Save PIN
+                    {tAuth('pinMgmtParentSaveConfirm')}
                   </Button>
                 </Group>
               </>
@@ -698,38 +697,36 @@ export default function ParentPinManagementPage() {
             {isChildMode && modalState.mode !== 'child-remove' && modalStep === 'login' && (
               <>
                 <Text size="sm">
-                  To set up PIN for{' '}
-                  <strong>
-                    {modalState.child?.firstName} {modalState.child?.lastName}
-                  </strong>
-                  , please enter their school login credentials.
+                  {tAuth('pinMgmtChildLoginBody', {
+                    childName: `${modalState.child?.firstName ?? ''} ${modalState.child?.lastName ?? ''}`.trim(),
+                  })}
                 </Text>
                 <TextInput
                   id="child-email-input"
-                  label="Child email"
-                  placeholder="student email"
+                  label={tAuth('pinMgmtChildEmailLabel')}
+                  placeholder={tAuth('pinMgmtChildEmailPlaceholder')}
                   value={childEmailInput}
                   onChange={(e) => setChildEmailInput(e.currentTarget.value)}
                   disabled={modalLoading}
                 />
                 <PasswordInput
                   id="child-password-input"
-                  label="Child password"
-                  placeholder="Enter child password"
+                  label={tAuth('pinMgmtChildPasswordLabel')}
+                  placeholder={tAuth('pinMgmtChildPasswordPlaceholder')}
                   value={childPasswordInput}
                   onChange={(e) => setChildPasswordInput(e.currentTarget.value)}
                   disabled={modalLoading}
                 />
                 <Group justify="flex-end">
                   <Button variant="light" onClick={resetModalState} disabled={modalLoading}>
-                    Cancel
+                    {tAuth('pinMgmtModalCancel')}
                   </Button>
                   <Button
                     id="child-pin-continue"
                     loading={modalLoading}
                     onClick={handleChildPinFlow}
                   >
-                    Continue
+                    {tAuth('pinMgmtChildContinue')}
                   </Button>
                 </Group>
               </>
@@ -738,16 +735,14 @@ export default function ParentPinManagementPage() {
             {isChildMode && modalState.mode !== 'child-remove' && modalStep === 'pin' && (
               <>
                 <Text size="sm">
-                  Choose a 4–6 digit PIN for{' '}
-                  <strong>
-                    {modalState.child?.firstName} {modalState.child?.lastName}
-                  </strong>{' '}
-                  on this device.
+                  {tAuth('pinMgmtChildPinBody', {
+                    childName: `${modalState.child?.firstName ?? ''} ${modalState.child?.lastName ?? ''}`.trim(),
+                  })}
                 </Text>
                 <PasswordInput
                   id="child-pin-input"
-                  label="PIN"
-                  placeholder="4–6 digits"
+                  label={tAuth('pinMgmtChildPinLabel')}
+                  placeholder={tAuth('pinMgmtChildPinPlaceholder')}
                   value={pin}
                   onChange={(e) => setPin(e.currentTarget.value.replace(/\D/g, '').slice(0, 6))}
                   maxLength={6}
@@ -755,8 +750,8 @@ export default function ParentPinManagementPage() {
                 />
                 <PasswordInput
                   id="child-pin-confirm-input"
-                  label="Confirm PIN"
-                  placeholder="Re-enter PIN"
+                  label={tAuth('pinMgmtChildConfirmPinLabel')}
+                  placeholder={tAuth('pinMgmtChildConfirmPinPlaceholder')}
                   value={confirmPin}
                   onChange={(e) =>
                     setConfirmPin(e.currentTarget.value.replace(/\D/g, '').slice(0, 6))
@@ -766,14 +761,14 @@ export default function ParentPinManagementPage() {
                 />
                 <Group justify="flex-end">
                   <Button variant="light" onClick={resetModalState} disabled={modalLoading}>
-                    Cancel
+                    {tAuth('pinMgmtModalCancel')}
                   </Button>
                   <Button
                     id="child-pin-confirm-save"
                     loading={modalLoading}
                     onClick={handleChildPinFlow}
                   >
-                    Save PIN
+                    {tAuth('pinMgmtChildSaveConfirm')}
                   </Button>
                 </Group>
               </>
@@ -782,15 +777,13 @@ export default function ParentPinManagementPage() {
             {modalState?.mode === 'child-remove' && (
               <>
                 <Text size="sm">
-                  Remove PIN on this device for{' '}
-                  <strong>
-                    {modalState.child?.firstName} {modalState.child?.lastName}
-                  </strong>
-                  ? They will no longer be able to log in with PIN here until you set a new one.
+                  {tAuth('pinMgmtChildRemoveBody', {
+                    childName: `${modalState.child?.firstName ?? ''} ${modalState.child?.lastName ?? ''}`.trim(),
+                  })}
                 </Text>
                 <Group justify="flex-end">
                   <Button variant="light" onClick={resetModalState} disabled={modalLoading}>
-                    Cancel
+                    {tAuth('pinMgmtModalCancel')}
                   </Button>
                   <Button
                     id="child-pin-confirm-remove"
@@ -798,7 +791,7 @@ export default function ParentPinManagementPage() {
                     loading={modalLoading}
                     onClick={handleChildPinRemove}
                   >
-                    Remove PIN
+                    {tAuth('pinMgmtModalRemoveConfirm')}
                   </Button>
                 </Group>
               </>

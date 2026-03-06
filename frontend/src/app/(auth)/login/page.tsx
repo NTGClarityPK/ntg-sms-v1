@@ -159,8 +159,10 @@ export default function LoginPage() {
         return;
       }
 
-      // If user has multiple branches, show selection modal
-      setBranches(userBranches);
+      // If user has multiple branches, show selection modal (deduplicate by id for Mantine Select)
+      setBranches(
+        Array.from(new Map((userBranches as Branch[]).map((b) => [b.id, b])).values()),
+      );
       setShowBranchSelection(true);
       setLoading(false);
     } catch (branchError: any) {

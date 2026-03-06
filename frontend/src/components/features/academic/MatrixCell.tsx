@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ActionIcon, Badge, Button, Group, Menu, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Button, Group, Menu, Text, Tooltip, Stack } from '@mantine/core';
 import { IconPlus, IconX } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
@@ -14,6 +14,7 @@ interface MatrixCellProps {
   subjectId: string;
   onCreate: (input: CreateTeacherAssignmentInput) => Promise<TeacherAssignment>;
   onDelete: (id: string) => Promise<void>;
+  showNameTooltip?: boolean;
 }
 
 function AssignMenuContent({
@@ -45,14 +46,16 @@ function AssignMenuContent({
 function TeacherBadge({
   assignment,
   onUnassign,
+  showNameTooltip,
 }: {
   assignment: TeacherAssignment;
   onUnassign: (id: string) => void;
+  showNameTooltip?: boolean;
 }) {
   const t = useTranslations('teacher');
   const [hovered, setHovered] = useState(false);
 
-  return (
+  const content = (
     <Group
       gap={2}
       wrap="nowrap"
@@ -88,6 +91,16 @@ function TeacherBadge({
       </Tooltip>
     </Group>
   );
+
+  if (showNameTooltip) {
+    return (
+      <Tooltip label={assignment.staffName || t('unknown')} withArrow>
+        {content}
+      </Tooltip>
+    );
+  }
+
+  return content;
 }
 
 export function MatrixCell({
@@ -96,6 +109,7 @@ export function MatrixCell({
   subjectId,
   onCreate,
   onDelete,
+  showNameTooltip,
 }: MatrixCellProps) {
   const t = useTranslations('teacher');
   const [assignMenuOpened, setAssignMenuOpened] = useState(false);
@@ -174,31 +188,47 @@ export function MatrixCell({
     );
   }
 
-  // Has teacher(s): [Badge1] ... [+][LastBadge] — small green + before the latest teacher
-  const teachersBeforeLast = assignments.slice(0, -1);
-  const lastTeacher = assignments[assignments.length - 1];
+  // Has teacher(s): first row is [+] and first teacher horizontally,
+  // additional teachers stack vertically underneath aligned with the first.
+  const [firstTeacher, ...otherTeachers] = assignments;
 
   return (
-    <Group gap={4} wrap="nowrap" align="center">
-      {teachersBeforeLast.map((assignment) => (
-        <TeacherBadge key={assignment.id} assignment={assignment} onUnassign={onDelete} />
-      ))}
-      <Menu opened={assignMenuOpened} onChange={setAssignMenuOpened}>
-        <Menu.Target>
-          <Tooltip label={t('assignTeacher')} withArrow>
-            <Button
-              variant="light"
-              size="xs"
-              px={6}
-              data-matrix-assign-button
-            >
-              <IconPlus size={14} />
-            </Button>
-          </Tooltip>
-        </Menu.Target>
-        {assignMenuDropdown}
-      </Menu>
-      <TeacherBadge assignment={lastTeacher} onUnassign={onDelete} />
-    </Group>
+    <Stack gap={4} align="flex-start">
+      <Group gap={4} wrap="nowrap" align="center">
+        <Menu opened={assignMenuOpened} onChange={setAssignMenuOpened}>
+          <Menu.Target>
+            <Tooltip label={t('assignTeacher')} withArrow>
+              <Button
+                variant="light"
+                size="xs"
+                px={6}
+                style={{ minWidth: 28 }}
+                data-matrix-assign-button
+              >
+                <IconPlus size={14} />
+              </Button>
+            </Tooltip>
+          </Menu.Target>
+          {assignMenuDropdown}
+        </Menu>
+        <TeacherBadge
+          assignment={firstTeacher}
+          onUnassign={onDelete}
+          showNameTooltip={showNameTooltip}
+        />
+      </Group>
+      {otherTeachers.length > 0 && (
+        <Stack gap={4} align="flex-start" style={{ marginLeft: 32 }}>
+          {otherTeachers.map((assignment) => (
+            <TeacherBadge
+              key={assignment.id}
+              assignment={assignment}
+              onUnassign={onDelete}
+              showNameTooltip={showNameTooltip}
+            />
+          ))}
+        </Stack>
+      )}
+    </Stack>
   );
 }

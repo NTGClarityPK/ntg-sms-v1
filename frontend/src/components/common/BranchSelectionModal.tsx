@@ -10,6 +10,10 @@ interface Branch {
   code: string;
 }
 
+function deduplicateBranchesById<T extends { id: string }>(branches: T[]): T[] {
+  return Array.from(new Map(branches.map((b) => [b.id, b])).values());
+}
+
 interface BranchSelectionModalProps {
   opened: boolean;
   branches: Branch[];
@@ -28,8 +32,9 @@ export function BranchSelectionModal({
   onClose,
 }: BranchSelectionModalProps) {
   const colors = useThemeColors();
+  const uniqueBranches = deduplicateBranchesById(branches);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(
-    branches.length > 0 ? branches[0].id : null,
+    uniqueBranches.length > 0 ? uniqueBranches[0].id : null,
   );
 
   const handleContinue = () => {
@@ -64,7 +69,7 @@ export function BranchSelectionModal({
           id="branch-selection-select"
           label="Branch"
           placeholder="Select a branch"
-          data={branches.map((b) => ({
+          data={uniqueBranches.map((b) => ({
             value: b.id,
             label: `${b.name} (${b.code})`,
           }))}

@@ -128,9 +128,9 @@ export class AssessmentController {
   async assignGradeTemplateToClass(
     @Param('id') gradeTemplateId: string,
     @Body() body: Omit<AssignGradeTemplateDto, 'gradeTemplateId'>,
-  ): Promise<{ data: unknown }> {
+  ): Promise<{ data: { assignedCount: number } }> {
     const result = await this.assessmentService.assignGradeTemplateToClass({
-      classId: body.classId,
+      classIds: body.classIds,
       gradeTemplateId,
       minimumPassingGrade: body.minimumPassingGrade,
     });

@@ -39,6 +39,23 @@ export class BranchGuard implements CanActivate {
 
       const row = profile as { current_branch_id: string | null } | null;
       branchId = row?.current_branch_id ?? undefined;
+
+      // Auto-select first branch when none set (e.g. non–school-admin users who skip branch modal)
+      if (!branchId) {
+        const { data: userBranches } = await supabase
+          .from('user_branches')
+          .select('branch_id')
+          .eq('user_id', userId)
+          .limit(1);
+        const firstBranchId = userBranches?.[0]?.branch_id;
+        if (firstBranchId) {
+          await supabase
+            .from('profiles')
+            .update({ current_branch_id: firstBranchId })
+            .eq('id', userId);
+          branchId = firstBranchId;
+        }
+      }
     }
 
     if (!branchId) {

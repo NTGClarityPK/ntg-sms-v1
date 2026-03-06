@@ -14,7 +14,9 @@ export function BranchSwitcher() {
   // Calculate derived values (before any returns)
   const userTyped = user as User | undefined;
   const isSchoolAdmin = userTyped?.roles?.some((r) => r.roleName === 'school_admin');
-  const branches = userTyped?.branches || [];
+  const branches = Array.from(
+    new Map((userTyped?.branches || []).map((b) => [b.id, b])).values(),
+  );
   const currentBranch = userTyped?.currentBranch;
 
   // Auto-select first branch if user has branches but no current branch selected

@@ -38,6 +38,8 @@
     "notFound": "Not found",
     "studentNotFound": "Student not found"
   },
+  "sidebarMain": "Main",
+  "sidebarManagement": "Management",
   "roleName": {
     "school_admin": "School Admin",
     "super_admin": "Super Admin",

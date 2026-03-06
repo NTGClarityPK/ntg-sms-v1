@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Paper,
   Table,
@@ -41,6 +41,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
   const [teacherSearchQuery, setTeacherSearchQuery] = useState('');
   const [onlyShowAssigned, setOnlyShowAssigned] = useState(false);
+  const [hasInitialisedSubjectFilter, setHasInitialisedSubjectFilter] = useState(false);
 
   const classSections = classSectionsData?.data || [];
   const subjects = subjectsData?.data || [];
@@ -98,6 +99,22 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
       return nameA.localeCompare(nameB);
     });
   }, [subjects]);
+
+  // On initial load, pre-select up to four subjects (if any) so the matrix
+  // starts in a focused state. Classes are unfiltered so all class-sections
+  // remain visible.
+  useEffect(() => {
+    if (!hasInitialisedSubjectFilter && uniqueSubjects.length > 0) {
+      setSelectedSubjectIds(uniqueSubjects.slice(0, 4).map((s) => s.id));
+      setHasInitialisedSubjectFilter(true);
+    }
+  }, [hasInitialisedSubjectFilter, uniqueSubjects, setSelectedSubjectIds]);
+
+  // Show teacher-name tooltip only when:
+  // 1) No subject filter (all subjects shown), OR
+  // 2) At least 4 subjects are selected.
+  const showTeacherNameTooltip =
+    selectedSubjectIds.length === 0 || selectedSubjectIds.length >= 4;
 
   // Class sections and subjects that have at least one assignment (for "only show assigned" filter)
   const assignedClassSectionIds = useMemo(() => {
@@ -318,6 +335,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
                           assignments={cellAssignments}
                           classSectionId={classSection.id}
                           subjectId={subject.id}
+                          showNameTooltip={showTeacherNameTooltip}
                           onCreate={async (input) => {
                             const result = await createAssignment.mutateAsync(input);
                             return result.data;

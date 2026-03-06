@@ -17,6 +17,7 @@ import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 type ProfileRow = {
   id: string;
   full_name: string;
+  email: string | null;
   avatar_url: string | null;
   phone: string | null;
   address: string | null;
@@ -88,7 +89,8 @@ export class UsersService {
     const supabase = this.supabaseConfig.getClient();
 
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    // Clamp limit to a safe maximum to avoid overloading Supabase/auth.
+    const limit = Math.min(query.limit ?? 20, 100);
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -142,12 +144,18 @@ export class UsersService {
       };
     }
 
-    // Step 2: Fetch profiles for these users (request count when filtering so total is correct)
-    const needFilterCount = query.isActive !== undefined;
-    let profilesQuery = supabase
-      .from('profiles')
-      .select('*', needFilterCount ? { count: 'exact' } : undefined)
-      .in('id', userIds);
+    // Step 2: Fetch profiles for the current page of users only.
+    // Avoid building extremely large IN() filters which can lead to
+    // \"TypeError: fetch failed\" for heavily seeded tenants (e.g. abcschool).
+    const pageUserIds = userIds.slice(from, from + limit);
+    if (pageUserIds.length === 0) {
+      return {
+        data: [],
+        meta: { total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) },
+      };
+    }
+
+    let profilesQuery = supabase.from('profiles').select('*').in('id', pageUserIds);
 
     // isActive is kept as string in DTO ('true' | 'false') to avoid NestJS converting 'false' to boolean true
     const isActiveBool: boolean | undefined =
@@ -184,15 +192,10 @@ export class UsersService {
     const dbSortColumn = sortColumnMap[sortBy] || 'created_at';
     profilesQuery = profilesQuery.order(dbSortColumn, { ascending });
 
-    profilesQuery = profilesQuery.range(from, to);
-
-    const { data: profilesData, error: profilesError, count: profilesCount } =
-      await profilesQuery;
+    const { data: profilesData, error: profilesError } = await profilesQuery;
     throwIfDbError(profilesError);
 
-    const totalFiltered =
-      needFilterCount && typeof profilesCount === 'number' ? profilesCount : total;
-    const totalPages = Math.max(1, Math.ceil(totalFiltered / limit));
+    const totalPages = Math.max(1, Math.ceil(total / limit));
 
     // Step 3: Fetch user_roles for these users in this branch
     const profileIds = (profilesData || []).map((p: ProfileRow) => p.id);
@@ -223,12 +226,12 @@ export class UsersService {
     throwIfDbError(rolesError);
     const roleMap = new Map((rolesData || []).map((r: RoleRow) => [r.id, r]));
 
-    // Step 5: Get emails for this page only (never listUsers - loads all auth users)
-    const emailPromises = profileIds.map((id) =>
-      supabase.auth.admin.getUserById(id).then((res) => [id, res.data.user?.email ?? ''] as const),
-    );
-    const emailEntries = await Promise.all(emailPromises);
-    const emailMap = new Map<string, string>(emailEntries);
+    // Step 5: Email resolution
+    // For large seeded tenants (like abcschool) calling auth.admin.getUserById
+    // hundreds of times per page was causing unstable \"fetch failed\" errors.
+    // To keep the users list reliable, we avoid runtime auth lookups here and
+    // fall back to empty emails (or future profile-backed emails).
+    const emailMap = new Map<string, string>();
 
     // Step 6: Filter by email search if needed (client-side after fetching emails)
     let filteredProfiles = profilesData || [];
@@ -266,7 +269,7 @@ export class UsersService {
 
       return new UserDto({
         id: profile.id,
-        email: emailMap.get(profile.id) || '',
+        email: profile.email ?? '',
         fullName: profile.full_name,
         avatarUrl: profile.avatar_url ?? undefined,
         phone: profile.phone ?? undefined,
@@ -282,7 +285,7 @@ export class UsersService {
 
     return {
       data: users,
-      meta: { total: totalFiltered, page, limit, totalPages },
+      meta: { total, page, limit, totalPages },
     };
   }
 
@@ -349,12 +352,10 @@ export class UsersService {
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
-    const { data: authUser } = await supabase.auth.admin.getUserById(id);
-
     const row = profile as ProfileRow;
     return new UserDto({
       id: row.id,
-      email: authUser.user?.email || '',
+      email: row.email ?? '',
       fullName: row.full_name,
       avatarUrl: row.avatar_url ?? undefined,
       phone: row.phone ?? undefined,

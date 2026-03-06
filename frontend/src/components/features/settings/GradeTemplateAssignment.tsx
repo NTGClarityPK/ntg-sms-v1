@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, Paper, Select, Stack, Table, Text } from '@mantine/core';
+import { Alert, Button, Group, MultiSelect, Paper, Select, Stack, Table, Text } from '@mantine/core';
 import { useMemo, useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -20,7 +20,7 @@ export function GradeTemplateAssignment() {
   const assignmentsQuery = useClassGradeAssignments();
 
   const [gradeTemplateId, setGradeTemplateId] = useState<string | null>(null);
-  const [classId, setClassId] = useState<string | null>(null);
+  const [classIds, setClassIds] = useState<string[]>([]);
   const [minimumPassingGrade, setMinimumPassingGrade] = useState<string | null>(null);
 
   const templateOptions = useMemo(
@@ -35,13 +35,18 @@ export function GradeTemplateAssignment() {
   const selectedTemplate = (templatesQuery.data?.data ?? []).find((t) => t.id === gradeTemplateId);
   const gradeOptions = (selectedTemplate?.ranges ?? []).map((r) => ({ value: r.letter, label: r.letter }));
 
-  const canSubmit = Boolean(gradeTemplateId && classId && minimumPassingGrade);
+  const canSubmit = Boolean(gradeTemplateId && classIds.length > 0 && minimumPassingGrade);
 
   const onAssign = async () => {
-    if (!gradeTemplateId || !classId || !minimumPassingGrade) return;
+    if (!gradeTemplateId || classIds.length === 0 || !minimumPassingGrade) return;
     try {
-      await assignMutation.mutateAsync({ gradeTemplateId, classId, minimumPassingGrade });
-      notifications.show({ title: tCommon('success'), message: tSettings('gradeAssignSuccess'), color: notifyColors.success });
+      await assignMutation.mutateAsync({ gradeTemplateId, classIds, minimumPassingGrade });
+      notifications.show({
+        title: tCommon('success'),
+        message: tSettings('gradeAssignSuccess'),
+        color: notifyColors.success,
+      });
+      setClassIds([]);
     } catch (error) {
       const message = error instanceof Error ? error.message : tCommon('errors.generic');
       notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
@@ -69,13 +74,15 @@ export function GradeTemplateAssignment() {
             value={gradeTemplateId}
             onChange={(v) => { setGradeTemplateId(v); setMinimumPassingGrade(null); }}
           />
-          <Select
+          <MultiSelect
             id="grade-template-assign-class"
             label={tSettings('gradeAssignClassLabel')}
             placeholder={tSettings('gradeAssignClassPlaceholder')}
             data={classOptions}
-            value={classId}
-            onChange={setClassId}
+            value={classIds}
+            onChange={setClassIds}
+            searchable
+            clearable
           />
           <Select
             id="grade-template-assign-passing-grade"

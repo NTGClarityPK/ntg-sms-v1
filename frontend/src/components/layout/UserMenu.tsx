@@ -27,8 +27,12 @@ export function UserMenu() {
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
 
-  const branches = (userTyped?.branches || []) as Branch[];
+  const branches = Array.from(
+    new Map(((userTyped?.branches || []) as Branch[]).map((b) => [b.id, b])).values(),
+  );
   const hasMultipleBranches = branches.length > 1;
+  const isSchoolAdmin =
+    userTyped?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
   const { promptInstall, canInstallDirectly, isSafari, isInstalled, setShowSafariModal } = useInstallApp();
 
   const handleInstallApp = () => {
@@ -132,7 +136,7 @@ export function UserMenu() {
           </Menu.Item>
         )}
         
-        {hasMultipleBranches && (
+        {hasMultipleBranches && isSchoolAdmin && (
           <>
             <Menu.Divider />
             <Menu.Item

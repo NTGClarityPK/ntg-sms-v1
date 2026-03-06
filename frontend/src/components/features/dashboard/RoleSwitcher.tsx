@@ -27,10 +27,15 @@ export function RoleSwitcher({
   const roles = user?.roles ?? [];
   if (roles.length <= 1) return null;
 
-  const options = roles.map((r) => ({
-    value: r.roleId,
-    label: formatRoleLabel(r.roleName),
-  }));
+  // Deduplicate by roleId: same role on multiple branches must not produce duplicate option values (Mantine forbids them)
+  const options = Array.from(
+    new Map(
+      roles.map((r) => [
+        r.roleId,
+        { value: r.roleId, label: formatRoleLabel(r.roleName) },
+      ])
+    ).values()
+  );
 
   const value = selectedRoleId && options.some((o) => o.value === selectedRoleId)
     ? selectedRoleId

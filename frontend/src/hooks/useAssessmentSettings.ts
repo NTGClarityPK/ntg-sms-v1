@@ -108,9 +108,9 @@ export function useDeleteGradeTemplate() {
 export function useAssignGradeTemplateToClass() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { gradeTemplateId: string; classId: string; minimumPassingGrade: string }) =>
-      apiClient.put<unknown>(`/api/v1/grade-templates/${payload.gradeTemplateId}/assign-classes`, {
-        classId: payload.classId,
+    mutationFn: async (payload: { gradeTemplateId: string; classIds: string[]; minimumPassingGrade: string }) =>
+      apiClient.put<{ assignedCount: number }>(`/api/v1/grade-templates/${payload.gradeTemplateId}/assign-classes`, {
+        classIds: payload.classIds,
         minimumPassingGrade: payload.minimumPassingGrade,
       }),
     onSuccess: async () => {

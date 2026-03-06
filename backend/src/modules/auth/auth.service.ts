@@ -160,7 +160,22 @@ export class AuthService {
     }
 
     // Use current_branch_id from profile (already fetched, no extra query needed)
-    const currentBranchId = (profile as { current_branch_id: string | null } | null)?.current_branch_id ?? null;
+    let currentBranchId = (profile as { current_branch_id: string | null } | null)?.current_branch_id ?? null;
+
+    // Auto-set current branch for users who have exactly one branch (e.g. non–school-admin roles
+    // that skip the branch selection modal). Ensures BranchGuard and frontend have a branch without
+    // requiring a separate select-branch call.
+    if (!currentBranchId && branches.length > 0) {
+      const defaultBranchId = branches[0].id;
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ current_branch_id: defaultBranchId })
+        .eq('id', userId);
+      if (!updateError) {
+        currentBranchId = defaultBranchId;
+      }
+    }
+
     const currentBranch = currentBranchId
       ? branches.find((b) => b.id === currentBranchId) ?? null
       : null;

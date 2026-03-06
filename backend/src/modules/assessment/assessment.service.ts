@@ -464,14 +464,21 @@ export class AssessmentService {
     return { id };
   }
 
-  async assignGradeTemplateToClass(input: { classId: string; gradeTemplateId: string; minimumPassingGrade: string }): Promise<{ data: ClassGradeAssignmentRow }> {
+  async assignGradeTemplateToClass(input: {
+    classIds: string[];
+    gradeTemplateId: string;
+    minimumPassingGrade: string;
+  }): Promise<{ data: { assignedCount: number } }> {
     const supabase = this.supabaseConfig.getClient();
 
-    const { data: template, error: tError } = await supabase.from('grade_templates').select('id').eq('id', input.gradeTemplateId).maybeSingle();
+    const { data: template, error: tError } = await supabase
+      .from('grade_templates')
+      .select('id')
+      .eq('id', input.gradeTemplateId)
+      .maybeSingle();
     throwIfDbError(tError);
     if (!template) throw new NotFoundException('Grade template not found');
 
-    // Ensure passing grade exists in template
     const { data: letterRow, error: lError } = await supabase
       .from('grade_ranges')
       .select('id')
@@ -481,22 +488,23 @@ export class AssessmentService {
     throwIfDbError(lError);
     if (!letterRow) throw new BadRequestException('minimumPassingGrade must exist in the template ranges');
 
-    // Upsert by unique class_id
-    const { data, error } = await supabase
+    const uniqueClassIds = Array.from(new Set(input.classIds));
+    if (uniqueClassIds.length === 0) {
+      return { data: { assignedCount: 0 } };
+    }
+
+    const rows = uniqueClassIds.map((class_id) => ({
+      class_id,
+      grade_template_id: input.gradeTemplateId,
+      minimum_passing_grade: input.minimumPassingGrade,
+    }));
+
+    const { error } = await supabase
       .from('class_grade_assignments')
-      .upsert(
-        {
-          class_id: input.classId,
-          grade_template_id: input.gradeTemplateId,
-          minimum_passing_grade: input.minimumPassingGrade,
-        },
-        { onConflict: 'class_id' },
-      )
-      .select('*')
-      .single();
+      .upsert(rows, { onConflict: 'class_id' });
     throwIfDbError(error);
 
-    return { data: data as ClassGradeAssignmentRow };
+    return { data: { assignedCount: rows.length } };
   }
 
   async listClassGradeAssignments(branchId: string): Promise<{

@@ -38,6 +38,8 @@
     "notFound": "غير موجود",
     "studentNotFound": "الطالب غير موجود"
   },
+  "sidebarMain": "رئيسي",
+  "sidebarManagement": "إدارة",
   "roleName": {
     "school_admin": "مسؤول المدرسة",
     "super_admin": "المسؤول الأعلى",

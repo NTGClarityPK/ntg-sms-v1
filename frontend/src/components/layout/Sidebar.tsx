@@ -211,6 +211,7 @@ export function Sidebar({
   const pathname = usePathname();
   const theme = useMantineTheme();
   const tNav = useTranslations('navigation');
+  const tCommon = useTranslations('common');
   const { user } = useAuth();
   const { canView } = usePermissions();
   const { studentToken } = useStudentSessionStore();
@@ -490,7 +491,7 @@ export function Sidebar({
           {/* Main Navigation */}
           {!effectiveCollapsed && mainItems.length > 0 && (
             <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-              Main
+              {tCommon('sidebarMain')}
             </Text>
           )}
           {mainItems.map(renderNavItem)}
@@ -501,7 +502,7 @@ export function Sidebar({
               {!effectiveCollapsed && <Divider my="sm" />}
               {!effectiveCollapsed && (
                 <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                  Management
+                  {tCommon('sidebarManagement')}
                 </Text>
               )}
               {managementItems.map(renderNavItem)}

@@ -16,7 +16,10 @@ export default function TeacherMappingPage() {
   const t = useTranslations('teacher');
   const [opened, { open, close }] = useDisclosure(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const { data, isLoading, error } = useTeacherAssignments();
+  // Fetch enough assignments to cover all subjects/class-sections for the branch.
+  // Backend pagination will cap this to its max, but we request a high limit so
+  // the matrix view has a complete picture instead of only the first page.
+  const { data, isLoading, error } = useTeacherAssignments({ limit: 500 });
 
   // Show skeleton when loading OR when data is not yet available (prevents flash of content)
   if (isLoading || !data) {
