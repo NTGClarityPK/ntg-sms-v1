@@ -31,6 +31,7 @@ export default getRequestConfig(async () => {
     event,
     timetable,
     reports,
+    results,
     settings,
     storage,
   ] =
@@ -55,6 +56,7 @@ export default getRequestConfig(async () => {
       load('event.json'),
       load('timetable.json'),
       load('reports.json'),
+      load('results.json'),
       load('settings.json'),
       load('storage.json'),
     ]);
@@ -82,6 +84,7 @@ export default getRequestConfig(async () => {
       event,
       timetable,
       reports,
+      results,
       settings,
       storage,
     },

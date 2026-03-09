@@ -34,6 +34,7 @@ import { SubjectTemplatesModule } from './modules/subject-templates/subject-temp
 import { EventsModule } from './modules/events/events.module';
 import { BehavioralModule } from './modules/behavioral/behavioral.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { ResultsModule } from './modules/results/results.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AuditLogModule } from './common/modules/audit-log/audit-log.module';
 import { MessagesModule } from './modules/messages/messages.module';
@@ -83,6 +84,7 @@ import { StudentSelfModule } from './modules/student-self/student-self.module';
     EventsModule,
     BehavioralModule,
     ReportsModule,
+    ResultsModule,
     AuditLogsModule,
     MessagesModule,
     LibraryModule,

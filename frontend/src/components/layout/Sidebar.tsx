@@ -166,6 +166,7 @@ const allNavItems: NavItem[] = [
     },
   },
   { key: 'reports', label: 'Report', href: '/reports', icon: IconChartBar },
+  { key: 'results', label: 'Results', href: '/results', icon: IconChartBar },
   {
     key: 'storage',
     label: 'Storage',
@@ -410,6 +411,7 @@ export function Sidebar({
       item.href === '/inventory' ||
       item.href === '/uniform-request' ||
       item.href === '/reports' ||
+      item.href === '/results' ||
       item.href === '/admin/storage' ||
       item.href === '/settings'
   );

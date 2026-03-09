@@ -1,0 +1,79 @@
+name: Deploy SMS (Staging & Production)
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: self-hosted
+    
+    steps:
+      - name: Determine Environment
+        id: env
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
+            echo "DEPLOY_PATH=/home/dev/production/ntg-sms-v1" >> $GITHUB_OUTPUT
+            echo "BACKEND_PORT=9001" >> $GITHUB_OUTPUT
+            echo "FRONTEND_PORT=9000" >> $GITHUB_OUTPUT
+            echo "BRANCH=main" >> $GITHUB_OUTPUT
+          else
+            echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
+            echo "DEPLOY_PATH=/home/dev/staging/ntg-sms-v1" >> $GITHUB_OUTPUT
+            echo "BACKEND_PORT=6001" >> $GITHUB_OUTPUT
+            echo "FRONTEND_PORT=6000" >> $GITHUB_OUTPUT
+            echo "BRANCH=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Show Deployment Info
+        run: |
+          echo "🚀 Deploying to: ${{ steps.env.outputs.ENVIRONMENT }}"
+          echo "📁 Path: ${{ steps.env.outputs.DEPLOY_PATH }}"
+          echo "🌐 Frontend Port: ${{ steps.env.outputs.FRONTEND_PORT }}"
+          echo "🔌 Backend Port: ${{ steps.env.outputs.BACKEND_PORT }}"
+
+      - name: Update Code on Server
+        run: |
+          cd ${{ steps.env.outputs.DEPLOY_PATH }}
+          git fetch origin
+          git reset --hard origin/${{ steps.env.outputs.BRANCH }}
+
+      - name: Deploy
+        run: |
+          cd ${{ steps.env.outputs.DEPLOY_PATH }}
+          
+          if [ "${{ steps.env.outputs.ENVIRONMENT }}" = "production" ]; then
+            echo "🏭 Deploying PRODUCTION..."
+            docker compose --env-file .env.prod down || true
+            docker compose --env-file .env.prod up -d --build
+          else
+            echo "🧪 Deploying STAGING..."
+            docker compose --env-file .env.staging -f docker-compose-staging.yml down || true
+            docker compose --env-file .env.staging -f docker-compose-staging.yml up -d --build
+          fi
+
+      - name: Health Check
+        run: |
+          echo "⏳ Waiting for backend to start..."
+          sleep 30
+          
+          MAX_RETRIES=30
+          RETRY=0
+          
+          while [ $RETRY -lt $MAX_RETRIES ]; do
+            if curl -f http://localhost:${{ steps.env.outputs.BACKEND_PORT }}/api/v1/health > /dev/null 2>&1; then
+              echo "✅ Backend is healthy!"
+              exit 0
+            fi
+            echo "Attempt $((RETRY+1))/$MAX_RETRIES failed, retrying..."
+            sleep 5
+            RETRY=$((RETRY+1))
+          done
+          
+          echo "❌ Health check failed after $MAX_RETRIES attempts"
+          exit 1
