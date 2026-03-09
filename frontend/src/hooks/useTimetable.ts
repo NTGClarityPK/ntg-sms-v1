@@ -21,6 +21,7 @@ export function useClassTimetable(
   classSectionId: string | null,
   academicYearId?: string,
   subjectTemplateId?: string,
+  options?: { enabled?: boolean },
 ) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
@@ -38,9 +39,42 @@ export function useClassTimetable(
       );
       return response;
     },
-    // Enable query if we have classSectionId and branchId
-    // subjectTemplateId is optional - if not provided, shows all slots regardless of template
-    enabled: !!classSectionId && !!branchId,
+    // Enable query if we have classSectionId and branchId.
+    // subjectTemplateId is optional - if not provided, shows all slots regardless of template.
+    // options.enabled allows callers to delay the initial fetch until defaults (e.g. template) are known.
+    enabled: !!classSectionId && !!branchId && (options?.enabled ?? true),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useClassTimetablesBatch(
+  classSectionIds: string[],
+  academicYearId?: string,
+  subjectTemplateId?: string,
+) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  // Deduplicate and sort IDs for stable query keys
+  const uniqueIds = Array.from(new Set(classSectionIds.filter((id) => !!id)));
+  const sortedIds = [...uniqueIds].sort();
+  const idsKey = sortedIds.join(',');
+
+  return useQuery({
+    queryKey: ['timetable', 'class-batch', branchId, idsKey, academicYearId, subjectTemplateId],
+    queryFn: async () => {
+      if (!branchId || sortedIds.length === 0) return null;
+      const params = new URLSearchParams();
+      params.append('classSectionIds', idsKey);
+      if (academicYearId) params.append('academicYearId', academicYearId);
+      if (subjectTemplateId) params.append('subjectTemplateId', subjectTemplateId);
+
+      const response = await apiClient.get<ClassTimetable[]>(
+        `/api/v1/timetable/batch?${params.toString()}`,
+      );
+      return response;
+    },
+    enabled: !!branchId && sortedIds.length > 0,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

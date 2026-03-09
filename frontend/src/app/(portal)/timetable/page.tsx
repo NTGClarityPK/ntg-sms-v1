@@ -13,7 +13,7 @@ import {
 } from '@mantine/core';
 import { useTranslations } from 'next-intl';
 import { useClassSections } from '@/hooks/useClassSections';
-import { useAcademicYears } from '@/hooks/useAcademicYears';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ClassTimetableContent } from '@/components/features/timetable/ClassTimetableContent';
 
@@ -21,12 +21,23 @@ export default function TimetablePage() {
   const t = useTranslations('timetable');
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
   const colors = useThemeColors();
-  const { data: classSectionsData, isLoading: isLoadingClassSections } = useClassSections({
-    isActive: true,
-  });
-  const { data: academicYearsData } = useAcademicYears();
+  const { data: activeYearResponse } = useActiveAcademicYear();
+  const activeYear = activeYearResponse?.data ?? null;
+  const activeYearId = activeYear?.id;
+  const { data: classSectionsData, isLoading: isLoadingClassSections } = useClassSections(
+    activeYearId
+      ? {
+          isActive: true,
+          minimal: true,
+          academicYearId: activeYearId,
+        }
+      : {
+          isActive: true,
+          minimal: true,
+          enabled: false,
+        },
+  );
 
-  const activeYear = academicYearsData?.data?.find((y) => y.isActive);
   const classSections = classSectionsData?.data || [];
 
   const classSectionOptions = classSections

@@ -4,10 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton, Container, Stack } from '@mantine/core';
 import { getSession } from '@/lib/auth';
-import { apiClient } from '@/lib/api-client';
-import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
-import { useThemeStore } from '@/lib/store/theme-store';
-import type { Tenant } from '@/types/tenant';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -17,6 +14,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const [checkingSession, setCheckingSession] = useState(true);
   const [hasSession, setHasSession] = useState(false);
+  const { user } = useAuth();
 
   // Check Supabase session directly - this is the source of truth
   useEffect(() => {
@@ -24,30 +22,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
       try {
         const session = await getSession();
         if (session?.access_token) {
-          // Check if user is super admin - redirect to admin portal
-          try {
-            const userResponse = await apiClient.get<{ roles?: Array<{ roleName?: string }> }>('/api/v1/auth/me');
-            const isSuperAdmin = userResponse.data?.roles?.some(
-              (r) => r.roleName?.toLowerCase() === 'super_admin'
-            );
-
-            if (isSuperAdmin) {
-              router.push('/adminportal');
-              return;
-            }
-          } catch {
-            // Continue with normal flow if check fails
-          }
-
-          // Bootstrap tenant theme before rendering protected pages.
-          // This keeps colour consistent for all users in the tenant on first paint.
-          try {
-            const tenantResponse = await apiClient.get<Tenant>('/api/v1/tenants/me');
-            const tenantTheme = tenantResponse.data?.primaryColor || DEFAULT_THEME_COLOR;
-            useThemeStore.getState().setPrimaryColor(tenantTheme);
-          } catch {
-            useThemeStore.getState().setPrimaryColor(DEFAULT_THEME_COLOR);
-          }
           setHasSession(true);
         } else {
           router.push('/login');
@@ -61,6 +35,19 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     checkSupabaseSession();
   }, [router]);
+
+  // If user is super admin, redirect to admin portal once session is confirmed
+  useEffect(() => {
+    if (!hasSession || !user) return;
+
+    const isSuperAdmin = user.roles?.some(
+      (r) => r.roleName?.toLowerCase() === 'super_admin',
+    );
+
+    if (isSuperAdmin) {
+      router.push('/adminportal');
+    }
+  }, [hasSession, user, router]);
 
   if (checkingSession) {
     return (

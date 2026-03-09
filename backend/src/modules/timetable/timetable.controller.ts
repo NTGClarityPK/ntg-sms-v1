@@ -173,6 +173,27 @@ export class TimetableController {
     return { data };
   }
 
+  @Get('batch')
+  async getClassTimetablesBatch(
+    @Query('classSectionIds') classSectionIdsParam: string,
+    @CurrentBranch() branch: { branchId: string },
+    @Query('academicYearId') academicYearId?: string,
+    @Query('subjectTemplateId') subjectTemplateId?: string,
+  ) {
+    const ids = (classSectionIdsParam || '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+
+    const data = await this.timetableService.getClassTimetablesBatch(
+      ids,
+      branch.branchId,
+      academicYearId,
+      subjectTemplateId,
+    );
+    return { data };
+  }
+
   @Get('class/:classSectionId/template-info')
   async getTimingTemplateInfo(
     @Param('classSectionId') classSectionId: string,

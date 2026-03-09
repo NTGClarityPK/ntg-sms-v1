@@ -88,7 +88,17 @@ type CreateTimetableSlotInput = {
   academicYearId?: string;
 };
 
-export function SlotEditPopover({
+// Lightweight wrapper: only mount the heavy popover logic (and its data-fetching hooks)
+// when the popover is actually opened. This avoids firing teacher-assignments, subjects,
+// staff, and other queries on initial timetable load.
+export function SlotEditPopover(props: SlotEditPopoverProps) {
+  if (!props.opened) {
+    return null;
+  }
+  return <SlotEditPopoverContent {...props} />;
+}
+
+function SlotEditPopoverContent({
   opened,
   onClose,
   target,

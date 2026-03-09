@@ -60,7 +60,7 @@ export function useClassSections(params?: QueryClassSectionsParams) {
       return response;
     },
     enabled: !!branchId && (params?.enabled !== false),
-    staleTime: 2 * 60 * 1000,  // 2 minutes - class sections rarely change mid-session
+    staleTime: params?.minimal ? 5 * 60 * 1000 : 2 * 60 * 1000, // minimal: 5 min (dropdowns); list: 2 min
   });
 }
 

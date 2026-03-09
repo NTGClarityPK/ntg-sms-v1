@@ -19,6 +19,7 @@ import { useClassSection, useClassSections } from '@/hooks/useClassSections';
 import type { ClassSection } from '@/types/class-sections';
 import {
   useClassTimetable,
+  useClassTimetablesBatch,
   useGenerateTimetable,
   useCheckSlotConflict,
   useTimingTemplateInfo,
@@ -76,8 +77,32 @@ export function ClassTimetableContent({
     classId,
     branchId ?? null,
   );
-  const { data: timetableData, isLoading: timetableLoading, error: timetableError } =
-    useClassTimetable(classSectionId ?? '', undefined, selectedTemplateId ?? undefined);
+  const availableTemplates = templatesData?.data ?? [];
+
+  // When templates load for the first time and no template is chosen yet,
+  // automatically select the first template as the default.
+  useEffect(() => {
+    if (!templatesLoading && !selectedTemplateId && availableTemplates.length > 0) {
+      setSelectedTemplateId(availableTemplates[0].id);
+    }
+  }, [templatesLoading, selectedTemplateId, availableTemplates]);
+
+  // Only enable timetable query once we know which template to use.
+  const timetableEnabled =
+    !!classSectionId && !!branchId && !!selectedTemplateId;
+
+  const {
+    data: timetableData,
+    isLoading: timetableLoading,
+    error: timetableError,
+    isFetched: timetableFetched,
+  } =
+    useClassTimetable(
+      classSectionId ?? '',
+      undefined,
+      selectedTemplateId ?? undefined,
+      { enabled: timetableEnabled },
+    );
   const { data: templateInfoData } = useTimingTemplateInfo(classSectionId ?? '');
   const generateMutation = useGenerateTimetable();
   const checkConflict = useCheckSlotConflict();
@@ -104,11 +129,13 @@ export function ClassTimetableContent({
   const [sourceSectionId, setSourceSectionId] = useState<string | null>(null);
   const [sourceTemplateId, setSourceTemplateId] = useState<string | null>(null);
 
-  // Fetch all class sections with the same classId (excluding current) for replicate to other sections
+  // Fetch all class sections with the same classId (excluding current) for replicate to other sections.
+  // Pass academicYearId so backend skips getActiveForBranch and responds faster.
   const { data: allClassSectionsData } = useClassSections({
     classId: classId ?? undefined,
     isActive: true,
     minimal: true,
+    academicYearId: activeYear?.data?.id,
   });
   const allClassSections = allClassSectionsData?.data ?? [];
   const otherSections = allClassSections
@@ -133,28 +160,31 @@ export function ClassTimetableContent({
   const allActiveSections = allActiveSectionsData?.data ?? [];
   const candidateSourceSections = allActiveSections.filter((cs) => cs.id !== classSectionId);
 
-  // Fetch timetables for all candidate sections in parallel to check if they have slots
-  const sourceTimetableQueries = useQueries({
-    queries: candidateSourceSections.map((section) => ({
-      queryKey: ['timetable', 'class', section.id, undefined, undefined, branchId],
-      queryFn: async () => {
-        if (!section.id || !branchId) return null;
-        const response = await apiClient.get<ClassTimetable>(
-          `/api/v1/timetable/class/${section.id}`,
-        );
-        return response;
-      },
-      enabled: !!section.id && !!branchId,
-      staleTime: 2 * 60 * 1000,
-    })),
-  });
+  // Fetch timetables for all candidate sections in a single batch call,
+  // only when the "Copy from other section" modal is open.
+  const candidateSourceSectionIds = candidateSourceSections
+    .map((cs) => cs.id)
+    .filter((id): id is string => !!id);
+
+  const batchTimetablesResponse = useClassTimetablesBatch(
+    replicateFromSectionModalOpened ? candidateSourceSectionIds : [],
+  );
+  const batchTimetables = batchTimetablesResponse.data?.data ?? [];
+
+  const timetablesBySectionId = useMemo(() => {
+    const map = new Map<string, ClassTimetable>();
+    batchTimetables.forEach((tt) => {
+      map.set(tt.classSectionId, tt);
+    });
+    return map;
+  }, [batchTimetables]);
 
   // Filter sections that have at least one slot and sort by class/section sort order
   const availableSourceSections = useMemo(() => {
     return candidateSourceSections
-      .filter((cs, index) => {
-        const queryResult = sourceTimetableQueries[index];
-        return queryResult?.data?.data?.slots && queryResult.data.data.slots.length > 0;
+      .filter((cs) => {
+        const timetable = timetablesBySectionId.get(cs.id);
+        return timetable && Array.isArray(timetable.slots) && timetable.slots.length > 0;
       })
       .sort((a, b) => {
         // Sort by class sort order first, then by section sort order
@@ -167,7 +197,7 @@ export function ClassTimetableContent({
         const sectionOrderB = b.sectionSortOrder ?? 999;
         return sectionOrderA - sectionOrderB;
       });
-  }, [candidateSourceSections, sourceTimetableQueries]);
+  }, [candidateSourceSections, timetablesBySectionId]);
 
   // Get the selected source section to fetch its class templates
   const selectedSourceSection = availableSourceSections.find((cs) => cs.id === sourceSectionId);
@@ -189,14 +219,6 @@ export function ClassTimetableContent({
     }
   }, [sourceSectionId, sourceTemplates, sourceTemplateId]);
   const timetable = timetableData?.data;
-  const availableTemplates = templatesData?.data ?? [];
-
-  // Auto-select first template if available, but don't require it
-  useEffect(() => {
-    if (!selectedTemplateId && availableTemplates.length > 0) {
-      setSelectedTemplateId(availableTemplates[0].id);
-    }
-  }, [availableTemplates, selectedTemplateId]);
 
   const handleSlotClick = (
     slot: TimetableSlot | null,
@@ -619,7 +641,7 @@ export function ClassTimetableContent({
               </>
             )}
 
-            {!timetableLoading && !timetable && !timetableError && (
+            {!timetableLoading && timetableFetched && !timetable && !timetableError && (
               <Alert color={colors.info} title={t('noTimetableData')}>
                 <Text size="sm">{t('noTimetableDataMessage')}</Text>
               </Alert>

@@ -228,6 +228,184 @@ export class TimetableService {
     });
   }
 
+  /**
+   * Batch variant of getClassTimetable.
+   * Fetches timetables for multiple class-sections in one go to avoid N+1 HTTP/database calls.
+   */
+  async getClassTimetablesBatch(
+    classSectionIds: string[],
+    branchId: string,
+    academicYearId?: string,
+    subjectTemplateId?: string,
+  ): Promise<ClassTimetableDto[]> {
+    if (!classSectionIds || classSectionIds.length === 0) {
+      return [];
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+
+    // Deduplicate IDs
+    const uniqueIds = Array.from(new Set(classSectionIds));
+
+    // Verify class-sections belong to branch and get their class/section IDs
+    const { data: classSectionRows, error: csError } = await supabase
+      .from('class_sections')
+      .select('id, class_id, section_id')
+      .in('id', uniqueIds)
+      .eq('branch_id', branchId);
+    throwIfDbError(csError);
+    const classSections =
+      (classSectionRows as Array<{ id: string; class_id: string; section_id: string }>) ?? [];
+    if (classSections.length === 0) {
+      return [];
+    }
+
+    const classIds = Array.from(new Set(classSections.map((cs) => cs.class_id)));
+    const sectionIds = Array.from(new Set(classSections.map((cs) => cs.section_id)));
+
+    // Resolve academic year once for the branch (batch endpoint focuses on current/active year)
+    let activeYearId = academicYearId;
+    if (!activeYearId) {
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+      if (!activeYear) {
+        throw new BadRequestException('No active academic year found');
+      }
+      activeYearId = activeYear.id;
+    }
+
+    // Fetch class and section names in parallel
+    const [classesResult, sectionsResult] = await Promise.all([
+      supabase.from('classes').select('id, name').in('id', classIds),
+      supabase.from('sections').select('id, name').in('id', sectionIds),
+    ]);
+    throwIfDbError(classesResult.error);
+    throwIfDbError(sectionsResult.error);
+
+    const classNameById = new Map<string, string>(
+      ((classesResult.data as Array<{ id: string; name: string }>) ?? []).map((c) => [
+        c.id,
+        c.name,
+      ]),
+    );
+    const sectionNameById = new Map<string, string>(
+      ((sectionsResult.data as Array<{ id: string; name: string }>) ?? []).map((s) => [
+        s.id,
+        s.name,
+      ]),
+    );
+
+    // Fetch all timetable slots for these class-sections in one query
+    let slotsQuery = supabase
+      .from('timetable_slots')
+      .select(
+        '*, subjects:subject_id(name), staff:staff_id(id, user_id)',
+      )
+      .in('class_section_id', uniqueIds)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYearId)
+      .order('day_of_week', { ascending: true })
+      .order('start_time', { ascending: true });
+
+    if (subjectTemplateId) {
+      slotsQuery = slotsQuery.eq('subject_template_id', subjectTemplateId);
+    }
+
+    const { data: slotsData, error: slotsError } = await slotsQuery;
+    throwIfDbError(slotsError);
+    const slotRows = (slotsData as TimetableSlotWithRelations[]) ?? [];
+
+    const slotsBySectionId = new Map<string, TimetableSlotDto[]>();
+    const staffUserIdBySlotId = new Map<string, string>();
+    const allSlots: TimetableSlotDto[] = [];
+
+    // Map rows to DTOs and group by class-section
+    for (const row of slotRows) {
+      const subjectData = Array.isArray(row.subjects) ? row.subjects[0] : row.subjects;
+      const staffData = Array.isArray(row.staff) ? row.staff[0] : row.staff;
+
+      if (staffData?.user_id) {
+        staffUserIdBySlotId.set(row.id, staffData.user_id);
+      }
+
+      const slotDto = new TimetableSlotDto({
+        id: row.id,
+        classSectionId: row.class_section_id,
+        dayOfWeek: row.day_of_week,
+        periodNumber: row.period_number ?? undefined,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        subjectId: row.subject_id ?? undefined,
+        staffId: row.staff_id ?? undefined,
+        room: row.room ?? undefined,
+        slotType: row.slot_type,
+        branchId: row.branch_id,
+        academicYearId: row.academic_year_id,
+        subjectTemplateId: (row as any).subject_template_id ?? undefined,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        subjectName: subjectData?.name,
+        staffName: undefined,
+        className: '', // set at container level
+        sectionName: '', // set at container level
+      });
+
+      allSlots.push(slotDto);
+      const existing = slotsBySectionId.get(row.class_section_id) ?? [];
+      existing.push(slotDto);
+      slotsBySectionId.set(row.class_section_id, existing);
+    }
+
+    // Fetch staff names once for all slots that have staff assignments
+    const staffUserIds = Array.from(new Set(staffUserIdBySlotId.values()));
+    if (staffUserIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', staffUserIds);
+      throwIfDbError(profilesError);
+
+      const profileMap = new Map(
+        ((profiles as Array<{ id: string; full_name: string }>) ?? []).map((p) => [
+          p.id,
+          p.full_name,
+        ]),
+      );
+
+      allSlots.forEach((slot) => {
+        const userId = staffUserIdBySlotId.get(slot.id);
+        if (userId) {
+          slot.staffName = profileMap.get(userId);
+        }
+      });
+    }
+
+    const classSectionById = new Map<
+      string,
+      { id: string; class_id: string; section_id: string }
+    >(classSections.map((cs) => [cs.id, cs]));
+
+    // Build result array in the same order as input classSectionIds (skipping missing ones)
+    const results: ClassTimetableDto[] = [];
+    for (const id of classSectionIds) {
+      const cs = classSectionById.get(id);
+      if (!cs) continue;
+      const className = classNameById.get(cs.class_id) ?? '';
+      const sectionName = sectionNameById.get(cs.section_id) ?? '';
+      const slotsForSection = slotsBySectionId.get(id) ?? [];
+
+      results.push(
+        new ClassTimetableDto({
+          classSectionId: id,
+          className,
+          sectionName,
+          slots: slotsForSection,
+        }),
+      );
+    }
+
+    return results;
+  }
+
   async getTeacherTimetable(
     staffId: string,
     branchId: string,

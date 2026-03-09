@@ -35,8 +35,9 @@ export default function MyTimetablePage() {
   const { themeVersion } = useThemeStore();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
-  const { data: activeYear } = useActiveAcademicYear();
-  const activeYearId = activeYear?.data?.id;
+  const { data: activeYearResponse } = useActiveAcademicYear();
+  const activeYear = activeYearResponse?.data ?? null;
+  const activeYearId = activeYear?.id;
 
   // Get light background color for banner (similar to blue-0 shade)
   // Reactive to theme changes via themeVersion dependency
@@ -59,9 +60,6 @@ export default function MyTimetablePage() {
 
   // Get current student
   const { data: myStudentData, isLoading: myStudentLoading, error: myStudentError } = useMyStudent();
-  console.log('[MyTimetablePage] myStudentData:', myStudentData);
-  console.log('[MyTimetablePage] myStudentLoading:', myStudentLoading);
-  console.log('[MyTimetablePage] myStudentError:', myStudentError);
   const studentId = myStudentData?.data?.id;
 
   // Get student's template assignment
@@ -78,6 +76,7 @@ export default function MyTimetablePage() {
           classId: myStudentData.data.classId,
           sectionId: myStudentData.data.sectionId,
           academicYearId: activeYearId,
+          minimal: true,
         }
       : undefined,
   );
@@ -126,24 +125,13 @@ export default function MyTimetablePage() {
       const currentMinutes = now.getMinutes();
       const currentTime = `${String(currentHours).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}:00`;
 
-      // Debug logging
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      console.log('[NextPeriod] Current day:', currentDay, `(${dayNames[currentDay]})`, 'Current time:', currentTime);
-      console.log('[NextPeriod] All slots:', timetable.slots);
-      console.log('[NextPeriod] Slots by day:', timetable.slots.map(s => ({ 
-        day: s.dayOfWeek, 
-        dayName: dayNames[s.dayOfWeek] || 'Unknown',
-        time: s.startTime, 
-        subject: s.subjectName || 'No subject'
-      })));
 
       // Filter today's slots - check if day matches
       const todaySlots = timetable.slots.filter((s) => s.dayOfWeek === currentDay);
-      console.log('[NextPeriod] Today slots (matching day', currentDay, `(${dayNames[currentDay]})):`, todaySlots);
-      
+
       // If no slots for today, try to find next available slot from any day
       if (todaySlots.length === 0) {
-        console.log('[NextPeriod] No slots for today, checking all slots for next available period...');
         // Find the next slot from any day (for better UX - show next period even if not today)
         const allUpcomingSlots = timetable.slots
           .map((s) => {
@@ -170,14 +158,10 @@ export default function MyTimetablePage() {
             }
             return a.startMinutes - b.startMinutes;
           });
-        
-        console.log('[NextPeriod] All upcoming slots (any day):', allUpcomingSlots);
-        
+
         if (allUpcomingSlots.length > 0) {
           const { slot: nextSlot, daysUntil, startMinutes } = allUpcomingSlots[0];
-          const nextDayName = dayNames[nextSlot.dayOfWeek] || 'Unknown';
-          console.log('[NextPeriod] Next slot is on', nextDayName, 'at', nextSlot.startTime, `(${daysUntil} days away)`);
-          
+
           // Calculate total time until next period
           const currentMinutesTotal = currentHours * 60 + currentMinutes;
           let totalMinutesUntil = 0;
@@ -201,8 +185,7 @@ export default function MyTimetablePage() {
           });
           return;
         }
-        
-        console.log('[NextPeriod] No upcoming slots found, setting status to none');
+
         setNextPeriod({ slot: null, timeUntil: null, status: 'none' });
         return;
       }
@@ -218,7 +201,6 @@ export default function MyTimetablePage() {
       });
 
       if (currentSlot) {
-        console.log('[NextPeriod] Currently in period:', currentSlot.subjectName);
         setNextPeriod({ slot: currentSlot, timeUntil: null, status: 'current' });
         return;
       }
@@ -237,8 +219,6 @@ export default function MyTimetablePage() {
           return aH * 60 + aM - (bH * 60 + bM);
         });
 
-      console.log('[NextPeriod] Upcoming slots:', upcomingSlots);
-
       if (upcomingSlots.length > 0) {
         const nextSlot = upcomingSlots[0];
         const [startH, startM] = nextSlot.startTime.split(':').map(Number);
@@ -249,15 +229,12 @@ export default function MyTimetablePage() {
         const hours = Math.floor(diffMinutes / 60);
         const minutes = diffMinutes % 60;
 
-        console.log('[NextPeriod] Next period:', nextSlot.subjectName, 'in', hours, 'hours', minutes, 'minutes');
         setNextPeriod({
           slot: nextSlot,
           timeUntil: { hours, minutes },
           status: 'upcoming',
         });
       } else {
-        // No more periods today
-        console.log('[NextPeriod] No more periods today');
         setNextPeriod({ slot: null, timeUntil: null, status: 'none' });
       }
     };
@@ -270,11 +247,9 @@ export default function MyTimetablePage() {
     };
   }, [timetable?.slots]);
 
-  console.log('[MyTimetablePage] subjectTemplate:', subjectTemplate);
-  console.log('[MyTimetablePage] myStudentData.data.subjectTemplateId:', myStudentData?.data?.subjectTemplateId);
-
-  // Loading state - only check isLoading flags, not data existence
-  if (myStudentLoading || timetableLoading || classSectionsLoading || templateInfoLoading) {
+  // Loading state: show page as soon as student, timetable and class-section are ready.
+  // Template info loads after classSectionId; we show the grid area as skeleton until then so the card doesn't hang.
+  if (myStudentLoading || timetableLoading || classSectionsLoading) {
     return (
       <>
         <div className="page-title-bar">
@@ -440,19 +415,23 @@ export default function MyTimetablePage() {
           </Paper>
 
           {timetable && (
-            <TimetableGrid
-              classSectionId={classSectionId ?? ''}
-              slots={timetable.slots}
-              onSlotClick={(slot, day, timeRange, target) => {
-                if (slot) {
-                  setSelectedSlot(slot);
-                  openSlotModal();
-                }
-              }}
-              templateInfo={templateInfo || null}
-              conflicts={[]}
-              isLoading={timetableLoading}
-            />
+            templateInfoLoading ? (
+              <Skeleton height={400} radius="sm" />
+            ) : (
+              <TimetableGrid
+                classSectionId={classSectionId ?? ''}
+                slots={timetable.slots}
+                onSlotClick={(slot, day, timeRange, target) => {
+                  if (slot) {
+                    setSelectedSlot(slot);
+                    openSlotModal();
+                  }
+                }}
+                templateInfo={templateInfo || null}
+                conflicts={[]}
+                isLoading={timetableLoading}
+              />
+            )
           )}
 
           {timetable && timetable.slots.length === 0 && (
