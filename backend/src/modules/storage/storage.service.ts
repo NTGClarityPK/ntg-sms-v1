@@ -146,30 +146,25 @@ export class StorageService {
     }
 
     if (!query.source || query.source === 'assessment') {
-      const { data: assessments } = await supabase
-        .from('assessments')
-        .select('id')
-        .eq('branch_id', branchId);
-      const assessmentIds = (assessments ?? []).map((a: { id: string }) => a.id);
-      if (assessmentIds.length > 0) {
-        const { data: attRows, error } = await supabase
-          .from('assessment_attachments')
-          .select('id, file_name, file_url, file_size_bytes, mime_type, created_at')
-          .in('assessment_id', assessmentIds)
-          .order('file_size_bytes', { ascending: false })
-          .limit(limit);
-        throwIfDbError(error);
-        for (const r of (attRows ?? []) as { id: string; file_name: string; file_url: string | null; file_size_bytes: number | null; mime_type: string | null; created_at: string }[]) {
-          files.push({
-            id: r.id,
-            source: 'assessment',
-            fileName: r.file_name,
-            fileUrl: r.file_url,
-            fileSizeBytes: Number(r.file_size_bytes) || 0,
-            mimeType: r.mime_type,
-            createdAt: r.created_at,
-          });
-        }
+      // Use a relational filter instead of building a huge IN() list of assessment_ids.
+      // This avoids "TypeError: fetch failed" for heavily seeded tenants.
+      const { data: attRows, error } = await supabase
+        .from('assessment_attachments')
+        .select('id, file_name, file_url, file_size_bytes, mime_type, created_at, assessments!inner(branch_id)')
+        .eq('assessments.branch_id', branchId)
+        .order('file_size_bytes', { ascending: false })
+        .limit(limit);
+      throwIfDbError(error);
+      for (const r of (attRows ?? []) as { id: string; file_name: string; file_url: string | null; file_size_bytes: number | null; mime_type: string | null; created_at: string }[]) {
+        files.push({
+          id: r.id,
+          source: 'assessment',
+          fileName: r.file_name,
+          fileUrl: r.file_url,
+          fileSizeBytes: Number(r.file_size_bytes) || 0,
+          mimeType: r.mime_type,
+          createdAt: r.created_at,
+        });
       }
     }
 

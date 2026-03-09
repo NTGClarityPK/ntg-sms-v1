@@ -6,6 +6,7 @@
     "deleteConfirmMessage": "هل أنت متأكد أنك تريد حذف التقييم {title}؟ لا يمكن التراجع عن هذا الإجراء.",
     "searchPlaceholder": "ابحث عن التقييمات...",
     "filterByStatus": "تصفية حسب الحالة",
+    "filterByClassSection": "الفصل الدراسي",
     "all": "الكل",
     "published": "منشور",
     "draft": "مسودة",

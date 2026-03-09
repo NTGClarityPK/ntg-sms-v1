@@ -40,6 +40,12 @@
   },
   "sidebarMain": "Main",
   "sidebarManagement": "Management",
+  "sidebarHome": "Home",
+  "sidebarAcademics": "Academics",
+  "sidebarAttendance": "Attendance",
+  "sidebarPeople": "People",
+  "sidebarEngage": "Engage",
+  "sidebarManage": "Manage",
   "roleName": {
     "school_admin": "School Admin",
     "super_admin": "Super Admin",

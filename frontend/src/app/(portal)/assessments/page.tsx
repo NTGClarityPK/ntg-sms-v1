@@ -25,11 +25,14 @@ import {
   Pagination,
   Table,
   ScrollArea,
+  Chip,
 } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye, IconChartBar } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAssessments, useDeleteAssessment } from '@/hooks/api/useAssessments';
+import { useClassSections } from '@/hooks/useClassSections';
+import { useAssessmentTypes } from '@/hooks/useAssessmentSettings';
 import { useFeaturePermission } from '@/hooks/usePermissions';
 import { modals } from '@mantine/modals';
 import dayjs from 'dayjs';
@@ -46,6 +49,25 @@ export default function AssessmentsPage() {
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState<string | null>(null);
+  const [assessmentTypeIdFilter, setAssessmentTypeIdFilter] = useState<string | null>(null);
+
+  const { data: classSectionsData } = useClassSections({
+    minimal: true,
+    isActive: true,
+    enabled: true,
+  });
+  const classSectionOptions =
+    Array.isArray(classSectionsData?.data) && classSectionsData.data.length > 0
+      ? classSectionsData.data.map((cs) => ({
+          value: cs.id,
+          label:
+            [cs.classDisplayName ?? cs.className, cs.sectionName].filter(Boolean).join(' - ') ||
+            cs.id,
+        }))
+      : [];
+
+  const { data: assessmentTypesData } = useAssessmentTypes();
+  const assessmentTypes = Array.isArray(assessmentTypesData?.data) ? assessmentTypesData.data : [];
 
   const { data, isLoading, error, isRefetching } = useAssessments({
     page,
@@ -53,7 +75,9 @@ export default function AssessmentsPage() {
     search: search || undefined,
     classSectionId: classSectionId || undefined,
     subjectId: subjectId || undefined,
-    isPublished: isPublished === 'true' ? true : isPublished === 'false' ? false : undefined,
+    assessmentTypeId: assessmentTypeIdFilter ?? undefined,
+    status:
+      isPublished === 'true' ? 'published' : isPublished === 'false' ? 'unpublished' : undefined,
   });
 
   const deleteAssessment = useDeleteAssessment();
@@ -119,6 +143,14 @@ export default function AssessmentsPage() {
                 onChange={(e) => setSearch(e.currentTarget.value)}
               />
               <Select
+                id="assessments-filter-class-section"
+                placeholder={t('filterByClassSection')}
+                data={classSectionOptions}
+                value={classSectionId ?? null}
+                onChange={(v) => setClassSectionId(v ?? null)}
+                clearable
+              />
+              <Select
                 id="assessments-filter-status"
                 placeholder={t('filterByStatus')}
                 data={[
@@ -131,6 +163,35 @@ export default function AssessmentsPage() {
                 clearable
               />
             </Group>
+
+            {/* Assessment type chips */}
+            <Paper p="sm" withBorder>
+              <Group gap="xs" wrap="wrap" className="filter-chip-group">
+                <Chip
+                  id="assessments-filter-type-all"
+                  checked={assessmentTypeIdFilter === null}
+                  onChange={() => setAssessmentTypeIdFilter(null)}
+                  variant="filled"
+                >
+                  {t('all')}
+                </Chip>
+                <Chip.Group
+                  value={assessmentTypeIdFilter ?? ''}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setAssessmentTypeIdFilter(val && val !== '' ? val : null);
+                  }}
+                >
+                  <Group gap="xs" wrap="wrap">
+                    {assessmentTypes.map((type) => (
+                      <Chip key={type.id} value={type.id} variant="filled">
+                        {type.name}
+                      </Chip>
+                    ))}
+                  </Group>
+                </Chip.Group>
+              </Group>
+            </Paper>
           </Stack>
         </Paper>
 

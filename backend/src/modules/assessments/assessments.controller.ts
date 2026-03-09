@@ -128,6 +128,7 @@ export class AssessmentsController {
       branch.branchId,
       undefined,
       user.id,
+      user.roles,
     );
   }
 

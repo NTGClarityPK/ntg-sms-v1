@@ -5,6 +5,17 @@
     "tabBreakdown": "التفصيل",
     "tabLargestFiles": "أكبر الملفات",
     "tabAlerts": "التنبيهات",
+    "tabOfflineDocuments": "المستندات دون اتصال",
+    "tabCache": "الذاكرة المؤقتة",
+
+    "offlineDocuments": {
+      "filterAll": "الكل",
+      "filterReportPdf": "تقرير PDF",
+      "filterReportExcel": "تقرير Excel",
+      "filterLibrary": "المكتبة",
+      "emptyTitle": "لا توجد مستندات دون اتصال",
+      "emptyHint": "استخدم \"حفظ للعمل دون اتصال\" في التقارير أو عناصر المكتبة للوصول إليها بدون إنترنت."
+    },
   
     "branchStorage": "تخزين الفرع",
     "requestMoreStorage": "طلب مساحة تخزين إضافية",

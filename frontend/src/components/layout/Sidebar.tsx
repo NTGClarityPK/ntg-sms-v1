@@ -37,7 +37,6 @@ import {
   IconPackage,
   IconClipboardList,
   IconDatabase,
-  IconFolderOff,
   IconKey,
   type IconProps,
 } from '@tabler/icons-react';
@@ -104,7 +103,6 @@ const allNavItems: NavItem[] = [
   { key: 'notifications', label: 'Notification', href: '/notifications', icon: IconBell },
   { key: 'messages', label: 'Messages', href: '/messages', icon: IconMessage },
   { key: 'library', label: 'Library', href: '/library', icon: IconBook },
-  { key: 'offlineDocuments', label: 'Offline documents', href: '/offline-documents', icon: IconFolderOff },
   { key: 'inventory', label: 'Inventory', href: '/inventory', icon: IconPackage },
   { key: 'uniformRequest', label: 'Request uniform', href: '/uniform-request', icon: IconClipboardList },
   {
@@ -168,16 +166,6 @@ const allNavItems: NavItem[] = [
     },
   },
   { key: 'reports', label: 'Report', href: '/reports', icon: IconChartBar },
-  {
-    key: 'administrativeReports',
-    label: 'Administrative Reports',
-    href: '/reports/administrative',
-    icon: IconChartBar,
-    showCondition: () => {
-      if (typeof window === 'undefined') return false;
-      return true;
-    },
-  },
   {
     key: 'storage',
     label: 'Storage',
@@ -333,10 +321,6 @@ export function Sidebar({
       if (item.href === '/behavioral') {
         return canAssessBehavioral;
       }
-      // Administrative Reports: staff/coordinator/principal/admin only (not parent/student)
-      if (item.href === '/reports/administrative') {
-        return !isParent && !isStudent && (isTeacher || canManageTimetable || canManageEvents);
-      }
       // Storage: school_admin, principal, super_admin only
       if (item.href === '/admin/storage') {
         return canManageStorage;
@@ -376,38 +360,55 @@ export function Sidebar({
     return true;
   });
 
-  // Group items like RMS: Main and Management
-  const mainItems = navItems.filter(
+  // Group items into logical sections
+  const homeItems = navItems.filter(
     (item) =>
       item.href === '/dashboard' ||
+      item.href === '/my-assessments'
+  );
+
+  const academicsItems = navItems.filter(
+    (item) =>
       item.href === '/students' ||
-      item.href === '/attendance' ||
+      item.href === '/academic/class-sections' ||
       item.href === '/assessments' ||
-      item.href === '/my-assessments' ||
       item.href === '/behavioral' ||
+      item.href === '/timetable' ||
+      item.href === '/my-timetable' ||
+      item.href === '/my-schedule' ||
+      item.href === '/children-timetable' ||
+      item.href === '/my-children' ||
+      item.href === '/parent/pin-management'
+  );
+
+  const attendanceItems = navItems.filter(
+    (item) =>
+      item.href === '/attendance' ||
       item.href === '/leaves' ||
-      item.href === '/early-departure' ||
-      item.href === '/notifications' ||
+      item.href === '/early-departure'
+  );
+
+  const peopleItems = navItems.filter(
+    (item) =>
+      item.href === '/academic/teacher-mapping' ||
+      item.href === '/parent-associations' ||
+      item.href === '/users'
+  );
+
+  const engageItems = navItems.filter(
+    (item) =>
       item.href === '/messages' ||
+      item.href === '/notifications' ||
+      item.href === '/events' ||
+      item.href === '/my-events' ||
+      item.href === '/conflict-management'
+  );
+
+  const manageItems = navItems.filter(
+    (item) =>
       item.href === '/library' ||
       item.href === '/inventory' ||
       item.href === '/uniform-request' ||
-      item.href === '/my-schedule' ||
-      item.href === '/my-timetable' ||
-      item.href === '/my-events' ||
-      item.href === '/my-children' ||
-      item.href === '/parent/pin-management' ||
-      item.href === '/children-timetable'
-  );
-  const managementItems = navItems.filter(
-    (item) =>
-      item.href === '/users' ||
-      item.href === '/academic/class-sections' ||
-      item.href === '/academic/teacher-mapping' ||
-      item.href === '/timetable' ||
-      item.href === '/conflict-management' ||
-      item.href === '/parent-associations' ||
-      item.href === '/events' ||
       item.href === '/reports' ||
       item.href === '/admin/storage' ||
       item.href === '/settings'
@@ -488,24 +489,88 @@ export function Sidebar({
         type="auto"
       >
         <Stack gap="xs" p={effectiveCollapsed ? 'xs' : 'md'}>
-          {/* Main Navigation */}
-          {!effectiveCollapsed && mainItems.length > 0 && (
-            <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-              {tCommon('sidebarMain')}
-            </Text>
+          {/* Home Section */}
+          {homeItems.length > 0 && (
+            <>
+              {!effectiveCollapsed && (
+                <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
+                  {tCommon('sidebarHome')}
+                </Text>
+              )}
+              {homeItems.map(renderNavItem)}
+            </>
           )}
-          {mainItems.map(renderNavItem)}
 
-          {/* Management Section */}
-          {managementItems.length > 0 && (
+          {/* Academics Section */}
+          {academicsItems.length > 0 && (
+            <>
+              {!effectiveCollapsed && (
+                <>
+                  <Divider my="sm" />
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
+                    {tCommon('sidebarAcademics')}
+                  </Text>
+                </>
+              )}
+              {academicsItems.map(renderNavItem)}
+            </>
+          )}
+
+          {/* Attendance Section */}
+          {attendanceItems.length > 0 && (
+            <>
+              {!effectiveCollapsed && (
+                <>
+                  <Divider my="sm" />
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
+                    {tCommon('sidebarAttendance')}
+                  </Text>
+                </>
+              )}
+              {attendanceItems.map(renderNavItem)}
+            </>
+          )}
+
+          {/* People Section */}
+          {peopleItems.length > 0 && (
+            <>
+              {!effectiveCollapsed && (
+                <>
+                  <Divider my="sm" />
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
+                    {tCommon('sidebarPeople')}
+                  </Text>
+                </>
+              )}
+              {peopleItems.map(renderNavItem)}
+            </>
+          )}
+
+          {/* Engage Section */}
+          {engageItems.length > 0 && (
+            <>
+              {!effectiveCollapsed && (
+                <>
+                  <Divider my="sm" />
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
+                    {tCommon('sidebarEngage')}
+                  </Text>
+                </>
+              )}
+              {engageItems.map(renderNavItem)}
+            </>
+          )}
+
+          {/* Manage Section */}
+          {manageItems.length > 0 && (
             <>
               {!effectiveCollapsed && <Divider my="sm" />}
               {!effectiveCollapsed && (
                 <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                  {tCommon('sidebarManagement')}
+                  {tCommon('sidebarManage')}
                 </Text>
               )}
-              {managementItems.map(renderNavItem)}
+              {manageItems.map(renderNavItem)}
             </>
           )}
         </Stack>

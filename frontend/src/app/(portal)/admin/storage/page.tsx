@@ -1,25 +1,70 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, usePathname, useRouter } from 'next/navigation';
 import { Group, Title, Tabs, Stack } from '@mantine/core';
 import {
   IconDatabase,
   IconChartPie,
   IconFile,
   IconAlertTriangle,
+  IconFolderOff,
+  IconCloud,
 } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/hooks/useAuth';
 import { StorageOverview } from '@/components/features/storage/StorageOverview';
 import { CategoryBreakdown } from '@/components/features/storage/CategoryBreakdown';
 import { LargestFiles } from '@/components/features/storage/LargestFiles';
 import { StorageAlerts } from '@/components/features/storage/StorageAlerts';
+import { OfflineDocumentsTab } from '@/components/features/offline/OfflineDocumentsTab';
+import { StorageManager } from '@/components/features/offline/StorageManager';
+
+const VALID_TABS = ['overview', 'breakdown', 'files', 'alerts', 'offline-documents', 'cache'] as const;
+const SUPER_ADMIN_ONLY_TABS = ['offline-documents', 'cache'] as const;
 
 export default function StoragePage() {
   const t = useTranslations('storage');
-  const [activeTab, setActiveTab] = useState<string | null>('overview');
+  const { user } = useAuth();
+  const isSuperAdmin =
+    user?.roles?.some((r) => r.roleName?.toLowerCase() === 'super_admin') ?? false;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<string | null>(
+    tabFromUrl && VALID_TABS.includes(tabFromUrl as (typeof VALID_TABS)[number])
+      ? tabFromUrl
+      : 'overview'
+  );
   const [categoryChip, setCategoryChip] = useState<string>('all');
   const [sourceChip, setSourceChip] = useState<string>('all');
   const [alertFilterChip, setAlertFilterChip] = useState<string>('all');
+
+  useEffect(() => {
+    if (tabFromUrl && VALID_TABS.includes(tabFromUrl as (typeof VALID_TABS)[number]) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+
+  // If non–super-admin lands on offline-documents or cache, switch to overview
+  useEffect(() => {
+    if (!isSuperAdmin && activeTab && SUPER_ADMIN_ONLY_TABS.includes(activeTab as (typeof SUPER_ADMIN_ONLY_TABS)[number])) {
+      setActiveTab('overview');
+      router.replace(pathname, { scroll: false });
+    }
+  }, [isSuperAdmin, activeTab, pathname, router]);
+
+  const handleTabChange = (value: string | null) => {
+    setActiveTab(value);
+    if (value && value !== 'overview') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', value);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    } else {
+      router.replace(pathname, { scroll: false });
+    }
+  };
 
   return (
     <>
@@ -36,7 +81,7 @@ export default function StoragePage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs value={activeTab} onChange={setActiveTab}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
           <Tabs.List>
             <Tabs.Tab value="overview" leftSection={<IconDatabase size={16} />}>
               {t('tabOverview')}
@@ -50,6 +95,16 @@ export default function StoragePage() {
             <Tabs.Tab value="alerts" leftSection={<IconAlertTriangle size={16} />}>
               {t('tabAlerts')}
             </Tabs.Tab>
+            {isSuperAdmin && (
+              <>
+                <Tabs.Tab value="offline-documents" leftSection={<IconFolderOff size={16} />}>
+                  {t('tabOfflineDocuments')}
+                </Tabs.Tab>
+                <Tabs.Tab value="cache" leftSection={<IconCloud size={16} />}>
+                  {t('tabCache')}
+                </Tabs.Tab>
+              </>
+            )}
           </Tabs.List>
 
           <Tabs.Panel value="overview" pt="md" px="md" pb="md">
@@ -81,6 +136,17 @@ export default function StoragePage() {
               />
             </Stack>
           </Tabs.Panel>
+
+          {isSuperAdmin && (
+            <>
+              <Tabs.Panel value="offline-documents" pt="md" px="md" pb="md">
+                <OfflineDocumentsTab />
+              </Tabs.Panel>
+              <Tabs.Panel value="cache" pt="md" px="md" pb="md">
+                <StorageManager />
+              </Tabs.Panel>
+            </>
+          )}
         </Tabs>
       </div>
     </>

@@ -83,7 +83,8 @@ export interface QueryAssessmentsInput {
   classSectionId?: string;
   subjectId?: string;
   assessmentTypeId?: string;
-  isPublished?: boolean;
+  /** Backend expects status: 'all' | 'published' | 'unpublished' */
+  status?: 'all' | 'published' | 'unpublished';
   startDate?: string;
   endDate?: string;
 }

@@ -138,6 +138,7 @@ export class AssessmentsService {
     branchId: string,
     academicYearId?: string,
     currentUserId?: string,
+    currentUserRoles?: string[],
   ): Promise<{ data: AssessmentDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -159,6 +160,78 @@ export class AssessmentsService {
       yearId = activeYear.id;
     }
 
+    const isAdmin = currentUserRoles?.includes('school_admin') ?? false;
+    let roleScopeClassSectionId: string | null = null;
+    let roleScopePairs: Array<{ classSectionId: string; subjectId: string }> = [];
+
+    if (currentUserId && !isAdmin) {
+      if (currentUserRoles?.includes('student')) {
+        const { data: student, error: studentError } = await supabase
+          .from('students')
+          .select('id, class_id, section_id, academic_year_id')
+          .eq('user_id', currentUserId)
+          .eq('branch_id', branchId)
+          .eq('is_active', true)
+          .maybeSingle();
+        throwIfDbError(studentError);
+        if (!student) {
+          return {
+            data: [],
+            meta: { total: 0, page, limit, totalPages: 1 },
+          };
+        }
+        const s = student as { class_id: string; section_id: string; academic_year_id: string };
+        const { data: classSection, error: csError } = await supabase
+          .from('class_sections')
+          .select('id')
+          .eq('class_id', s.class_id)
+          .eq('section_id', s.section_id)
+          .eq('academic_year_id', s.academic_year_id)
+          .eq('branch_id', branchId)
+          .maybeSingle();
+        throwIfDbError(csError);
+        if (!classSection) {
+          return {
+            data: [],
+            meta: { total: 0, page, limit, totalPages: 1 },
+          };
+        }
+        roleScopeClassSectionId = (classSection as { id: string }).id;
+      } else {
+        const staff = await this.staffService.getStaffByUserId(
+          currentUserId,
+          branchId,
+        );
+        if (!staff) {
+          return {
+            data: [],
+            meta: { total: 0, page, limit, totalPages: 1 },
+          };
+        }
+        const { data: assignments, error: taError } = await supabase
+          .from('teacher_assignments')
+          .select('class_section_id, subject_id')
+          .eq('staff_id', staff.id)
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', yearId);
+        throwIfDbError(taError);
+        const pairs = (assignments ?? []) as Array<{
+          class_section_id: string;
+          subject_id: string;
+        }>;
+        if (pairs.length === 0) {
+          return {
+            data: [],
+            meta: { total: 0, page, limit, totalPages: 1 },
+          };
+        }
+        roleScopePairs = pairs.map((p) => ({
+          classSectionId: p.class_section_id,
+          subjectId: p.subject_id,
+        }));
+      }
+    }
+
     let dbQuery = supabase
       .from('assessments')
       .select(
@@ -169,6 +242,16 @@ export class AssessmentsService {
       .eq('academic_year_id', yearId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
+
+    if (roleScopeClassSectionId !== null) {
+      dbQuery = dbQuery.eq('class_section_id', roleScopeClassSectionId);
+    } else if (roleScopePairs.length > 0) {
+      const orParts = roleScopePairs.map(
+        (p) =>
+          `and(class_section_id.eq.${p.classSectionId},subject_id.eq.${p.subjectId})`,
+      );
+      dbQuery = dbQuery.or(orParts.join(','));
+    }
 
     if (query.classSectionId) {
       dbQuery = dbQuery.eq('class_section_id', query.classSectionId);
@@ -202,7 +285,6 @@ export class AssessmentsService {
     const total = count ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
-    // In future we can restrict by teacher/student using currentUserId + teacherAssignmentsService
     return {
       data: rows.map(mapAssessment),
       meta: {

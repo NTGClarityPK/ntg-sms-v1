@@ -40,6 +40,12 @@
   },
   "sidebarMain": "رئيسي",
   "sidebarManagement": "إدارة",
+  "sidebarHome": "الرئيسية",
+  "sidebarAcademics": "الشؤون الأكاديمية",
+  "sidebarAttendance": "الحضور والغياب",
+  "sidebarPeople": "الأشخاص",
+  "sidebarEngage": "التفاعل",
+  "sidebarManage": "الإدارة",
   "roleName": {
     "school_admin": "مسؤول المدرسة",
     "super_admin": "المسؤول الأعلى",

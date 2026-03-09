@@ -6,6 +6,7 @@
   "deleteConfirmMessage": "Are you sure you want to delete the assessment {title}? This action cannot be undone.",
   "searchPlaceholder": "Search assessments...",
   "filterByStatus": "Filter by status",
+  "filterByClassSection": "Class section",
   "all": "All",
   "published": "Published",
   "draft": "Draft",

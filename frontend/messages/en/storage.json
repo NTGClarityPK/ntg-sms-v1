@@ -5,6 +5,17 @@
   "tabBreakdown": "Breakdown",
   "tabLargestFiles": "Largest files",
   "tabAlerts": "Alerts",
+  "tabOfflineDocuments": "Offline documents",
+  "tabCache": "Cache",
+
+  "offlineDocuments": {
+    "filterAll": "All",
+    "filterReportPdf": "Report PDF",
+    "filterReportExcel": "Report Excel",
+    "filterLibrary": "Library",
+    "emptyTitle": "No offline documents",
+    "emptyHint": "Use \"Save for offline\" on reports or library items to access them without internet."
+  },
 
   "branchStorage": "Branch storage",
   "requestMoreStorage": "Request more storage",
