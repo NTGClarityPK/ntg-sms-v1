@@ -229,11 +229,11 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* Adjust for collapsed navbar (desktop) */
       @media (min-width: 768px) {
         body[data-navbar-collapsed="true"] .page-title-bar {
-          inset-inline-start: 100px !important;
+          inset-inline-start: 120px !important;
         }
         
         body[data-navbar-collapsed="true"] .page-sub-title-bar {
-          inset-inline-start: 100px !important;
+          inset-inline-start: 120px !important;
         }
       }
       
@@ -445,11 +445,17 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         font-weight: ${config.typography.fontWeight.bold} !important;
       }
       
-      /* Page titles (order={1} or h1) - Use pageHeaderColor */
+      /* Page titles (order={1} or h1) - default pageHeaderColor */
       .mantine-Title-root[data-order="1"],
       h1.mantine-Title-root {
         color: ${config.typography.pageHeaderColor} !important;
         font-size: ${config.typography.titleSize.h1} !important;
+      }
+      
+      /* Main header per screen: title bar heading overrides to theme primary (higher specificity) */
+      .page-title-bar .mantine-Title-root[data-order="1"],
+      .page-title-bar h1.mantine-Title-root {
+        color: ${config.typography.pageTitleBarHeaderColor} !important;
       }
       
       /* Section titles (order={2} or h2) - Use pageSectionHeaderColor */
@@ -869,7 +875,10 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         
         // Apply colors and sizes based on order/tag
         if (order === '1' || tagName === 'h1') {
-          el.style.color = config.typography.pageHeaderColor;
+          const inPageTitleBar = el.closest('.page-title-bar');
+          el.style.color = inPageTitleBar
+            ? config.typography.pageTitleBarHeaderColor
+            : config.typography.pageHeaderColor;
           el.style.fontSize = config.typography.titleSize.h1;
         } else if (order === '2' || tagName === 'h2') {
           el.style.color = config.typography.pageSectionHeaderColor;

@@ -1,7 +1,7 @@
 import { Providers } from './providers';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
-import { Rajdhani, Saira, JetBrains_Mono } from 'next/font/google';
+import { Audiowide, Rajdhani, Saira, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { DirectionProvider } from '@mantine/core';
@@ -11,6 +11,13 @@ const primaryFont = Saira({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-primary',
+  display: 'swap',
+});
+
+const audiowideFont = Audiowide({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-audiowide',
   display: 'swap',
 });
 
@@ -29,9 +36,10 @@ const monoFont = JetBrains_Mono({
 });
 
 export const metadata = {
-  title: 'School Management System',
+  title: 'NTG Alma',
   description: 'Multi-tenant school management system',
   manifest: '/manifest.json',
+  icons: { icon: '/ntg-logo.svg' },
   other: {
     google: 'notranslate',
   },
@@ -53,7 +61,9 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} dir={dir} translate="no">
-      <body className={`${primaryFont.variable} ${headingFont.variable} ${monoFont.variable}`}>
+      <body
+        className={`${primaryFont.variable} ${headingFont.variable} ${monoFont.variable} ${audiowideFont.variable}`}
+      >
         <NextIntlClientProvider messages={messages}>
           <DirectionProvider initialDirection={dir} detectDirection={true}>
             <Providers>{children}</Providers>

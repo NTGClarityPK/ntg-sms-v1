@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { UserResponseDto } from './dto/user-response.dto';
 import { BranchSummaryDto } from './dto/branch-summary.dto';
+import { ProfileResponseDto } from './dto/profile-response.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('api/v1/auth')
 export class AuthController {
@@ -53,6 +55,25 @@ export class AuthController {
   ): Promise<{ data: BranchSummaryDto | null }> {
     const current = await this.authService.getCurrentBranch(user.id);
     return { data: current };
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  async getProfile(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: ProfileResponseDto }> {
+    const profile = await this.authService.getProfile(user.id);
+    return { data: profile };
+  }
+
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() body: UpdateProfileDto,
+  ): Promise<{ data: ProfileResponseDto }> {
+    const profile = await this.authService.updateProfile(user.id, body);
+    return { data: profile };
   }
 
   @Post('select-child')

@@ -129,7 +129,7 @@ export function Header() {
               {tenantName || 'School'}
             </Text>
             <Text size="xs" c="dimmed" style={{ lineHeight: 1 }} visibleFrom="sm">
-              School Management System
+              School Management
             </Text>
           </div>
         </Group>

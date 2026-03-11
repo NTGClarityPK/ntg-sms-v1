@@ -126,11 +126,12 @@ export function AdminSidebar({
   return (
     <Stack h="100%" justify="space-between" gap={0}>
       {/* Scrollable navigation area */}
-      <ScrollArea 
-        h="100%" 
+      <ScrollArea
+        h="100%"
         style={{ flex: 1 }}
         scrollbarSize={8}
-        type="auto"
+        type="hover"
+        scrollHideDelay={400}
       >
         <Stack gap="xs" p={collapsed ? 'xs' : 'md'}>
           {adminNavItems.map(renderNavItem)}

@@ -258,6 +258,15 @@ export default function LoginPage() {
         );
       }
 
+      // Supabase refresh tokens can rotate. Persist the latest refresh token so PIN keeps working
+      // after logout/login cycles and future session refreshes.
+      try {
+        const rotatedRefreshToken = data.session.refresh_token || refreshToken;
+        await pinAuth.setupPinAuth(pinValue, rotatedRefreshToken, userEmail);
+      } catch {
+        // Non-blocking: user is logged in; PIN persistence will still work in most cases.
+      }
+
       clearStudentToken();
       setPinIdentifier('');
       setPinValue('');

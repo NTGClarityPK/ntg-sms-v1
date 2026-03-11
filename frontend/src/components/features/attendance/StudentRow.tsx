@@ -15,6 +15,7 @@ import {
 } from '@mantine/core';
 import { IconNotes } from '@tabler/icons-react';
 import type { Attendance, AttendanceStatus } from '@/types/attendance';
+import { displayStudentId } from '@/lib/utils/student-display';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 interface StudentRowProps {
@@ -80,7 +81,7 @@ export function StudentRow({
               {attendance.studentName}
             </Text>
             <Text size="xs" c="dimmed" lineClamp={1}>
-              {attendance.studentIdNumber || 'N/A'}
+              {displayStudentId(attendance.studentIdNumber, attendance.studentId)}
             </Text>
           </div>
         </Group>

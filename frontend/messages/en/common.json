@@ -26,6 +26,9 @@
   "required": "Required",
   "retry": "Retry",
   "noData": "No data yet",
+  "profile": "Profile",
+  "help": "Help",
+  "logout": "Logout",
   "status": {
     "active": "Active",
     "inactive": "Inactive",
@@ -40,6 +43,7 @@
   },
   "sidebarMain": "Main",
   "sidebarManagement": "Management",
+  "sidebarSchool": "School",
   "sidebarHome": "Home",
   "sidebarAcademics": "Academics",
   "sidebarAttendance": "Attendance",

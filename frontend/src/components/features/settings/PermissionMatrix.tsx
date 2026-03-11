@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl';
 import type { User } from '@/types/auth';
 
 const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
+const SUPER_ADMIN_ROLE_NAME = 'super_admin';
 const DEFAULT_VISIBLE_TAB_COUNT = 5;
 
 interface PermissionMatrixProps {
@@ -25,7 +26,11 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   const branchId = userTyped?.currentBranch?.id;
   const queryClient = useQueryClient();
 
-  const rolesInMatrix = roles.filter((r) => r.name !== SCHOOL_ADMIN_ROLE_NAME);
+  const rolesInMatrix = roles.filter(
+    (r) =>
+      r.name !== SCHOOL_ADMIN_ROLE_NAME &&
+      r.name?.toLowerCase() !== SUPER_ADMIN_ROLE_NAME,
+  );
   const tSettings = useTranslations('settings');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('navigation');

@@ -38,6 +38,7 @@ import {
   IconClipboardList,
   IconDatabase,
   IconKey,
+  IconMedal,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -166,7 +167,7 @@ const allNavItems: NavItem[] = [
     },
   },
   { key: 'reports', label: 'Report', href: '/reports', icon: IconChartBar },
-  { key: 'results', label: 'Results', href: '/results', icon: IconChartBar },
+  { key: 'results', label: 'Results', href: '/results', icon: IconMedal },
   {
     key: 'storage',
     label: 'Storage',
@@ -361,60 +362,50 @@ export function Sidebar({
     return true;
   });
 
-  // Group items into logical sections
-  const homeItems = navItems.filter(
-    (item) =>
-      item.href === '/dashboard' ||
-      item.href === '/my-assessments'
-  );
+  // Group items into two sections: School and Management
+  const schoolHrefsOrdered = [
+    '/dashboard',
+    '/students',
+    '/attendance',
+    '/leaves',
+    '/early-departure',
+    '/assessments',
+    '/my-assessments',
+    '/behavioral',
+    '/timetable',
+    '/my-timetable',
+    '/my-schedule',
+    '/children-timetable',
+    '/my-children',
+    '/parent/pin-management',
+    '/messages',
+    '/notifications',
+    '/events',
+    '/my-events',
+    '/results',
+  ];
 
-  const academicsItems = navItems.filter(
-    (item) =>
-      item.href === '/students' ||
-      item.href === '/academic/class-sections' ||
-      item.href === '/assessments' ||
-      item.href === '/behavioral' ||
-      item.href === '/timetable' ||
-      item.href === '/my-timetable' ||
-      item.href === '/my-schedule' ||
-      item.href === '/children-timetable' ||
-      item.href === '/my-children' ||
-      item.href === '/parent/pin-management'
-  );
+  const managementHrefsOrdered = [
+    '/academic/class-sections',
+    '/academic/teacher-mapping',
+    '/parent-associations',
+    '/users',
+    '/library',
+    '/inventory',
+    '/uniform-request',
+    '/reports',
+    '/conflict-management',
+    '/admin/storage',
+    '/settings',
+  ];
 
-  const attendanceItems = navItems.filter(
-    (item) =>
-      item.href === '/attendance' ||
-      item.href === '/leaves' ||
-      item.href === '/early-departure'
-  );
+  const schoolItems: NavItem[] = schoolHrefsOrdered
+    .map((href) => navItems.find((item) => item.href === href))
+    .filter((item): item is NavItem => Boolean(item));
 
-  const peopleItems = navItems.filter(
-    (item) =>
-      item.href === '/academic/teacher-mapping' ||
-      item.href === '/parent-associations' ||
-      item.href === '/users'
-  );
-
-  const engageItems = navItems.filter(
-    (item) =>
-      item.href === '/messages' ||
-      item.href === '/notifications' ||
-      item.href === '/events' ||
-      item.href === '/my-events' ||
-      item.href === '/conflict-management'
-  );
-
-  const manageItems = navItems.filter(
-    (item) =>
-      item.href === '/library' ||
-      item.href === '/inventory' ||
-      item.href === '/uniform-request' ||
-      item.href === '/reports' ||
-      item.href === '/results' ||
-      item.href === '/admin/storage' ||
-      item.href === '/settings'
-  );
+  const managementItems: NavItem[] = managementHrefsOrdered
+    .map((href) => navItems.find((item) => item.href === href))
+    .filter((item): item is NavItem => Boolean(item));
 
   const isActive = (href: string) =>
     pathname === href || pathname?.startsWith(`${href}/`);
@@ -484,95 +475,36 @@ export function Sidebar({
   return (
     <Stack h="100%" justify="space-between" gap={0}>
       {/* Scrollable navigation area - matches RMS structure */}
-      <ScrollArea 
-        h="100%" 
+      <ScrollArea
+        h="100%"
         style={{ flex: 1 }}
         scrollbarSize={8}
-        type="auto"
+        type="hover"
+        scrollHideDelay={400}
       >
         <Stack gap="xs" p={effectiveCollapsed ? 'xs' : 'md'}>
-          {/* Home Section */}
-          {homeItems.length > 0 && (
+          {/* School Section */}
+          {schoolItems.length > 0 && (
             <>
               {!effectiveCollapsed && (
                 <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                  {tCommon('sidebarHome')}
+                  {tCommon('sidebarSchool')}
                 </Text>
               )}
-              {homeItems.map(renderNavItem)}
+              {schoolItems.map(renderNavItem)}
             </>
           )}
 
-          {/* Academics Section */}
-          {academicsItems.length > 0 && (
-            <>
-              {!effectiveCollapsed && (
-                <>
-                  <Divider my="sm" />
-                  <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                    {tCommon('sidebarAcademics')}
-                  </Text>
-                </>
-              )}
-              {academicsItems.map(renderNavItem)}
-            </>
-          )}
-
-          {/* Attendance Section */}
-          {attendanceItems.length > 0 && (
-            <>
-              {!effectiveCollapsed && (
-                <>
-                  <Divider my="sm" />
-                  <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                    {tCommon('sidebarAttendance')}
-                  </Text>
-                </>
-              )}
-              {attendanceItems.map(renderNavItem)}
-            </>
-          )}
-
-          {/* People Section */}
-          {peopleItems.length > 0 && (
-            <>
-              {!effectiveCollapsed && (
-                <>
-                  <Divider my="sm" />
-                  <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                    {tCommon('sidebarPeople')}
-                  </Text>
-                </>
-              )}
-              {peopleItems.map(renderNavItem)}
-            </>
-          )}
-
-          {/* Engage Section */}
-          {engageItems.length > 0 && (
-            <>
-              {!effectiveCollapsed && (
-                <>
-                  <Divider my="sm" />
-                  <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                    {tCommon('sidebarEngage')}
-                  </Text>
-                </>
-              )}
-              {engageItems.map(renderNavItem)}
-            </>
-          )}
-
-          {/* Manage Section */}
-          {manageItems.length > 0 && (
+          {/* Management Section */}
+          {managementItems.length > 0 && (
             <>
               {!effectiveCollapsed && <Divider my="sm" />}
               {!effectiveCollapsed && (
                 <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                  {tCommon('sidebarManage')}
+                  {tCommon('sidebarManagement')}
                 </Text>
               )}
-              {manageItems.map(renderNavItem)}
+              {managementItems.map(renderNavItem)}
             </>
           )}
         </Stack>

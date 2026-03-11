@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { MantineProvider } from '@mantine/core';
@@ -13,8 +14,10 @@ import { InstallPrompt } from '@/components/common/InstallPrompt';
 import { PushSubscribe } from '@/components/common/PushSubscribe';
 import { InstallAppProvider } from '@/lib/install-app-context';
 import { SafariInstallModal } from '@/components/common/SafariInstallModal';
+import { FaviconUpdater } from '@/components/common/FaviconUpdater';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeStore } from '@/lib/store/theme-store';
+import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 
 /** In development, unregister any existing service workers so the production sw.js (and workbox) are not used. */
 function DevServiceWorkerCleanup() {
@@ -29,14 +32,29 @@ function DevServiceWorkerCleanup() {
   return null;
 }
 
+/** Auth routes where theme must be default green, not tenant primary */
+function isAuthRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/signup') ||
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/select-child')
+  );
+}
+
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { theme: colorScheme } = useTheme();
   const { primaryColor } = useThemeStore();
-  const mantineTheme = createDynamicTheme(primaryColor, colorScheme);
+  // On auth pages use default green so login/signup/branch selector are not tenant-themed
+  const effectivePrimary = isAuthRoute(pathname) ? DEFAULT_THEME_COLOR : (primaryColor || DEFAULT_THEME_COLOR);
+  const mantineTheme = createDynamicTheme(effectivePrimary, colorScheme);
 
   return (
     <MantineProvider theme={mantineTheme}>
       <ModalsProvider>
+        <FaviconUpdater />
         <DynamicThemeProvider>
           {children}
         </DynamicThemeProvider>

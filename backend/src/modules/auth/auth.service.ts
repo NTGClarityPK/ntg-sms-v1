@@ -3,6 +3,8 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { UserResponseDto } from './dto/user-response.dto';
 import { BranchSummaryDto } from './dto/branch-summary.dto';
 import { StudentTokenService } from '../../common/modules/student-token/student-token.service';
+import { ProfileResponseDto } from './dto/profile-response.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -209,6 +211,120 @@ export class AuthService {
     }
 
     return this.getCurrentUser(user.id);
+  }
+
+  async getProfile(userId: string): Promise<ProfileResponseDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const [authResult, profileResult] = await Promise.all([
+      supabase.auth.admin.getUserById(userId),
+      supabase
+        .from('profiles')
+        .select('full_name, created_at, updated_at')
+        .eq('id', userId)
+        .maybeSingle(),
+    ]);
+
+    const {
+      data: { user },
+      error: userError,
+    } = authResult;
+
+    if (userError || !user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const { data: profile, error: profileError } = profileResult;
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      throw new BadRequestException(profileError.message);
+    }
+
+    const profileRow = profile as
+      | {
+          full_name?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        }
+      | null;
+
+    const fullName = profileRow?.full_name || user.email || 'User';
+    const createdAt =
+      profileRow?.created_at ||
+      // Fallback to auth user created_at if available
+      (user as { created_at?: string }).created_at ||
+      new Date().toISOString();
+    const updatedAt =
+      profileRow?.updated_at ||
+      (user as { updated_at?: string }).updated_at ||
+      createdAt;
+
+    return new ProfileResponseDto({
+      id: user.id,
+      email: user.email || '',
+      fullName,
+      createdAt,
+      updatedAt,
+    });
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<ProfileResponseDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const trimmedName = dto.fullName?.trim();
+    if (!trimmedName) {
+      throw new BadRequestException('Full name is required');
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: userId,
+          full_name: trimmedName,
+        },
+        {
+          onConflict: 'id',
+        },
+      )
+      .select('full_name, created_at, updated_at')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new BadRequestException(profileError.message);
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.admin.getUserById(userId);
+
+    if (userError || !user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const profileRow = profile as
+      | {
+          full_name?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        }
+      | null;
+
+    const createdAt =
+      profileRow?.created_at ||
+      (user as { created_at?: string }).created_at ||
+      new Date().toISOString();
+    const updatedAt = profileRow?.updated_at || createdAt;
+
+    return new ProfileResponseDto({
+      id: user.id,
+      email: user.email || '',
+      fullName: profileRow?.full_name || user.email || 'User',
+      createdAt,
+      updatedAt,
+    });
   }
 
   async getMyBranches(userId: string): Promise<BranchSummaryDto[]> {

@@ -56,9 +56,7 @@ rmsreference/*
 .env.local
 
 # Docker
-docker-compose.override.yml
-
-# Cursor IDE
+docker-compose.override.yml# Cursor IDE
 .cursor/
 .cursorignore
 

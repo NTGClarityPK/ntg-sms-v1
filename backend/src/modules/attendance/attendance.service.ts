@@ -332,13 +332,17 @@ export class AttendanceService {
       (markedByProfiles || []).map((p) => [p.id, p.full_name]),
     );
 
-    // Combine data
+    // Combine data — map student UUID -> profile user_id and display student_id (e.g. "0056")
     const studentMap = new Map(
       (studentsData || []).map((s) => [s.id, s.user_id]),
+    );
+    const studentIdNumberById = new Map<string, string | null | undefined>(
+      (studentsData || []).map((s) => [s.id, s.student_id]),
     );
 
     const attendanceList = attendanceRows.map((row) => {
       const studentUserId = studentMap.get(row.student_id);
+      const displayStudentId = studentIdNumberById.get(row.student_id);
       const studentName = studentUserId
         ? profileMap.get(studentUserId)
         : undefined;
@@ -356,6 +360,7 @@ export class AttendanceService {
       return new AttendanceDto({
         id: row.id,
         studentId: row.student_id,
+        studentIdNumber: displayStudentId || undefined,
         studentName: studentName || 'Unknown',
         classSectionId: row.class_section_id,
         className: className || 'Unknown',
@@ -560,7 +565,7 @@ export class AttendanceService {
     // in such cases we return an empty result instead of a hard 404.
     const { data: studentData, error: studentError } = await supabase
       .from('students')
-      .select('id, user_id')
+      .select('id, user_id, student_id')
       .eq('id', studentId)
       .maybeSingle();
     throwIfDbError(studentError);
@@ -684,6 +689,8 @@ export class AttendanceService {
       : { data: null };
 
     const studentName = profileData?.full_name || 'Unknown';
+    const displayStudentId = (studentData as { student_id?: string | null } | null)
+      ?.student_id;
 
     return attendanceRows.map((row) => {
       const classSection = classSectionMap.get(row.class_section_id);
@@ -697,6 +704,7 @@ export class AttendanceService {
       return new AttendanceDto({
         id: row.id,
         studentId: row.student_id,
+        studentIdNumber: displayStudentId || undefined,
         studentName,
         classSectionId: row.class_section_id,
         className: className || 'Unknown',
