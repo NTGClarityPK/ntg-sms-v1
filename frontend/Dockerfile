@@ -7,11 +7,24 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Build the application
 FROM base AS builder
 WORKDIR /app
+
+# ⭐ CRITICAL - Accept build arguments
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_API_URL
+
+# ⭐ CRITICAL - Make them available as environment variables
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 

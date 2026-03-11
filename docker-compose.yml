@@ -23,17 +23,17 @@ services:
     restart: unless-stopped
     networks:
       - sms-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/v1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+   
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:  # ⭐ ADD THIS SECTION
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
     container_name: sms-prod-frontend
     ports:
       - "9000:3000"
@@ -46,9 +46,7 @@ services:
     networks:
       - sms-network
     depends_on:
-      backend:
-        condition: service_healthy
-
+      backend
 networks:
   sms-network:
     driver: bridge
