@@ -36,6 +36,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/timetable': 'timetable_management',
   '/conflict-management': 'timetable_management',
   '/reports': 'reports',
+  '/results': 'reports',
   '/reports/public': 'reports',
   '/reports/administrative': 'reports',
   '/settings': 'settings',

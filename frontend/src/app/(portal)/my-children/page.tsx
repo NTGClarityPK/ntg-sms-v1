@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Alert,
   Badge,
+  Divider,
   Group,
   Paper,
   Skeleton,
@@ -16,6 +17,7 @@ import { IconAlertCircle, IconInfoCircle, IconUsersGroup } from '@tabler/icons-r
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api-client';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ChildResultCards } from '@/components/features/results/ChildResultCards';
 import type { User } from '@/types/auth';
 
 interface Child {
@@ -126,6 +128,8 @@ export default function MyChildrenPage() {
                     </Tooltip>
                   </Group>
                 </Group>
+                <Divider my="md" />
+                <ChildResultCards studentId={child.studentId} />
               </Paper>
             ))
           )}

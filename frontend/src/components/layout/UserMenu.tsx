@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Avatar, Menu, Text, Group } from '@mantine/core';
-import { IconUser, IconSettings, IconLogout, IconSwitchHorizontal, IconDownload } from '@tabler/icons-react';
+import { IconUser, IconBook, IconLogout, IconSwitchHorizontal, IconDownload } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -119,11 +119,21 @@ export function UserMenu() {
 
       <Menu.Dropdown>
         <Menu.Label>Account</Menu.Label>
-        <Menu.Item leftSection={<IconUser size={14} />} disabled>
+        <Menu.Item
+          id="user-menu-profile"
+          leftSection={<IconUser size={14} />}
+          onClick={() => {
+            router.push('/profile');
+          }}
+        >
           Profile
         </Menu.Item>
-        <Menu.Item leftSection={<IconSettings size={14} />} disabled>
-          Settings
+        <Menu.Item
+          id="user-menu-help"
+          leftSection={<IconBook size={14} />}
+          disabled
+        >
+          Help
         </Menu.Item>
 
         {showInstallApp && (

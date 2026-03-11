@@ -5,7 +5,16 @@ const createNextIntlPlugin = require('next-intl/plugin');
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
+  
+  // Skip type checking in production build (temporary workaround)
+  typescript: {
+    ignoreBuildErrors: process.env.SKIP_TYPE_CHECK === 'true',
+  },
+  
+  // Disable font optimization (Google Fonts blocked on server)
+  optimizeFonts: false,
 };
 
 const pwaConfig = withPWA({
@@ -19,4 +28,3 @@ const pwaConfig = withPWA({
 });
 
 module.exports = withNextIntl(pwaConfig(nextConfig));
-

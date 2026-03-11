@@ -14,7 +14,7 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-import { IconCheck, IconToolsKitchen2, IconUpload } from '@tabler/icons-react';
+import { IconCheck, IconSchool, IconUpload } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
@@ -62,9 +62,12 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
     setPrimaryColor(effectiveColor);
     setDraftColor(effectiveColor);
     setLogoPreview(data.logoUrl || null);
+    const currentLogoUrl = useTenantBrandingStore.getState().logoUrl;
     setBranding({
       name: data.name || 'School',
-      logoUrl: data.logoUrl || null,
+      logoUrl: typeof data.logoUrl === 'string' && data.logoUrl.length > 0
+        ? data.logoUrl
+        : currentLogoUrl ?? null,
     });
   }, [tenantQuery.data?.data, setBranding, setPrimaryColor]);
 
@@ -72,12 +75,13 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
     if (!file) return;
     try {
       const response = await uploadLogoMutation.mutateAsync(file);
+      const tenant = response?.data ?? response;
+      const newLogoUrl = tenant?.logoUrl ?? null;
       setBranding({
-        name: response.data?.name || 'School',
-        logoUrl: response.data?.logoUrl || null,
+        name: tenant?.name || 'School',
+        logoUrl: newLogoUrl,
       });
-      setLogoPreview(response.data?.logoUrl || null);
-      await tenantQuery.refetch();
+      setLogoPreview(newLogoUrl);
       notifications.show({
         title: tCommon('success'),
         message: tSettings('themeLogoSaved'),
@@ -137,7 +141,7 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
                 style={{ objectFit: 'contain' }}
               />
             ) : (
-              <IconToolsKitchen2 size={64} stroke={1.5} color={draftColor} />
+              <IconSchool size={64} stroke={1.5} color={draftColor} />
             )}
           </Box>
           <FileButton onChange={handleLogoUpload} accept="image/png,image/jpeg,image/jpg,image/webp">

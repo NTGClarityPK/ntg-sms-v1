@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sms-prod-backend
+    ports:
+      - "9001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - SERVER_DEVELOPMENT=${SERVER_DEVELOPMENT}
+      - SERVER_PRODUCTION=${SERVER_PRODUCTION}
+      - SERVER_STAGING=${SERVER_STAGING}
+    restart: unless-stopped
+    networks:
+      - sms-network
+   
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:  # ⭐ ADD THIS SECTION
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+    container_name: sms-prod-frontend
+    ports:
+      - "9000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    networks:
+      - sms-network
+    depends_on:
+      backend
+networks:
+  sms-network:
+    driver: bridge

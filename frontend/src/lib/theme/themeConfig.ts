@@ -203,7 +203,9 @@ export interface ThemeConfig {
       bold: number;
     };
     // Header text colors
-    pageHeaderColor: string; // Page headers (Title components)
+    /** Main page title bar only (order=1 inside .page-title-bar) — always matches theme primary */
+    pageTitleBarHeaderColor: string;
+    pageHeaderColor: string; // Page headers (Title components) outside title bar / fallback
     navbarSectionHeaderColor: string; // Navbar section headers (Navigation, Management, etc.)
     pageSectionHeaderColor: string; // Page section headers (uppercase Text components)
     // Title font sizes (based on order prop)
@@ -414,8 +416,9 @@ export function generateThemeConfig(
         semibold: 600,
         bold: 700,
       },
-      // Header text colors
-      pageHeaderColor: themeColors.colorTextDark, // Page headers (Title)
+      // Header text colors — main screen header uses primary (tenant theme); elsewhere keep readable text
+      pageTitleBarHeaderColor: themeColors.primary,
+      pageHeaderColor: themeColors.colorTextDark, // Content area / fallback
       navbarSectionHeaderColor: themeColors.colorTextDark, // Navbar section headers
       pageSectionHeaderColor: themeColors.colorTextLight, // Page section headers
       // Title font sizes (based on order prop)

@@ -1,0 +1,10 @@
+.heroDescriptionText {
+  font-size: var(--mantine-font-size-md);
+}
+
+@media (min-width: 768px) {
+  .heroDescriptionText {
+    font-size: var(--mantine-font-size-xl);
+  }
+}
+

@@ -251,7 +251,14 @@ export default function SettingsPage() {
         ) : (
           <>
             <Tabs value={activeTab} onChange={setActiveTab}>
-              <Tabs.List>
+              <Tabs.List
+                style={{
+                  overflowX: 'auto',
+                  flexWrap: 'nowrap',
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'thin',
+                }}
+              >
                 <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
                   {tSettings('tabPermissions')}
                 </Tabs.Tab>
@@ -279,15 +286,13 @@ export default function SettingsPage() {
                 <Tabs.Tab value="inventory-management" leftSection={<IconPackage size={16} />}>
                   {tSettings('tabInventoryManagement')}
                 </Tabs.Tab>
+                <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
+                  {tSettings('tabThemeSettings')}
+                </Tabs.Tab>
                 {isSchoolAdmin && (
-                  <>
-                    <Tabs.Tab value="public-statistics" leftSection={<IconChartBar size={16} />}>
-                      {tSettings('tabPublicStatistics')}
-                    </Tabs.Tab>
-                    <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
-                      {tSettings('tabThemeSettings')}
-                    </Tabs.Tab>
-                  </>
+                  <Tabs.Tab value="public-statistics" leftSection={<IconChartBar size={16} />}>
+                    {tSettings('tabPublicStatistics')}
+                  </Tabs.Tab>
                 )}
               </Tabs.List>
 
@@ -336,15 +341,15 @@ export default function SettingsPage() {
                 <InventoryManagementTabContent />
               </Tabs.Panel>
 
+              {/* Theme Settings Tab - visible to all users with settings access */}
+              <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">
+                <ThemeSettingsPanel showTitle={false} />
+              </Tabs.Panel>
+
               {isSchoolAdmin && (
-                <>
-                  <Tabs.Panel value="public-statistics" pt="md" px="md" pb="md">
-                    <PublicStatsSettings />
-                  </Tabs.Panel>
-                  <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">
-                    <ThemeSettingsPanel showTitle={false} />
-                  </Tabs.Panel>
-                </>
+                <Tabs.Panel value="public-statistics" pt="md" px="md" pb="md">
+                  <PublicStatsSettings />
+                </Tabs.Panel>
               )}
             </Tabs>
           </>

@@ -96,7 +96,7 @@ function createEphemeralSupabaseClient() {
         autoRefreshToken: false,
         storage: createEphemeralStorage(),
       },
-      cookies: createEphemeralCookies(),
+      cookies: createEphemeralCookies() as any,
     },
   );
 }

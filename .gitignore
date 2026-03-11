@@ -48,9 +48,15 @@ coverage/
 .cache/
 
 # Reference files (if needed)
+rmsreference/*
+# Environment files with secrets
 
+.env.prod
+.env.staging
+.env.local
 
-# Cursor IDE
+# Docker
+docker-compose.override.yml# Cursor IDE
 .cursor/
 .cursorignore
 

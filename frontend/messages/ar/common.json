@@ -26,6 +26,9 @@
   "required": "مطلوب",
   "retry": "إعادة المحاولة",
   "noData": "لا توجد بيانات بعد",
+  "profile": "الملف الشخصي",
+  "help": "مساعدة",
+  "logout": "تسجيل الخروج",
   "status": {
     "active": "نشط",
     "inactive": "غير نشط",
@@ -40,6 +43,7 @@
   },
   "sidebarMain": "رئيسي",
   "sidebarManagement": "إدارة",
+  "sidebarSchool": "المدرسة",
   "sidebarHome": "الرئيسية",
   "sidebarAcademics": "الشؤون الأكاديمية",
   "sidebarAttendance": "الحضور والغياب",

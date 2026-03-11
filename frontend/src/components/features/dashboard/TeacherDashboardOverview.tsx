@@ -85,6 +85,12 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
     ? formatRoleName(user.roles[0].roleName)
     : t('teacher');
 
+  const firstClass =
+    classSections.length > 0 ? classSections[0] : undefined;
+  const classDescriptor = firstClass
+    ? `${firstClass.className || firstClass.classDisplayName || ''} ${firstClass.sectionName || ''}`.trim()
+    : '';
+
   const chartData = [
     { name: t('assessment'), count: pendingGradingTotal },
     { name: t('todayClasses'), count: todaySlotsCount },
@@ -100,6 +106,11 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
           <Text size="sm" c="dimmed">
             {t('role')}: {roleLabel}
           </Text>
+          {classDescriptor && (
+            <Text size="sm" c="dimmed">
+              {t('class')}: {classDescriptor}
+            </Text>
+          )}
         </Stack>
       </Paper>
 

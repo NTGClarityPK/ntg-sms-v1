@@ -14,6 +14,7 @@ import {
 } from '@mantine/core';
 import { IconDownload } from '@tabler/icons-react';
 import type { Attendance } from '@/types/attendance';
+import { displayStudentId } from '@/lib/utils/student-display';
 
 interface AttendanceReportProps {
   attendance: Attendance[];
@@ -59,7 +60,7 @@ export function AttendanceReport({
         [
           a.date,
           a.studentName,
-          a.studentIdNumber || a.studentId,
+          displayStudentId(a.studentIdNumber, a.studentId),
           a.className,
           a.sectionName,
           a.status,
@@ -189,7 +190,7 @@ export function AttendanceReport({
                     <Table.Tr key={`${record.id}-${record.date}-${record.studentId}`}>
                       <Table.Td>{new Date(record.date).toLocaleDateString()}</Table.Td>
                       <Table.Td>{record.studentName}</Table.Td>
-                      <Table.Td>{record.studentIdNumber || record.studentId}</Table.Td>
+                      <Table.Td>{displayStudentId(record.studentIdNumber, record.studentId)}</Table.Td>
                       <Table.Td>{record.className}</Table.Td>
                       <Table.Td>{record.sectionName}</Table.Td>
                       <Table.Td>
