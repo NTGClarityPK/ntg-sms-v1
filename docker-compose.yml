@@ -46,7 +46,7 @@ services:
     networks:
       - sms-network
     depends_on:
-      backend
+      - backend
 networks:
   sms-network:
     driver: bridge
