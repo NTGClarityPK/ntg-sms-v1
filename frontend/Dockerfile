@@ -16,7 +16,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build Next.js application
-RUN SKIP_TYPE_CHECK=true npm run build
+RUN npm run build
 
 # Production image
 FROM base AS runner
