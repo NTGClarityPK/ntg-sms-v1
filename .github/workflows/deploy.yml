@@ -11,7 +11,7 @@ jobs:
   deploy:
     name: Deploy
     runs-on: self-hosted
-    
+    timeout-minutes: 15  # ⭐ ADD THIS
     steps:
       - name: Determine Environment
         id: env
