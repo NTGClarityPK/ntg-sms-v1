@@ -106,24 +106,33 @@ export default function LoginPage() {
   }, []);
 
   const completeLoginAfterSupabaseSession = async () => {
-    // Get user (for locale sync and role-based redirects)
+    // Get user (for locale sync, role-based redirects, and branches)
     try {
       const userResponse = await apiClient.get<{
         preferredLocale?: string;
         roles?: Array<{ roleName?: string }>;
+        branches?: Array<{
+          id: string;
+          tenantId?: string | null;
+          name: string;
+          code?: string | null;
+        }>;
       }>('/api/v1/auth/me');
-      const locale = userResponse.data?.preferredLocale ?? 'en';
+
+      const userData = userResponse.data ?? {};
+
+      const locale = userData.preferredLocale ?? 'en';
       document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000; SameSite=Lax`;
       localStorage.setItem('locale', locale);
 
-      const roles = userResponse.data?.roles ?? [];
+      const roles = userData.roles ?? [];
       const normalisedRoleNames = roles
         .map((r) => r.roleName?.toLowerCase())
         .filter((name): name is string => !!name);
 
       const isSuperAdmin = normalisedRoleNames.includes('super_admin');
       if (isSuperAdmin) {
-        window.location.href = '/adminportal';
+        router.push('/adminportal');
         return;
       }
 
@@ -132,7 +141,7 @@ export default function LoginPage() {
       // Only school admins should be prompted to select a branch.
       // All other users (students, parents, etc.) skip branch selection and go straight to dashboard.
       if (!isSchoolAdmin) {
-        window.location.href = '/dashboard';
+        router.push('/dashboard');
         return;
       }
     } catch (userError: unknown) {
@@ -141,10 +150,14 @@ export default function LoginPage() {
       // so school admins are still able to choose a branch.
     }
 
-    // Fetch user's branches for school admins
+    // Fetch user's branches for school admins (reuse branches from /auth/me response)
     try {
-      const response = await apiClient.get<Branch[]>('/api/v1/auth/my-branches');
-      const userBranches = response.data || [];
+      const userBranches = (await (async () => {
+        const response = await apiClient.get<{
+          branches?: Branch[];
+        }>('/api/v1/auth/me');
+        return response.data?.branches || [];
+      })()) as Branch[];
 
       if (userBranches.length === 0) {
         setError('No branches assigned to your account. Please contact your administrator.');
@@ -155,7 +168,6 @@ export default function LoginPage() {
       // If user has only one branch, auto-select it
       if (userBranches.length === 1) {
         await handleBranchSelection(userBranches[0].id);
-        window.location.href = '/dashboard';
         return;
       }
 
@@ -179,10 +191,7 @@ export default function LoginPage() {
     try {
       clearStudentToken();
       const result = await signIn(values.email, values.password);
-      
-      // Wait for session to be fully established in cookies
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      
+
       // Verify session was created
       if (!result.session) {
         throw new Error('Session not created');
@@ -311,9 +320,9 @@ export default function LoginPage() {
         // Non-blocking: dashboard will still bootstrap theme via AuthGuard/Header
       }
       
-      // Close modal and redirect
+      // Close modal and redirect (use SPA navigation)
       setShowBranchSelection(false);
-      window.location.href = '/dashboard';
+      router.push('/dashboard');
     } catch (err: any) {
       console.error('Failed to select branch:', err);
       setError('Failed to select branch. Please try again.');
