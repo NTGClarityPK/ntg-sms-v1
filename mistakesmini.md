@@ -109,4 +109,4 @@
 - **Where the real message is**: The backend (e.g. Nest `HttpExceptionFilter`) sends the actual message in the **response body**, e.g. `{ error: { code, message } }` or `{ message }`. That lives on **`error.response.data`**, not on `error.message`.
 - **Rule**: In **useMutation** **onError**, never rely only on `error.message` for user-facing notifications. Read the body first: e.g. `(error as any).response?.data?.error?.message ?? (error as any).response?.data?.message`, then fall back to `Error.message`, then a fallback string. Prefer a small helper (e.g. `getApiErrorMessage(error, fallback)`) and use it in all mutation **onError** handlers so users see the backend message (e.g. “An early departure request for this student on the same date and time already exists.”) instead of “Request failed with status code 400”.
 
-ENDss
+E
