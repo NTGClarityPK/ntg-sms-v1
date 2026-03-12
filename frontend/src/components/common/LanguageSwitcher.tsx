@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { Menu, Button, Stack, Text } from '@mantine/core';
 import { IconLanguage, IconCheck } from '@tabler/icons-react';
 import { useLocale } from 'next-intl';
+import { useMediaQuery } from '@mantine/hooks';
+import { useMantineTheme } from '@mantine/core';
 import { apiClient } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 const LOCALE_COOKIE = 'NEXT_LOCALE';
@@ -22,6 +24,8 @@ function setLocaleCookie(locale: string) {
 export function LanguageSwitcher() {
   const router = useRouter();
   const locale = useLocale();
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
   const currentLanguage = LANGUAGES.find((l) => l.code === locale) ?? LANGUAGES[0];
 
@@ -44,18 +48,37 @@ export function LanguageSwitcher() {
   };
 
   return (
-    <Menu shadow="md" width={200} position="bottom-end" zIndex={2000}>
+    <Menu
+      shadow="md"
+      width={isMobile ? 160 : 200}
+      position={isMobile ? 'bottom' : 'bottom-end'}
+      zIndex={2000}
+    >
       <Menu.Target>
-        <Button
-          leftSection={<IconLanguage size={16} />}
-          size="sm"
-          style={{
-            backgroundColor: DEFAULT_THEME_COLOR,
-            color: 'white',
-          }}
-        >
-          {currentLanguage.nativeName}
-        </Button>
+        {isMobile ? (
+          <Button
+            size="sm"
+            px="xs"
+            aria-label="Change language"
+            style={{
+              backgroundColor: DEFAULT_THEME_COLOR,
+              color: 'white',
+            }}
+          >
+            <IconLanguage size={16} />
+          </Button>
+        ) : (
+          <Button
+            leftSection={<IconLanguage size={16} />}
+            size="sm"
+            style={{
+              backgroundColor: DEFAULT_THEME_COLOR,
+              color: 'white',
+            }}
+          >
+            {currentLanguage.nativeName}
+          </Button>
+        )}
       </Menu.Target>
 
       <Menu.Dropdown>
