@@ -90,7 +90,7 @@ function ProblemCard({
           <List
             spacing="sm"
             icon={
-              <ThemeIcon color="red" size={20} radius="xl">
+              <ThemeIcon color="green" size={20} radius="xl">
                 <IconX size={12} />
               </ThemeIcon>
             }

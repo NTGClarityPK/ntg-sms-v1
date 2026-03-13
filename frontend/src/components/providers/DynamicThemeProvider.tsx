@@ -250,7 +250,6 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         margin: 0 !important;
         text-align: start !important;
         padding-inline-start: 0 !important;
-        padding-top: var(--mantine-spacing-sm) !important;
       }
       
       /* Title bar button group alignment */

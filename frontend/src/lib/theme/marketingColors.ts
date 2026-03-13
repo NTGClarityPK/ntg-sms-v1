@@ -8,8 +8,10 @@
 // ============================================
 // CHANGE THESE TWO COLORS TO UPDATE EVERYTHING
 // ============================================
-const PRIMARY_COLOR = '#e74c3c'; // ← Change this
-const SECONDARY_COLOR = '#c0392b'; // ← Change this
+// Green primary/secondary for marketing site
+// Primary: medium green, Secondary: deeper green
+const PRIMARY_COLOR = '#16a34a'; // ← Green primary
+const SECONDARY_COLOR = '#15803d'; // ← Green secondary
 
 // ============================================
 // Utility Functions (Don't modify)

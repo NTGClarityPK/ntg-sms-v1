@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import { Avatar, Menu, Text, Group } from '@mantine/core';
-import { IconUser, IconBook, IconLogout, IconSwitchHorizontal, IconDownload } from '@tabler/icons-react';
+import {
+  IconUser,
+  IconBook,
+  IconLogout,
+  IconSwitchHorizontal,
+  IconDownload,
+  IconBell,
+} from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -134,6 +141,15 @@ export function UserMenu() {
           disabled
         >
           Help
+        </Menu.Item>
+        <Menu.Item
+          id="user-menu-enable-notifications"
+          leftSection={<IconBell size={14} />}
+          onClick={() => {
+            router.push('/notifications?tab=settings');
+          }}
+        >
+          Enable Notifications
         </Menu.Item>
 
         {showInstallApp && (

@@ -24,14 +24,21 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '@/hooks/useNotifications';
 import { usePushSubscribe } from '@/hooks/usePushSubscribe';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { Notification } from '@/types/notifications';
+import { useMediaQuery } from '@mantine/hooks';
+import { useMantineTheme } from '@mantine/core';
 
 export default function NotificationsPage() {
   const t = useTranslations('notification');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const notifyColors = useThemeColors();
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const initialTab = searchParams.get('tab') === 'settings' ? 'settings' : 'all';
+  const [activeTab, setActiveTab] = useState<string | null>(initialTab);
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
   const {
@@ -211,8 +218,10 @@ export default function NotificationsPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{t('title')}</Title>
+        <Group justify="space-between" w="100%" wrap="nowrap" gap="xs">
+          <Title order={1} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {t('title')}
+          </Title>
           <Group gap="sm">
             <Tooltip label={t('refresh')}>
               <ActionIcon
@@ -225,13 +234,27 @@ export default function NotificationsPage() {
               </ActionIcon>
             </Tooltip>
             {unreadCount > 0 && (
-              <Button
-                leftSection={<IconChecks size={18} />}
-                onClick={() => markAllAsRead.mutate()}
-                loading={markAllAsRead.isPending}
-              >
-                {t('markAllAsRead')}
-              </Button>
+              isMobile ? (
+                <Tooltip label={t('markAllAsRead')}>
+                  <ActionIcon
+                    variant="light"
+                    size="lg"
+                    loading={markAllAsRead.isPending}
+                    onClick={() => markAllAsRead.mutate()}
+                    aria-label={t('markAllAsRead')}
+                  >
+                    <IconChecks size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              ) : (
+                <Button
+                  leftSection={<IconChecks size={18} />}
+                  onClick={() => markAllAsRead.mutate()}
+                  loading={markAllAsRead.isPending}
+                >
+                  {t('markAllAsRead')}
+                </Button>
+              )
             )}
           </Group>
         </Group>
@@ -246,7 +269,7 @@ export default function NotificationsPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs defaultValue="all">
+        <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="all" leftSection={<IconBell size={16} />}>
               {t('tabAll')}

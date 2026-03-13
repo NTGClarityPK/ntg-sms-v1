@@ -16,12 +16,12 @@ export function GradientBackground({
     primary: {
       light: marketingColors.gradientBackgroundLight,
       medium: marketingColors.gradientBackgroundPrimary,
-      strong: 'linear-gradient(135deg, rgba(255, 107, 107, 0.25) 0%, rgba(101, 173, 232, 0.25) 100%)',
+      strong: marketingColors.gradientBackgroundPrimary,
     },
     secondary: {
       light: marketingColors.gradientBackgroundLight,
       medium: marketingColors.gradientBackgroundSecondary,
-      strong: 'linear-gradient(135deg, rgba(101, 173, 232, 0.25) 0%, rgba(255, 107, 107, 0.25) 100%)',
+      strong: marketingColors.gradientBackgroundSecondary,
     },
   };
 

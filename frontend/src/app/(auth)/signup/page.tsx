@@ -28,11 +28,11 @@ import {
 } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
-import { useErrorColor, useInfoColor, useSuccessColor } from '@/lib/hooks/use-theme-colors';
+import { useErrorColor, useInfoColor, useSuccessColor, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeColor } from '@/lib/hooks/use-theme-color';
 import { generateThemeColors } from '@/lib/utils/themeColors';
-import { signIn } from '@/lib/auth';
+import { notifications } from '@mantine/notifications';
 
 interface RegisterData {
   // School/Tenant
@@ -57,6 +57,7 @@ export default function SignupPage() {
   const errorColor = useErrorColor();
   const infoColor = useInfoColor();
   const successColor = useSuccessColor();
+  const notifyColors = useNotificationColors();
   const { isDark } = useTheme();
   const primaryColor = useThemeColor();
   const themeColors = generateThemeColors(primaryColor, isDark);
@@ -154,17 +155,7 @@ export default function SignupPage() {
     try {
       // Call registration API
       const { confirmPassword, ...registerData } = values;
-      const response = await apiClient.post<{
-        user: {
-          id: string;
-          email: string;
-          fullName: string;
-          tenantId: string;
-          branchId: string;
-        };
-        accessToken: string;
-        refreshToken: string;
-      }>('/api/v1/auth/register', {
+      await apiClient.post('/api/v1/auth/register', {
         schoolName: registerData.schoolName,
         schoolCode: registerData.schoolCode || undefined,
         schoolDomain: registerData.schoolDomain || undefined,
@@ -178,16 +169,18 @@ export default function SignupPage() {
         phone: registerData.phone || undefined,
       });
 
-      // Auto-login after successful registration
-      try {
-        await signIn(values.email, values.password);
-        // Wait for session to be established
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        router.push('/dashboard');
-      } catch (loginError) {
-        // Registration succeeded but auto-login failed - redirect to login page
+      // Show success notification briefly, then redirect to login
+      notifications.show({
+        id: 'signup-success',
+        title: 'Account created',
+        message: 'Your school account has been created. Redirecting to login…',
+        color: notifyColors.success,
+        autoClose: 2000,
+      });
+
+      setTimeout(() => {
         router.push('/login?registered=true');
-      }
+      }, 2000);
     } catch (err: any) {
       const errorMsg =
         err.response?.data?.error?.message ||
@@ -195,11 +188,21 @@ export default function SignupPage() {
         err.message ||
         'Registration failed. Please try again.';
       setError(errorMsg);
+
+      // Show failure notification (stay on page so user can fix and retry)
+      notifications.show({
+        id: 'signup-error',
+        title: 'Registration failed',
+        message: errorMsg,
+        color: notifyColors.error,
+        autoClose: 2000,
+      });
+    } finally {
       setLoading(false);
     }
   };
 
-  // Prevent form submit from running registration; only "Create Account" button click should submit
+  // Prevent implicit submit (e.g. Enter key); only the button should trigger registration
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
   };
@@ -525,6 +528,7 @@ export default function SignupPage() {
               id="signup-submit"
               type="button"
               loading={loading}
+              onClick={() => form.onSubmit(handleSubmit)()}
               style={{
                 backgroundColor: DEFAULT_THEME_COLOR,
                 color: 'white',
