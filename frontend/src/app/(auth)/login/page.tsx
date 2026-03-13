@@ -106,6 +106,13 @@ export default function LoginPage() {
   }, []);
 
   const completeLoginAfterSupabaseSession = async () => {
+    // Ensure Google-authenticated users have a default school/branch/role before loading profile.
+    try {
+      await apiClient.post('/api/v1/auth/bootstrap-google');
+    } catch (bootstrapError) {
+      console.error('Failed to bootstrap Google user (non-fatal):', bootstrapError);
+    }
+
     // Get user (for locale sync, role-based redirects, and branches)
     try {
       const userResponse = await apiClient.get<{
@@ -183,6 +190,28 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // If we land on /login with an existing Supabase session (e.g. after Google OAuth),
+  // automatically complete the login flow instead of staying on the login screen.
+  useEffect(() => {
+    let cancelled = false;
+    async function resumeFromExistingSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session || cancelled) return;
+        await completeLoginAfterSupabaseSession();
+      } catch (err) {
+        console.error('Failed to complete login from existing session:', err);
+      }
+    }
+    void resumeFromExistingSession();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (values: typeof form.values) => {
     setLoading(true);

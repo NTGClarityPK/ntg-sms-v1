@@ -625,4 +625,154 @@ export class AuthService {
       },
     };
   }
+
+  /**
+   * Ensure a Google-authenticated user has a tenant, branch, profile, and school_admin role.
+   * Idempotent: if the user already has at least one branch, it will simply return the current user.
+   */
+  async bootstrapGoogleUser(userId: string): Promise<UserResponseDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // If user already has branches, nothing to do.
+    const { data: existingUserBranches, error: userBranchesError } = await supabase
+      .from('user_branches')
+      .select('branch_id')
+      .eq('user_id', userId);
+
+    if (userBranchesError) {
+      throw new BadRequestException(`Failed to check user branches: ${userBranchesError.message}`);
+    }
+
+    if (existingUserBranches && existingUserBranches.length > 0) {
+      return this.getCurrentUser(userId);
+    }
+
+    // Fetch auth user to get email/name
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.admin.getUserById(userId);
+
+    if (userError || !user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const email = user.email || '';
+    const fullName =
+      (user.user_metadata as { full_name?: string; name?: string } | null)?.full_name ||
+      (user.user_metadata as { name?: string } | null)?.name ||
+      email ||
+      'User';
+
+    // Create tenant
+    const random = Math.floor(Math.random() * 1_000_000)
+      .toString()
+      .padStart(6, '0');
+    const tenantCode = `GOOG${random}`;
+
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .insert({
+        name: 'Default School',
+        code: tenantCode,
+        domain: null,
+        is_active: true,
+      })
+      .select('id')
+      .single();
+
+    if (tenantError || !tenant) {
+      throw new BadRequestException(
+        `Failed to create default tenant for Google user: ${tenantError?.message ?? 'Unknown error'}`,
+      );
+    }
+
+    const tenantId = (tenant as { id: string }).id;
+
+    // Create branch
+    const branchCode = `${tenantCode}-MAIN`;
+    const { data: branch, error: branchError } = await supabase
+      .from('branches')
+      .insert({
+        tenant_id: tenantId,
+        name: 'Default Branch',
+        code: branchCode,
+        address: null,
+        phone: null,
+        email,
+        storage_quota_gb: 100,
+        is_active: true,
+      })
+      .select('id')
+      .single();
+
+    if (branchError || !branch) {
+      throw new BadRequestException(
+        `Failed to create default branch for Google user: ${branchError?.message ?? 'Unknown error'}`,
+      );
+    }
+
+    const branchId = (branch as { id: string }).id;
+
+    // Upsert profile
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: userId,
+          full_name: fullName,
+          is_active: true,
+          current_branch_id: branchId,
+        },
+        { onConflict: 'id' },
+      );
+
+    if (profileError) {
+      throw new BadRequestException(`Failed to create profile for Google user: ${profileError.message}`);
+    }
+
+    // Link user to branch
+    const { error: userBranchError } = await supabase.from('user_branches').insert({
+      user_id: userId,
+      branch_id: branchId,
+      is_primary: true,
+    });
+
+    if (userBranchError) {
+      throw new BadRequestException(
+        `Failed to assign Google user to default branch: ${userBranchError.message}`,
+      );
+    }
+
+    // Find school_admin role
+    const { data: schoolAdminRole, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', 'school_admin')
+      .maybeSingle();
+
+    if (roleError) {
+      throw new BadRequestException(`Failed to fetch school_admin role: ${roleError.message}`);
+    }
+
+    if (!schoolAdminRole) {
+      throw new BadRequestException('School Admin role not found in database');
+    }
+
+    // Assign school_admin role scoped to the default branch
+    const { error: roleAssignmentError } = await supabase.from('user_roles').insert({
+      user_id: userId,
+      role_id: (schoolAdminRole as { id: string }).id,
+      branch_id: branchId,
+    });
+
+    if (roleAssignmentError) {
+      throw new BadRequestException(
+        `Failed to assign school_admin role to Google user: ${roleAssignmentError.message}`,
+      );
+    }
+
+    // Return full user payload
+    return this.getCurrentUser(userId);
+  }
 }

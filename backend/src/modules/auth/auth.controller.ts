@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, UseGuards, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
@@ -9,7 +11,33 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('api/v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  @Get('google')
+  async redirectToGoogle(@Res() res: Response): Promise<void> {
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+
+    if (!supabaseUrl || !frontendUrl) {
+      res.status(500).json({
+        error: {
+          code: 'GoogleAuthNotConfigured',
+          message: 'Google authentication is not configured on the server.',
+        },
+      });
+      return;
+    }
+
+    const redirectTo = `${frontendUrl}/login`;
+    const url = new URL('/auth/v1/authorize', supabaseUrl);
+    url.searchParams.set('provider', 'google');
+    url.searchParams.set('redirect_to', redirectTo);
+
+    res.redirect(url.toString());
+  }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
@@ -144,5 +172,18 @@ export class AuthController {
   }> {
     const result = await this.authService.switchChild(user.id, body.studentId);
     return { data: result };
+  }
+
+  /**
+   * Bootstrap a Google-authenticated user with a default school / branch / role if needed.
+   * Idempotent: if the user already has branches, it simply returns the current user payload.
+   */
+  @Post('bootstrap-google')
+  @UseGuards(JwtAuthGuard)
+  async bootstrapGoogle(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: UserResponseDto }> {
+    const userData = await this.authService.bootstrapGoogleUser(user.id);
+    return { data: userData };
   }
 }
