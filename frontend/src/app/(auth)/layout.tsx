@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useMemo } from 'react';
+import { usePathname } from 'next/navigation';
 import { Box, Title, Text, Card, Group } from '@mantine/core';
 import { IconSchool } from '@tabler/icons-react';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
@@ -29,7 +30,8 @@ function calculateShade(baseColor: string, shade: number = 8): string {
 }
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
-  // Use default theme color for auth pages, don't read from localStorage
+  const pathname = usePathname();
+  const isCallback = pathname === '/auth/callback';
   const primary = DEFAULT_THEME_COLOR;
   const primaryShade = useMemo(() => calculateShade(DEFAULT_THEME_COLOR, 8), []);
 
@@ -137,10 +139,12 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </Text>
           </Box>
 
-          {/* Language Switcher */}
-          <Group justify="flex-end" mb="md">
-            <LanguageSwitcher />
-          </Group>
+          {/* Language Switcher - hidden on callback page */}
+          {!isCallback && (
+            <Group justify="flex-end" mb="md">
+              <LanguageSwitcher />
+            </Group>
+          )}
 
           {children}
         </Card>

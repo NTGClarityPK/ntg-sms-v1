@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
   Title,
@@ -14,6 +14,7 @@ import {
   Alert,
   Stepper,
   Group,
+  Divider,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import {
@@ -25,8 +26,9 @@ import {
   IconCheck,
   IconSchool,
   IconBuilding,
+  IconBrandGoogle,
 } from '@tabler/icons-react';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getEffectiveApiBaseURL } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useErrorColor, useInfoColor, useSuccessColor, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
@@ -52,8 +54,11 @@ interface RegisterData {
   phone: string;
 }
 
+type SignupMethod = 'google' | 'email' | null;
+
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const errorColor = useErrorColor();
   const infoColor = useInfoColor();
   const successColor = useSuccessColor();
@@ -61,6 +66,7 @@ export default function SignupPage() {
   const { isDark } = useTheme();
   const primaryColor = useThemeColor();
   const themeColors = generateThemeColors(primaryColor, isDark);
+  const [signupMethod, setSignupMethod] = useState<SignupMethod>(null);
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,18 +125,25 @@ export default function SignupPage() {
       }
     } else if (active === 2) {
       // Validate step 3: Admin Account before moving to step 4
-      const emailValidation = form.validateField('email');
-      const passwordValidation = form.validateField('password');
-      const confirmPasswordValidation = form.validateField('confirmPassword');
       const fullNameValidation = form.validateField('fullName');
-      
-      if (
-        !emailValidation.hasError &&
-        !passwordValidation.hasError &&
-        !confirmPasswordValidation.hasError &&
-        !fullNameValidation.hasError
-      ) {
-        setActive((current) => (current < 3 ? current + 1 : current));
+
+      if (signupMethod === 'google') {
+        if (!fullNameValidation.hasError) {
+          setActive((current) => (current < 3 ? current + 1 : current));
+        }
+      } else {
+        const emailValidation = form.validateField('email');
+        const passwordValidation = form.validateField('password');
+        const confirmPasswordValidation = form.validateField('confirmPassword');
+
+        if (
+          !emailValidation.hasError &&
+          !passwordValidation.hasError &&
+          !confirmPasswordValidation.hasError &&
+          !fullNameValidation.hasError
+        ) {
+          setActive((current) => (current < 3 ? current + 1 : current));
+        }
       }
     }
   };
@@ -148,7 +161,38 @@ export default function SignupPage() {
     setActive((current) => (current > 0 ? current - 1 : current));
   };
 
+  const handleGoogleSignup = async (values: RegisterData) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const apiBase = getEffectiveApiBaseURL();
+      // Encode signup context into a custom query param (gstate), not OAuth state.
+      const gstate = btoa(
+        JSON.stringify({
+          schoolName: values.schoolName,
+          branchName: values.branchName,
+          fullName: values.fullName,
+          phone: values.phone || undefined,
+          isSignup: true,
+        }),
+      );
+
+      window.location.href = `${apiBase}/api/v1/auth/google?gstate=${encodeURIComponent(gstate)}`;
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to initiate Google signup. Please try again.';
+      setError(errorMsg);
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (values: RegisterData) => {
+    // Email-based signup uses the existing registration endpoint.
+    if (signupMethod === 'google') {
+      await handleGoogleSignup(values);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -207,10 +251,112 @@ export default function SignupPage() {
     e.preventDefault();
   };
 
+  // Method selection view (Google vs Email) – mirrors RMS signup behaviour.
+  if (!signupMethod) {
+    return (
+      <form id="signup-form" onSubmit={handleFormSubmit}>
+        <Stack gap="lg">
+          <Box>
+            <Title
+              order={2}
+              size="1.8rem"
+              fw={700}
+              mb="xs"
+              style={{ color: themeColors.colorTextDark }}
+            >
+              Create Account
+            </Title>
+            <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
+              Choose how you want to sign up for NTG Alma.
+            </Text>
+          </Box>
+
+          {searchParams.get('google') === 'not_found' && (
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              style={{
+                backgroundColor: `${errorColor}15`,
+                borderColor: errorColor,
+                color: errorColor,
+              }}
+              variant="light"
+              radius="md"
+            >
+              <Text size="sm">
+                This Google account is not registered. Please sign up below to create your school account.
+              </Text>
+            </Alert>
+          )}
+
+          <Stack gap="md">
+            <Button
+              id="signup-google-button"
+              size="lg"
+              radius="md"
+              leftSection={<IconBrandGoogle size={20} style={{ color: '#4285F4' }} />}
+              onClick={() => setSignupMethod('google')}
+              style={{
+                backgroundColor: 'white',
+                color: '#333333',
+                border: '1px solid #e0e0e0',
+              }}
+              fullWidth
+            >
+              Sign up with Google
+            </Button>
+
+            <Divider label="Or" labelPosition="center" my="md" />
+
+            <Button
+              id="signup-email-button"
+              size="lg"
+              radius="md"
+              leftSection={<IconMail size={20} />}
+              onClick={() => setSignupMethod('email')}
+              style={{
+                backgroundColor: DEFAULT_THEME_COLOR,
+                color: 'white',
+              }}
+              fullWidth
+            >
+              Sign up with email
+            </Button>
+          </Stack>
+
+          <Text ta="center" size="sm" style={{ color: themeColors.colorTextMedium }}>
+            Already have an account?{' '}
+            <Anchor
+              id="signup-login-link"
+              href="/login"
+              size="sm"
+              style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}
+            >
+              Sign in
+            </Anchor>
+          </Text>
+        </Stack>
+      </form>
+    );
+  }
+
+  // For now, both Google and email methods use the same multi-step school signup form.
+  // Behaviour differences (e.g. redirecting to Google OAuth) can be layered on later.
   return (
     <form id="signup-form" onSubmit={handleFormSubmit}>
       <Stack gap="lg">
         <Box>
+          <Button
+            id="signup-back-method"
+            variant="subtle"
+            size="sm"
+            onClick={() => {
+              setSignupMethod(null);
+              setActive(0);
+            }}
+            style={{ marginBottom: '1rem', color: DEFAULT_THEME_COLOR }}
+          >
+            Back
+          </Button>
           <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
             Create School Account
           </Title>
@@ -324,18 +470,20 @@ export default function SignupPage() {
             icon={<IconUser size={18} />}
           >
             <Stack gap="md" mt="xl">
-              <TextInput
-                id="signup-email"
-                label="Email"
-                placeholder="admin@school.com"
-                required
-                leftSection={<IconMail size={18} />}
-                size="lg"
-                radius="md"
-                autoComplete="email"
-                disabled={loading}
-                {...form.getInputProps('email')}
-              />
+              {signupMethod === 'email' && (
+                <TextInput
+                  id="signup-email"
+                  label="Email"
+                  placeholder="admin@school.com"
+                  required
+                  leftSection={<IconMail size={18} />}
+                  size="lg"
+                  radius="md"
+                  autoComplete="email"
+                  disabled={loading}
+                  {...form.getInputProps('email')}
+                />
+              )}
 
               <TextInput
                 id="signup-full-name"
@@ -360,45 +508,49 @@ export default function SignupPage() {
                 {...form.getInputProps('phone')}
               />
 
-              <PasswordInput
-                id="signup-password"
-                label="Password"
-                placeholder="Enter your password"
-                required
-                leftSection={<IconLock size={18} />}
-                size="lg"
-                radius="md"
-                autoComplete="new-password"
-                disabled={loading}
-                {...form.getInputProps('password')}
-              />
+              {signupMethod === 'email' && (
+                <>
+                  <PasswordInput
+                    id="signup-password"
+                    label="Password"
+                    placeholder="Enter your password"
+                    required
+                    leftSection={<IconLock size={18} />}
+                    size="lg"
+                    radius="md"
+                    autoComplete="new-password"
+                    disabled={loading}
+                    {...form.getInputProps('password')}
+                  />
 
-              <PasswordInput
-                id="signup-confirm-password"
-                label="Confirm Password"
-                placeholder="Confirm your password"
-                required
-                leftSection={<IconLock size={18} />}
-                size="lg"
-                radius="md"
-                autoComplete="new-password"
-                disabled={loading}
-                {...form.getInputProps('confirmPassword')}
-              />
+                  <PasswordInput
+                    id="signup-confirm-password"
+                    label="Confirm Password"
+                    placeholder="Confirm your password"
+                    required
+                    leftSection={<IconLock size={18} />}
+                    size="lg"
+                    radius="md"
+                    autoComplete="new-password"
+                    disabled={loading}
+                    {...form.getInputProps('confirmPassword')}
+                  />
 
-              <Alert
-                style={{
-                  backgroundColor: `${infoColor}15`,
-                  borderColor: infoColor,
-                  color: infoColor,
-                }}
-                variant="light"
-                radius="md"
-              >
-                <Text size="sm">
-                  Password must be at least 6 characters long. Choose a strong password to keep your account secure.
-                </Text>
-              </Alert>
+                  <Alert
+                    style={{
+                      backgroundColor: `${infoColor}15`,
+                      borderColor: infoColor,
+                      color: infoColor,
+                    }}
+                    variant="light"
+                    radius="md"
+                  >
+                    <Text size="sm">
+                      Password must be at least 6 characters long. Choose a strong password to keep your account secure.
+                    </Text>
+                  </Alert>
+                </>
+              )}
             </Stack>
           </Stepper.Step>
 
@@ -434,15 +586,6 @@ export default function SignupPage() {
                 </Text>
                 <Text fw={500} style={{ color: themeColors.colorTextDark }}>
                   {form.values.branchName}
-                </Text>
-              </Box>
-
-              <Box>
-                <Text size="sm" mb="xs" style={{ color: themeColors.colorTextMedium }}>
-                  Admin Email
-                </Text>
-                <Text fw={500} style={{ color: themeColors.colorTextDark }}>
-                  {form.values.email}
                 </Text>
               </Box>
 
@@ -528,13 +671,21 @@ export default function SignupPage() {
               id="signup-submit"
               type="button"
               loading={loading}
-              onClick={() => form.onSubmit(handleSubmit)()}
+              onClick={() => {
+                if (signupMethod === 'google') {
+                  // For Google signup, go straight to Google OAuth without hitting the email/password validator.
+                  void handleGoogleSignup(form.values);
+                } else {
+                  form.onSubmit(handleSubmit)();
+                }
+              }}
               style={{
-                backgroundColor: DEFAULT_THEME_COLOR,
-                color: 'white',
+                backgroundColor: signupMethod === 'google' ? 'white' : DEFAULT_THEME_COLOR,
+                color: signupMethod === 'google' ? '#333333' : 'white',
+                border: signupMethod === 'google' ? '1px solid #e0e0e0' : undefined,
               }}
             >
-              Create Account
+              {signupMethod === 'google' ? 'Continue with Google' : 'Create Account'}
             </Button>
           )}
         </Group>

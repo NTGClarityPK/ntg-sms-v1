@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, UseGuards, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, UseGuards, Res, Query } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -17,7 +17,10 @@ export class AuthController {
   ) {}
 
   @Get('google')
-  async redirectToGoogle(@Res() res: Response): Promise<void> {
+  async redirectToGoogle(
+    @Res() res: Response,
+    @Query('gstate') gstate?: string,
+  ): Promise<void> {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
 
@@ -31,7 +34,11 @@ export class AuthController {
       return;
     }
 
-    const redirectTo = `${frontendUrl}/login`;
+    const redirectToUrl = new URL('/auth/callback', frontendUrl);
+    if (gstate) {
+      redirectToUrl.searchParams.set('gstate', gstate);
+    }
+    const redirectTo = redirectToUrl.toString();
     const url = new URL('/auth/v1/authorize', supabaseUrl);
     url.searchParams.set('provider', 'google');
     url.searchParams.set('redirect_to', redirectTo);
@@ -184,6 +191,31 @@ export class AuthController {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: UserResponseDto }> {
     const userData = await this.authService.bootstrapGoogleUser(user.id);
+    return { data: userData };
+  }
+
+  /**
+   * Provision a Google-signup user using school/branch/admin data captured during signup.
+   * Called after Google OAuth completes, when the Supabase session is already established.
+   */
+  @Post('google-signup')
+  @UseGuards(JwtAuthGuard)
+  async googleSignup(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body()
+    body: {
+      schoolName: string;
+      branchName: string;
+      fullName: string;
+      phone?: string | null;
+    },
+  ): Promise<{ data: UserResponseDto }> {
+    const userData = await this.authService.googleSignupProvision(user.id, {
+      schoolName: body.schoolName,
+      branchName: body.branchName,
+      fullName: body.fullName,
+      phone: body.phone ?? null,
+    });
     return { data: userData };
   }
 }

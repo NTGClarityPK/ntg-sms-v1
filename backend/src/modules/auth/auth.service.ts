@@ -714,6 +714,22 @@ export class AuthService {
 
     const branchId = (branch as { id: string }).id;
 
+    // Create default active academic year for the tenant
+    const now = new Date();
+    const y = now.getFullYear();
+    const ayName = `${y}-${y + 1}`;
+    const ayStart = `${y}-09-01`;
+    const ayEnd = `${y + 1}-08-31`;
+    await supabase.from('academic_years').insert({
+      tenant_id: tenantId,
+      name: ayName,
+      start_date: ayStart,
+      end_date: ayEnd,
+      is_active: true,
+      created_by: 'system',
+      updated_by: 'system',
+    });
+
     // Upsert profile
     const { error: profileError } = await supabase
       .from('profiles')
@@ -773,6 +789,178 @@ export class AuthService {
     }
 
     // Return full user payload
+    return this.getCurrentUser(userId);
+  }
+
+  /**
+   * Provision a Google-signup user using school/branch/admin info captured during signup.
+   * Similar to bootstrapGoogleUser but uses explicit names instead of defaults.
+   */
+  async googleSignupProvision(
+    userId: string,
+    payload: { schoolName: string; branchName: string; fullName: string; phone?: string | null },
+  ): Promise<UserResponseDto> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // If user already has branches, nothing to do.
+    const { data: existingUserBranches, error: userBranchesError } = await supabase
+      .from('user_branches')
+      .select('branch_id')
+      .eq('user_id', userId);
+
+    if (userBranchesError) {
+      throw new BadRequestException(`Failed to check user branches: ${userBranchesError.message}`);
+    }
+
+    if (existingUserBranches && existingUserBranches.length > 0) {
+      return this.getCurrentUser(userId);
+    }
+
+    const trimmedSchoolName = payload.schoolName?.trim();
+    const trimmedBranchName = payload.branchName?.trim();
+    const trimmedFullName = payload.fullName?.trim();
+
+    if (!trimmedSchoolName || !trimmedBranchName || !trimmedFullName) {
+      throw new BadRequestException('School name, branch name, and full name are required for Google signup.');
+    }
+
+    // Fetch auth user to get email
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.admin.getUserById(userId);
+
+    if (userError || !user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const email = user.email || '';
+
+    // Create tenant
+    const random = Math.floor(Math.random() * 1_000_000)
+      .toString()
+      .padStart(6, '0');
+    const tenantCode = `GOOG${random}`;
+
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .insert({
+        name: trimmedSchoolName,
+        code: tenantCode,
+        domain: null,
+        is_active: true,
+      })
+      .select('id')
+      .single();
+
+    if (tenantError || !tenant) {
+      throw new BadRequestException(
+        `Failed to create tenant for Google signup: ${tenantError?.message ?? 'Unknown error'}`,
+      );
+    }
+
+    const tenantId = (tenant as { id: string }).id;
+
+    // Create branch
+    const branchCode = `${tenantCode}-MAIN`;
+    const { data: branch, error: branchError } = await supabase
+      .from('branches')
+      .insert({
+        tenant_id: tenantId,
+        name: trimmedBranchName,
+        code: branchCode,
+        address: null,
+        phone: payload.phone ?? null,
+        email,
+        storage_quota_gb: 100,
+        is_active: true,
+      })
+      .select('id')
+      .single();
+
+    if (branchError || !branch) {
+      throw new BadRequestException(
+        `Failed to create branch for Google signup: ${branchError?.message ?? 'Unknown error'}`,
+      );
+    }
+
+    const branchId = (branch as { id: string }).id;
+
+    // Create default active academic year for the tenant
+    const now = new Date();
+    const y = now.getFullYear();
+    const ayName = `${y}-${y + 1}`;
+    const ayStart = `${y}-09-01`;
+    const ayEnd = `${y + 1}-08-31`;
+    await supabase.from('academic_years').insert({
+      tenant_id: tenantId,
+      name: ayName,
+      start_date: ayStart,
+      end_date: ayEnd,
+      is_active: true,
+      created_by: 'system',
+      updated_by: 'system',
+    });
+
+    // Upsert profile
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: userId,
+          full_name: trimmedFullName,
+          phone: payload.phone ?? null,
+          is_active: true,
+          current_branch_id: branchId,
+        },
+        { onConflict: 'id' },
+      );
+
+    if (profileError) {
+      throw new BadRequestException(`Failed to create profile for Google signup: ${profileError.message}`);
+    }
+
+    // Link user to branch
+    const { error: userBranchError } = await supabase.from('user_branches').insert({
+      user_id: userId,
+      branch_id: branchId,
+      is_primary: true,
+    });
+
+    if (userBranchError) {
+      throw new BadRequestException(
+        `Failed to assign Google signup user to branch: ${userBranchError.message}`,
+      );
+    }
+
+    // Find school_admin role
+    const { data: schoolAdminRole, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', 'school_admin')
+      .maybeSingle();
+
+    if (roleError) {
+      throw new BadRequestException(`Failed to fetch school_admin role: ${roleError.message}`);
+    }
+
+    if (!schoolAdminRole) {
+      throw new BadRequestException('School Admin role not found in database');
+    }
+
+    // Assign school_admin role scoped to the new branch
+    const { error: roleAssignmentError } = await supabase.from('user_roles').insert({
+      user_id: userId,
+      role_id: (schoolAdminRole as { id: string }).id,
+      branch_id: branchId,
+    });
+
+    if (roleAssignmentError) {
+      throw new BadRequestException(
+        `Failed to assign school_admin role to Google signup user: ${roleAssignmentError.message}`,
+      );
+    }
+
     return this.getCurrentUser(userId);
   }
 }

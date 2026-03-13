@@ -106,13 +106,6 @@ export default function LoginPage() {
   }, []);
 
   const completeLoginAfterSupabaseSession = async () => {
-    // Ensure Google-authenticated users have a default school/branch/role before loading profile.
-    try {
-      await apiClient.post('/api/v1/auth/bootstrap-google');
-    } catch (bootstrapError) {
-      console.error('Failed to bootstrap Google user (non-fatal):', bootstrapError);
-    }
-
     // Get user (for locale sync, role-based redirects, and branches)
     try {
       const userResponse = await apiClient.get<{
@@ -151,10 +144,25 @@ export default function LoginPage() {
         router.push('/dashboard');
         return;
       }
-    } catch (userError: unknown) {
+    } catch (userError: any) {
+      // If this Google-authenticated user doesn't have an SMS account yet,
+      // redirect them to the signup flow instead of leaving them on login.
+      const status = userError?.response?.status as number | undefined;
+      const message =
+        userError?.response?.data?.error?.message ||
+        userError?.response?.data?.message ||
+        userError?.message ||
+        '';
+
+      const msg = typeof message === 'string' ? message.toLowerCase() : '';
+      if (status === 404 || msg.includes('user not found')) {
+        router.push('/signup?google=not_found');
+        return;
+      }
+
       console.error('Failed to check user role:', userError);
-      // If we cannot determine the role, fall back to branch selection behaviour
-      // so school admins are still able to choose a branch.
+      // If we cannot determine the role for other reasons, fall back to branch selection behaviour
+      // so school admins are still able to choose a branch when possible.
     }
 
     // Fetch user's branches for school admins (reuse branches from /auth/me response)
@@ -191,26 +199,13 @@ export default function LoginPage() {
     }
   };
 
-  // If we land on /login with an existing Supabase session (e.g. after Google OAuth),
-  // automatically complete the login flow instead of staying on the login screen.
+  // OAuth callbacks are handled by /auth/callback. Redirect there if user lands on /login with hash.
   useEffect(() => {
-    let cancelled = false;
-    async function resumeFromExistingSession() {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session || cancelled) return;
-        await completeLoginAfterSupabaseSession();
-      } catch (err) {
-        console.error('Failed to complete login from existing session:', err);
-      }
-    }
-    void resumeFromExistingSession();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (typeof window === 'undefined') return;
+    if (!window.location.hash?.includes('access_token=')) return;
+    const u = new URL(window.location.href);
+    u.pathname = '/auth/callback';
+    window.location.replace(u.toString());
   }, []);
 
   const handleSubmit = async (values: typeof form.values) => {
