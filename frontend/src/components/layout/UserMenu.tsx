@@ -33,6 +33,7 @@ export function UserMenu() {
   const userTyped = user as User | undefined;
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  const helpUrl = 'https://ntg-1.gitbook.io/ntg-sms-user-docs/';
 
   const branches = Array.from(
     new Map(((userTyped?.branches || []) as Branch[]).map((b) => [b.id, b])).values(),
@@ -138,7 +139,10 @@ export function UserMenu() {
         <Menu.Item
           id="user-menu-help"
           leftSection={<IconBook size={14} />}
-          disabled
+          component="a"
+          href={helpUrl}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           Help
         </Menu.Item>
