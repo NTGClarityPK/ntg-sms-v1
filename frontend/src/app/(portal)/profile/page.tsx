@@ -165,7 +165,8 @@ export default function ProfilePage() {
                 </Stack>
               </Paper>
 
-              <ParentPinSection />
+              {/* Temporarily hidden: PIN setup is only enabled for student PIN via parent flow */}
+              {false && <ParentPinSection />}
             </Stack>
           )}
         </Container>

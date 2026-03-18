@@ -213,14 +213,40 @@ export default function EventDetailPage() {
                 <Stack gap="xs">
                   {conflicts.assessmentConflicts.length > 0 && (
                     <div>
-                      <Text fw={500}>{t('assessmentConflicts')}</Text>
-                      <ul>
-                        {conflicts.assessmentConflicts.map((conflict) => (
-                          <li key={conflict.id}>
-                            {conflict.title} (Due: {dayjs(conflict.dueDate).format('MMM D, YYYY')})
-                          </li>
-                        ))}
-                      </ul>
+                      <Text fw={500} mb="xs">
+                        {t('assessmentConflicts')}
+                      </Text>
+                      <Stack gap={4}>
+                        {conflicts.assessmentConflicts.map((conflict) => {
+                          const classLabelParts: string[] = [];
+                          if (conflict.className && conflict.sectionName) {
+                            classLabelParts.push(`${conflict.className} - ${conflict.sectionName}`);
+                          } else if (conflict.className) {
+                            classLabelParts.push(conflict.className);
+                          }
+                          if (conflict.classTeacherName) {
+                            classLabelParts.push(conflict.classTeacherName);
+                          }
+                          if (conflict.subjectName) {
+                            classLabelParts.push(conflict.subjectName);
+                          }
+                          const classLine = classLabelParts.join(' - ');
+
+                          return (
+                            <div key={conflict.id}>
+                              {classLine && (
+                                <Text fw={600} size="sm">
+                                  {classLine}
+                                </Text>
+                              )}
+                              <Text size="sm">
+                                {conflict.title} (Due:{' '}
+                                {dayjs(conflict.dueDate).format('MMM D, YYYY')})
+                              </Text>
+                            </div>
+                          );
+                        })}
+                      </Stack>
                     </div>
                   )}
                   {conflicts.eventConflicts.length > 0 && (

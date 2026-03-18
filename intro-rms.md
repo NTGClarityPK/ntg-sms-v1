@@ -1,167 +1,392 @@
 # Introduction
 
-Welcome to the **NTG School Management System (SMS)** documentation.
+Welcome to the **NTG Restaurant Management System User Documentation**! This space contains all guides and manuals for restaurant owners, managers, and staff using the NTG Resto platform.
 
-This GitBook space is intended to document **the SMS application as implemented in this repository** (`ntg-sms-v1`) — covering the user-facing portal, the backend API, and the operational setup used by our team.
+## 📚 What's in This Space
 
-## What this SMS is
+This documentation space covers:
 
-The SMS is a **multi-tenant, multi-branch** school platform built around:
+* **User Manual** - Complete guide for restaurant staff
+* **Feature Guides** - Detailed guides for each system feature
+* **Operational Procedures** - Step-by-step instructions for daily operations
+* **Troubleshooting** - Common issues and solutions
 
-- **Supabase Auth** for authentication (email/password, session cookies)
-- A **NestJS API** (single gateway for all data access)
-- A **Next.js 14 portal** (Mantine UI + React Query) with role-based navigation
+## 🚀 Quick Start
 
-All authenticated features run inside a single portal layout (header + sidebar) so navigation is consistent and fast across modules.
+### For Restaurant Owners
 
-## Who uses it (roles implemented)
+1. Start with [**User Manual**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Complete guide for owners
+2. Review [**Menu Management**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/menu-management) - Set up your menu
+3. Explore [**Employee Management**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/employees)- Manage your staff
+4. Check [**Reports & Analytics**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/reports) - Understand your business
 
-The app supports multiple roles (role names are used throughout the portal and API):
+### For Restaurant Staff
 
-- **School Admin**, **Principal**, **Academic Coordinator**
-- **Class Teacher**, **Subject Teacher**
-- **Guidance Counsellor**
-- **Parent** (including child selection / “act as child” mode in the portal)
-- **Student**
-- **Super Admin** (full access)
+1. [**User Manual**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Complete operational guide
+2. [**Order Management**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/orders) - Processing orders
+3. [**POS System**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/features/orders#point-of-sale-pos) - Using the POS
+4. [**Kitchen Display**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/features/orders#kitchen-display-system-kds) - Kitchen operations
 
-Access to features is permission-driven; the sidebar only shows what the current role can view.
+## 📖 Documentation Structure
 
-## What’s included (current portal modules)
+```
+user/
+├── README.md                    # This file
+├── user-manual.md               # Complete user manual
+└── features/                    # Feature-specific guides
+    ├── menu-management.md       # Menu setup and management
+    ├── orders.md                # Order processing
+    ├── inventory.md             # Inventory management
+    ├── employees.md             # Employee management
+    ├── customers.md             # Customer management
+    ├── delivery.md              # Delivery operations
+    └── reports.md               # Reports and analytics
+```
 
-The portal currently includes pages and flows for:
+## 🎯 Documentation Sections
 
-- **Authentication**: login, reset password, signup, auth callback, optional **PIN-based** auth mode, branch selection during login (when applicable)
-- **Multi-branch context**: branch-aware behaviour via `X-Branch-Id` (backend) and persisted current branch (frontend)
-- **Dashboard**: role-aware landing within the authenticated portal
-- **Users & Roles**
-  - Users management
-  - Roles/permissions-based visibility in the UI
-- **Students & Parents**
-  - Students listing and management
-  - Parent–student associations
-  - “My children” experience for parents
-- **Academic structure**
-  - Class sections
-  - Teacher mapping / assignments
-  - Subject templates (settings)
-- **Attendance**
-  - Attendance overview and history
-  - Attendance marking (staff)
-  - Child attendance view (parent/student context)
-- **Assessments & grading**
-  - Assessments list, create, edit
-  - Assessment grades + statistics pages
-  - “My assessments” for teaching roles
-- **Timetable & schedules**
-  - Timetable views
-  - “My timetable” and “My schedule” pages
-  - Children timetable view
-  - Conflict management page (timetable/events/assessments conflicts)
-- **Behavioural**
-  - Behavioural overview
-  - Behavioural assessment entry flow (role-limited)
-- **Leaves & early departure**
-  - Leave requests (raise, review, approve/reject/cancel)
-  - Early departure requests (raise, review, approve/reject)
-- **Events**
-  - Events list, create, view, edit
-  - “My events” page
-- **Notifications**
-  - Notifications page (all/unread/read/attendance)
-  - Notification bell in the header with unread counts and “mark all read”
-- **Messages**
-  - Messages page (portal entry point)
-- **Library**
-  - Library page (portal entry point)
-- **Uniform inventory**
-  - Inventory dashboard + items + requests + history
-  - Uniform request page (parent flow)
-- **Reports & results**
-  - Reports index + student report pages + class reports + administrative reports
-  - Public report/statistics pages (branch-code based route)
-  - Results page
-- **Storage**
-  - Admin storage page (portal)
-- **Settings**
-  - Academic years
-  - Academic lookups/settings
-  - Schedule settings
-  - Assessment settings
-  - Communication settings
-  - Behaviour settings
-  - Permissions settings
-  - Theme settings
-- **Audit trail**
-  - Admin portal pages for audit trail and related admin-only operations
+### [**User Manual**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual)
 
-## Language, RTL, and PWA support
+Complete guide for all users:
 
-- **Internationalisation**: implemented with `next-intl` (locale stored via `NEXT_LOCALE` cookie) with **LTR/RTL** switching.
-- **PWA**: the frontend includes PWA support and an **Offline Documents** area to access content when connectivity is limited.
+* **For Restaurant Owners** - Account setup, restaurant configuration, employee management
+* **For Restaurant Staff** - Daily operations, POS system, order management
+* **Getting Started** - First-time login, dashboard overview, navigation
+* **Point of Sale (POS)** - Creating orders, processing payments
+* **Order Management** - Viewing orders, updating status, modifications
+* **Kitchen Display System** - KDS features, status updates
+* **Menu Management** - Viewing menu, adding items to orders
+* **Inventory Management** - Stock levels, transactions
+* **Customer Management** - Searching, viewing, creating customers
+* **Delivery Management** - Assigning deliveries, tracking status
+* **Reports & Analytics** - Viewing reports, exporting data
+* **Dynamic Roles & RBAC** - Understanding and configuring role-based access control
+* **Settings** - Profile, branch selection, language
+* **PIN Authentication** - Quick login with PIN (device-specific)
+* **Common Tasks** - Daily checklists, workflows
+* **Troubleshooting** - Common issues and solutions
 
-## System boundaries (how the app is built)
+### Feature Guides
 
-To keep data access consistent and secure, the architecture follows one strict rule:
+#### [**Menu Management**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/menu-management)
 
-- **Frontend → NestJS API → Supabase (Postgres)**  
-  The frontend does not query Supabase directly (except for Supabase Auth/session).
+Complete guide for managing your restaurant menu:
 
-The backend enforces:
+* Creating categories
+* Adding food items
+* Setting up variations
+* Configuring add-ons
+* Managing menus, buffets, and combo meals
+* **Bulk Import** - Import multiple items at once using Excel files
+* Export functionality for data backup
 
-- **Standard API shape**: all responses follow `{ data, meta? }` via a global response interceptor
-- **JWT validation**: Supabase JWT is validated on protected routes
-- **Branch context**: branch isolation is applied through request context (e.g. `X-Branch-Id`) and server-side guards/policies
+#### [**Order Management**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/orders)
 
-## Repository structure (as in this repo)
+Guide for processing and managing orders:
 
-This repository is organised as:
+* POS system operations
+* Order types (dine-in, takeaway, delivery)
+* Kitchen display system
+* Payment processing
+* Order status tracking
+* Order modifications
 
-- `frontend/`: Next.js 14 portal (Mantine UI, React Query, next-intl, PWA)
-- `backend/`: NestJS API (Swagger, guards/interceptors, Supabase service client)
-- `supabase/`: migrations and related database assets
-- `docs/`, `documentations/`, `developmentguide/`: internal implementation and team guides
+#### [**Inventory Management**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/inventory)
 
-## Quick start (local development)
+Inventory and stock management guide:
 
-### Prerequisites
+* Ingredients tracking
+* Stock transactions
+* Recipe management
+* Stock alerts
+* Inventory reports
+* Supplier management
 
-- Node.js (for both `frontend/` and `backend/`)
-- A Supabase project (URL, anon key for frontend; service key + JWT secret for backend)
+#### [**Employee Management**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/employees)
 
-### Run the backend (NestJS)
+Staff and employee management guide:
 
-- Configure environment variables in `backend/.env` (see `backend/.env.example`)
-- Start dev server:
-  - `npm install`
-  - `npm run start:dev`
-- Health check: `GET /health`
-- Swagger: `GET /api/docs`
+* Employee profiles
+* Role assignment
+* Branch assignment
+* Permissions and access control
+* Dynamic roles and RBAC configuration
 
-### Run the frontend (Next.js)
+#### [**Customer Management**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/customers)
 
-- Configure environment variables in `frontend/.env.local` (see `frontend/.env.local.example`)
-- Start dev server:
-  - `npm install`
-  - `npm run dev`
+Customer database and analytics guide:
 
-## Deployment (Docker)
+* Customer profiles
+* Order history
+* Customer analytics
+* Customer segmentation
+* Customer communication
 
-This repo includes Docker Compose definitions:
+#### [Delivery Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/delivery)
 
-- `docker-compose.yml` for production-like deployment (frontend + backend)
-- `docker-compose-staging.yml` for staging-like deployment
+Delivery operations guide:
 
-These compose files expose:
+* Delivery assignment
+* Status tracking
+* Delivery personnel management
+* Delivery analytics
+* Route optimization
 
-- Frontend on port `3000` (mapped to `9000` in `docker-compose.yml`)
-- Backend on port `3001` (mapped to `9001` in `docker-compose.yml`)
+#### [**Reports & Analytics**](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/reports)
 
-## Where to go next in this GitBook
+Comprehensive reporting guide:
 
-Suggested starting points (depending on your audience):
+* Sales reports
+* Financial reports
+* Inventory reports
+* Customer reports
+* Order reports
+* Tax reports
+* Exporting reports
 
-- **Product overview**: portal modules, roles, and branch/tenant concepts
-- **User journeys**: login → branch selection → core workflows (attendance, leaves, assessments, timetable, reports)
-- **Admin setup**: academic years, lookups, schedule settings, permissions, and templates
-- **Developer reference**: API conventions, response format, and environment setup
+## 🎯 Finding Information
+
+### By Role
+
+**Restaurant Owner:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Owner section
+* [Menu Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/menu-management)
+* [Employee Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/employees)
+* [Reports & Analytics](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/reports)
+* [Dynamic Roles & RBAC](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/user-manual#understanding-dynamic-roles-and-rbac)
+
+**Manager:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Manager section
+* [Order Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/orders)
+* [Reports & Analytics](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/reports)
+* [Employee Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/employees)
+* [Dynamic Roles & RBAC](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/user-manual#understanding-dynamic-roles-and-rbac)
+
+**Cashier:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - POS section
+* [Order Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/orders)
+* [Customer Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/customers)
+
+**Kitchen Staff:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Kitchen Display section
+* [Menu Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/menu-management)
+* [Order Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/orders)
+* [Inventory Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/inventory)
+
+**Waiter:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Order Management section
+* [Order Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/orders)
+* [Customer Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/customers)
+
+**Delivery Personnel:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Delivery section
+* [Delivery Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/delivery)
+
+### By Task
+
+**Setting Up Restaurant:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Initial Setup
+* [Menu Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/menu-management)
+* [Employee Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/employees)
+
+**Daily Operations:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Daily Operations
+* [Order Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/orders)
+* [POS System](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/features/orders#point-of-sale-pos)
+
+**Managing Inventory:**
+
+* [Inventory Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/inventory)
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Inventory section
+
+**Viewing Reports:**
+
+* [Reports & Analytics](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/reports)
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual) - Reports section
+
+**Configuring Access Control:**
+
+* [Dynamic Roles & RBAC](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/user-manual#understanding-dynamic-roles-and-rbac)
+* [Employee Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/employees)
+
+## 📝 Quick Reference
+
+### Common Tasks
+
+**Daily Opening:**
+
+1. Login to system
+2. Select branch
+3. Check dashboard
+4. Review low stock alerts
+5. Verify POS is ready
+
+**Creating an Order:**
+
+1. Open POS
+2. Select order type
+3. Add items to cart
+4. Select customer (optional)
+5. Process payment
+6. Create order
+
+**Updating Order Status:**
+
+1. Open Orders page
+2. Select order
+3. Click Status button
+4. Select new status
+
+**Managing Inventory:**
+
+1. Go to Inventory
+2. View stock levels
+3. Record transactions
+4. Check low stock alerts
+
+**Configuring Role Access:**
+
+1. Go to Settings → Role Access
+2. Select role to configure
+3. Check/uncheck accessible tabs
+4. Configure kitchen display access
+5. Save changes
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+**Cannot Login:**
+
+* Verify email and password
+* Check internet connection
+* Contact administrator if locked out
+
+**Order Not Appearing:**
+
+* Check order status
+* Refresh page
+* Verify branch selection
+
+**Payment Not Processing:**
+
+* Verify payment method
+* Check order total
+* Ensure order is not already paid
+
+**Stock Not Updating:**
+
+* Check if transaction was saved
+* Verify ingredient selection
+* Check branch selection
+
+**Access Issues:**
+
+* Check assigned roles
+* Verify role access configuration
+* Review Settings → Role Access
+* See [Dynamic Roles & RBAC](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/user-manual#understanding-dynamic-roles-and-rbac) section
+
+See [User Manual - Trouble Shooting](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/user-manual#troubleshooting) for more solutions.
+
+## 💡 Tips & Best Practices
+
+### Order Management
+
+* Double-check items before creating order
+* Update order status promptly
+* Communicate delays to customers
+* Track payment status accurately
+
+### Customer Service
+
+* Use customer search for faster checkout
+* Review past orders for preferences
+* Always note special requests
+* Check on customers during service
+
+### Inventory Management
+
+* Check stock levels regularly
+* Act on low stock alerts promptly
+* Record all transactions accurately
+* Maintain supplier information
+
+### Access Control
+
+* Follow principle of least privilege
+* Review role assignments regularly
+* Test role configurations after changes
+* Document custom role configurations
+
+## 📱 Mobile Usage
+
+The system works on mobile devices:
+
+* Open browser on phone/tablet
+* Navigate to restaurant URL
+* Login with credentials
+* Full functionality available
+
+## 🔐 Security
+
+### Account Security
+
+* Use strong passwords
+* Don't share passwords
+* Change password regularly
+* Logout when done
+
+### Session Management
+
+* System auto-logs out after inactivity
+* Always logout when leaving station
+* Don't leave system unattended
+
+### Access Control
+
+* Understand your role and permissions
+* Report access issues to manager
+* Don't share login credentials
+* Follow role-based access guidelines
+
+## 📞 Support
+
+For questions or issues:
+
+* Check relevant documentation section
+* Review troubleshooting guides
+* Contact your manager
+* Contact system administrator
+
+## 🔄 Documentation Updates
+
+This documentation is updated regularly:
+
+* With new features
+* Based on user feedback
+* For bug fixes
+* With improved instructions
+
+***
+
+**Start Here:** [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual)
+
+**Most Popular:**
+
+* [User Manual](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/user-manual)
+* [Menu Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/menu-management)
+* [Order Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/orders)
+* [Inventory Management](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/table-of-contents/features/inventory)
+* [Reports & Analytics](#reports-and-analytics)
+* [Dynamic Roles & RBAC](https://ntgclarity-1.gitbook.io/ntg-resto-user-docs/user-manual#understanding-dynamic-roles-and-rbac)
+
+**Need Help?** Contact your manager or system administrator.

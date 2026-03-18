@@ -256,31 +256,23 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      let email: string;
+      // PIN login is temporarily restricted to students only.
+      // Staff/parents should use email + password login.
       if (identifier.includes('@')) {
-        email = identifier.toLowerCase().trim();
-      } else {
-        const response = await apiClient.post<{ email: string }>(
-          '/api/v1/public/resolve-student-roll',
-          { rollNumber: identifier },
-        );
-        const resolved = response.data?.email;
-        if (!resolved) {
-          throw new Error('We could not find a student with that roll number.');
-        }
-        email = resolved;
+        throw new Error('PIN login is currently available for students only. Please use email and password.');
       }
 
-      const available = await pinAuth.isPinAuthAvailable(email);
-      if (!available) {
-        throw new PinAuthError(
-          'NOT_SETUP',
-          identifier.includes('@')
-            ? 'PIN is not set up on this device. Please log in with email and password, then set up PIN.'
-            : 'PIN not set up on this device. Please ask your parent to log in with your email and password first.',
-        );
+      const response = await apiClient.post<{ email: string }>(
+        '/api/v1/public/resolve-student-roll',
+        { rollNumber: identifier },
+      );
+      const resolved = response.data?.email;
+      if (!resolved) {
+        throw new Error('We could not find a student with that roll number.');
       }
+      const email = resolved;
 
+      // Student PIN must be tied to this student email (no global fallback).
       const { refreshToken, userEmail } = await pinAuth.authenticateWithPin(pinValue, email);
 
       const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
@@ -507,10 +499,12 @@ export default function LoginPage() {
                 <Stack gap="sm">
                   <TextInput
                     id="login-pin-identifier"
-                    label="Email or roll number"
-                    placeholder="Enter your email or roll number"
+                    label="Student roll number"
+                    placeholder="Enter student roll number"
                     value={pinIdentifier}
-                    onChange={(e) => setPinIdentifier(e.currentTarget.value)}
+                    onChange={(e) =>
+                      setPinIdentifier(e.currentTarget.value.replace(/[^0-9A-Za-z_-]/g, ''))
+                    }
                     disabled={pinLoading}
                   />
                   <PasswordInput

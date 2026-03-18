@@ -985,7 +985,16 @@ export class EventsService {
     eventId: string,
     branchId: string,
   ): Promise<{
-    assessmentConflicts: Array<{ id: string; title: string; dueDate: string; classSectionId: string }>;
+    assessmentConflicts: Array<{
+      id: string;
+      title: string;
+      dueDate: string;
+      classSectionId: string;
+      className?: string;
+      sectionName?: string;
+      classTeacherName?: string;
+      subjectName?: string;
+    }>;
     eventConflicts: Array<{ id: string; title: string; startDate: string; endDate: string }>;
   }> {
     const supabase = this.supabaseConfig.getClient();
@@ -1014,18 +1023,64 @@ export class EventsService {
     // Check assessment conflicts
     const { data: assessments } = await supabase
       .from('assessments')
-      .select('id, title, due_date, class_section_id')
+      .select('id, title, due_date, class_section_id, subject_id')
       .in('class_section_id', classSectionIds)
       .eq('branch_id', branchId)
       .gte('due_date', event.startDate)
       .lte('due_date', event.endDate);
 
-    const assessmentConflicts = (assessments || []).map((a) => ({
-      id: a.id as string,
-      title: a.title as string,
-      dueDate: a.due_date as string,
-      classSectionId: a.class_section_id as string,
-    }));
+    const assessmentRows =
+      (assessments || []) as Array<{
+        id: string;
+        title: string;
+        due_date: string;
+        class_section_id: string;
+        subject_id: string;
+      }>;
+
+    const subjectIds = [
+      ...new Set(assessmentRows.map((a) => a.subject_id).filter((id) => !!id)),
+    ];
+    const classSectionIdsForAssessments = [
+      ...new Set(assessmentRows.map((a) => a.class_section_id).filter((id) => !!id)),
+    ];
+
+    // Load subject names in a single query
+    let subjectNameById = new Map<string, string>();
+    if (subjectIds.length > 0) {
+      const { data: subjects } = await supabase
+        .from('subjects')
+        .select('id, name')
+        .in('id', subjectIds);
+      subjectNameById = new Map(
+        (subjects || []).map((s: any) => [s.id as string, s.name as string]),
+      );
+    }
+
+    // Load class section details (including class/section names and class teacher) via service
+    const classSectionById = new Map<string, import('../class-sections/dto/class-section.dto').ClassSectionDto>();
+    for (const csId of classSectionIdsForAssessments) {
+      const classSection = await this.classSectionsService.getClassSectionById(
+        csId,
+        branchId,
+      );
+      classSectionById.set(csId, classSection);
+    }
+
+    const assessmentConflicts = assessmentRows.map((a) => {
+      const cs = classSectionById.get(a.class_section_id);
+      const subjectName = subjectNameById.get(a.subject_id);
+      return {
+        id: a.id,
+        title: a.title,
+        dueDate: a.due_date,
+        classSectionId: a.class_section_id,
+        className: cs?.classDisplayName || cs?.className,
+        sectionName: cs?.sectionName,
+        classTeacherName: cs?.classTeacherName,
+        subjectName,
+      };
+    });
 
     // Check event conflicts
     const { data: conflictingEvents } = await supabase
@@ -1053,7 +1108,16 @@ export class EventsService {
     classSectionIds: string[],
     branchId: string,
   ): Promise<{
-    assessmentConflicts: Array<{ id: string; title: string; dueDate: string; classSectionId: string }>;
+    assessmentConflicts: Array<{
+      id: string;
+      title: string;
+      dueDate: string;
+      classSectionId: string;
+      className?: string;
+      sectionName?: string;
+      classTeacherName?: string;
+      subjectName?: string;
+    }>;
     eventConflicts: Array<{ id: string; title: string; startDate: string; endDate: string }>;
   }> {
     const supabase = this.supabaseConfig.getClient();
@@ -1065,18 +1129,62 @@ export class EventsService {
     // Check assessment conflicts
     const { data: assessments } = await supabase
       .from('assessments')
-      .select('id, title, due_date, class_section_id')
+      .select('id, title, due_date, class_section_id, subject_id')
       .in('class_section_id', classSectionIds)
       .eq('branch_id', branchId)
       .gte('due_date', startDate)
       .lte('due_date', endDate);
 
-    const assessmentConflicts = (assessments || []).map((a) => ({
-      id: a.id as string,
-      title: a.title as string,
-      dueDate: a.due_date as string,
-      classSectionId: a.class_section_id as string,
-    }));
+    const assessmentRows =
+      (assessments || []) as Array<{
+        id: string;
+        title: string;
+        due_date: string;
+        class_section_id: string;
+        subject_id: string;
+      }>;
+
+    const subjectIds = [
+      ...new Set(assessmentRows.map((a) => a.subject_id).filter((id) => !!id)),
+    ];
+    const classSectionIdsForAssessments = [
+      ...new Set(assessmentRows.map((a) => a.class_section_id).filter((id) => !!id)),
+    ];
+
+    let subjectNameById = new Map<string, string>();
+    if (subjectIds.length > 0) {
+      const { data: subjects } = await supabase
+        .from('subjects')
+        .select('id, name')
+        .in('id', subjectIds);
+      subjectNameById = new Map(
+        (subjects || []).map((s: any) => [s.id as string, s.name as string]),
+      );
+    }
+
+    const classSectionById = new Map<string, import('../class-sections/dto/class-section.dto').ClassSectionDto>();
+    for (const csId of classSectionIdsForAssessments) {
+      const classSection = await this.classSectionsService.getClassSectionById(
+        csId,
+        branchId,
+      );
+      classSectionById.set(csId, classSection);
+    }
+
+    const assessmentConflicts = assessmentRows.map((a) => {
+      const cs = classSectionById.get(a.class_section_id);
+      const subjectName = subjectNameById.get(a.subject_id);
+      return {
+        id: a.id,
+        title: a.title,
+        dueDate: a.due_date,
+        classSectionId: a.class_section_id,
+        className: cs?.classDisplayName || cs?.className,
+        sectionName: cs?.sectionName,
+        classTeacherName: cs?.classTeacherName,
+        subjectName,
+      };
+    });
 
     // Check event conflicts (overlapping events)
     // Events overlap if: startDate <= other.endDate && endDate >= other.startDate

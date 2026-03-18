@@ -145,6 +145,30 @@ export function createDynamicTheme(
           };
         },
       },
+
+      PasswordInput: {
+        styles: (theme: MantineTheme) => {
+          const config = (theme.other as any) as typeof themeConfig;
+          return {
+            input: {
+              backgroundColor: config.components.input.backgroundColor,
+              borderColor: config.components.input.borderColor,
+              color: config.components.input.textColor,
+              fontFamily: config.typography.fontFamily.primary,
+              '&:focus': {
+                borderColor: config.colors.primary,
+              },
+            },
+            label: {
+              color: config.components.input.textColor,
+              fontFamily: config.typography.fontFamily.primary,
+            },
+            innerInput: {
+              color: config.components.input.textColor,
+            },
+          };
+        },
+      },
       
       Textarea: {
         styles: (theme: MantineTheme) => {

@@ -5,6 +5,7 @@ import { IconAlertCircle } from '@tabler/icons-react';
 import type { TimetableSlot } from '@/types/timetable';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTheme } from '@/lib/hooks/use-theme';
 
 interface TimetableSlotProps {
   slot: TimetableSlot;
@@ -35,8 +36,13 @@ export function TimetableSlotComponent({
   const theme = useMantineTheme();
   const colors = useThemeColors();
   const themeConfig = (theme.other as any) as ThemeConfig | undefined;
-  // Use surface color which is very close to white (#f8f9fa) but still visible
-  const cardBackgroundColor = themeConfig?.colors?.surface || '#f8f9fa';
+  const { isDark } = useTheme();
+  // Slot background should be slightly lifted from the grid lane in dark mode.
+  // Use theme-config surfaces (no hardcoded colours).
+  const cardBackgroundColor =
+    (isDark ? themeConfig?.colors?.surfaceVariant : themeConfig?.colors?.surface) ??
+    themeConfig?.colors?.surface ??
+    (isDark ? theme.colors.dark[6] : theme.colors.gray[0]);
   // Class badge uses theme primary; assembly/break keep semantic colors
   const slotTypeColors: Record<TimetableSlot['slotType'], string> = {
     class: colors.primary,

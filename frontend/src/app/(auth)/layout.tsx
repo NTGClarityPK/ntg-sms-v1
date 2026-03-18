@@ -6,6 +6,7 @@ import { Box, Title, Text, Card, Group } from '@mantine/core';
 import { IconSchool } from '@tabler/icons-react';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
+import { useTheme } from '@/lib/hooks/use-theme';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -34,6 +35,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   const isCallback = pathname === '/auth/callback';
   const primary = DEFAULT_THEME_COLOR;
   const primaryShade = useMemo(() => calculateShade(DEFAULT_THEME_COLOR, 8), []);
+  const { isDark } = useTheme();
 
   return (
     <Box
@@ -134,7 +136,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             >
               NTG Alma
             </Title>
-            <Text size="sm" fw={500} style={{ color: '#4a4a4a' }}>
+            <Text size="sm" fw={500} c={isDark ? 'white' : '#4a4a4a'}>
               School Management System
             </Text>
           </Box>

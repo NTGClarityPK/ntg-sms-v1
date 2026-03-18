@@ -14,7 +14,9 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
+  // Use local sign-out so refresh tokens remain valid for PIN-based login.
+  // This clears auth state from this browser without revoking tokens server-side.
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
 
   if (error) {
     throw error;

@@ -32,12 +32,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { supabase } from '@/lib/supabase/client';
 import type { MessageType, ConversationListItem, Message } from '@/types/messages';
+import type { ThemeConfig } from '@/lib/theme/themeConfig';
+import { useTheme } from '@/lib/hooks/use-theme';
 
 export default function MessagesPage() {
   const t = useTranslations('messages');
   const searchParams = useSearchParams();
   const theme = useMantineTheme();
   const colors = useThemeColors();
+  const themeConfig = (theme.other as any) as ThemeConfig | undefined;
+  const { isDark } = useTheme();
   const { user } = useAuth();
   const conversationIdFromUrl = searchParams.get('conversation');
   const [selectedId, setSelectedId] = useState<string | null>(conversationIdFromUrl);
@@ -417,6 +421,20 @@ export default function MessagesPage() {
   const chatHeight = isMobile ? 'calc(100vh - 120px)' : 480;
   const listHeight = isMobile ? 'calc(100vh - 120px)' : 480;
 
+  const conversationRowStyles = useMemo(() => {
+    const selectedBg =
+      themeConfig?.components?.navbar?.activeBackground ??
+      (isDark ? theme.colors.dark[6] : theme.colors.blue[0]);
+    const hoverBg =
+      themeConfig?.components?.navbar?.hoverBackground ??
+      (isDark ? theme.colors.dark[5] : theme.colors.gray[0]);
+    const selectedText =
+      themeConfig?.components?.navbar?.activeTextColor ??
+      (isDark ? theme.white : theme.black);
+
+    return { selectedBg, hoverBg, selectedText };
+  }, [themeConfig, isDark, theme.colors.dark, theme.colors.blue, theme.colors.gray, theme.black, theme.white]);
+
   return (
     <>
       <div className="page-title-bar">
@@ -503,11 +521,21 @@ export default function MessagesPage() {
                         p="sm"
                         style={{
                           cursor: 'pointer',
-                          backgroundColor: selectedId === c.id ? theme.colors.blue[0] : undefined,
+                          backgroundColor:
+                            selectedId === c.id ? conversationRowStyles.selectedBg : undefined,
+                          color: selectedId === c.id ? conversationRowStyles.selectedText : undefined,
                         }}
                         onClick={() => {
                           setSelectedId(c.id);
                           window.history.replaceState(null, '', `/messages?conversation=${c.id}`);
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedId === c.id) return;
+                          e.currentTarget.style.backgroundColor = conversationRowStyles.hoverBg;
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedId === c.id) return;
+                          e.currentTarget.style.backgroundColor = '';
                         }}
                       >
                         <Group justify="space-between" wrap="nowrap" gap="xs">

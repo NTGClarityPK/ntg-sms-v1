@@ -52,7 +52,7 @@ function ThemeWrapper({ children }: { children: React.ReactNode }) {
   const mantineTheme = createDynamicTheme(effectivePrimary, colorScheme);
 
   return (
-    <MantineProvider theme={mantineTheme}>
+    <MantineProvider theme={mantineTheme} forceColorScheme={colorScheme}>
       <ModalsProvider>
         <FaviconUpdater />
         <DynamicThemeProvider>

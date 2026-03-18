@@ -103,7 +103,16 @@ export class EventsController {
     @Query('classSectionIds') classSectionIds: string | string[],
     @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{
-    assessmentConflicts: Array<{ id: string; title: string; dueDate: string; classSectionId: string }>;
+    assessmentConflicts: Array<{
+      id: string;
+      title: string;
+      dueDate: string;
+      classSectionId: string;
+      className?: string;
+      sectionName?: string;
+      classTeacherName?: string;
+      subjectName?: string;
+    }>;
     eventConflicts: Array<{ id: string; title: string; startDate: string; endDate: string }>;
   }> {
     if (!startDate || !endDate) {
@@ -173,7 +182,16 @@ export class EventsController {
     @Param('id') id: string,
     @CurrentBranch() branch: CurrentBranchContext,
   ): Promise<{
-    assessmentConflicts: Array<{ id: string; title: string; dueDate: string; classSectionId: string }>;
+    assessmentConflicts: Array<{
+      id: string;
+      title: string;
+      dueDate: string;
+      classSectionId: string;
+      className?: string;
+      sectionName?: string;
+      classTeacherName?: string;
+      subjectName?: string;
+    }>;
     eventConflicts: Array<{ id: string; title: string; startDate: string; endDate: string }>;
   }> {
     return this.eventsService.getConflicts(id, branch.branchId);

@@ -72,6 +72,10 @@ export interface EventConflict {
     title: string;
     dueDate: string;
     classSectionId: string;
+    className?: string;
+    sectionName?: string;
+    classTeacherName?: string;
+    subjectName?: string;
   }>;
   eventConflicts: Array<{
     id: string;

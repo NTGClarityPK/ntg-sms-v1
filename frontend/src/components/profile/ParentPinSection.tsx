@@ -2,16 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import {
-  Alert,
-  Button,
-  Group,
-  Paper,
-  PasswordInput,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core';
+import { Alert, Button, Group, Paper, PasswordInput, Stack, Text, Title } from '@mantine/core';
 import { IconAlertCircle, IconCheck, IconKey } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
 import { pinAuth } from '@/lib/pin-auth';
