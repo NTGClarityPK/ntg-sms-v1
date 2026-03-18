@@ -84,7 +84,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <IconSchool size={60} stroke={2} />
           </Box>
           <Title order={1} size="2.5rem" fw={800} mb="md" c="white">
-            School Management System
+            School Management
           </Title>
           <Text size="lg" c="white" opacity={0.9}>
             Streamline your school operations
@@ -132,7 +132,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 marginBottom: '8px',
               }}
             >
-              SMS
+              NTG Alma
             </Title>
             <Text size="sm" fw={500} style={{ color: '#4a4a4a' }}>
               School Management System

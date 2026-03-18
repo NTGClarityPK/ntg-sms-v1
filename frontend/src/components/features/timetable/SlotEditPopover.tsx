@@ -526,7 +526,8 @@ function SlotEditPopoverContent({
               <Button
                 type="submit"
                 size="xs"
-                loading={createOrUpdate.isPending || isCheckingConflict}
+                loading={createOrUpdate.isPending}
+                disabled={isCheckingConflict}
               >
                 {isEdit ? t('update') : t('create')}
               </Button>
