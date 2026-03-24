@@ -9,6 +9,7 @@ import { LevelsController } from './levels.controller';
 @Module({
   controllers: [SubjectsController, ClassesController, SectionsController, LevelsController],
   providers: [CoreLookupsService, SupabaseConfig],
+  exports: [CoreLookupsService],
 })
 export class CoreLookupsModule {}
 

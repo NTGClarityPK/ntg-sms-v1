@@ -15,6 +15,14 @@ export class SettingsStatusService {
   async checkInitializationStatus(branchId: string, tenantId: string | null): Promise<SettingsStatusDto> {
     const supabase = this.supabaseConfig.getClient();
 
+    // Explicit completion flag set by bulk onboarding import.
+    const { data: importInitFlag, error: importInitError } = await supabase
+      .from('system_settings')
+      .select('key')
+      .eq('key', `settings_initialized:${branchId}`)
+      .maybeSingle();
+    throwIfDbError(importInitError);
+
     // Check Academic Year: at least one active academic year exists
     const { data: academicYears, error: academicYearsError } = await supabase
       .from('academic_years')
@@ -71,6 +79,12 @@ export class SettingsStatusService {
       (gradeTemplatesResult.data?.length ?? 0) > 0 &&
       (leaveSettingsResult.data?.length ?? 0) > 0;
 
+    const tabbedScreenReady =
+      academicYear &&
+      academic &&
+      ((assessmentTypesResult.data?.length ?? 0) > 0 ||
+        (gradeTemplatesResult.data?.length ?? 0) > 0);
+
     // Check Communication: communication_direction setting exists
     const { data: communicationSetting, error: communicationError } = await supabase
       .from('system_settings')
@@ -99,7 +113,8 @@ export class SettingsStatusService {
     const permissions = (permissionsResult?.length ?? 0) > 0;
 
     const isInitialized =
-      academicYear && academic && schedule && assessment && communication && behavior && permissions;
+      importInitFlag !== null ||
+      (academicYear && academic && schedule && assessment && communication && behavior && permissions);
 
     return new SettingsStatusDto({
       academicYear,
@@ -109,6 +124,7 @@ export class SettingsStatusService {
       communication,
       behavior,
       permissions,
+      tabbedScreenReady,
       isInitialized,
     });
   }

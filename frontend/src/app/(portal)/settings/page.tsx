@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -67,6 +67,7 @@ import { TranslatableInput, type TranslatableValue } from '@/components/common/T
 import { SubjectTemplatesTabContent } from '@/components/features/settings/SubjectTemplatesTabContent';
 import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettingsPanel';
 import { PublicStatsSettings } from '@/components/features/settings/PublicStatsSettings';
+import { BulkSetupTabContent } from '@/components/features/settings/BulkSetupTabContent';
 
 // Common timezones list with GMT offsets (matching RMS)
 const TIMEZONE_DATA = [
@@ -171,6 +172,7 @@ export default function SettingsPage() {
   const [wizardOpened, { open: openWizard, close: closeWizard }] = useDisclosure(false);
   const [copyModalOpened, { open: openCopyModal, close: closeCopyModal }] = useDisclosure(false);
   const [activeTab, setActiveTab] = useState<string | null>('permissions');
+  const [showBulkImportPanel, setShowBulkImportPanel] = useState(false);
   const statusQuery = useSettingsStatus();
   const branchesQuery = useTenantBranches();
   const saveWizard = useSaveSetupWizard();
@@ -180,6 +182,7 @@ export default function SettingsPage() {
   const isSchoolAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
   const settingsStatusData = statusQuery.data?.data;
   const isInitialized = settingsStatusData?.isInitialized ?? false;
+  const tabbedScreenReady = settingsStatusData?.tabbedScreenReady ?? isInitialized;
   const branches = branchesQuery.data?.data ?? [];
   const hasMultipleBranches = branches.length > 1;
   const hasSettingsStatusData = !!settingsStatusData; // Only show buttons when we have actual data
@@ -218,7 +221,8 @@ export default function SettingsPage() {
   }
 
   // Not initialized: show only "Start school setup" CTA; user must complete setup before seeing full settings
-  const showSetupOnly = !isLoading && !hasError && hasSettingsStatusData && !isInitialized;
+  const showSetupOnly =
+    !isLoading && !hasError && hasSettingsStatusData && !tabbedScreenReady;
 
   return (
     <>
@@ -243,11 +247,25 @@ export default function SettingsPage() {
             <Skeleton height={400} />
           </Stack>
         ) : showSetupOnly ? (
-          <StartSchoolSetupView
-            onStartSetup={openWizard}
-            onCopyFromBranch={hasMultipleBranches ? openCopyModal : undefined}
-            colors={colors}
-          />
+          <Stack gap="lg">
+            <Grid>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <StartSchoolSetupView
+                  onStartSetup={openWizard}
+                  onCopyFromBranch={hasMultipleBranches ? openCopyModal : undefined}
+                  colors={colors}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <BulkImportSetupView
+                  onOpenBulkImport={() => setShowBulkImportPanel((prev) => !prev)}
+                  isOpen={showBulkImportPanel}
+                  colors={colors}
+                />
+              </Grid.Col>
+            </Grid>
+            {showBulkImportPanel && <BulkSetupTabContent />}
+          </Stack>
         ) : (
           <>
             <Tabs value={activeTab} onChange={setActiveTab}>
@@ -380,53 +398,97 @@ interface StartSchoolSetupViewProps {
 function StartSchoolSetupView({ onStartSetup, onCopyFromBranch, colors }: StartSchoolSetupViewProps) {
   const tSettings = useTranslations('settings');
   return (
-    <Stack align="center" gap="xl" py="xl" maw={520} mx="auto">
-      <Paper withBorder shadow="sm" p="xl" radius="md" style={{ width: '100%', textAlign: 'center' }}>
-        <Stack align="center" gap="lg">
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: '50%',
-              background: colors.primary ? `var(--mantine-color-${colors.primary}-light)` : 'var(--mantine-color-blue-1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+    <Paper withBorder shadow="sm" p="xl" radius="md" style={{ width: '100%', textAlign: 'center', height: '100%' }}>
+      <Stack align="center" gap="lg" justify="center" h="100%">
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: '50%',
+            background: colors.primary ? `var(--mantine-color-${colors.primary}-light)` : 'var(--mantine-color-blue-1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconSchool size={40} style={{ color: colors.primary ? `var(--mantine-color-${colors.primary}-6)` : 'var(--mantine-color-blue-6)' }} />
+        </div>
+        <Stack gap="xs" align="center">
+          <Title order={2}>{tSettings('setupRequiredTitle')}</Title>
+          <Text size="sm" c="dimmed" maw={400}>
+            {tSettings('setupRequiredDescription')}
+          </Text>
+        </Stack>
+        <Stack gap="sm" w="100%" maw={320}>
+          <Button
+            fullWidth
+            size="md"
+            leftSection={<IconRocket size={18} />}
+            onClick={onStartSetup}
+            color={colors.primary}
           >
-            <IconSchool size={40} style={{ color: colors.primary ? `var(--mantine-color-${colors.primary}-6)` : 'var(--mantine-color-blue-6)' }} />
-          </div>
-          <Stack gap="xs" align="center">
-            <Title order={2}>{tSettings('setupRequiredTitle')}</Title>
-            <Text size="sm" c="dimmed" maw={400}>
-              {tSettings('setupRequiredDescription')}
-            </Text>
-          </Stack>
-          <Stack gap="sm" w="100%" maw={320}>
+            {tSettings('setupStartButton')}
+          </Button>
+          {onCopyFromBranch && (
             <Button
               fullWidth
+              variant="light"
               size="md"
-              leftSection={<IconRocket size={18} />}
-              onClick={onStartSetup}
-              color={colors.primary}
+              leftSection={<IconCopy size={18} />}
+              onClick={onCopyFromBranch}
             >
-              {tSettings('setupStartButton')}
+              {tSettings('setupCopyFromBranchButton')}
             </Button>
-            {onCopyFromBranch && (
-              <Button
-                fullWidth
-                variant="light"
-                size="md"
-                leftSection={<IconCopy size={18} />}
-                onClick={onCopyFromBranch}
-              >
-                {tSettings('setupCopyFromBranchButton')}
-              </Button>
-            )}
-          </Stack>
+          )}
         </Stack>
-      </Paper>
-    </Stack>
+      </Stack>
+    </Paper>
+  );
+}
+
+interface BulkImportSetupViewProps {
+  onOpenBulkImport: () => void;
+  isOpen: boolean;
+  colors: ReturnType<typeof useThemeColors>;
+}
+
+function BulkImportSetupView({ onOpenBulkImport, isOpen, colors }: BulkImportSetupViewProps) {
+  const tSettings = useTranslations('settings');
+  return (
+    <Paper withBorder shadow="sm" p="xl" radius="md" style={{ width: '100%', textAlign: 'center', height: '100%' }}>
+      <Stack align="center" gap="lg" justify="center" h="100%">
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: '50%',
+            background: colors.primary ? `var(--mantine-color-${colors.primary}-light)` : 'var(--mantine-color-blue-1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconFileImport size={40} style={{ color: colors.primary ? `var(--mantine-color-${colors.primary}-6)` : 'var(--mantine-color-blue-6)' }} />
+        </div>
+        <Stack gap="xs" align="center">
+          <Title order={2}>{tSettings('bulkSetupCardTitle')}</Title>
+          <Text size="sm" c="dimmed" maw={400}>
+            {tSettings('bulkSetupCardDescription')}
+          </Text>
+        </Stack>
+        <Button
+          fullWidth
+          maw={320}
+          size="md"
+          leftSection={<IconFileImport size={18} />}
+          onClick={onOpenBulkImport}
+          color={colors.primary}
+          variant={isOpen ? 'light' : 'filled'}
+        >
+          {isOpen ? tSettings('bulkSetupCardHideButton') : tSettings('bulkSetupCardOpenButton')}
+        </Button>
+      </Stack>
+    </Paper>
   );
 }
 

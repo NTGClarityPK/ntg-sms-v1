@@ -11,6 +11,7 @@ export interface SettingsStatus {
   communication: boolean;
   behavior: boolean;
   permissions: boolean;
+  tabbedScreenReady: boolean;
   isInitialized: boolean;
 }
 

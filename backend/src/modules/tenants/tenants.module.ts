@@ -6,6 +6,7 @@ import { TenantsService } from './tenants.service';
 @Module({
   controllers: [TenantsController],
   providers: [TenantsService, SupabaseConfig],
+  exports: [TenantsService],
 })
 export class TenantsModule {}
 

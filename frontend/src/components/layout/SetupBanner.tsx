@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Text } from '@mantine/core';
 import Link from 'next/link';
 import { IconRocket } from '@tabler/icons-react';
@@ -17,11 +18,25 @@ export function SetupBanner() {
   const { user } = useAuth();
   const primaryColor = useThemeColor();
   const statusQuery = useSettingsStatus();
-  const status = statusQuery.data?.data as { isInitialized?: boolean } | undefined;
-  const isInitialized = status?.isInitialized ?? true;
+  const status = statusQuery.data?.data as
+    | { isInitialized?: boolean; tabbedScreenReady?: boolean }
+    | undefined;
+  const isSetupReady = status?.tabbedScreenReady ?? status?.isInitialized ?? true;
+  const hideKey = useMemo(() => {
+    const userId = user?.id ?? 'anonymous';
+    const branchId = user?.currentBranch?.id ?? 'no-branch';
+    return `setup-banner-hidden:${userId}:${branchId}`;
+  }, [user?.id, user?.currentBranch?.id]);
+  const [isDismissed, setIsDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hidden = window.localStorage.getItem(hideKey) === '1';
+    setIsDismissed(hidden);
+  }, [hideKey]);
 
   if (!user || !canManageSetup(user.roles)) return null;
-  if (statusQuery.isLoading || isInitialized) return null;
+  if (statusQuery.isLoading || isSetupReady || isDismissed) return null;
 
   return (
     <Alert
@@ -34,6 +49,14 @@ export function SetupBanner() {
         marginRight: 'var(--mantine-spacing-md)',
         borderColor: primaryColor,
         color: primaryColor,
+      }}
+      withCloseButton
+      closeButtonLabel="Dismiss setup banner"
+      onClose={() => {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(hideKey, '1');
+        }
+        setIsDismissed(true);
       }}
     >
       <Text size="sm" component="span">

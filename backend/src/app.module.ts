@@ -47,6 +47,7 @@ import { PushModule } from './modules/push/push.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BulkImportModule } from './modules/bulk-import/bulk-import.module';
 import { StudentSelfModule } from './modules/student-self/student-self.module';
+import { SettingsImportModule } from './modules/settings-import/settings-import.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { StudentSelfModule } from './modules/student-self/student-self.module';
     PushModule,
     DashboardModule,
     BulkImportModule,
+    SettingsImportModule,
     StudentSelfModule,
   ],
   controllers: [AppController],

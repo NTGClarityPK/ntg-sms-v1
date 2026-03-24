@@ -6,6 +6,7 @@ export class SettingsStatusDto {
   communication!: boolean;
   behavior!: boolean;
   permissions!: boolean;
+  tabbedScreenReady!: boolean;
   isInitialized!: boolean;
 
   constructor(partial: Partial<SettingsStatusDto>) {
