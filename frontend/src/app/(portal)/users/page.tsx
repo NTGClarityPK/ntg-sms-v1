@@ -135,7 +135,16 @@ export default function UsersPage() {
         </Group>
       </div>
 
-      <Stack gap="md">
+      <div
+        style={{
+          marginTop: '60px',
+          paddingLeft: 'var(--mantine-spacing-md)',
+          paddingRight: 'var(--mantine-spacing-md)',
+          paddingTop: 'var(--mantine-spacing-sm)',
+          paddingBottom: 'var(--mantine-spacing-xl)',
+        }}
+      >
+        <Stack gap="md">
         {!permissionsLoading && !canEdit && (
           <Alert color={colors.info} title={t('viewOnly')}>
             <Text size="sm">
@@ -263,7 +272,8 @@ export default function UsersPage() {
             canEdit={canEdit}
           />
         )}
-      </Stack>
+        </Stack>
+      </div>
 
       <UserForm opened={opened} onClose={close} roles={staffRoles} />
     </>

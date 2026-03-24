@@ -90,114 +90,124 @@ export default function StudentsPage() {
         </Group>
       </div>
 
-      <Stack gap="md">
-        {!canEdit && (
-          <Alert color={colors.info} title={tStudents('viewOnly')}>
-            <Text size="sm">
-              {tStudents('viewOnlyMessage')}
-            </Text>
-          </Alert>
-        )}
+      <div
+        style={{
+          marginTop: '60px',
+          paddingLeft: 'var(--mantine-spacing-md)',
+          paddingRight: 'var(--mantine-spacing-md)',
+          paddingTop: 'var(--mantine-spacing-sm)',
+          paddingBottom: 'var(--mantine-spacing-xl)',
+        }}
+      >
+        <Stack gap="md">
+          {!canEdit && (
+            <Alert color={colors.info} title={tStudents('viewOnly')}>
+              <Text size="sm">
+                {tStudents('viewOnlyMessage')}
+              </Text>
+            </Alert>
+          )}
 
-        <Group>
-          <TextInput
-            id="students-search"
-            placeholder={tStudents('searchPlaceholder')}
-            leftSection={<IconSearch size={16} />}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              handleFilterChange();
-            }}
-            style={{ flex: 1 }}
-          />
-          <div style={{ width: 200, flexShrink: 0 }}>
-            <MultiSelect
-              id="students-filter-class"
-              placeholder={tStudents('filterByClass')}
-              data={classes.map((c) => {
-                const classEntity = c as ClassEntity;
-                return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
-              })}
-              value={classFilter}
-              onChange={(value) => {
-                setClassFilter(value);
+          <Group>
+            <TextInput
+              id="students-search"
+              placeholder={tStudents('searchPlaceholder')}
+              leftSection={<IconSearch size={16} />}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
                 handleFilterChange();
               }}
-              clearable
-              searchable
-              style={{ width: '100%' }}
+              style={{ flex: 1 }}
             />
-          </div>
-          <div style={{ width: 180, flexShrink: 0 }}>
-            <MultiSelect
-              id="students-filter-section"
-              placeholder={tStudents('filterBySection')}
-              data={sections.map((s) => ({ value: s.id, label: s.name }))}
-              value={sectionFilter}
-              onChange={(value) => {
-                setSectionFilter(value);
-                handleFilterChange();
-              }}
-              clearable
-              searchable
-              style={{ width: '100%' }}
-            />
-          </div>
-        </Group>
+            <div style={{ width: 200, flexShrink: 0 }}>
+              <MultiSelect
+                id="students-filter-class"
+                placeholder={tStudents('filterByClass')}
+                data={classes.map((c) => {
+                  const classEntity = c as ClassEntity;
+                  return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
+                })}
+                value={classFilter}
+                onChange={(value) => {
+                  setClassFilter(value);
+                  handleFilterChange();
+                }}
+                clearable
+                searchable
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div style={{ width: 180, flexShrink: 0 }}>
+              <MultiSelect
+                id="students-filter-section"
+                placeholder={tStudents('filterBySection')}
+                data={sections.map((s) => ({ value: s.id, label: s.name }))}
+                value={sectionFilter}
+                onChange={(value) => {
+                  setSectionFilter(value);
+                  handleFilterChange();
+                }}
+                clearable
+                searchable
+                style={{ width: '100%' }}
+              />
+            </div>
+          </Group>
 
-        {studentsQuery.isLoading || studentsQuery.isRefetching || !studentsResponse ? (
-          <Stack gap="md">
-            <Skeleton height={40} width="30%" />
-            <Skeleton height={400} />
-            <Skeleton height={50} />
-          </Stack>
-        ) : studentsQuery.error ? (
-          <Alert color={colors.error} title={tStudents('failedToLoad')}>
-            <Group justify="space-between" mt="sm">
-              <Text size="sm">{tStudents('pleaseTryAgain')}</Text>
-              <Button
-                variant="light"
-                leftSection={<IconRefresh size={16} />}
-                onClick={() => studentsQuery.refetch()}
-              >
-                {tStudents('retry')}
-              </Button>
-            </Group>
-          </Alert>
-        ) : !studentsResponse?.data || studentsResponse.data.length === 0 ? (
-          <Alert color={colors.info} title={tStudents('noStudentsFound')}>
-            <Text size="sm">
-              {canEdit
-                ? tStudents('noStudentsCreateHint')
-                : tStudents('noStudentsViewOnly')}
-            </Text>
-          </Alert>
-        ) : (
-          <>
-            <Text size="sm" c="dimmed">
-              {tStudents('studentCount', { count: studentsResponse.meta?.total ?? studentsResponse.data.length })}
-            </Text>
-            <StudentTable
-              canEdit={canEdit}
-              students={studentsResponse.data}
-              meta={studentsResponse.meta}
-            onPageChange={setPage}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSort={(field) => {
-              if (sortBy === field) {
-                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-              } else {
-                setSortBy(field);
-                setSortOrder('asc');
-              }
-              setPage(1); // Reset to first page when sorting changes
-            }}
-          />
-          </>
-        )}
-      </Stack>
+          {studentsQuery.isLoading || studentsQuery.isRefetching || !studentsResponse ? (
+            <Stack gap="md">
+              <Skeleton height={40} width="30%" />
+              <Skeleton height={400} />
+              <Skeleton height={50} />
+            </Stack>
+          ) : studentsQuery.error ? (
+            <Alert color={colors.error} title={tStudents('failedToLoad')}>
+              <Group justify="space-between" mt="sm">
+                <Text size="sm">{tStudents('pleaseTryAgain')}</Text>
+                <Button
+                  variant="light"
+                  leftSection={<IconRefresh size={16} />}
+                  onClick={() => studentsQuery.refetch()}
+                >
+                  {tStudents('retry')}
+                </Button>
+              </Group>
+            </Alert>
+          ) : !studentsResponse?.data || studentsResponse.data.length === 0 ? (
+            <Alert color={colors.info} title={tStudents('noStudentsFound')}>
+              <Text size="sm">
+                {canEdit
+                  ? tStudents('noStudentsCreateHint')
+                  : tStudents('noStudentsViewOnly')}
+              </Text>
+            </Alert>
+          ) : (
+            <>
+              <Text size="sm" c="dimmed">
+                {tStudents('studentCount', { count: studentsResponse.meta?.total ?? studentsResponse.data.length })}
+              </Text>
+              <StudentTable
+                canEdit={canEdit}
+                students={studentsResponse.data}
+                meta={studentsResponse.meta}
+              onPageChange={setPage}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSort={(field) => {
+                if (sortBy === field) {
+                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                } else {
+                  setSortBy(field);
+                  setSortOrder('asc');
+                }
+                setPage(1); // Reset to first page when sorting changes
+              }}
+            />
+            </>
+          )}
+        </Stack>
+      </div>
 
       <StudentForm opened={opened} onClose={close} />
     </>

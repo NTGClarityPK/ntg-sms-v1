@@ -20,23 +20,33 @@ export default function AssessmentSettingsPage() {
         </Group>
       </div>
 
-      <Tabs defaultValue="types">
-        <Tabs.List>
-          <Tabs.Tab value="types">Assessment types</Tabs.Tab>
-          <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
-          <Tabs.Tab value="leave">{tLeave('tabLeaveQuota')}</Tabs.Tab>
-        </Tabs.List>
+      <div
+        style={{
+          marginTop: '60px',
+          paddingLeft: 'var(--mantine-spacing-md)',
+          paddingRight: 'var(--mantine-spacing-md)',
+          paddingTop: 'var(--mantine-spacing-sm)',
+          paddingBottom: 'var(--mantine-spacing-xl)',
+        }}
+      >
+        <Tabs defaultValue="types">
+          <Tabs.List>
+            <Tabs.Tab value="types">Assessment types</Tabs.Tab>
+            <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
+            <Tabs.Tab value="leave">{tLeave('tabLeaveQuota')}</Tabs.Tab>
+          </Tabs.List>
 
-        <Tabs.Panel value="types" pt="md" px="md" pb="md">
-          <AssessmentTypeList />
-        </Tabs.Panel>
-        <Tabs.Panel value="templates" pt="md" px="md" pb="md">
-          <GradeTemplateBuilder />
-        </Tabs.Panel>
-        <Tabs.Panel value="leave" pt="md" px="md" pb="md">
-          <LeaveQuotaSetting academicYearId={activeYearId} />
-        </Tabs.Panel>
-      </Tabs>
+          <Tabs.Panel value="types" pt="md" px="md" pb="md">
+            <AssessmentTypeList />
+          </Tabs.Panel>
+          <Tabs.Panel value="templates" pt="md" px="md" pb="md">
+            <GradeTemplateBuilder />
+          </Tabs.Panel>
+          <Tabs.Panel value="leave" pt="md" px="md" pb="md">
+            <LeaveQuotaSetting academicYearId={activeYearId} />
+          </Tabs.Panel>
+        </Tabs>
+      </div>
     </>
   );
 }

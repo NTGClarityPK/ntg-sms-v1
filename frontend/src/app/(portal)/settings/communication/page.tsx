@@ -13,10 +13,20 @@ export default function CommunicationSettingsPage() {
         </Group>
       </div>
 
-      <Stack gap="xl">
-        <CommunicationSettings />
-        <LibraryCategoryEditor />
-      </Stack>
+      <div
+        style={{
+          marginTop: '60px',
+          paddingLeft: 'var(--mantine-spacing-md)',
+          paddingRight: 'var(--mantine-spacing-md)',
+          paddingTop: 'var(--mantine-spacing-sm)',
+          paddingBottom: 'var(--mantine-spacing-xl)',
+        }}
+      >
+        <Stack gap="xl">
+          <CommunicationSettings />
+          <LibraryCategoryEditor />
+        </Stack>
+      </div>
     </>
   );
 }

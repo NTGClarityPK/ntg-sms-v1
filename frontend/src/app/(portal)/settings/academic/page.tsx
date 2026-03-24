@@ -15,27 +15,37 @@ export default function AcademicSettingsPage() {
         </Group>
       </div>
 
-      <Tabs defaultValue="subjects">
-        <Tabs.List>
-          <Tabs.Tab value="subjects">Subjects</Tabs.Tab>
-          <Tabs.Tab value="classes">Classes</Tabs.Tab>
-          <Tabs.Tab value="sections">Sections</Tabs.Tab>
-          <Tabs.Tab value="levels">Levels</Tabs.Tab>
-        </Tabs.List>
+      <div
+        style={{
+          marginTop: '60px',
+          paddingLeft: 'var(--mantine-spacing-md)',
+          paddingRight: 'var(--mantine-spacing-md)',
+          paddingTop: 'var(--mantine-spacing-sm)',
+          paddingBottom: 'var(--mantine-spacing-xl)',
+        }}
+      >
+        <Tabs defaultValue="subjects">
+          <Tabs.List>
+            <Tabs.Tab value="subjects">Subjects</Tabs.Tab>
+            <Tabs.Tab value="classes">Classes</Tabs.Tab>
+            <Tabs.Tab value="sections">Sections</Tabs.Tab>
+            <Tabs.Tab value="levels">Levels</Tabs.Tab>
+          </Tabs.List>
 
-        <Tabs.Panel value="subjects" pt="md" px="md" pb="md">
-          <SubjectList />
-        </Tabs.Panel>
-        <Tabs.Panel value="classes" pt="md" px="md" pb="md">
-          <ClassList />
-        </Tabs.Panel>
-        <Tabs.Panel value="sections" pt="md" px="md" pb="md">
-          <SectionList />
-        </Tabs.Panel>
-        <Tabs.Panel value="levels" pt="md" px="md" pb="md">
-          <LevelManager />
-        </Tabs.Panel>
-      </Tabs>
+          <Tabs.Panel value="subjects" pt="md" px="md" pb="md">
+            <SubjectList />
+          </Tabs.Panel>
+          <Tabs.Panel value="classes" pt="md" px="md" pb="md">
+            <ClassList />
+          </Tabs.Panel>
+          <Tabs.Panel value="sections" pt="md" px="md" pb="md">
+            <SectionList />
+          </Tabs.Panel>
+          <Tabs.Panel value="levels" pt="md" px="md" pb="md">
+            <LevelManager />
+          </Tabs.Panel>
+        </Tabs>
+      </div>
     </>
   );
 }

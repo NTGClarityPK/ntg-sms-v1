@@ -12,7 +12,17 @@ export default function BehaviorSettingsPage() {
         </Group>
       </div>
 
-      <BehaviorSettings />
+      <div
+        style={{
+          marginTop: '60px',
+          paddingLeft: 'var(--mantine-spacing-md)',
+          paddingRight: 'var(--mantine-spacing-md)',
+          paddingTop: 'var(--mantine-spacing-sm)',
+          paddingBottom: 'var(--mantine-spacing-xl)',
+        }}
+      >
+        <BehaviorSettings />
+      </div>
     </>
   );
 }

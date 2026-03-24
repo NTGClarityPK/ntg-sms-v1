@@ -30,6 +30,8 @@ export function SetupBanner() {
       title="Complete your setup"
       variant="light"
       style={{
+        marginLeft: 'var(--mantine-spacing-md)',
+        marginRight: 'var(--mantine-spacing-md)',
         borderColor: primaryColor,
         color: primaryColor,
       }}
