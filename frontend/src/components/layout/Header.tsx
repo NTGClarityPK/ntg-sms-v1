@@ -9,6 +9,7 @@ import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranch
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTheme } from '@/lib/hooks/use-theme';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { useMantineTheme } from '@mantine/core';
 import { useTenantMe } from '@/hooks/useTenant';
@@ -33,6 +34,7 @@ const headerBadgeStyle = {
 
 export function Header() {
   const theme = useMantineTheme();
+  const { isDark } = useTheme();
   const themeConfig = (theme.other ?? {}) as ThemeConfig | undefined;
   const onlineBadgeColor = themeConfig?.components?.statusOnline?.badgeColor ?? '#22c55e';
   const offlineBadgeColor = themeConfig?.components?.statusOffline?.badgeColor ?? '#868e96';
@@ -201,7 +203,10 @@ export function Header() {
             width="100%"
             height="100%"
             fit="contain"
-            style={{ objectFit: 'contain' }}
+            style={{
+              objectFit: 'contain',
+              filter: isDark ? 'brightness(0) saturate(100%) invert(100%)' : 'none',
+            }}
           />
         </Box>
 

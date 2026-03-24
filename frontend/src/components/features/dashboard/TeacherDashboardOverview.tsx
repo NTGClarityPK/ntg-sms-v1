@@ -162,7 +162,7 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis allowDecimals={false} />
-                      <Tooltip />
+                      <Tooltip cursor={false} contentStyle={{ backgroundColor: 'var(--mantine-color-dark-7)', border: '1px solid var(--mantine-color-dark-4)', borderRadius: 8 }} labelStyle={{ color: '#ffffff' }} itemStyle={{ color: '#ffffff' }} />
                       <Bar dataKey="count" name={t('count')} fill={colors.primary} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>

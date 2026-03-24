@@ -26,9 +26,12 @@ import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeColor } from '@/lib/hooks/use-theme-color';
 import { generateThemeColors } from '@/lib/utils/themeColors';
 import { apiClient, getEffectiveApiBaseURL } from '@/lib/api-client';
+import {
+  completeSessionRouting,
+  selectBranchAndGoDashboard,
+} from '@/lib/auth/complete-session-routing';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 import { useThemeStore } from '@/lib/store/theme-store';
-import type { Tenant } from '@/types/tenant';
 import { clearStudentToken } from '@/lib/student-session';
 import { pinAuth, PinAuthError } from '@/lib/pin-auth';
 import { supabase } from '@/lib/supabase/client';
@@ -106,97 +109,23 @@ export default function LoginPage() {
   }, []);
 
   const completeLoginAfterSupabaseSession = async () => {
-    // Get user (for locale sync, role-based redirects, and branches)
-    try {
-      const userResponse = await apiClient.get<{
-        preferredLocale?: string;
-        roles?: Array<{ roleName?: string }>;
-        branches?: Array<{
-          id: string;
-          tenantId?: string | null;
-          name: string;
-          code?: string | null;
-        }>;
-      }>('/api/v1/auth/me');
-
-      const userData = userResponse.data ?? {};
-
-      const locale = userData.preferredLocale ?? 'en';
-      document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000; SameSite=Lax`;
-      localStorage.setItem('locale', locale);
-
-      const roles = userData.roles ?? [];
-      const normalisedRoleNames = roles
-        .map((r) => r.roleName?.toLowerCase())
-        .filter((name): name is string => !!name);
-
-      const isSuperAdmin = normalisedRoleNames.includes('super_admin');
-      if (isSuperAdmin) {
-        router.push('/adminportal');
-        return;
-      }
-
-      const isSchoolAdmin = normalisedRoleNames.includes('school_admin');
-
-      // Only school admins should be prompted to select a branch.
-      // All other users (students, parents, etc.) skip branch selection and go straight to dashboard.
-      if (!isSchoolAdmin) {
-        router.push('/dashboard');
-        return;
-      }
-    } catch (userError: any) {
-      // If this Google-authenticated user doesn't have an SMS account yet,
-      // redirect them to the signup flow instead of leaving them on login.
-      const status = userError?.response?.status as number | undefined;
-      const message =
-        userError?.response?.data?.error?.message ||
-        userError?.response?.data?.message ||
-        userError?.message ||
-        '';
-
-      const msg = typeof message === 'string' ? message.toLowerCase() : '';
-      if (status === 404 || msg.includes('user not found')) {
-        router.push('/signup?google=not_found');
-        return;
-      }
-
-      console.error('Failed to check user role:', userError);
-      // If we cannot determine the role for other reasons, fall back to branch selection behaviour
-      // so school admins are still able to choose a branch when possible.
-    }
-
-    // Fetch user's branches for school admins (reuse branches from /auth/me response)
-    try {
-      const userBranches = (await (async () => {
-        const response = await apiClient.get<{
-          branches?: Branch[];
-        }>('/api/v1/auth/me');
-        return response.data?.branches || [];
-      })()) as Branch[];
-
-      if (userBranches.length === 0) {
-        setError('No branches assigned to your account. Please contact your administrator.');
-        setLoading(false);
-        return;
-      }
-
-      // If user has only one branch, auto-select it
-      if (userBranches.length === 1) {
-        await handleBranchSelection(userBranches[0].id);
-        return;
-      }
-
-      // If user has multiple branches, show selection modal (deduplicate by id for Mantine Select)
-      setBranches(
-        Array.from(new Map((userBranches as Branch[]).map((b) => [b.id, b])).values()),
-      );
-      setShowBranchSelection(true);
-      setLoading(false);
-    } catch (branchError: any) {
-      console.error('Failed to fetch branches:', branchError);
-      setError('Failed to fetch branches. Please try again.');
-      setLoading(false);
-    }
+    await completeSessionRouting({
+      router,
+      setError,
+      setLoading,
+      setPrimaryColor,
+      onMultiBranch: (branchList) => {
+        setBranches(
+          branchList.map((b) => ({
+            id: b.id,
+            name: b.name,
+            code: b.code ?? '',
+            tenantId: b.tenantId ?? '',
+          })),
+        );
+        setShowBranchSelection(true);
+      },
+    });
   };
 
   // OAuth callbacks are handled by /auth/callback. Redirect there if user lands on /login with hash.
@@ -317,31 +246,14 @@ export default function LoginPage() {
 
   const handleBranchSelection = async (branchId: string) => {
     setBranchSelectionLoading(true);
-    
-    try {
-      // Set the selected branch on the backend
-      await apiClient.post('/api/v1/auth/select-branch', { branchId });
-      
-      // Store in localStorage for immediate use
-      localStorage.setItem('currentBranchId', branchId);
 
-      // Fetch tenant theme before redirect so first dashboard paint uses DB colour
-      try {
-        const tenantResponse = await apiClient.get<Tenant>('/api/v1/tenants/me');
-        const tenantTheme = tenantResponse.data?.primaryColor;
-        if (tenantTheme) {
-          setPrimaryColor(tenantTheme);
-        }
-      } catch {
-        // Non-blocking: dashboard will still bootstrap theme via AuthGuard/Header
-      }
-      
-      // Close modal and redirect (use SPA navigation)
+    try {
       setShowBranchSelection(false);
-      router.push('/dashboard');
-    } catch (err: any) {
+      await selectBranchAndGoDashboard(branchId, router, setPrimaryColor);
+    } catch (err: unknown) {
       console.error('Failed to select branch:', err);
       setError('Failed to select branch. Please try again.');
+    } finally {
       setBranchSelectionLoading(false);
     }
   };

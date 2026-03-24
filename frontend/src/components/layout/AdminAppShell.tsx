@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AppShell as MantineAppShell, Burger, Group } from '@mantine/core';
+import { AppShell as MantineAppShell, Box, Burger, Group } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
@@ -13,6 +13,7 @@ interface AdminAppShellProps {
 
 export function AdminAppShell({ children }: AdminAppShellProps) {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
+  const [isRtl, setIsRtl] = useState(false);
 
   // Desktop navbar collapsed state (persisted to localStorage)
   const [navbarCollapsed, setNavbarCollapsed] = useState<boolean>(() => {
@@ -30,6 +31,12 @@ export function AdminAppShell({ children }: AdminAppShellProps) {
 
   // Calculate navbar width based on collapsed state
   const navbarWidth = navbarCollapsed ? 100 : 270;
+  const cornerOffset = navbarWidth;
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    setIsRtl(document.documentElement.getAttribute('dir') === 'rtl');
+  }, []);
 
   return (
     <MantineAppShell
@@ -60,6 +67,24 @@ export function AdminAppShell({ children }: AdminAppShellProps) {
           onMobileClose={() => mobileOpened && toggleMobile()}
         />
       </MantineAppShell.Navbar>
+
+      <Box
+        aria-hidden="true"
+        visibleFrom="sm"
+        style={{
+          position: 'fixed',
+          top: '60px',
+          width: '16px',
+          height: '16px',
+          zIndex: 101,
+          pointerEvents: 'none',
+          left: isRtl ? undefined : `${cornerOffset}px`,
+          right: isRtl ? `${cornerOffset}px` : undefined,
+          background: isRtl
+            ? 'radial-gradient(circle at 0 100%, transparent 16px, var(--theme-navbar-bg) 16px)'
+            : 'radial-gradient(circle at 100% 100%, transparent 16px, var(--theme-navbar-bg) 16px)',
+        }}
+      />
 
       <MantineAppShell.Main>
         <ConnectionIndicator />

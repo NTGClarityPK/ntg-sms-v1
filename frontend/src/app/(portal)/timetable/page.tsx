@@ -10,8 +10,10 @@ import {
   Paper,
   Group,
   Alert,
+  Anchor,
 } from '@mantine/core';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -21,10 +23,18 @@ export default function TimetablePage() {
   const t = useTranslations('timetable');
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
   const colors = useThemeColors();
-  const { data: activeYearResponse } = useActiveAcademicYear();
+  const {
+    data: activeYearResponse,
+    isLoading: isLoadingActiveYear,
+    error: activeYearError,
+  } = useActiveAcademicYear();
   const activeYear = activeYearResponse?.data ?? null;
   const activeYearId = activeYear?.id;
-  const { data: classSectionsData, isLoading: isLoadingClassSections } = useClassSections(
+  const {
+    data: classSectionsData,
+    isLoading: isLoadingClassSections,
+    error: classSectionsError,
+  } = useClassSections(
     activeYearId
       ? {
           isActive: true,
@@ -57,7 +67,7 @@ export default function TimetablePage() {
       label: `${cs.className || cs.classDisplayName || t('unknown')} - ${cs.sectionName || t('unknown')}`,
     }));
 
-  if (isLoadingClassSections || !classSectionsData) {
+  if (isLoadingActiveYear || isLoadingClassSections) {
     return (
       <>
         <div className="page-title-bar">
@@ -76,6 +86,57 @@ export default function TimetablePage() {
             <Skeleton height={40} width="30%" />
             <Skeleton height={200} />
           </Stack>
+        </div>
+      </>
+    );
+  }
+
+  if (activeYearError || !activeYearId) {
+    return (
+      <>
+        <div className="page-title-bar">
+          <Title order={1}>{t('title')}</Title>
+        </div>
+        <div
+          style={{
+            marginTop: '60px',
+            paddingLeft: 'var(--mantine-spacing-md)',
+            paddingRight: 'var(--mantine-spacing-md)',
+            paddingTop: 'var(--mantine-spacing-sm)',
+            paddingBottom: 'var(--mantine-spacing-xl)',
+          }}
+        >
+          <Alert color={colors.warning} title={t('academicYear')}>
+            <Text size="sm">
+              {t('noActiveAcademicYearTimetableMessage')}{' '}
+              <Anchor component={Link} href="/settings/academic-years">
+                {t('settingsAcademicYears')}
+              </Anchor>
+            </Text>
+          </Alert>
+        </div>
+      </>
+    );
+  }
+
+  if (classSectionsError) {
+    return (
+      <>
+        <div className="page-title-bar">
+          <Title order={1}>{t('title')}</Title>
+        </div>
+        <div
+          style={{
+            marginTop: '60px',
+            paddingLeft: 'var(--mantine-spacing-md)',
+            paddingRight: 'var(--mantine-spacing-md)',
+            paddingTop: 'var(--mantine-spacing-sm)',
+            paddingBottom: 'var(--mantine-spacing-xl)',
+          }}
+        >
+          <Alert color={colors.error} title={t('errorLoadingTimetable')}>
+            <Text size="sm">{String(classSectionsError)}</Text>
+          </Alert>
         </div>
       </>
     );

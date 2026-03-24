@@ -53,9 +53,7 @@ rmsreference/*
 
 .env.prod
 .env.staging
-.env.local
-
-# Docker
+.env.local# Docker
 docker-compose.override.yml# Cursor IDE
 .cursor/
 .cursorignore

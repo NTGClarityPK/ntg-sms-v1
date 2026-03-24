@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { IconRocket } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useAuth } from '@/hooks/useAuth';
+import { useThemeColor } from '@/lib/hooks/use-theme-color';
 
 const canManageSetup = (roles: { roleName?: string }[] = []): boolean =>
   roles.some((r) => {
@@ -14,6 +15,7 @@ const canManageSetup = (roles: { roleName?: string }[] = []): boolean =>
 
 export function SetupBanner() {
   const { user } = useAuth();
+  const primaryColor = useThemeColor();
   const statusQuery = useSettingsStatus();
   const status = statusQuery.data?.data as { isInitialized?: boolean } | undefined;
   const isInitialized = status?.isInitialized ?? true;
@@ -23,15 +25,19 @@ export function SetupBanner() {
 
   return (
     <Alert
-      color="blue"
       icon={<IconRocket size={20} />}
       mb="md"
       title="Complete your setup"
+      variant="light"
+      style={{
+        borderColor: primaryColor,
+        color: primaryColor,
+      }}
     >
       <Text size="sm" component="span">
         Add academic details, schedule, and more in Settings to get the most out of your school.
         {' '}
-        <Link href="/settings" style={{ fontWeight: 600 }}>
+        <Link href="/settings" style={{ fontWeight: 600, color: primaryColor }}>
           Go to Settings
         </Link>
       </Text>

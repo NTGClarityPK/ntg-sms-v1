@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Title,
   Text,
@@ -17,6 +18,7 @@ import {
   Divider,
   Tooltip,
   ActionIcon,
+  Anchor,
 } from '@mantine/core';
 import { IconAlertTriangle, IconExternalLink, IconRefresh } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -58,7 +60,11 @@ export default function ConflictManagementPage() {
     isActive: true,
   });
   const { data: staffData, isLoading: isLoadingStaff } = useStaff({ isActive: true });
-  const { data: activeYear } = useActiveAcademicYear();
+  const {
+    data: activeYear,
+    isLoading: activeYearLoading,
+    error: activeYearError,
+  } = useActiveAcademicYear();
   const { data: academicYearsData } = useAcademicYearsList();
 
   const { data: conflictsData, isLoading: isLoadingConflicts, isRefetching } = useConflicts({
@@ -126,7 +132,7 @@ export default function ConflictManagementPage() {
     setSelectedAcademicYearId(null);
   };
 
-  if (isLoadingClassSections || isLoadingStaff || !classSectionsData || !staffData) {
+  if (activeYearLoading || isLoadingClassSections || isLoadingStaff) {
     return (
       <>
         <div className="page-title-bar">
@@ -145,6 +151,34 @@ export default function ConflictManagementPage() {
             <Skeleton height={40} width="30%" />
             <Skeleton height={200} />
           </Stack>
+        </div>
+      </>
+    );
+  }
+
+  if (activeYearError || !effectiveAcademicYearId) {
+    return (
+      <>
+        <div className="page-title-bar">
+          <Title order={1}>{t('conflictManagement')}</Title>
+        </div>
+        <div
+          style={{
+            marginTop: '60px',
+            paddingLeft: 'var(--mantine-spacing-md)',
+            paddingRight: 'var(--mantine-spacing-md)',
+            paddingTop: 'var(--mantine-spacing-sm)',
+            paddingBottom: 'var(--mantine-spacing-xl)',
+          }}
+        >
+          <Alert color={colors.warning} title={t('academicYear')}>
+            <Text size="sm">
+              {t('noActiveAcademicYearConflictsMessage')}{' '}
+              <Anchor component={Link} href="/settings/academic-years">
+                {t('settingsAcademicYears')}
+              </Anchor>
+            </Text>
+          </Alert>
         </div>
       </>
     );

@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeaturePermission } from '@/hooks/usePermissions';
-import { Skeleton, Stack } from '@mantine/core';
+import { Skeleton, Stack, Title } from '@mantine/core';
 
 export default function InventoryDashboardPage() {
   const router = useRouter();
@@ -27,9 +27,26 @@ export default function InventoryDashboardPage() {
   }, [router, canEdit, isParent]);
 
   return (
-    <Stack gap="md" p="md">
-      <Skeleton height={40} width="60%" />
-      <Skeleton height={200} />
-    </Stack>
+    <>
+      <div className="page-title-bar">
+        <Title order={1}>
+          <Skeleton height={28} width={220} />
+        </Title>
+      </div>
+      <div
+        style={{
+          marginTop: '60px',
+          paddingLeft: 'var(--mantine-spacing-md)',
+          paddingRight: 'var(--mantine-spacing-md)',
+          paddingTop: 'var(--mantine-spacing-sm)',
+          paddingBottom: 'var(--mantine-spacing-xl)',
+        }}
+      >
+        <Stack gap="md">
+          <Skeleton height={40} width="60%" />
+          <Skeleton height={200} />
+        </Stack>
+      </div>
+    </>
   );
 }

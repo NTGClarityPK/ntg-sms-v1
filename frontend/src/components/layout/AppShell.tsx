@@ -16,6 +16,7 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
   const isMobile = useMediaQuery('(max-width: 767px)');
+  const [isRtl, setIsRtl] = useState(false);
 
   // Desktop navbar collapsed state (persisted to localStorage, like RMS)
   const [navbarCollapsed, setNavbarCollapsed] = useState<boolean>(() => {
@@ -33,6 +34,12 @@ export function AppShell({ children }: AppShellProps) {
 
   // On mobile use full drawer width; on desktop use collapsed/expanded width
   const navbarWidth = isMobile ? 280 : (navbarCollapsed ? 100 : 270);
+  const cornerOffset = navbarWidth;
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    setIsRtl(document.documentElement.getAttribute('dir') === 'rtl');
+  }, []);
 
   return (
     <MantineAppShell
@@ -69,6 +76,25 @@ export function AppShell({ children }: AppShellProps) {
           isMobile={isMobile}
         />
       </MantineAppShell.Navbar>
+
+      {!isMobile && (
+        <Box
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            top: '60px',
+            width: '16px',
+            height: '16px',
+            zIndex: 101,
+            pointerEvents: 'none',
+            left: isRtl ? undefined : `${cornerOffset}px`,
+            right: isRtl ? `${cornerOffset}px` : undefined,
+            background: isRtl
+              ? 'radial-gradient(circle at 0 100%, transparent 16px, var(--theme-navbar-bg) 16px)'
+              : 'radial-gradient(circle at 100% 100%, transparent 16px, var(--theme-navbar-bg) 16px)',
+          }}
+        />
+      )}
 
       <MantineAppShell.Main>
           <ConnectionIndicator />

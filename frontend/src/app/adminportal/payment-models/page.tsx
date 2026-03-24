@@ -5,7 +5,13 @@ import { Group, Title, Stack, Text, Paper, Center } from '@mantine/core';
 export default function PaymentModelsPage() {
   return (
     <>
-      <div className="page-title-bar">
+      <div
+        className="page-title-bar"
+        style={{
+          borderTopLeftRadius: '12px',
+          overflow: 'hidden',
+        }}
+      >
         <Group justify="space-between" w="100%">
           <Title order={1}>Payment Model</Title>
         </Group>

@@ -15,6 +15,7 @@ import {
   Stepper,
   Group,
   Divider,
+  LoadingOverlay,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import {
@@ -29,6 +30,13 @@ import {
   IconBrandGoogle,
 } from '@tabler/icons-react';
 import { apiClient, getEffectiveApiBaseURL } from '@/lib/api-client';
+import { signIn } from '@/lib/auth';
+import {
+  completeSessionRouting,
+  selectBranchAndGoDashboard,
+} from '@/lib/auth/complete-session-routing';
+import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
+import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useErrorColor, useInfoColor, useSuccessColor, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
@@ -70,6 +78,12 @@ export default function SignupPage() {
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showBranchSelection, setShowBranchSelection] = useState(false);
+  const [branches, setBranches] = useState<
+    Array<{ id: string; name: string; code: string; tenantId: string }>
+  >([]);
+  const [branchSelectionLoading, setBranchSelectionLoading] = useState(false);
+  const { setPrimaryColor } = useThemeStore();
 
   const form = useForm<RegisterData>({
     initialValues: {
@@ -197,7 +211,6 @@ export default function SignupPage() {
     setError(null);
 
     try {
-      // Call registration API
       const { confirmPassword, ...registerData } = values;
       await apiClient.post('/api/v1/auth/register', {
         schoolName: registerData.schoolName,
@@ -213,27 +226,61 @@ export default function SignupPage() {
         phone: registerData.phone || undefined,
       });
 
-      // Show success notification briefly, then redirect to login
+      try {
+        const sessionResult = await signIn(registerData.email, registerData.password);
+        if (!sessionResult.session) {
+          throw new Error('Session not created');
+        }
+      } catch {
+        setLoading(false);
+        notifications.show({
+          id: 'signup-partial',
+          title: 'Account created',
+          message: 'Your account was created. Please sign in with your email and password.',
+          color: notifyColors.success,
+          autoClose: 5000,
+        });
+        router.push('/login?registered=true');
+        return;
+      }
+
       notifications.show({
         id: 'signup-success',
         title: 'Account created',
-        message: 'Your school account has been created. Redirecting to login…',
+        message: 'Your school account is ready. Opening your dashboard…',
         color: notifyColors.success,
-        autoClose: 2000,
+        autoClose: 3000,
       });
 
-      setTimeout(() => {
-        router.push('/login?registered=true');
-      }, 2000);
-    } catch (err: any) {
+      await completeSessionRouting({
+        router,
+        setError,
+        setLoading,
+        setPrimaryColor,
+        onMultiBranch: (branchList) => {
+          setBranches(
+            branchList.map((b) => ({
+              id: b.id,
+              name: b.name,
+              code: b.code ?? '',
+              tenantId: b.tenantId ?? '',
+            })),
+          );
+          setShowBranchSelection(true);
+        },
+      });
+    } catch (err: unknown) {
+      const fromAxios = err as {
+        response?: { data?: { error?: { message?: string }; message?: string } };
+        message?: string;
+      };
       const errorMsg =
-        err.response?.data?.error?.message ||
-        err.response?.data?.message ||
-        err.message ||
+        fromAxios.response?.data?.error?.message ||
+        fromAxios.response?.data?.message ||
+        fromAxios.message ||
         'Registration failed. Please try again.';
       setError(errorMsg);
 
-      // Show failure notification (stay on page so user can fix and retry)
       notifications.show({
         id: 'signup-error',
         title: 'Registration failed',
@@ -241,8 +288,20 @@ export default function SignupPage() {
         color: notifyColors.error,
         autoClose: 2000,
       });
-    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSignupBranchSelection = async (branchId: string) => {
+    setBranchSelectionLoading(true);
+
+    try {
+      setShowBranchSelection(false);
+      await selectBranchAndGoDashboard(branchId, router, setPrimaryColor);
+    } catch {
+      setError('Failed to select branch. Please try again.');
+    } finally {
+      setBranchSelectionLoading(false);
     }
   };
 
@@ -342,7 +401,15 @@ export default function SignupPage() {
   // For now, both Google and email methods use the same multi-step school signup form.
   // Behaviour differences (e.g. redirecting to Google OAuth) can be layered on later.
   return (
+    <>
     <form id="signup-form" onSubmit={handleFormSubmit}>
+      <Box pos="relative">
+        <LoadingOverlay
+          visible={loading}
+          zIndex={1000}
+          overlayProps={{ radius: 'md', blur: 2 }}
+          loaderProps={{ size: 'lg' }}
+        />
       <Stack gap="lg">
         <Box>
           <Button
@@ -452,7 +519,7 @@ export default function SignupPage() {
 
                 <TextInput
                 id="signup-branch-email"
-                label="Email (Optional)"
+                label="School Email (Optional)"
                 placeholder="branch@school.com"
                   leftSection={<IconMail size={18} />}
                   size="lg"
@@ -627,7 +694,7 @@ export default function SignupPage() {
                 radius="md"
               >
                 <Text size="sm" fw={500}>
-                  Account created successfully! Redirecting...
+                  Account created successfully! Opening your dashboard…
                 </Text>
               </Alert>
             </Stack>
@@ -670,13 +737,17 @@ export default function SignupPage() {
             <Button
               id="signup-submit"
               type="button"
-              loading={loading}
               onClick={() => {
                 if (signupMethod === 'google') {
-                  // For Google signup, go straight to Google OAuth without hitting the email/password validator.
                   void handleGoogleSignup(form.values);
                 } else {
-                  form.onSubmit(handleSubmit)();
+                  setLoading(true);
+                  setError(null);
+                  const handler = form.onSubmit(handleSubmit);
+                  handler({ preventDefault: () => {} } as React.FormEvent<HTMLFormElement>);
+                  if (Object.keys(form.errors).length > 0) {
+                    setLoading(false);
+                  }
                 }
               }}
               style={{
@@ -697,7 +768,17 @@ export default function SignupPage() {
           </Anchor>
         </Text>
       </Stack>
+      </Box>
     </form>
+    <BranchSelectionModal
+      opened={showBranchSelection}
+      branches={branches}
+      onSelect={(id) => {
+        void handleSignupBranchSelection(id);
+      }}
+      loading={branchSelectionLoading}
+    />
+    </>
   );
 }
 

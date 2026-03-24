@@ -7,6 +7,7 @@ import { UserMenu } from './UserMenu';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/lib/hooks/use-theme';
 
 const headerBadgeStyle = {
   cursor: 'default' as const,
@@ -19,6 +20,7 @@ const headerBadgeStyle = {
 
 export function AdminHeader() {
   const theme = useMantineTheme();
+  const { isDark } = useTheme();
   const themeConfig = (theme.other ?? {}) as ThemeConfig | undefined;
   const onlineBadgeColor = themeConfig?.components?.statusOnline?.badgeColor ?? '#22c55e';
   const offlineBadgeColor = themeConfig?.components?.statusOffline?.badgeColor ?? '#868e96';
@@ -109,7 +111,10 @@ export function AdminHeader() {
             width="100%"
             height="100%"
             fit="contain"
-            style={{ objectFit: 'contain' }}
+            style={{
+              objectFit: 'contain',
+              filter: isDark ? 'brightness(0) saturate(100%) invert(100%)' : 'none',
+            }}
           />
         </Box>
 

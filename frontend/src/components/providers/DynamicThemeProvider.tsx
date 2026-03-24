@@ -167,73 +167,65 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         border-inline-start: none !important;
       }
       
-      /* Header - rounded corner at inline-start (next to navbar) */
+      /* Header */
       .mantine-AppShell-header {
         background-color: ${config.components.header.backgroundColor} !important;
         border-bottom-color: ${config.components.header.borderColor} !important;
         color: ${config.components.header.textColor} !important;
-        border-end-start-radius: 12px !important;
-        overflow: hidden !important;
-      }
-
-      .mantine-AppShell-header > .mantine-Group-root {
-        background-color: ${config.components.header.backgroundColor} !important;
-        border-end-start-radius: 12px !important;
-        overflow: hidden !important;
-      }
-
-      /* Main - rounded corner at inline-start (next to navbar); RTL uses inline-end corner */
-      .mantine-AppShell-main {
-        background-color: ${config.components.page.backgroundColor} !important;
-        border-start-start-radius: 12px !important;
-        overflow: hidden !important;
-      }
-
-      html[dir="rtl"] .mantine-AppShell-main,
-      [dir="rtl"] .mantine-AppShell-main {
-        border-start-start-radius: 0 !important;
-        border-start-end-radius: 12px !important;
       }
       
-      /* Page Title Bar - logical inset so RTL flips automatically */
+      /* Page Title Bar */
       .page-title-bar {
         position: fixed !important;
         top: 60px !important; /* Below header */
-        inset-inline-start: 300px !important; /* After navbar (expanded) */
-        inset-inline-end: 0 !important;
+        left: 270px !important; /* To the right of navbar (expanded) */
+        right: 0 !important;
         height: 60px !important; /* Same height as header */
         background-color: ${config.components.titleBar.backgroundColor} !important;
         z-index: 100 !important;
         display: flex !important;
         align-items: center !important;
         border-bottom: none !important;
-        transition: inset-inline-start 0.3s ease !important;
-        border-start-end-radius: 12px !important; /* Rounded corner next to main content */
+        transition: left 0.3s ease !important;
+        border-top-left-radius: 12px !important;
         overflow: hidden !important;
-        padding-inline-start: var(--mantine-spacing-xs) !important;
-        padding-inline-end: var(--mantine-spacing-sm) !important;
+        padding-left: var(--mantine-spacing-md) !important;
+        padding-right: var(--mantine-spacing-md) !important;
+      }
+
+      /* Force visible inner rounded join with sidebar/header edge */
+      .page-title-bar::before {
+        content: '' !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: -12px !important;
+        width: 12px !important;
+        height: 12px !important;
+        border-top-right-radius: 12px !important;
+        box-shadow: 6px -6px 0 6px ${config.components.titleBar.backgroundColor} !important;
+        pointer-events: none !important;
       }
       
       /* Page Sub Title Bar - Same position as title bar */
       .page-sub-title-bar {
         position: fixed !important;
-        top: 60px !important;
-        inset-inline-start: 300px !important;
-        inset-inline-end: 0 !important;
-        height: 60px !important;
+        top: 60px !important; /* Same position as title bar */
+        left: 270px !important; /* To the right of navbar (expanded) */
+        right: 0 !important;
+        height: 60px !important; /* Same height as title bar */
         background-color: ${config.components.subTitleBar.backgroundColor} !important;
         z-index: 98 !important;
-        transition: inset-inline-start 0.3s ease !important;
+        transition: left 0.3s ease !important;
       }
       
       /* Adjust for collapsed navbar (desktop) */
       @media (min-width: 768px) {
         body[data-navbar-collapsed="true"] .page-title-bar {
-          inset-inline-start: 120px !important;
+          left: 100px !important;
         }
         
         body[data-navbar-collapsed="true"] .page-sub-title-bar {
-          inset-inline-start: 120px !important;
+          left: 100px !important;
         }
       }
       
@@ -241,22 +233,94 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       @media (max-width: 767px) {
         .page-title-bar,
         .page-sub-title-bar {
-          inset-inline-start: 0 !important;
+          left: 0 !important;
+        }
+      }
+
+      /* RTL Support - Title and Subtitle Bars */
+      html[dir="rtl"] .page-title-bar,
+      [dir="rtl"] .page-title-bar {
+        left: 0 !important;
+        right: 270px !important;
+        width: calc(100% - 270px) !important;
+        border-top-left-radius: 0 !important;
+        border-top-right-radius: 12px !important;
+        padding-left: var(--mantine-spacing-md) !important;
+        padding-right: var(--mantine-spacing-md) !important;
+        transition: right 0.3s ease, width 0.3s ease !important;
+      }
+
+      html[dir="rtl"] .page-title-bar::before,
+      [dir="rtl"] .page-title-bar::before {
+        left: auto !important;
+        right: -12px !important;
+        border-top-right-radius: 0 !important;
+        border-top-left-radius: 12px !important;
+        box-shadow: -6px -6px 0 6px ${config.components.titleBar.backgroundColor} !important;
+      }
+      
+      html[dir="rtl"] .page-sub-title-bar,
+      [dir="rtl"] .page-sub-title-bar {
+        left: 0 !important;
+        right: 270px !important;
+        width: calc(100% - 270px) !important;
+        transition: right 0.3s ease, width 0.3s ease !important;
+      }
+      
+      /* RTL - Collapsed navbar */
+      @media (min-width: 768px) {
+        html[dir="rtl"] body[data-navbar-collapsed="true"] .page-title-bar,
+        [dir="rtl"] body[data-navbar-collapsed="true"] .page-title-bar {
+          right: 100px !important;
+          width: calc(100% - 100px) !important;
+        }
+        
+        html[dir="rtl"] body[data-navbar-collapsed="true"] .page-sub-title-bar,
+        [dir="rtl"] body[data-navbar-collapsed="true"] .page-sub-title-bar {
+          right: 100px !important;
+          width: calc(100% - 100px) !important;
+        }
+      }
+      
+      /* RTL - Mobile */
+      @media (max-width: 767px) {
+        html[dir="rtl"] .page-title-bar,
+        [dir="rtl"] .page-title-bar,
+        html[dir="rtl"] .page-sub-title-bar,
+        [dir="rtl"] .page-sub-title-bar {
+          right: 0 !important;
+          width: 100% !important;
         }
       }
       
       /* Title bar content - start aligned with padding to match content div */
       .page-title-bar .mantine-Title-root {
         margin: 0 !important;
-        text-align: start !important;
-        padding-inline-start: 0 !important;
+        text-align: left !important;
+        padding-left: var(--mantine-spacing-md) !important;
+        padding-top: var(--mantine-spacing-sm) !important;
+      }
+      
+      html[dir="rtl"] .page-title-bar .mantine-Title-root,
+      [dir="rtl"] .page-title-bar .mantine-Title-root {
+        text-align: right !important;
+        padding-left: 0 !important;
+        padding-right: var(--mantine-spacing-md) !important;
       }
       
       /* Title bar button group alignment */
       .page-title-bar .mantine-Group-root[data-justify="space-between"],
       .page-title-bar .mantine-Group-root[style*="justify-content: space-between"] {
-        padding-inline-end: 0 !important;
-        padding-inline-start: 0 !important;
+        padding-right: 0 !important;
+        padding-left: 0 !important;
+      }
+      
+      html[dir="rtl"] .page-title-bar .mantine-Group-root[data-justify="space-between"],
+      [dir="rtl"] .page-title-bar .mantine-Group-root[data-justify="space-between"],
+      html[dir="rtl"] .page-title-bar .mantine-Group-root[style*="justify-content: space-between"],
+      [dir="rtl"] .page-title-bar .mantine-Group-root[style*="justify-content: space-between"] {
+        padding-right: 0 !important;
+        padding-left: 0 !important;
       }
       
       /* Add top margin to main content to account for title bar */

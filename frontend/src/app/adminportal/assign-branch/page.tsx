@@ -78,7 +78,13 @@ export default function AssignBranchPage() {
 
   return (
     <>
-      <div className="page-title-bar">
+      <div
+        className="page-title-bar"
+        style={{
+          borderTopLeftRadius: '12px',
+          overflow: 'hidden',
+        }}
+      >
         <Group justify="space-between" w="100%">
           <Title order={1}>Assign Branch to Tenant</Title>
         </Group>

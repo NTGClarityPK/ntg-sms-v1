@@ -16,7 +16,13 @@ export default function AdminPortalDashboardPage() {
 
   return (
     <>
-      <div className="page-title-bar">
+      <div
+        className="page-title-bar"
+        style={{
+          borderTopLeftRadius: '12px',
+          overflow: 'hidden',
+        }}
+      >
         <Group justify="space-between" w="100%">
           <Title order={1}>Dashboard</Title>
         </Group>
