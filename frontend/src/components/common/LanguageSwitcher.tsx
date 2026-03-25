@@ -12,7 +12,8 @@ const LOCALE_COOKIE = 'NEXT_LOCALE';
 const COOKIE_MAX_AGE = 31536000; // 1 year
 
 const LANGUAGES = [
-  { code: 'en', nativeName: 'English', name: 'English' },
+  { code: 'en-US', nativeName: 'English (US)', name: 'English (US)' },
+  { code: 'en-GB', nativeName: 'English (UK)', name: 'English (UK)' },
   { code: 'ar', nativeName: 'العربية', name: 'Arabic' },
 ];
 
@@ -27,7 +28,10 @@ export function LanguageSwitcher() {
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
-  const currentLanguage = LANGUAGES.find((l) => l.code === locale) ?? LANGUAGES[0];
+  // Backward compatibility: older profiles/cookies may still store `en`.
+  const normalizedLocale = locale === 'en' ? 'en-US' : locale;
+  const currentLanguage =
+    LANGUAGES.find((l) => l.code === normalizedLocale) ?? LANGUAGES[0];
 
   const handleChange = async (value: string) => {
     setLocaleCookie(value);
@@ -89,14 +93,14 @@ export function LanguageSwitcher() {
             leftSection={
               <IconCheck
                 size={16}
-                style={{ visibility: locale === lang.code ? 'visible' : 'hidden' }}
+                style={{ visibility: normalizedLocale === lang.code ? 'visible' : 'hidden' }}
               />
             }
             onClick={() => handleChange(lang.code)}
-            style={{ fontWeight: locale === lang.code ? 600 : 400 }}
+            style={{ fontWeight: normalizedLocale === lang.code ? 600 : 400 }}
           >
             <Stack gap={2}>
-              <Text size="sm" fw={locale === lang.code ? 600 : 400}>
+              <Text size="sm" fw={normalizedLocale === lang.code ? 600 : 400}>
                 {lang.nativeName}
               </Text>
               <Text size="xs" c="dimmed">

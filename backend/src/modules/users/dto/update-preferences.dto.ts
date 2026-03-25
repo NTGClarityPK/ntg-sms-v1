@@ -2,6 +2,6 @@ import { IsOptional, IsIn } from 'class-validator';
 
 export class UpdatePreferencesDto {
   @IsOptional()
-  @IsIn(['en', 'ar'])
+  @IsIn(['en', 'en-US', 'en-GB', 'ar'])
   preferred_locale?: string;
 }

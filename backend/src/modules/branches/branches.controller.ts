@@ -74,7 +74,7 @@ export class BranchesController {
   @Get(':id')
   async getById(
     @Param('id') id: string,
-    @Query('language') language?: 'en' | 'ar',
+    @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
   ): Promise<{ data: BranchDto }> {
     const branch = await this.branchesService.getById(id, language ?? 'ar');
     return { data: branch };

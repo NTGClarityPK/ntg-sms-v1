@@ -39,7 +39,7 @@ export const metadata = {
   title: 'NTG Alma',
   description: 'Multi-tenant school management system',
   manifest: '/manifest.json',
-  icons: { icon: '/ntg-logo.svg' },
+  icons: { icon: '/NTGTempLogo.svg' },
   other: {
     google: 'notranslate',
   },

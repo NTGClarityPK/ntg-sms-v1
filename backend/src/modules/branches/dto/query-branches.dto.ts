@@ -7,8 +7,8 @@ export class QueryBranchesDto extends BasePaginationDto {
   sortBy?: 'name' | 'code' | 'created_at';
 
   @IsOptional()
-  @IsIn(['en', 'ar'])
-  language?: 'en' | 'ar';
+  @IsIn(['en', 'en-US', 'en-GB', 'ar'])
+  language?: 'en' | 'en-US' | 'en-GB' | 'ar';
 }
 
 

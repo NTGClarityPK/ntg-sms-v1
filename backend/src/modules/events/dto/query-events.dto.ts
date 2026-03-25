@@ -45,8 +45,8 @@ export class QueryEventsDto {
   limit?: number;
 
   @IsOptional()
-  @IsIn(['en', 'ar'])
-  language?: 'en' | 'ar';
+  @IsIn(['en', 'en-US', 'en-GB', 'ar'])
+  language?: 'en' | 'en-US' | 'en-GB' | 'ar';
 }
 
 

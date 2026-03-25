@@ -1,6 +1,6 @@
 {
-  "name": "School Management System",
-  "short_name": "SMS",
+  "name": "NTG Alma",
+  "short_name": "NTG Alma",
   "description": "Multi-tenant school management system",
   "theme_color": "#4caf50",
   "background_color": "#ffffff",
@@ -9,7 +9,7 @@
   "start_url": "/",
   "icons": [
     {
-      "src": "/ntg-logo.svg",
+      "src": "/NTGTempLogo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
 import { useThemeStore } from '@/lib/store/theme-store';
 
-const DEFAULT_FAVICON_HREF = '/ntg-logo.svg';
+const DEFAULT_FAVICON_HREF = '/NTGTempLogo.svg';
 
 const APPLE_TOUCH_ATTR = 'data-tenant-apple-touch';
 
@@ -125,8 +125,8 @@ export function useFavicon() {
 
     removeOurAppleTouchLinks();
 
-    const displayName = tenantName?.trim() || 'School Management System';
-    const shortName = tenantName?.trim() || 'SMS';
+    const displayName = tenantName?.trim() || 'NTG Alma';
+    const shortName = tenantName?.trim() || 'NTG Alma';
     const themeColor = primaryColor || '#4caf50';
 
     const defaultIconAbs = absoluteUrlFromPublicPath(DEFAULT_FAVICON_HREF);
