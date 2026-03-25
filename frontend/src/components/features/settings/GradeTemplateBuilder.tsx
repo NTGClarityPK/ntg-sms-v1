@@ -4,6 +4,8 @@ import {
   ActionIcon,
   Alert,
   Button,
+  Flex,
+  Grid,
   Group,
   Skeleton,
   Menu,
@@ -14,6 +16,8 @@ import {
   Table,
   Text,
   TextInput,
+  Tooltip,
+  rem,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconDotsVertical, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
@@ -32,6 +36,11 @@ interface RangeInput {
   maxPercentage: number;
   sortOrder: number;
 }
+
+/** Keeps range row inputs aligned when descriptions wrap to different line counts */
+const RANGE_FIELD_STYLES = {
+  description: { minHeight: rem(52) },
+} as const;
 
 export function GradeTemplateBuilder() {
   const colors = useThemeColors();
@@ -223,12 +232,13 @@ export function GradeTemplateBuilder() {
         <GradeTemplateAssignment />
       </Stack>
 
-      <Modal opened={opened} onClose={close} title={editingTemplate ? tSettings('gradeTemplateModalEdit') : tSettings('gradeTemplateModalCreate')} size="lg">
+      <Modal opened={opened} onClose={close} title={editingTemplate ? tSettings('gradeTemplateModalEdit') : tSettings('gradeTemplateModalCreate')} size="xl">
         <form onSubmit={handleSubmit}>
           <Stack gap="md">
             <TextInput
               id="grade-template-form-name"
               label={tSettings('gradeTemplateFormNameLabel')}
+              description={tSettings('gradeTemplateFormNameDescription')}
               placeholder={tSettings('gradeTemplateFormNamePlaceholder')}
               {...form.getInputProps('name')}
             />
@@ -241,21 +251,72 @@ export function GradeTemplateBuilder() {
                   </Button>
                 </Group>
                 {form.values.ranges.map((_, idx) => (
-                  <Group key={idx} align="flex-end" grow>
-                    <TextInput id={`grade-template-range-${idx}-letter`} label={tSettings('gradeTemplateFormRangeLetter')} {...form.getInputProps(`ranges.${idx}.letter`)} />
-                    <NumberInput id={`grade-template-range-${idx}-min`} label={tSettings('gradeTemplateFormRangeMin')} min={0} max={100} {...form.getInputProps(`ranges.${idx}.minPercentage`)} />
-                    <NumberInput id={`grade-template-range-${idx}-max`} label={tSettings('gradeTemplateFormRangeMax')} min={0} max={100} {...form.getInputProps(`ranges.${idx}.maxPercentage`)} />
-                    <NumberInput id={`grade-template-range-${idx}-sort`} label={tSettings('gradeTemplateFormRangeSort')} min={0} {...form.getInputProps(`ranges.${idx}.sortOrder`)} />
-                    <Button
-                      id={`grade-template-range-${idx}-remove`}
-                      variant="light"
-                      onClick={() => removeRange(idx)}
-                      disabled={form.values.ranges.length <= 1}
-                      leftSection={<IconTrash size={16} />}
-                    >
-                      {tSettings('gradeTemplateFormRangeRemove')}
-                    </Button>
-                  </Group>
+                  <Paper key={idx} withBorder p="sm" radius="sm">
+                    <Grid gutter="md" align="flex-end">
+                      <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                        <TextInput
+                          id={`grade-template-range-${idx}-letter`}
+                          label={tSettings('gradeTemplateFormRangeLetter')}
+                          description={tSettings('gradeTemplateFormRangeLetterDescription')}
+                          placeholder={tSettings('gradeTemplateFormRangeLetterPlaceholder')}
+                          styles={RANGE_FIELD_STYLES}
+                          {...form.getInputProps(`ranges.${idx}.letter`)}
+                        />
+                      </Grid.Col>
+                      <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                        <NumberInput
+                          id={`grade-template-range-${idx}-min`}
+                          label={tSettings('gradeTemplateFormRangeMin')}
+                          description={tSettings('gradeTemplateFormRangeMinDescription')}
+                          placeholder={tSettings('gradeTemplateFormRangeMinPlaceholder')}
+                          min={0}
+                          max={100}
+                          styles={RANGE_FIELD_STYLES}
+                          {...form.getInputProps(`ranges.${idx}.minPercentage`)}
+                        />
+                      </Grid.Col>
+                      <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                        <NumberInput
+                          id={`grade-template-range-${idx}-max`}
+                          label={tSettings('gradeTemplateFormRangeMax')}
+                          description={tSettings('gradeTemplateFormRangeMaxDescription')}
+                          placeholder={tSettings('gradeTemplateFormRangeMaxPlaceholder')}
+                          min={0}
+                          max={100}
+                          styles={RANGE_FIELD_STYLES}
+                          {...form.getInputProps(`ranges.${idx}.maxPercentage`)}
+                        />
+                      </Grid.Col>
+                      <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+                        <NumberInput
+                          id={`grade-template-range-${idx}-sort`}
+                          label={tSettings('gradeTemplateFormRangeSort')}
+                          description={tSettings('gradeTemplateFormRangeSortDescription')}
+                          placeholder={tSettings('gradeTemplateFormRangeSortPlaceholder')}
+                          min={0}
+                          styles={RANGE_FIELD_STYLES}
+                          {...form.getInputProps(`ranges.${idx}.sortOrder`)}
+                        />
+                      </Grid.Col>
+                      <Grid.Col span={{ base: 12, md: 1 }}>
+                        <Flex justify="flex-end" align="flex-end" pb={4}>
+                          <Tooltip label={tSettings('gradeTemplateFormRangeRemove')} withArrow position="top">
+                            <ActionIcon
+                              id={`grade-template-range-${idx}-remove`}
+                              variant="light"
+                              color={colors.error}
+                              size="lg"
+                              onClick={() => removeRange(idx)}
+                              disabled={form.values.ranges.length <= 1}
+                              aria-label={tSettings('gradeTemplateFormRangeRemove')}
+                            >
+                              <IconTrash size={18} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Flex>
+                      </Grid.Col>
+                    </Grid>
+                  </Paper>
                 ))}
               </Stack>
             </Paper>

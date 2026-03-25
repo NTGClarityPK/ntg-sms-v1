@@ -184,11 +184,18 @@ export function LevelManager() {
       >
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput id="level-form-name" label={tCommon('name')} placeholder="Primary" {...form.getInputProps('name')} />
+            <TextInput
+              id="level-form-name"
+              label={tSettings('levelFormNameLabel')}
+              description={tSettings('levelFormNameDescription')}
+              placeholder={tSettings('levelFormNamePlaceholder')}
+              {...form.getInputProps('name')}
+            />
             {!editLevel && (
               <MultiSelect
                 id="level-form-classes"
                 label={tSettings('levelClassesLabel')}
+                description={tSettings('levelClassesDescription')}
                 placeholder={tSettings('levelClassesPlaceholder')}
                 data={classOptions}
                 searchable

@@ -157,13 +157,23 @@ export function SubjectList() {
           <Stack gap="md">
             <TranslatableInput
               id="subject-form-name"
-              label={tCommon('name')}
+              label={tSettings('subjectFormNameLabel')}
+              description={tSettings('subjectFormNameDescription')}
               value={form.values.nameTranslations}
               onChange={(v) => form.setFieldValue('nameTranslations', v)}
               required
-              placeholder={{ en: 'Mathematics', ar: 'الرياضيات' }}
+              placeholder={{
+                en: tSettings('subjectFormNamePlaceholderEn'),
+                ar: tSettings('subjectFormNamePlaceholderAr'),
+              }}
             />
-            <TextInput id="subject-form-code" label={tSettings('subjectColCode')} placeholder="MATH" {...form.getInputProps('code')} />
+            <TextInput
+              id="subject-form-code"
+              label={tSettings('subjectColCode')}
+              description={tSettings('subjectFormCodeDescription')}
+              placeholder={tSettings('subjectFormCodePlaceholder')}
+              {...form.getInputProps('code')}
+            />
             <Group justify="flex-end" mt="md">
               <Button id="subject-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 {tCommon('cancel')}

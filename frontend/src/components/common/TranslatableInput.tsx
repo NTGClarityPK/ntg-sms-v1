@@ -10,6 +10,7 @@ export interface TranslatableValue {
 
 interface TranslatableInputProps {
   label: string;
+  description?: string;
   value: TranslatableValue;
   onChange: (value: TranslatableValue) => void;
   required?: boolean;
@@ -19,6 +20,7 @@ interface TranslatableInputProps {
 
 export function TranslatableInput({
   label,
+  description,
   value,
   onChange,
   required = false,
@@ -61,6 +63,7 @@ export function TranslatableInput({
       <Tabs.Panel value="en" pt="sm">
         <TextInput
           label={label}
+          description={description}
           value={value.en ?? ''}
           onChange={(e) => onChange({ ...value, en: e.target.value })}
           placeholder={placeholder?.en}
@@ -71,6 +74,7 @@ export function TranslatableInput({
       <Tabs.Panel value="ar" pt="sm">
         <TextInput
           label={label}
+          description={description}
           value={value.ar ?? ''}
           onChange={(e) => onChange({ ...value, ar: e.target.value })}
           placeholder={placeholder?.ar}

@@ -134,7 +134,13 @@ export function SectionList() {
       >
         <form onSubmit={onSubmit}>
           <Stack gap="md">
-            <TextInput id="section-form-name" label={tCommon('name')} placeholder="A" {...form.getInputProps('name')} />
+            <TextInput
+              id="section-form-name"
+              label={tSettings('sectionFormNameLabel')}
+              description={tSettings('sectionFormNameDescription')}
+              placeholder={tSettings('sectionFormNamePlaceholder')}
+              {...form.getInputProps('name')}
+            />
             <Group justify="flex-end" mt="md">
               <Button id="section-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 {tCommon('cancel')}

@@ -146,11 +146,15 @@ export function AssessmentTypeList() {
           <Stack gap="md">
             <TranslatableInput
               id="assessment-type-form-name"
-              label={tCommon('name')}
+              label={tSettings('assessmentTypeFormNameLabel')}
+              description={tSettings('assessmentTypeFormNameDescription')}
               value={form.values.nameTranslations}
               onChange={(v) => form.setFieldValue('nameTranslations', v)}
               required
-              placeholder={{ en: 'Quiz', ar: 'اختبار قصير' }}
+              placeholder={{
+                en: tSettings('assessmentTypeFormNamePlaceholderEn'),
+                ar: tSettings('assessmentTypeFormNamePlaceholderAr'),
+              }}
             />
             <Group justify="flex-end" mt="md">
               <Button id="assessment-type-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
