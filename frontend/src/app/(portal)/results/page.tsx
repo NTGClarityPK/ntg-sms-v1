@@ -100,10 +100,10 @@ export default function ResultsPage() {
       params.set('resultType', 'final');
       params.set('reportType', reportType);
       if (academicYearId) params.set('academicYearId', academicYearId);
-      const blob = await apiClient.getBlob(
+      const { blob, filename } = await apiClient.getBlobWithFilename(
         `/api/v1/results/student/${studentId}/result-card/pdf?${params.toString()}`,
       );
-      triggerDownload(blob, `result-card-${studentId}-final.pdf`);
+      triggerDownload(blob, filename || `result-card-${studentId}-final.pdf`);
     } catch {
       // Error already shown by api client / notifications
     } finally {

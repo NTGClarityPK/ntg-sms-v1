@@ -36,10 +36,10 @@ export function ChildResultCards({ studentId }: { studentId: string }) {
       params.set('classSectionId', card.classSectionId);
       params.set('academicYearId', card.academicYearId);
       params.set('resultType', card.resultType);
-      const blob = await apiClient.getBlob(
+      const { blob, filename } = await apiClient.getBlobWithFilename(
         `/api/v1/results/student/${studentId}/result-card/pdf?${params.toString()}`,
       );
-      triggerDownload(blob, `result-card-${studentId}-${card.resultType}.pdf`);
+      triggerDownload(blob, filename || `result-card-${studentId}-${card.resultType}.pdf`);
     } catch {
       // Error handled by api client
     } finally {

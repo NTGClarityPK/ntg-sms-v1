@@ -8,6 +8,8 @@ import { BehavioralService } from '../behavioral/behavioral.service';
 import { StudentsService } from '../students/students.service';
 import { StudentGradeDto } from '../grades/dto/student-grade.dto';
 import puppeteer from 'puppeteer';
+import { PdfLogoCacheService } from '../../common/pdf/pdf-logo-cache.service';
+import { buildPdfFooterTemplate, buildPdfHeaderTemplate } from '../../common/pdf/pdf-templates';
 import {
   AcademicEntryDto,
   AcademicSectionDto,
@@ -73,7 +75,66 @@ export class ReportsService {
     private readonly attendanceService: AttendanceService,
     private readonly behavioralService: BehavioralService,
     private readonly studentsService: StudentsService,
+    private readonly pdfLogoCache: PdfLogoCacheService,
   ) {}
+
+  private resolveBranchName(
+    row: { name: string; name_translations?: Record<string, string> | null },
+    language: string,
+  ): string {
+    const t = row.name_translations;
+    return (t?.[language] ?? t?.en ?? row.name) || row.name;
+  }
+
+  private async getPdfBranding(branchId: string, language: string = 'en'): Promise<{
+    headerTemplate: string;
+    footerTemplate: string;
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch } = await supabase
+      .from('branches')
+      .select('id, name, name_translations, tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    const branchRow = branch as
+      | { id: string; name: string; name_translations?: Record<string, string> | null; tenant_id: string | null }
+      | null;
+
+    const branchName = branchRow ? this.resolveBranchName(branchRow, language) : '—';
+    const tenantId = branchRow?.tenant_id ?? null;
+
+    let tenantLogoUrl: string | null = null;
+    let tenantName: string | null = null;
+    if (tenantId) {
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('id, name, logo_url')
+        .eq('id', tenantId)
+        .maybeSingle();
+      const tenantRow = tenant as { name?: string | null; logo_url?: string | null } | null;
+      tenantLogoUrl = tenantRow?.logo_url ?? null;
+      tenantName = tenantRow?.name ?? null;
+    }
+
+    const ntgLogoDataUrl = await this.pdfLogoCache.getNtgLogoDataUrl();
+    const tenantLogoDataUrl = tenantId
+      ? await this.pdfLogoCache.getTenantLogoDataUrl(tenantId, tenantLogoUrl)
+      : undefined;
+
+    const schoolAndBranchName =
+      tenantName?.trim()
+        ? `${tenantName.trim()} - ${branchName}`
+        : branchName;
+
+    return {
+      headerTemplate: buildPdfHeaderTemplate({
+        ntgLogoDataUrl,
+        branchName: schoolAndBranchName,
+        tenantLogoDataUrl,
+      }),
+      footerTemplate: buildPdfFooterTemplate(),
+    };
+  }
 
   /**
    * Get date range for a given period type.
@@ -1468,7 +1529,7 @@ export class ReportsService {
         userId,
         userRoles,
       );
-      return this.renderAttendanceReportPdf(report);
+      return this.renderAttendanceReportPdf(report, branchId);
     }
 
     const { data: summary } = await this.getAttendanceSummaryBranch(
@@ -1478,10 +1539,13 @@ export class ReportsService {
       userId,
       userRoles,
     );
-    return this.renderAttendanceSummaryPdf(summary);
+    return this.renderAttendanceSummaryPdf(summary, branchId);
   }
 
-  private async renderAttendanceReportPdf(report: AttendanceReportByClassDto): Promise<Buffer> {
+  private async renderAttendanceReportPdf(
+    report: AttendanceReportByClassDto,
+    branchId: string,
+  ): Promise<Buffer> {
     let htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1500,6 +1564,7 @@ th{background:#eee;}
 `;
     });
     htmlContent += `</table><p>Class average: ${report.classSummary.averageAttendance}% | Students: ${report.classSummary.studentCount}</p></body></html>`;
+    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: getPuppeteerExecutablePath(),
@@ -1510,7 +1575,10 @@ th{background:#eee;}
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
         format: 'A4',
-        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
         printBackground: true,
       });
       return Buffer.from(pdf);
@@ -1519,7 +1587,10 @@ th{background:#eee;}
     }
   }
 
-  private async renderAttendanceSummaryPdf(summary: AttendanceSummaryBranchDto): Promise<Buffer> {
+  private async renderAttendanceSummaryPdf(
+    summary: AttendanceSummaryBranchDto,
+    branchId: string,
+  ): Promise<Buffer> {
     let htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1538,6 +1609,7 @@ th{background:#eee;}
 `;
     });
     htmlContent += `</table><p>Overall average: ${summary.overall.averageAttendance}% | Total students: ${summary.overall.totalStudents}</p></body></html>`;
+    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: getPuppeteerExecutablePath(),
@@ -1548,7 +1620,10 @@ th{background:#eee;}
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
         format: 'A4',
-        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
         printBackground: true,
       });
       return Buffer.from(pdf);
@@ -1932,6 +2007,7 @@ th{background:#eee;}
 `;
       });
       htmlContent += `</table></body></html>`;
+      const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
       const browser = await puppeteer.launch({
         headless: true,
         executablePath: getPuppeteerExecutablePath(),
@@ -1942,7 +2018,10 @@ th{background:#eee;}
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
         const pdf = await page.pdf({
           format: 'A4',
-          margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+          displayHeaderFooter: true,
+          headerTemplate,
+          footerTemplate,
+          margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
           printBackground: true,
         });
         return Buffer.from(pdf);
@@ -1975,6 +2054,7 @@ th{background:#eee;}
 `;
       });
       htmlContent += `</table></body></html>`;
+      const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
       const browser = await puppeteer.launch({
         headless: true,
         executablePath: getPuppeteerExecutablePath(),
@@ -1985,7 +2065,10 @@ th{background:#eee;}
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
         const pdf = await page.pdf({
           format: 'A4',
-          margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+          displayHeaderFooter: true,
+          headerTemplate,
+          footerTemplate,
+          margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
           printBackground: true,
         });
         return Buffer.from(pdf);
@@ -2914,6 +2997,7 @@ th{background:#eee;}
 `;
 
     // Generate PDF using Puppeteer
+    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: getPuppeteerExecutablePath(),
@@ -2925,7 +3009,10 @@ th{background:#eee;}
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
         format: 'A4',
-        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
         printBackground: true,
       });
       return Buffer.from(pdf);

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { PdfLogoCacheService } from '../../common/pdf/pdf-logo-cache.service';
 import { AcademicYearsModule } from '../academic-years/academic-years.module';
 import { GradesModule } from '../grades/grades.module';
 import { AttendanceModule } from '../attendance/attendance.module';
@@ -20,7 +21,7 @@ import { PublicStatisticsController } from './public-statistics.controller';
     BranchesModule,
   ],
   controllers: [ReportsController, PublicStatisticsController],
-  providers: [ReportsService, SupabaseConfig],
+  providers: [ReportsService, SupabaseConfig, PdfLogoCacheService],
   exports: [ReportsService],
 })
 export class ReportsModule {}

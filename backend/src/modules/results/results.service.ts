@@ -3,6 +3,8 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import archiver from 'archiver';
 import puppeteer from 'puppeteer';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { PdfLogoCacheService } from '../../common/pdf/pdf-logo-cache.service';
+import { buildPdfFooterTemplate, buildPdfHeaderTemplate } from '../../common/pdf/pdf-templates';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { BehavioralService } from '../behavioral/behavioral.service';
 import { StudentResultDto } from './dto/student-result.dto';
@@ -37,7 +39,66 @@ export class ResultsService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
     private readonly behavioralService: BehavioralService,
+    private readonly pdfLogoCache: PdfLogoCacheService,
   ) {}
+
+  private resolveBranchName(
+    row: { name: string; name_translations?: Record<string, string> | null },
+    language: string,
+  ): string {
+    const t = row.name_translations;
+    return (t?.[language] ?? t?.en ?? row.name) || row.name;
+  }
+
+  private async getPdfBranding(branchId: string, language: string = 'en'): Promise<{
+    headerTemplate: string;
+    footerTemplate: string;
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch } = await supabase
+      .from('branches')
+      .select('id, name, name_translations, tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    const branchRow = branch as
+      | { id: string; name: string; name_translations?: Record<string, string> | null; tenant_id: string | null }
+      | null;
+
+    const branchName = branchRow ? this.resolveBranchName(branchRow, language) : '—';
+    const tenantId = branchRow?.tenant_id ?? null;
+
+    let tenantLogoUrl: string | null = null;
+    let tenantName: string | null = null;
+    if (tenantId) {
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('id, name, logo_url')
+        .eq('id', tenantId)
+        .maybeSingle();
+      const tenantRow = tenant as { name?: string | null; logo_url?: string | null } | null;
+      tenantLogoUrl = tenantRow?.logo_url ?? null;
+      tenantName = tenantRow?.name ?? null;
+    }
+
+    const ntgLogoDataUrl = await this.pdfLogoCache.getNtgLogoDataUrl();
+    const tenantLogoDataUrl = tenantId
+      ? await this.pdfLogoCache.getTenantLogoDataUrl(tenantId, tenantLogoUrl)
+      : undefined;
+
+    const schoolAndBranchName =
+      tenantName?.trim()
+        ? `${tenantName.trim()} - ${branchName}`
+        : branchName;
+
+    return {
+      headerTemplate: buildPdfHeaderTemplate({
+        ntgLogoDataUrl,
+        branchName: schoolAndBranchName,
+        tenantLogoDataUrl,
+      }),
+      footerTemplate: buildPdfFooterTemplate(),
+    };
+  }
 
   private async getLetterGradeRanges(classId: string): Promise<GradeRangeRow[] | null> {
     const supabase = this.supabaseConfig.getClient();
@@ -1015,6 +1076,7 @@ export class ResultsService {
 </body>
 </html>`;
 
+    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: getPuppeteerExecutablePath(),
@@ -1026,7 +1088,10 @@ export class ResultsService {
       await page.setContent(htmlContent, { waitUntil: 'load', timeout: 0 });
       const pdf = await page.pdf({
         format: 'A4',
-        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
         printBackground: true,
       });
       return Buffer.from(pdf);
@@ -1107,6 +1172,7 @@ export class ResultsService {
   ${htmlPage2}
 </body>
 </html>`;
+    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: getPuppeteerExecutablePath(),
@@ -1117,7 +1183,10 @@ export class ResultsService {
       await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
         format: 'A4',
-        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
         printBackground: true,
       });
       return Buffer.from(pdf);
@@ -1219,6 +1288,7 @@ export class ResultsService {
 <body>${inner}
 </body>
 </html>`;
+    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: getPuppeteerExecutablePath(),
@@ -1229,7 +1299,10 @@ export class ResultsService {
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
         format: 'A4',
-        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
         printBackground: true,
       });
       return Buffer.from(pdf);
@@ -1352,6 +1425,7 @@ export class ResultsService {
   <div class="overall">Overall (star-based): <span class="stars">${renderStars(overallAverage)} ${overallAverage.toFixed(1)}</span></div>
 </body>
 </html>`;
+    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: getPuppeteerExecutablePath(),
@@ -1362,7 +1436,10 @@ export class ResultsService {
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
         format: 'A4',
-        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
         printBackground: true,
       });
       return Buffer.from(pdf);
@@ -1385,6 +1462,17 @@ export class ResultsService {
       .eq('id', (student as { user_id: string }).user_id)
       .maybeSingle();
     return (profile as { full_name?: string } | null)?.full_name ?? 'Student';
+  }
+
+  private async getStudentNumericId(studentId: string): Promise<string | undefined> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data } = await supabase
+      .from('students')
+      .select('student_id')
+      .eq('id', studentId)
+      .maybeSingle();
+    const numericId = (data as { student_id?: string | null } | null)?.student_id ?? undefined;
+    return numericId?.toString().trim() || undefined;
   }
 
   private async getAcademicYearCode(
@@ -1417,18 +1505,22 @@ export class ResultsService {
     academicYearId: string | undefined,
     reportType: 'basic' | 'detailed',
   ): Promise<string> {
-    const [studentName, labels, yearCode] = await Promise.all([
+    const [studentName, studentNumericId, yearCode] = await Promise.all([
       this.getStudentName(studentId),
-      this.getClassSectionLabels(classSectionId, branchId),
+      this.getStudentNumericId(studentId),
       this.getAcademicYearCode(academicYearId, branchId),
     ]);
     const clean = (value: string): string =>
       value.replace(/\s+/g, '').replace(/[^A-Za-z0-9]/g, '');
     const studentSeg = clean(studentName) || 'Student';
-    const classSeg = clean(`${labels.className ?? ''}${labels.sectionName ?? ''}`) || 'Class';
-    const typeCode = reportType === 'detailed' ? 'DR' : 'BR';
+    const studentIdSeg = studentNumericId ? clean(studentNumericId) : '';
+    const typeLabel = reportType === 'detailed' ? 'DetailedReport' : 'BasicReport';
     const yearSeg = clean(yearCode) || 'Year';
-    return `ReportCard-${studentSeg}-${classSeg}-${typeCode}-${yearSeg}.pdf`;
+
+    // Required format: StudentName-StudentID-BasicReport/DetailedReport-Year.pdf
+    // StudentID is the numeric student_id stored in DB (e.g. 0058).
+    const parts = [studentSeg, studentIdSeg || 'StudentID', typeLabel, yearSeg].filter(Boolean);
+    return `${parts.join('-')}.pdf`;
   }
 
   private static readonly BULK_MAX_STUDENTS = 60;
