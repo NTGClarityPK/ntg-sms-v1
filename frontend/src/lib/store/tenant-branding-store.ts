@@ -12,20 +12,20 @@ type TenantBrandingState = {
 
 const getInitialBranding = (): { name: string; logoUrl: string | null } => {
   if (typeof window === 'undefined') {
-    return { name: 'School', logoUrl: null };
+    return { name: 'NTG Alma', logoUrl: null };
   }
 
   const raw = localStorage.getItem(BRANDING_STORAGE_KEY);
-  if (!raw) return { name: 'School', logoUrl: null };
+  if (!raw) return { name: 'NTG Alma', logoUrl: null };
 
   try {
     const parsed = JSON.parse(raw) as { name?: string; logoUrl?: string | null };
     return {
-      name: parsed.name || 'School',
+      name: parsed.name || 'NTG Alma',
       logoUrl: parsed.logoUrl || null,
     };
   } catch {
-    return { name: 'School', logoUrl: null };
+    return { name: 'NTG Alma', logoUrl: null };
   }
 };
 

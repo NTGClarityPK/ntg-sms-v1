@@ -49,6 +49,15 @@ function throwIfDbError(error: PostgrestError | null): void {
   throw new BadRequestException(error.message);
 }
 
+function getPuppeteerExecutablePath(): string | undefined {
+  return (
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    process.env.CHROME_EXECUTABLE_PATH ||
+    process.env.CHROMIUM_EXECUTABLE_PATH ||
+    undefined
+  );
+}
+
 type GradeRangeRow = {
   letter: string;
   min_percentage: number;
@@ -1493,6 +1502,7 @@ th{background:#eee;}
     htmlContent += `</table><p>Class average: ${report.classSummary.averageAttendance}% | Students: ${report.classSummary.studentCount}</p></body></html>`;
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: getPuppeteerExecutablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {
@@ -1530,6 +1540,7 @@ th{background:#eee;}
     htmlContent += `</table><p>Overall average: ${summary.overall.averageAttendance}% | Total students: ${summary.overall.totalStudents}</p></body></html>`;
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: getPuppeteerExecutablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {
@@ -1923,6 +1934,7 @@ th{background:#eee;}
       htmlContent += `</table></body></html>`;
       const browser = await puppeteer.launch({
         headless: true,
+        executablePath: getPuppeteerExecutablePath(),
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
       try {
@@ -1965,6 +1977,7 @@ th{background:#eee;}
       htmlContent += `</table></body></html>`;
       const browser = await puppeteer.launch({
         headless: true,
+        executablePath: getPuppeteerExecutablePath(),
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
       try {
@@ -2903,6 +2916,7 @@ th{background:#eee;}
     // Generate PDF using Puppeteer
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: getPuppeteerExecutablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 

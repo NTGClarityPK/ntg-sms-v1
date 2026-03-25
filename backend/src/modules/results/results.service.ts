@@ -22,6 +22,15 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 type BehavioralPeriod = { period: string; attributes: { attributeName: string; average: number }[] };
 
+function getPuppeteerExecutablePath(): string | undefined {
+  return (
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    process.env.CHROME_EXECUTABLE_PATH ||
+    process.env.CHROMIUM_EXECUTABLE_PATH ||
+    undefined
+  );
+}
+
 @Injectable()
 export class ResultsService {
   constructor(
@@ -1008,6 +1017,7 @@ export class ResultsService {
 
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: getPuppeteerExecutablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {
@@ -1099,6 +1109,7 @@ export class ResultsService {
 </html>`;
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: getPuppeteerExecutablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {
@@ -1210,6 +1221,7 @@ export class ResultsService {
 </html>`;
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: getPuppeteerExecutablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {
@@ -1342,6 +1354,7 @@ export class ResultsService {
 </html>`;
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: getPuppeteerExecutablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     try {

@@ -38,7 +38,7 @@ export function InstallPrompt() {
       }}
     >
       <Text size="sm" c="dimmed" mb="md">
-        Install the School Management System on your device for quick access and offline use.
+        Install the NTG Alma on your device for quick access and offline use.
       </Text>
       <Group justify="flex-end" gap="sm">
         <Button variant="subtle" color="gray" onClick={handleDismiss}>
