@@ -1,5 +1,5 @@
 diff --git a/node_modules/nextstepjs/dist/NextStepReact.js b/node_modules/nextstepjs/dist/NextStepReact.js
-index 218eece..6f0e3e7 100644
+index 218eece..aa3ee3f 100644
 --- a/node_modules/nextstepjs/dist/NextStepReact.js
 +++ b/node_modules/nextstepjs/dist/NextStepReact.js
 @@ -113,7 +113,7 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
@@ -29,3 +29,84 @@ index 218eece..6f0e3e7 100644
                          const side = checkSideCutOff(currentTourSteps?.[stepIndex]?.side || 'right');
                          element.scrollIntoView({
                              behavior: 'smooth',
+@@ -825,6 +825,8 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                                         right: 0,
+                                         pointerEvents: 'auto',
+                                         height: Math.max(pointerPosition.y - pointerPadOffset, 0),
++                                        backgroundColor: `rgba(${shadowRgb}, ${shadowOpacity})`,
++                                        backgroundImage: `radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0))`,
+                                     } }), _jsx("div", { "data-name": "nextstep-prevent-click-overlay-bottom", style: {
+                                         position: 'absolute',
+                                         left: 0,
+@@ -833,6 +835,8 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                                         pointerEvents: 'auto',
+                                         height: `${Math.max(viewportRect.height -
+                                             (pointerPosition.y + pointerPosition.height + pointerPadOffset), 0)}px`,
++                                        backgroundColor: `rgba(${shadowRgb}, ${shadowOpacity})`,
++                                        backgroundImage: `radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0))`,
+                                     } }), _jsx("div", { "data-name": "nextstep-prevent-click-overlay-left", style: {
+                                         position: 'absolute',
+                                         left: 0,
+@@ -840,6 +844,8 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                                         pointerEvents: 'auto',
+                                         width: Math.max(pointerPosition.x - pointerPadOffset, 0),
+                                         height: viewportRect.height,
++                                        backgroundColor: `rgba(${shadowRgb}, ${shadowOpacity})`,
++                                        backgroundImage: `radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0))`,
+                                     } }), _jsx("div", { "data-name": "nextstep-prevent-click-overlay-right", style: {
+                                         position: 'absolute',
+                                         top: 0,
+@@ -847,6 +853,8 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                                         left: `${pointerPosition.x + pointerPosition.width + pointerPadOffset}px`,
+                                         right: 0,
+                                         height: viewportRect.height,
++                                        backgroundColor: `rgba(${shadowRgb}, ${shadowOpacity})`,
++                                        backgroundImage: `radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0))`,
+                                     } })] })), _jsx(SmoothSpotlight, { x: pointerPosition.x - pointerPadOffset, y: pointerPosition.y - pointerPadOffset, width: pointerPosition.width + pointerPadding, height: pointerPosition.height + pointerPadding, padding: pointerPadding, radius: pointerRadius, shadowOpacity: shadowOpacity, shadowRgb: shadowRgb, zIndex: overlayZIndex - 1 }), _jsx(motion.div, { "data-name": "nextstep-pointer", style: {
+                                 position: 'relative',
+                                 zIndex: overlayZIndex,
+@@ -903,6 +911,7 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                                     height: scrollableParent.getBoundingClientRect().top + window.scrollY,
+                                     width: `${document.body.scrollWidth}px`,
+                                     backgroundColor: `rgba(${shadowRgb}, ${shadowOpacity})`,
++                                    backgroundImage: `radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0))`,
+                                 } }), _jsx("div", { style: {
+                                     position: 'absolute',
+                                     left: 0,
+@@ -914,6 +923,7 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                                         window.scrollY}px`,
+                                     width: `${document.body.scrollWidth}px`,
+                                     backgroundColor: `rgba(${shadowRgb}, ${shadowOpacity})`,
++                                    backgroundImage: `radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0))`,
+                                 } }), _jsx("div", { style: {
+                                     position: 'absolute',
+                                     pointerEvents: 'auto',
+@@ -922,6 +932,7 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                                     width: scrollableParent.getBoundingClientRect().left + window.scrollX,
+                                     height: scrollableParent.getBoundingClientRect().height,
+                                     backgroundColor: `rgba(${shadowRgb}, ${shadowOpacity})`,
++                                    backgroundImage: `radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0))`,
+                                 } }), _jsx("div", { style: {
+                                     position: 'absolute',
+                                     pointerEvents: 'auto',
+@@ -932,6 +943,7 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                                         window.scrollX}px`,
+                                     height: scrollableParent.getBoundingClientRect().height,
+                                     backgroundColor: `rgba(${shadowRgb}, ${shadowOpacity})`,
++                                    backgroundImage: `radial-gradient(1200px 400px at 20% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0))`,
+                                 } })] })) }) }))] }));
+ };
+ export default NextStepReact;
+diff --git a/node_modules/nextstepjs/dist/SmoothSpotlight.js b/node_modules/nextstepjs/dist/SmoothSpotlight.js
+index 8d0621b..78d52e7 100644
+--- a/node_modules/nextstepjs/dist/SmoothSpotlight.js
++++ b/node_modules/nextstepjs/dist/SmoothSpotlight.js
+@@ -10,6 +10,8 @@ const SmoothSpotlight = ({ x, y, width, height, padding, radius, shadowOpacity,
+             inset: 0,
+             zIndex: zIndex,
+             pointerEvents: 'none',
++            // Note: glossy blur is applied on the outside overlay segments only,
++            // so the highlighted target element stays crisp.
+         }, children: _jsxs("svg", { width: "100%", height: "100%", children: [_jsx("defs", { children: _jsxs("mask", { id: "smooth-spotlight-mask", children: [_jsx("rect", { width: "100%", height: "100%", fill: "white" }), _jsx(motion.rect, { initial: false, animate: {
+                                     x: px,
+                                     y: py,

@@ -13,7 +13,8 @@ export function NextStepRoot({ children }: PropsWithChildren) {
         steps={allGuidedTourSteps}
         showNextStep={true}
         cardComponent={OnboardingTourCard}
-        shadowOpacity="0.35"
+        shadowRgb="76, 175, 80"
+        shadowOpacity="0.22"
         overlayZIndex={10000}
         noInViewScroll
         scrollToTop={false}

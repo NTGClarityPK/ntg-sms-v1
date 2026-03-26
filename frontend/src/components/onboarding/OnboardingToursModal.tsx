@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, SimpleGrid, Card, Text, Group, Button, Badge, Stack } from '@mantine/core';
+import { Modal, SimpleGrid, Card, Text, Stack, Box, Group, useMantineTheme } from '@mantine/core';
 import { useRouter, usePathname } from 'next/navigation';
 import { useNextStep } from 'nextstepjs';
 import { getTourLauncherDefinitions } from '@/features/guided-tours/tours/tourLaunchers';
@@ -14,6 +14,7 @@ type Props = {
 };
 
 export function OnboardingToursModal({ opened, onClose }: Props) {
+  const theme = useMantineTheme();
   const router = useRouter();
   const pathname = usePathname();
   const { startNextStep } = useNextStep();
@@ -68,38 +69,68 @@ export function OnboardingToursModal({ opened, onClose }: Props) {
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Take a tour" centered size="lg">
-      <Stack gap="md">
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="Welcome! Let's Get You Started"
+      centered
+      size="xl"
+      styles={{
+        title: { fontWeight: 800 },
+      }}
+    >
+      <Stack gap="sm">
         <Text size="sm" c="dimmed">
-          Select a screen to tour. You can skip at any time.
+          (Optimized for laptops and desktops)
+        </Text>
+        <Text size="sm" c="dimmed">
+          Choose a guided tour below, or launch one anytime from your profile menu (top-right corner).
         </Text>
 
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="sm">
           {launchers.map((tour) => (
-            <Card key={tour.key} withBorder radius="md" p="md">
-              <Group justify="space-between" align="flex-start" gap="xs">
-                <Stack gap={4} style={{ flex: 1 }}>
-                  <Text fw={700}>{tour.title}</Text>
-                  {tour.description ? (
-                    <Text size="sm" c="dimmed" lineClamp={2}>
-                      {tour.description}
-                    </Text>
-                  ) : null}
-                </Stack>
-                <Badge variant="light" color={tour.available ? 'green' : 'gray'}>
-                  {tour.available ? 'Available' : 'Coming soon'}
-                </Badge>
-              </Group>
-
-              <Group justify="flex-end" mt="md">
-                <Button
-                  onClick={() => void handleStartTour(tour)}
-                  disabled={!tour.available}
-                  loading={isStarting}
-                  id={`tour-start-${tour.key}`}
+            <Card
+              key={tour.key}
+              withBorder
+              radius="md"
+              p="md"
+              component="button"
+              type="button"
+              id={`tour-card-${tour.key}`}
+              onClick={() => void handleStartTour(tour)}
+              disabled={!tour.available || isStarting}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                cursor: tour.available && !isStarting ? 'pointer' : 'not-allowed',
+                background: 'transparent',
+                position: 'relative',
+                opacity: tour.available ? 1 : 0.6,
+              }}
+            >
+              <Group gap="sm" align="flex-start" wrap="nowrap">
+                <Box
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 28,
+                    height: 28,
+                    borderRadius: theme.radius.sm,
+                    color: theme.colors[theme.primaryColor][6],
+                    flexShrink: 0,
+                  }}
                 >
-                  Start
-                </Button>
+                  {tour.icon}
+                </Box>
+                <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+                  <Text size="xs" fw={600} tt="uppercase" c="dimmed" style={{ letterSpacing: 0.8 }}>
+                    {tour.label}
+                  </Text>
+                  <Text fw={600} size="md">
+                    {tour.title}
+                  </Text>
+                </Stack>
               </Group>
             </Card>
           ))}
