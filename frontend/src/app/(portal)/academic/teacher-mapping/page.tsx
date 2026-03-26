@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Container, Title, Group, Button, Skeleton, Text, SegmentedControl, Stack } from '@mantine/core';
+import { Title, Group, Button, Skeleton, Text, SegmentedControl, Stack } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
 import { useTeacherAssignments } from '@/hooks/useTeacherAssignments';
@@ -21,8 +21,8 @@ export default function TeacherMappingPage() {
   // the matrix view has a complete picture instead of only the first page.
   const { data, isLoading, error } = useTeacherAssignments({ limit: 500 });
 
-  // Show skeleton when loading OR when data is not yet available (prevents flash of content)
-  if (isLoading || !data) {
+  // Show skeleton only while actively loading. Do not hide errors behind a perpetual loader.
+  if (isLoading) {
     return (
       <>
         <div className="page-title-bar">
@@ -95,6 +95,42 @@ export default function TeacherMappingPage() {
           <Text c="red">
             {t('errorLoading', { message: error instanceof Error ? error.message : 'Unknown error' })}
           </Text>
+        </div>
+      </>
+    );
+  }
+
+  if (!data) {
+    return (
+      <>
+        <div className="page-title-bar">
+          <Group justify="space-between" w="100%" mt="xs">
+            <Title order={1}>{t('title')}</Title>
+            <Group>
+              <SegmentedControl
+                value={viewMode}
+                onChange={(value) => setViewMode(value as ViewMode)}
+                data={[
+                  { label: t('listView'), value: 'list' },
+                  { label: t('matrixView'), value: 'matrix' },
+                ]}
+              />
+              <Button leftSection={<IconPlus size={16} />} onClick={open}>
+                {t('createAssignment')}
+              </Button>
+            </Group>
+          </Group>
+        </div>
+        <div
+          style={{
+            marginTop: '60px',
+            paddingLeft: 'var(--mantine-spacing-md)',
+            paddingRight: 'var(--mantine-spacing-md)',
+            paddingTop: 'var(--mantine-spacing-sm)',
+            paddingBottom: 'var(--mantine-spacing-xl)',
+          }}
+        >
+          <Text c="red">{t('errorLoading', { message: 'No data returned from server' })}</Text>
         </div>
       </>
     );

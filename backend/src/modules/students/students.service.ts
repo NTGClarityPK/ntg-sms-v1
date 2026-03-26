@@ -425,11 +425,20 @@ export class StudentsService {
         });
       }
 
+      // Generate a roll number in-app (do not rely on triggers existing in every environment).
+      // If RPC fails for any reason, we fall back to DB trigger/default behaviour.
+      let generatedStudentId: string | null = null;
+      const { data: rollData, error: rollError } = await supabase.rpc('next_student_roll');
+      if (!rollError && typeof rollData === 'string' && rollData.trim() !== '') {
+        generatedStudentId = rollData.trim();
+      }
+
       const { data: student, error: studentError } = await supabase
         .from('students')
         .insert({
           user_id: user.id,
           branch_id: branchId,
+          student_id: generatedStudentId ?? undefined,
           first_name: input.firstName.trim(),
           last_name: input.lastName.trim(),
           class_id: input.classId ?? null,
@@ -445,7 +454,15 @@ export class StudentsService {
         .select()
         .single();
 
-      throwIfDbError(studentError);
+      if (studentError) {
+        // Provide a clear message for QA + users when unique constraints are hit.
+        if (studentError.code === '23505' && studentError.message.includes('students_student_id_key')) {
+          throw new ConflictException(
+            'Student ID already exists. Please try again.',
+          );
+        }
+        throwIfDbError(studentError);
+      }
       if (!student) {
         throw new BadRequestException('Failed to create student record');
       }

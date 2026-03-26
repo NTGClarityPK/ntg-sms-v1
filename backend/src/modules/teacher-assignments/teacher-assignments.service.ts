@@ -60,18 +60,24 @@ export class TeacherAssignmentsService {
   }> {
     const supabase = this.supabaseConfig.getClient();
 
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
     if (!activeYearId) {
       const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) {
-        throw new BadRequestException('No active academic year found');
+        // Fresh tenants may not have an academic year configured yet.
+        // For read/list endpoints, degrade gracefully so the UI can render an empty state.
+        return {
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 1 },
+        };
       }
       activeYearId = activeYear.id;
     }
 
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
