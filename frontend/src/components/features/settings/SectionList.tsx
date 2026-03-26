@@ -137,7 +137,6 @@ export function SectionList() {
             <TextInput
               id="section-form-name"
               label={tSettings('sectionFormNameLabel')}
-              description={tSettings('sectionFormNameDescription')}
               placeholder={tSettings('sectionFormNamePlaceholder')}
               {...form.getInputProps('name')}
             />

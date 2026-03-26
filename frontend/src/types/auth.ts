@@ -10,6 +10,7 @@ export interface User {
   email: string;
   fullName: string;
   avatarUrl?: string;
+  onboardingSeenToursModal?: boolean;
   roles?: Array<{
     roleId: string;
     roleName: string;

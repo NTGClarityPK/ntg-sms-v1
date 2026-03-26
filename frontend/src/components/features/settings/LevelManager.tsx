@@ -187,7 +187,6 @@ export function LevelManager() {
             <TextInput
               id="level-form-name"
               label={tSettings('levelFormNameLabel')}
-              description={tSettings('levelFormNameDescription')}
               placeholder={tSettings('levelFormNamePlaceholder')}
               {...form.getInputProps('name')}
             />
@@ -195,7 +194,6 @@ export function LevelManager() {
               <MultiSelect
                 id="level-form-classes"
                 label={tSettings('levelClassesLabel')}
-                description={tSettings('levelClassesDescription')}
                 placeholder={tSettings('levelClassesPlaceholder')}
                 data={classOptions}
                 searchable

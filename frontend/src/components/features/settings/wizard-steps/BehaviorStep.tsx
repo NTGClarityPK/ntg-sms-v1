@@ -4,6 +4,7 @@ import { Button, Checkbox, Group, Stack, Text, TextInput } from '@mantine/core';
 import { useState } from 'react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { BehaviorData } from './types';
+import { useTranslations } from 'next-intl';
 
 interface BehaviorStepProps {
   data: BehaviorData | null;
@@ -14,6 +15,7 @@ interface BehaviorStepProps {
 
 export function BehaviorStep({ data, onChange, onNext, onBack }: BehaviorStepProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
   const [newAttribute, setNewAttribute] = useState('');
 
   const formData = data || {
@@ -91,7 +93,7 @@ export function BehaviorStep({ data, onChange, onNext, onBack }: BehaviorStepPro
               <Group gap="xs" mb="xs">
                 <TextInput
                   id="behavior-step-attribute-input"
-                  placeholder="Add attribute (e.g., Respect, Responsibility)"
+                  placeholder={tSettings('setupWizardBehaviorAttributePlaceholder')}
                   value={newAttribute}
                   onChange={(e) => setNewAttribute(e.target.value)}
                   onKeyDown={(e) => {

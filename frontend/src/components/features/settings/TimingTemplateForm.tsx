@@ -86,7 +86,6 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
           <TextInput
             id="timing-template-name"
             label={tSettings('scheduleTimingFormNameLabel')}
-            description={tSettings('scheduleTimingFormNameDescription')}
             placeholder={tSettings('scheduleTimingFormNamePlaceholder')}
             {...form.getInputProps('name')}
           />
@@ -94,7 +93,6 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
             <TextInput
               id="timing-template-start-time"
               label={tSettings('scheduleTimingFormStartTimeLabel')}
-              description={tSettings('scheduleTimingFormStartTimeDescription')}
               placeholder={tSettings('scheduleTimingFormStartTimePlaceholder')}
               type="time"
               {...form.getInputProps('startTime')}
@@ -102,7 +100,6 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
             <TextInput
               id="timing-template-end-time"
               label={tSettings('scheduleTimingFormEndTimeLabel')}
-              description={tSettings('scheduleTimingFormEndTimeDescription')}
               placeholder={tSettings('scheduleTimingFormEndTimePlaceholder')}
               type="time"
               {...form.getInputProps('endTime')}
@@ -111,7 +108,6 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
           <NumberInput
             id="timing-template-period-duration"
             label={tSettings('scheduleTimingFormPeriodDurationLabel')}
-            description={tSettings('scheduleTimingFormPeriodDurationDescription')}
             placeholder={tSettings('scheduleTimingFormPeriodDurationPlaceholder')}
             min={1}
             {...form.getInputProps('periodDurationMinutes')}
@@ -157,7 +153,6 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
                     <TextInput
                       id={`timing-template-slot-${index}-name`}
                       label={tSettings('scheduleTimingFormSlotNameLabel')}
-                      description={tSettings('scheduleTimingFormSlotNameDescription')}
                       placeholder={tSettings('scheduleTimingFormSlotNamePlaceholder')}
                       {...form.getInputProps(`slots.${index}.name`)}
                     />
@@ -165,7 +160,6 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
                       <TextInput
                         id={`timing-template-slot-${index}-start`}
                         label={tSettings('scheduleTimingFormSlotStartLabel')}
-                        description={tSettings('scheduleTimingFormSlotStartDescription')}
                         placeholder={tSettings('scheduleTimingFormSlotStartPlaceholder')}
                         type="time"
                         {...form.getInputProps(`slots.${index}.startTime`)}
@@ -173,7 +167,6 @@ export function TimingTemplateForm({ opened, onClose, onSubmit, isSubmitting }: 
                       <TextInput
                         id={`timing-template-slot-${index}-end`}
                         label={tSettings('scheduleTimingFormSlotEndLabel')}
-                        description={tSettings('scheduleTimingFormSlotEndDescription')}
                         placeholder={tSettings('scheduleTimingFormSlotEndPlaceholder')}
                         type="time"
                         {...form.getInputProps(`slots.${index}.endTime`)}

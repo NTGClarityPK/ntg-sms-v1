@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Avatar, Menu, Text, Group } from '@mantine/core';
 import {
   IconUser,
@@ -9,6 +9,7 @@ import {
   IconSwitchHorizontal,
   IconDownload,
   IconBell,
+  IconCompass,
 } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,12 @@ import { useInstallApp } from '@/lib/install-app-context';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
+import { OnboardingToursModal } from '@/components/onboarding/OnboardingToursModal';
+import {
+  clearOpenToursModalRequested,
+  useOnboardingStore,
+} from '@/lib/store/onboarding-store';
+import { useSystemSetting } from '@/hooks/useSystemSettings';
 
 interface Branch {
   id: string;
@@ -33,7 +40,13 @@ export function UserMenu() {
   const userTyped = user as User | undefined;
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [toursModalOpened, setToursModalOpened] = useState(false);
   const helpUrl = 'https://ntg-1.gitbook.io/ntg-sms-user-docs/';
+  const openToursModalRequested = useOnboardingStore((s) => s.openToursModalRequested);
+  const autoOpenSetting = useSystemSetting<boolean>('guided_tours_auto_open_enabled');
+
+  const autoOpenEnabled = autoOpenSetting.data?.data?.value === true;
+  const hasSeenToursModal = userTyped?.onboardingSeenToursModal === true;
 
   const branches = Array.from(
     new Map(((userTyped?.branches || []) as Branch[]).map((b) => [b.id, b])).values(),
@@ -52,6 +65,25 @@ export function UserMenu() {
   };
 
   const showInstallApp = !isInstalled && (canInstallDirectly || isSafari);
+
+  useEffect(() => {
+    if (!openToursModalRequested) return;
+    setToursModalOpened(true);
+    clearOpenToursModalRequested();
+  }, [openToursModalRequested]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!autoOpenEnabled) return;
+    if (hasSeenToursModal) return;
+
+    const key = 'ntg_alma_show_tours_modal';
+    const shouldOpen = window.sessionStorage.getItem(key) === '1';
+    if (!shouldOpen) return;
+
+    window.sessionStorage.removeItem(key);
+    setToursModalOpened(true);
+  }, [autoOpenEnabled, hasSeenToursModal]);
 
   const handleLogout = async () => {
     try {
@@ -178,7 +210,16 @@ export function UserMenu() {
             </Menu.Item>
           </>
         )}
-        
+
+        <Menu.Divider />
+        <Menu.Item
+          id="user-menu-take-a-tour"
+          leftSection={<IconCompass size={14} />}
+          onClick={() => setToursModalOpened(true)}
+        >
+          Take a tour
+        </Menu.Item>
+
         <Menu.Divider />
         <Menu.Item
           id="user-menu-logout"
@@ -198,6 +239,8 @@ export function UserMenu() {
         allowClose={true}
         onClose={() => setShowBranchModal(false)}
       />
+
+      <OnboardingToursModal opened={toursModalOpened} onClose={() => setToursModalOpened(false)} />
     </Menu>
   );
 }

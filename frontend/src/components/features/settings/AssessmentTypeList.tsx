@@ -147,7 +147,6 @@ export function AssessmentTypeList() {
             <TranslatableInput
               id="assessment-type-form-name"
               label={tSettings('assessmentTypeFormNameLabel')}
-              description={tSettings('assessmentTypeFormNameDescription')}
               value={form.values.nameTranslations}
               onChange={(v) => form.setFieldValue('nameTranslations', v)}
               required

@@ -7,6 +7,7 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  transpilePackages: ['nextstepjs'],
   
   // Skip type checking in production build (temporary workaround)
   typescript: {

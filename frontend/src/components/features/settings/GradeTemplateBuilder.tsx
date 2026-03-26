@@ -17,7 +17,6 @@ import {
   Text,
   TextInput,
   Tooltip,
-  rem,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconDotsVertical, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
@@ -36,11 +35,6 @@ interface RangeInput {
   maxPercentage: number;
   sortOrder: number;
 }
-
-/** Keeps range row inputs aligned when descriptions wrap to different line counts */
-const RANGE_FIELD_STYLES = {
-  description: { minHeight: rem(52) },
-} as const;
 
 export function GradeTemplateBuilder() {
   const colors = useThemeColors();
@@ -238,7 +232,6 @@ export function GradeTemplateBuilder() {
             <TextInput
               id="grade-template-form-name"
               label={tSettings('gradeTemplateFormNameLabel')}
-              description={tSettings('gradeTemplateFormNameDescription')}
               placeholder={tSettings('gradeTemplateFormNamePlaceholder')}
               {...form.getInputProps('name')}
             />
@@ -257,9 +250,7 @@ export function GradeTemplateBuilder() {
                         <TextInput
                           id={`grade-template-range-${idx}-letter`}
                           label={tSettings('gradeTemplateFormRangeLetter')}
-                          description={tSettings('gradeTemplateFormRangeLetterDescription')}
                           placeholder={tSettings('gradeTemplateFormRangeLetterPlaceholder')}
-                          styles={RANGE_FIELD_STYLES}
                           {...form.getInputProps(`ranges.${idx}.letter`)}
                         />
                       </Grid.Col>
@@ -267,11 +258,9 @@ export function GradeTemplateBuilder() {
                         <NumberInput
                           id={`grade-template-range-${idx}-min`}
                           label={tSettings('gradeTemplateFormRangeMin')}
-                          description={tSettings('gradeTemplateFormRangeMinDescription')}
                           placeholder={tSettings('gradeTemplateFormRangeMinPlaceholder')}
                           min={0}
                           max={100}
-                          styles={RANGE_FIELD_STYLES}
                           {...form.getInputProps(`ranges.${idx}.minPercentage`)}
                         />
                       </Grid.Col>
@@ -279,11 +268,9 @@ export function GradeTemplateBuilder() {
                         <NumberInput
                           id={`grade-template-range-${idx}-max`}
                           label={tSettings('gradeTemplateFormRangeMax')}
-                          description={tSettings('gradeTemplateFormRangeMaxDescription')}
                           placeholder={tSettings('gradeTemplateFormRangeMaxPlaceholder')}
                           min={0}
                           max={100}
-                          styles={RANGE_FIELD_STYLES}
                           {...form.getInputProps(`ranges.${idx}.maxPercentage`)}
                         />
                       </Grid.Col>
@@ -291,10 +278,8 @@ export function GradeTemplateBuilder() {
                         <NumberInput
                           id={`grade-template-range-${idx}-sort`}
                           label={tSettings('gradeTemplateFormRangeSort')}
-                          description={tSettings('gradeTemplateFormRangeSortDescription')}
                           placeholder={tSettings('gradeTemplateFormRangeSortPlaceholder')}
                           min={0}
-                          styles={RANGE_FIELD_STYLES}
                           {...form.getInputProps(`ranges.${idx}.sortOrder`)}
                         />
                       </Grid.Col>

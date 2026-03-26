@@ -1,0 +1,76 @@
+'use client';
+
+import type { Tour } from 'nextstepjs';
+
+export const assessmentsTourSteps: Tour = {
+  tour: 'assessmentsTour',
+  steps: [
+    {
+      icon: '🧭',
+      title: 'Assessments overview',
+      content: 'This page shows all assessments. You can search, filter, and open any assessment to view grades or statistics.',
+      selector: '#assessments-search',
+      side: 'bottom',
+      showControls: true,
+      showSkip: true,
+      pointerPadding: 8,
+      pointerRadius: 10,
+    },
+    {
+      icon: '🔎',
+      title: 'Search',
+      content: 'Use search to quickly find an assessment by title or keyword.',
+      selector: '#assessments-search',
+      side: 'bottom',
+      showControls: true,
+      showSkip: true,
+      pointerPadding: 8,
+      pointerRadius: 10,
+    },
+    {
+      icon: '🏫',
+      title: 'Filter by class & section',
+      content: 'Narrow the list to a specific class section.',
+      selector: '#assessments-filter-class-section',
+      side: 'bottom',
+      showControls: true,
+      showSkip: true,
+      pointerPadding: 8,
+      pointerRadius: 10,
+    },
+    {
+      icon: '✅',
+      title: 'Published vs draft',
+      content: 'Filter assessments by published status.',
+      selector: '#assessments-filter-status',
+      side: 'bottom',
+      showControls: true,
+      showSkip: true,
+      pointerPadding: 8,
+      pointerRadius: 10,
+    },
+    {
+      icon: '🏷️',
+      title: 'Assessment types',
+      content: 'Use these chips to filter by assessment type.',
+      selector: '#assessments-filter-type-container',
+      side: 'bottom',
+      showControls: true,
+      showSkip: true,
+      pointerPadding: 8,
+      pointerRadius: 10,
+    },
+    {
+      icon: '➕',
+      title: 'Create an assessment',
+      content: 'Use this button to create a new assessment.',
+      selector: '#assessments-btn-create',
+      side: 'left',
+      showControls: true,
+      showSkip: true,
+      pointerPadding: 8,
+      pointerRadius: 10,
+    },
+  ],
+};
+

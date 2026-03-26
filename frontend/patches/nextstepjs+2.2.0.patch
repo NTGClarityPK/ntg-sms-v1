@@ -1,0 +1,31 @@
+diff --git a/node_modules/nextstepjs/dist/NextStepReact.js b/node_modules/nextstepjs/dist/NextStepReact.js
+index 218eece..6f0e3e7 100644
+--- a/node_modules/nextstepjs/dist/NextStepReact.js
++++ b/node_modules/nextstepjs/dist/NextStepReact.js
+@@ -113,7 +113,7 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                     setElementToScroll(element);
+                     const rect = element.getBoundingClientRect();
+                     const isInViewportWithOffset = rect.top >= -offset && rect.bottom <= window.innerHeight + offset;
+-                    if (!isInViewportWithOffset) {
++                    if (!isInViewportWithOffset && !noInViewScroll) {
+                         const side = checkSideCutOff(currentTourSteps?.[currentStep]?.side || 'right');
+                         element.scrollIntoView({
+                             behavior: 'smooth',
+@@ -241,7 +241,7 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                     setElementToScroll(element);
+                     const rect = element.getBoundingClientRect();
+                     const isInViewportWithOffset = rect.top >= -offset && rect.bottom <= window.innerHeight + offset;
+-                    if (!isInViewportWithOffset) {
++                    if (!isInViewportWithOffset && !noInViewScroll) {
+                         const side = checkSideCutOff(currentTourSteps?.[currentStep]?.side || 'right');
+                         element.scrollIntoView({
+                             behavior: 'smooth',
+@@ -508,7 +508,7 @@ const NextStepReact = ({ children, steps, shadowRgb = '0, 0, 0', shadowOpacity =
+                 if (element) {
+                     const { top } = element.getBoundingClientRect();
+                     const isInViewport = top >= -offset && top <= window.innerHeight + offset;
+-                    if (!isInViewport) {
++                    if (!isInViewport && !noInViewScroll) {
+                         const side = checkSideCutOff(currentTourSteps?.[stepIndex]?.side || 'right');
+                         element.scrollIntoView({
+                             behavior: 'smooth',

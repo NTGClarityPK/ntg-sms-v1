@@ -153,6 +153,9 @@ export default function AuthCallbackPage() {
 
         if (roleNames.includes('super_admin')) {
           setStepMsg(2, 'Taking you to admin portal...');
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
+          }
           router.push('/adminportal');
           return;
         }
@@ -163,6 +166,9 @@ export default function AuthCallbackPage() {
             localStorage.setItem('currentBranchId', branchId);
           }
           setStepMsg(2, 'Taking you to dashboard...');
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
+          }
           router.push('/dashboard');
           return;
         }
@@ -176,6 +182,9 @@ export default function AuthCallbackPage() {
           const branchId = userBranches[0].id;
           localStorage.setItem('currentBranchId', branchId);
           setStepMsg(2, 'Taking you to dashboard...');
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
+          }
           router.push('/dashboard');
           return;
         }

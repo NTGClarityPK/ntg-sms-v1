@@ -110,7 +110,6 @@ export function SubjectTemplateForm({
           <TextInput
             id="subject-template-form-name"
             label={tSettings('subjectTemplateFormNameLabel')}
-            description={tSettings('subjectTemplateFormNameDescription')}
             placeholder={tSettings('subjectTemplateFormNamePlaceholder')}
             required
             {...form.getInputProps('name')}
@@ -118,7 +117,6 @@ export function SubjectTemplateForm({
           <Textarea
             id="subject-template-form-description"
             label={tSettings('subjectTemplateFormDescLabel')}
-            description={tSettings('subjectTemplateFormDescDescription')}
             placeholder={tSettings('subjectTemplateFormDescPlaceholder')}
             {...form.getInputProps('description')}
           />
@@ -126,7 +124,6 @@ export function SubjectTemplateForm({
           <MultiSelect
             id="subject-template-form-subjects"
             label={tSettings('subjectTemplateFormSubjectsLabel')}
-            description={tSettings('subjectTemplateFormSubjectsDescription')}
             placeholder={tSettings('subjectTemplateFormSubjectsPlaceholder')}
             data={subjectOptions}
             {...form.getInputProps('subjectIds')}
@@ -136,7 +133,6 @@ export function SubjectTemplateForm({
           <MultiSelect
             id="subject-template-form-classes"
             label={tSettings('subjectTemplateFormClassesLabel')}
-            description={tSettings('subjectTemplateFormClassesDescription')}
             placeholder={tSettings('subjectTemplateFormClassesPlaceholder')}
             data={classOptions}
             disabled={classesDisabled}
@@ -154,7 +150,6 @@ export function SubjectTemplateForm({
           <MultiSelect
             id="subject-template-form-levels"
             label={tSettings('subjectTemplateFormLevelsLabel')}
-            description={tSettings('subjectTemplateFormLevelsDescription')}
             placeholder={tSettings('subjectTemplateFormLevelsPlaceholder')}
             data={levelOptions}
             disabled={levelsDisabled}

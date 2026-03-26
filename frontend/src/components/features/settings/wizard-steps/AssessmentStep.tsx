@@ -4,6 +4,7 @@ import { Button, Group, Stack, Text, TextInput, NumberInput } from '@mantine/cor
 import { useState } from 'react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { AssessmentData } from './types';
+import { useTranslations } from 'next-intl';
 
 interface AssessmentStepProps {
   data: AssessmentData;
@@ -14,6 +15,7 @@ interface AssessmentStepProps {
 
 export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentStepProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
   const [newAssessmentType, setNewAssessmentType] = useState({ name: '', sortOrder: 0 });
   const [newGradeTemplate, setNewGradeTemplate] = useState({ name: '' });
   const [newRange, setNewRange] = useState({ letter: '', minPercentage: 0, maxPercentage: 100, sortOrder: 0 });
@@ -107,14 +109,14 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
           <Group gap="xs" mb="xs">
             <TextInput
               id="assessment-step-type-name"
-              placeholder="Type name"
+              placeholder={tSettings('setupWizardAssessmentTypeNamePlaceholder')}
               value={newAssessmentType.name}
               onChange={(e) => setNewAssessmentType({ ...newAssessmentType, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <NumberInput
               id="assessment-step-type-order"
-              placeholder="Order"
+              placeholder={tSettings('setupWizardAssessmentTypeOrderPlaceholder')}
               value={newAssessmentType.sortOrder}
               onChange={(val) => setNewAssessmentType({ ...newAssessmentType, sortOrder: Number(val) || 0 })}
               style={{ width: 100 }}
@@ -141,7 +143,7 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
           <Group gap="xs" mb="xs">
             <TextInput
               id="assessment-step-template-name"
-              placeholder="Template name"
+              placeholder={tSettings('setupWizardAssessmentGradeTemplatePlaceholder')}
               value={newGradeTemplate.name}
               onChange={(e) => setNewGradeTemplate({ ...newGradeTemplate, name: e.target.value })}
               style={{ flex: 1 }}
@@ -174,21 +176,21 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
                       <Group gap="xs" mb="xs">
                         <TextInput
                           id="assessment-step-range-letter"
-                          placeholder="Letter (A, B, C...)"
+                          placeholder={tSettings('setupWizardAssessmentRangeLetterPlaceholder')}
                           value={newRange.letter}
                           onChange={(e) => setNewRange({ ...newRange, letter: e.target.value })}
                           style={{ width: 100 }}
                         />
                         <NumberInput
                           id="assessment-step-range-min"
-                          placeholder="Min %"
+                          placeholder={tSettings('setupWizardAssessmentRangeMinPlaceholder')}
                           value={newRange.minPercentage}
                           onChange={(val) => setNewRange({ ...newRange, minPercentage: Number(val) || 0 })}
                           style={{ width: 100 }}
                         />
                         <NumberInput
                           id="assessment-step-range-max"
-                          placeholder="Max %"
+                          placeholder={tSettings('setupWizardAssessmentRangeMaxPlaceholder')}
                           value={newRange.maxPercentage}
                           onChange={(val) => setNewRange({ ...newRange, maxPercentage: Number(val) || 100 })}
                           style={{ width: 100 }}
@@ -211,6 +213,7 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
           </Text>
           <NumberInput
             id="assessment-step-leave-quota"
+            placeholder={tSettings('setupWizardAssessmentLeaveQuotaPlaceholder')}
             value={leaveQuota}
             onChange={handleLeaveQuotaChange}
             min={0}

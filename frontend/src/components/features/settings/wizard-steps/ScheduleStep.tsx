@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { ScheduleData } from './types';
+import { useTranslations } from 'next-intl';
 
 interface ScheduleStepProps {
   data: ScheduleData;
@@ -31,6 +32,7 @@ const DAYS_OF_WEEK = [
 
 export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
   
   // State for the main timing template
   const [templateName, setTemplateName] = useState('Primary Morning Schedule');
@@ -157,7 +159,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
             <TextInput
               id="schedule-step-template-name"
               label="Name"
-              placeholder="Primary Morning Schedule"
+              placeholder={tSettings('setupWizardScheduleTemplateNamePlaceholder')}
               value={templateName}
               onChange={(e) => setTemplateName(e.currentTarget.value)}
               required
@@ -188,6 +190,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
             <NumberInput
               id="schedule-step-period-duration"
               label="Period duration (minutes)"
+              placeholder={tSettings('setupWizardSchedulePeriodPlaceholder')}
               value={periodDuration}
               min={1}
               onChange={(val) => setPeriodDuration(Number(val) || 60)}
@@ -216,21 +219,21 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
               <Stack gap="xs">
                 <TextInput
                   id="schedule-step-slot-name"
-                  placeholder="Slot name (e.g., Assembly, Break, Lunch)"
+                  placeholder={tSettings('setupWizardScheduleSlotNamePlaceholder')}
                   value={newSlot.name}
                   onChange={(e) => setNewSlot({ ...newSlot, name: e.currentTarget.value })}
                 />
                 <Group grow>
                   <TextInput
                     id="schedule-step-slot-start"
-                    placeholder="Start time (optional)"
+                    placeholder={tSettings('setupWizardScheduleSlotStartPlaceholder')}
                     type="time"
                     value={newSlot.startTime}
                     onChange={(e) => setNewSlot({ ...newSlot, startTime: e.currentTarget.value })}
                   />
                   <TextInput
                     id="schedule-step-slot-end"
-                    placeholder="End time (optional)"
+                    placeholder={tSettings('setupWizardScheduleSlotEndPlaceholder')}
                     type="time"
                     value={newSlot.endTime}
                     onChange={(e) => setNewSlot({ ...newSlot, endTime: e.currentTarget.value })}

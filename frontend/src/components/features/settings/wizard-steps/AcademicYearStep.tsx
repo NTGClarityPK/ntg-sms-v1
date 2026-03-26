@@ -4,6 +4,7 @@ import { Button, Group, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { AcademicYearData } from './types';
+import { useTranslations } from 'next-intl';
 
 interface AcademicYearStepProps {
   data: AcademicYearData | null;
@@ -13,6 +14,7 @@ interface AcademicYearStepProps {
 
 export function AcademicYearStep({ data, onChange, onNext }: AcademicYearStepProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
 
   const form = useForm<AcademicYearData>({
     initialValues: data || {
@@ -53,13 +55,14 @@ export function AcademicYearStep({ data, onChange, onNext }: AcademicYearStepPro
           <TextInput
             id="wizard-academic-year-name"
             label="Academic Year Name"
-            placeholder="2025-2026"
+            placeholder={tSettings('setupWizardAcademicYearNamePlaceholder')}
             required
             {...form.getInputProps('name')}
           />
           <TextInput
             id="wizard-academic-year-start"
             label="Start Date"
+            placeholder={tSettings('setupWizardAcademicYearStartPlaceholder')}
             type="date"
             required
             {...form.getInputProps('startDate')}
@@ -67,6 +70,7 @@ export function AcademicYearStep({ data, onChange, onNext }: AcademicYearStepPro
           <TextInput
             id="wizard-academic-year-end"
             label="End Date"
+            placeholder={tSettings('setupWizardAcademicYearEndPlaceholder')}
             type="date"
             required
             {...form.getInputProps('endDate')}

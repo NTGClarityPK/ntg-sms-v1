@@ -87,7 +87,7 @@ export class AuthService {
       // Get profile from public.profiles (only needed fields)
       supabase
         .from('profiles')
-        .select('full_name, avatar_url, current_branch_id, preferred_locale')
+        .select('full_name, avatar_url, current_branch_id, preferred_locale, onboarding_seen_tours_modal')
         .eq('id', userId)
         .maybeSingle(),
       // Get user branch mappings
@@ -189,6 +189,9 @@ export class AuthService {
       fullName: profile?.full_name || user.email || 'User',
       avatarUrl: profile?.avatar_url || undefined,
       preferredLocale: profileRow?.preferred_locale ?? 'ar',
+      onboardingSeenToursModal:
+        (profile as { onboarding_seen_tours_modal?: boolean | null } | null)
+          ?.onboarding_seen_tours_modal ?? false,
       roles,
       branches,
       currentBranch,
@@ -272,21 +275,42 @@ export class AuthService {
     const supabase = this.supabaseConfig.getClient();
 
     const trimmedName = dto.fullName?.trim();
-    if (!trimmedName) {
-      throw new BadRequestException('Full name is required');
+    const shouldUpdateName = typeof trimmedName === 'string' && trimmedName.length > 0;
+    const shouldUpdateSeen =
+      typeof dto.onboardingSeenToursModal === 'boolean';
+
+    if (!shouldUpdateName && !shouldUpdateSeen) {
+      throw new BadRequestException('No profile fields provided');
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          id: userId,
-          full_name: trimmedName,
-        },
-        {
-          onConflict: 'id',
-        },
-      )
+    // Important: `profiles.full_name` is NOT NULL in this database.
+    // If we "upsert" a row without full_name and the profile doesn't exist yet, Postgres will try to INSERT
+    // and fail. So:
+    // - update when only toggling flags
+    // - upsert only when we have a full_name value
+    const profileWrite = shouldUpdateName
+      ? supabase
+          .from('profiles')
+          .upsert(
+            {
+              id: userId,
+              full_name: trimmedName,
+              ...(shouldUpdateSeen
+                ? { onboarding_seen_tours_modal: dto.onboardingSeenToursModal }
+                : {}),
+            },
+            { onConflict: 'id' },
+          )
+      : supabase
+          .from('profiles')
+          .update({
+            ...(shouldUpdateSeen
+              ? { onboarding_seen_tours_modal: dto.onboardingSeenToursModal }
+              : {}),
+          })
+          .eq('id', userId);
+
+    const { data: profile, error: profileError } = await profileWrite
       .select('full_name, created_at, updated_at')
       .eq('id', userId)
       .maybeSingle();

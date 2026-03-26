@@ -18,6 +18,7 @@ import { FaviconUpdater } from '@/components/common/FaviconUpdater';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
+import { NextStepRoot } from '@/components/onboarding/NextStepRoot';
 
 /** In development, unregister any existing service workers so the production sw.js (and workbox) are not used. */
 function DevServiceWorkerCleanup() {
@@ -73,7 +74,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <InstallPrompt />
           <SafariInstallModal />
           <PushSubscribe />
-          {children}
+          <NextStepRoot>{children}</NextStepRoot>
         </InstallAppProvider>
         <ReactQueryDevtools initialIsOpen={false} />
       </ThemeWrapper>

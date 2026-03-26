@@ -158,7 +158,6 @@ export function SubjectList() {
             <TranslatableInput
               id="subject-form-name"
               label={tSettings('subjectFormNameLabel')}
-              description={tSettings('subjectFormNameDescription')}
               value={form.values.nameTranslations}
               onChange={(v) => form.setFieldValue('nameTranslations', v)}
               required
@@ -170,7 +169,6 @@ export function SubjectList() {
             <TextInput
               id="subject-form-code"
               label={tSettings('subjectColCode')}
-              description={tSettings('subjectFormCodeDescription')}
               placeholder={tSettings('subjectFormCodePlaceholder')}
               {...form.getInputProps('code')}
             />

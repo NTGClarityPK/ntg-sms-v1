@@ -12,6 +12,7 @@ export class UserResponseDto {
   fullName!: string;
   avatarUrl?: string;
   preferredLocale?: string;
+  onboardingSeenToursModal?: boolean;
   roles?: UserRoleDto[];
   branches?: BranchSummaryDto[];
   currentBranch?: BranchSummaryDto | null;

@@ -165,7 +165,7 @@ export default function AssessmentsPage() {
             </Group>
 
             {/* Assessment type chips */}
-            <Paper p="sm" withBorder>
+            <Paper p="sm" withBorder id="assessments-filter-type-container">
               <Group gap="xs" wrap="wrap" className="filter-chip-group">
                 <Chip
                   id="assessments-filter-type-all"

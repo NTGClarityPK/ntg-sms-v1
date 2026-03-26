@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { AcademicData } from './types';
 import { IconX } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 
 interface AcademicStepProps {
   data: AcademicData;
@@ -15,6 +16,7 @@ interface AcademicStepProps {
 
 export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepProps) {
   const colors = useThemeColors();
+  const tSettings = useTranslations('settings');
   const [newSubject, setNewSubject] = useState({ name: '', code: '', sortOrder: 0 });
   const [newClass, setNewClass] = useState({ name: '', displayName: '', sortOrder: 0 });
   const [newSection, setNewSection] = useState({ name: '', sortOrder: 0 });
@@ -142,21 +144,21 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           <Group gap="xs" mb="xs">
             <TextInput
               id="academic-step-subject-name"
-              placeholder="Subject name"
+              placeholder={tSettings('setupWizardAcademicSubjectNamePlaceholder')}
               value={newSubject.name}
               onChange={(e) => setNewSubject({ ...newSubject, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <TextInput
               id="academic-step-subject-code"
-              placeholder="Code (optional)"
+              placeholder={tSettings('setupWizardAcademicSubjectCodePlaceholder')}
               value={newSubject.code}
               onChange={(e) => setNewSubject({ ...newSubject, code: e.target.value })}
               style={{ width: 120 }}
             />
             <NumberInput
               id="academic-step-subject-order"
-              placeholder="Order"
+              placeholder={tSettings('setupWizardAcademicSubjectOrderPlaceholder')}
               value={newSubject.sortOrder}
               onChange={(val) => setNewSubject({ ...newSubject, sortOrder: Number(val) || 0 })}
               style={{ width: 100 }}
@@ -193,21 +195,21 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           <Group gap="xs" mb="xs">
             <TextInput
               id="academic-step-class-name"
-              placeholder="Class name"
+              placeholder={tSettings('setupWizardAcademicClassNamePlaceholder')}
               value={newClass.name}
               onChange={(e) => setNewClass({ ...newClass, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <TextInput
               id="academic-step-class-display-name"
-              placeholder="Display name"
+              placeholder={tSettings('setupWizardAcademicClassDisplayPlaceholder')}
               value={newClass.displayName}
               onChange={(e) => setNewClass({ ...newClass, displayName: e.target.value })}
               style={{ flex: 1 }}
             />
             <NumberInput
               id="academic-step-class-order"
-              placeholder="Order"
+              placeholder={tSettings('setupWizardAcademicClassOrderPlaceholder')}
               value={newClass.sortOrder}
               onChange={(val) => setNewClass({ ...newClass, sortOrder: Number(val) || 0 })}
               style={{ width: 100 }}
@@ -242,14 +244,14 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           <Group gap="xs" mb="xs">
             <TextInput
               id="academic-step-section-name"
-              placeholder="Section name"
+              placeholder={tSettings('setupWizardAcademicSectionNamePlaceholder')}
               value={newSection.name}
               onChange={(e) => setNewSection({ ...newSection, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <NumberInput
               id="academic-step-section-order"
-              placeholder="Order"
+              placeholder={tSettings('setupWizardAcademicSectionOrderPlaceholder')}
               value={newSection.sortOrder}
               onChange={(val) => setNewSection({ ...newSection, sortOrder: Number(val) || 0 })}
               style={{ width: 100 }}
@@ -284,14 +286,14 @@ export function AcademicStep({ data, onChange, onNext, onBack }: AcademicStepPro
           <Group gap="xs" mb="xs" align="flex-end">
             <TextInput
               id="academic-step-level-name"
-              placeholder="Level name"
+              placeholder={tSettings('setupWizardAcademicLevelNamePlaceholder')}
               value={newLevel.name}
               onChange={(e) => setNewLevel({ ...newLevel, name: e.target.value })}
               style={{ flex: 1 }}
             />
             <MultiSelect
               id="academic-step-level-classes"
-              placeholder="Assign classes"
+              placeholder={tSettings('setupWizardAcademicLevelClassesPlaceholder')}
               data={classOptions}
               value={newLevel.classIds}
               onChange={(val) => setNewLevel({ ...newLevel, classIds: val })}

@@ -150,6 +150,10 @@ export default function LoginPage() {
         throw new Error('Session not created');
       }
 
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
+      }
+
       await completeLoginAfterSupabaseSession();
     } catch (err: any) {
       // Extract error message from various possible response structures
@@ -225,6 +229,11 @@ export default function LoginPage() {
       setPinIdentifier('');
       setPinValue('');
       setPinMode('none');
+
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
+      }
+
       await completeLoginAfterSupabaseSession();
     } catch (err) {
       let message =

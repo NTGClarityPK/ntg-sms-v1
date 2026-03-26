@@ -145,21 +145,18 @@ export function ClassList() {
             <TextInput
               id="class-form-name"
               label={tSettings('classFormNameLabel')}
-              description={tSettings('classFormNameDescription')}
               placeholder={tSettings('classFormNamePlaceholder')}
               {...form.getInputProps('name')}
             />
             <TextInput
               id="class-form-display-name"
               label={tSettings('classDisplayNameLabel')}
-              description={tSettings('classDisplayNameDescription')}
               placeholder={tSettings('classDisplayNamePlaceholder')}
               {...form.getInputProps('displayName')}
             />
             <NumberInput
               id="class-form-sort-order"
               label={tSettings('classSortOrderLabel')}
-              description={tSettings('classSortOrderDescription')}
               placeholder={tSettings('classSortOrderPlaceholder')}
               min={0}
               {...form.getInputProps('sortOrder')}
