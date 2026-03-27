@@ -348,14 +348,12 @@ export class StudentsService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
-    // Get active academic year if not provided
-    let academicYearId = input.academicYearId;
+    // Get active academic year if not provided.
+    // Fresh tenants may not have one configured yet; allow creating a student without it.
+    let academicYearId: string | null = input.academicYearId ?? null;
     if (!academicYearId) {
       const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
-      if (!activeYear) {
-        throw new BadRequestException('No active academic year found');
-      }
-      academicYearId = activeYear.id;
+      academicYearId = activeYear?.id ?? null;
     }
 
     // Create auth user
@@ -474,8 +472,13 @@ export class StudentsService {
         })
         .catch(() => {});
 
-      // Create subject template assignment if provided
+      // Create subject template assignment if provided (requires an academic year).
       if (input.subjectTemplateId) {
+        if (!academicYearId) {
+          throw new BadRequestException(
+            'Cannot assign subject template: No active academic year found. Please set an academic year in Settings.',
+          );
+        }
         const { error: assignmentError } = await supabase
           .from('student_subject_template_assignments')
           .upsert(

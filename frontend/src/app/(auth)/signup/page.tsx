@@ -27,6 +27,7 @@ import {
   IconCheck,
   IconSchool,
   IconBuilding,
+  IconCalendar,
   IconBrandGoogle,
 } from '@tabler/icons-react';
 import { apiClient, getEffectiveApiBaseURL } from '@/lib/api-client';
@@ -54,6 +55,10 @@ interface RegisterData {
   branchAddress: string;
   branchPhone: string;
   branchEmail: string;
+  // Academic Year (required)
+  academicYearName: string;
+  academicYearStartDate: string;
+  academicYearEndDate: string;
   // Admin User
   email: string;
   password: string;
@@ -94,6 +99,9 @@ export default function SignupPage() {
       branchAddress: '',
       branchPhone: '',
       branchEmail: '',
+      academicYearName: '',
+      academicYearStartDate: '',
+      academicYearEndDate: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -105,6 +113,17 @@ export default function SignupPage() {
     validate: {
       schoolName: (value) => (value.length < 2 ? 'School name must be at least 2 characters' : null),
       branchName: (value) => (value.length < 2 ? 'Branch name must be at least 2 characters' : null),
+      academicYearName: (value) => (value.length < 2 ? 'Academic year name must be at least 2 characters' : null),
+      academicYearStartDate: (value, values) => {
+        if (!value) return 'Start date is required';
+        if (values.academicYearEndDate && value > values.academicYearEndDate) return 'Start date must be before end date';
+        return null;
+      },
+      academicYearEndDate: (value, values) => {
+        if (!value) return 'End date is required';
+        if (values.academicYearStartDate && value < values.academicYearStartDate) return 'End date must be after start date';
+        return null;
+      },
       email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
       password: (value) => (value.length < 6 ? 'Password must be at least 6 characters' : null),
       confirmPassword: (value, values) =>
@@ -120,30 +139,44 @@ export default function SignupPage() {
       if (!validation.hasError) {
         // Clear any errors from other steps when moving forward
         form.clearFieldError('branchName');
+        form.clearFieldError('academicYearName');
+        form.clearFieldError('academicYearStartDate');
+        form.clearFieldError('academicYearEndDate');
         form.clearFieldError('email');
         form.clearFieldError('password');
         form.clearFieldError('confirmPassword');
         form.clearFieldError('fullName');
-        setActive((current) => (current < 3 ? current + 1 : current));
+        setActive((current) => (current < 4 ? current + 1 : current));
       }
     } else if (active === 1) {
       // Validate step 2: Branch Details before moving to step 3
       const validation = form.validateField('branchName');
       if (!validation.hasError) {
         // Clear any errors from other steps when moving forward
+        form.clearFieldError('academicYearName');
+        form.clearFieldError('academicYearStartDate');
+        form.clearFieldError('academicYearEndDate');
         form.clearFieldError('email');
         form.clearFieldError('password');
         form.clearFieldError('confirmPassword');
         form.clearFieldError('fullName');
-        setActive((current) => (current < 3 ? current + 1 : current));
+        setActive((current) => (current < 4 ? current + 1 : current));
       }
     } else if (active === 2) {
-      // Validate step 3: Admin Account before moving to step 4
+      // Validate step 3: Academic Year before moving to step 4
+      const nameV = form.validateField('academicYearName');
+      const startV = form.validateField('academicYearStartDate');
+      const endV = form.validateField('academicYearEndDate');
+      if (!nameV.hasError && !startV.hasError && !endV.hasError) {
+        setActive((current) => (current < 4 ? current + 1 : current));
+      }
+    } else if (active === 3) {
+      // Validate step 4: Admin Account before moving to step 5
       const fullNameValidation = form.validateField('fullName');
 
       if (signupMethod === 'google') {
         if (!fullNameValidation.hasError) {
-          setActive((current) => (current < 3 ? current + 1 : current));
+          setActive((current) => (current < 4 ? current + 1 : current));
         }
       } else {
         const emailValidation = form.validateField('email');
@@ -156,7 +189,7 @@ export default function SignupPage() {
           !confirmPasswordValidation.hasError &&
           !fullNameValidation.hasError
         ) {
-          setActive((current) => (current < 3 ? current + 1 : current));
+          setActive((current) => (current < 4 ? current + 1 : current));
         }
       }
     }
@@ -166,6 +199,10 @@ export default function SignupPage() {
     // Clear errors when going back
     if (active === 1) {
       form.clearFieldError('branchName');
+    } else if (active === 2) {
+      form.clearFieldError('academicYearName');
+      form.clearFieldError('academicYearStartDate');
+      form.clearFieldError('academicYearEndDate');
     } else if (active === 2) {
       form.clearFieldError('email');
       form.clearFieldError('password');
@@ -186,6 +223,9 @@ export default function SignupPage() {
         JSON.stringify({
           schoolName: values.schoolName,
           branchName: values.branchName,
+          academicYearName: values.academicYearName,
+          academicYearStartDate: values.academicYearStartDate,
+          academicYearEndDate: values.academicYearEndDate,
           fullName: values.fullName,
           phone: values.phone || undefined,
           isSignup: true,
@@ -220,6 +260,9 @@ export default function SignupPage() {
         branchAddress: registerData.branchAddress || undefined,
         branchPhone: registerData.branchPhone || undefined,
         branchEmail: registerData.branchEmail || undefined,
+        academicYearName: registerData.academicYearName,
+        academicYearStartDate: registerData.academicYearStartDate,
+        academicYearEndDate: registerData.academicYearEndDate,
         email: registerData.email,
         password: registerData.password,
         fullName: registerData.fullName,
@@ -532,6 +575,47 @@ export default function SignupPage() {
           </Stepper.Step>
 
           <Stepper.Step
+            label="Academic Year"
+            description="Set the current school year"
+            icon={<IconCalendar size={18} />}
+          >
+            <Stack gap="md" mt="xl">
+              <TextInput
+                id="signup-academic-year-name"
+                label="Academic Year"
+                placeholder="2024–2025"
+                required
+                size="lg"
+                radius="md"
+                disabled={loading}
+                {...form.getInputProps('academicYearName')}
+              />
+              <Group grow>
+                <TextInput
+                  id="signup-academic-year-start-date"
+                  label="Start Date"
+                  type="date"
+                  required
+                  size="lg"
+                  radius="md"
+                  disabled={loading}
+                  {...form.getInputProps('academicYearStartDate')}
+                />
+                <TextInput
+                  id="signup-academic-year-end-date"
+                  label="End Date"
+                  type="date"
+                  required
+                  size="lg"
+                  radius="md"
+                  disabled={loading}
+                  {...form.getInputProps('academicYearEndDate')}
+                />
+              </Group>
+            </Stack>
+          </Stepper.Step>
+
+          <Stepper.Step
             label="Admin Account"
             description="Create administrator account"
             icon={<IconUser size={18} />}
@@ -658,6 +742,18 @@ export default function SignupPage() {
 
               <Box>
                 <Text size="sm" mb="xs" style={{ color: themeColors.colorTextMedium }}>
+                  Academic Year
+                </Text>
+                <Text fw={500} style={{ color: themeColors.colorTextDark }}>
+                  {form.values.academicYearName}
+                </Text>
+                <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
+                  {form.values.academicYearStartDate} – {form.values.academicYearEndDate}
+                </Text>
+              </Box>
+
+              <Box>
+                <Text size="sm" mb="xs" style={{ color: themeColors.colorTextMedium }}>
                   Admin Name
                 </Text>
                 <Text fw={500} style={{ color: themeColors.colorTextDark }}>
@@ -720,7 +816,7 @@ export default function SignupPage() {
           ) : (
             <div /> // Spacer
           )}
-          {active < 3 ? (
+          {active < 4 ? (
             <Button
               id="signup-next"
               type="button"

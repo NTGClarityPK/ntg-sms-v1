@@ -30,7 +30,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
         address: z.string().optional(),
         dateOfBirth: z.string().optional(),
         gender: z.enum(['male', 'female']).optional(),
-        roleIds: z.array(z.string()).optional(),
+        roleIds: z.array(z.string()).min(1, t('roleRequired')),
         isActive: z.boolean().optional(),
       }),
     [t],
@@ -204,6 +204,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
             id="user-form-roles"
             label={t('roles')}
             data={roles.map((r) => ({ value: r.id, label: tCommon(`roleName.${r.name}` as any) || r.displayName }))}
+            required
             {...form.getInputProps('roleIds')}
           />
 

@@ -8,7 +8,6 @@ import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
 import { useCreateStudent, useUpdateStudent } from '@/hooks/useStudents';
 import { useClasses, useSections } from '@/hooks/useCoreLookups';
-import { useAcademicYearsList } from '@/hooks/useAcademicYears';
 import { useTemplatesForClass, useStudentTemplate } from '@/hooks/useSubjectTemplates';
 import { useAuth } from '@/hooks/useAuth';
 import type { Student, CreateStudentInput, UpdateStudentInput } from '@/types/students';
@@ -66,10 +65,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
   const { data: classesData } = useClasses();
   const { data: sectionsData } = useSections();
-  const { data: academicYearsData } = useAcademicYearsList({ page: 1, limit: 50 });
   const classes = classesData?.data ?? [];
   const sections = sectionsData?.data ?? [];
-  const academicYears = academicYearsData?.data || [];
 
   const form = useForm({
     initialValues: {
@@ -86,7 +83,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       bloodGroup: '',
       medicalNotes: '',
       admissionDate: '',
-      academicYearId: '',
       isActive: true,
       subjectTemplateId: '',
     },
@@ -104,7 +100,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   // Fetch student's current template assignment (for edit mode)
   const { data: studentTemplateData } = useStudentTemplate(
     student?.id ?? null,
-    form.values.academicYearId || student?.academicYearId || null,
+    student?.academicYearId || null,
     branchId ?? null,
   );
 
@@ -145,7 +141,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         bloodGroup: student.bloodGroup || '',
         medicalNotes: student.medicalNotes || '',
         admissionDate: student.admissionDate || '',
-        academicYearId: student.academicYearId || '',
         isActive: student.isActive ?? true,
         subjectTemplateId: student.subjectTemplateId || currentTemplate?.id || '',
       });
@@ -170,7 +165,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           bloodGroup: values.bloodGroup || undefined,
           medicalNotes: values.medicalNotes || undefined,
           admissionDate: values.admissionDate || undefined,
-          academicYearId: values.academicYearId || undefined,
           isActive: values.isActive,
           subjectTemplateId: values.subjectTemplateId || undefined,
         };
@@ -191,7 +185,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           bloodGroup: values.bloodGroup || undefined,
           medicalNotes: values.medicalNotes || undefined,
           admissionDate: values.admissionDate || undefined,
-          academicYearId: values.academicYearId || undefined,
           isActive: values.isActive,
           subjectTemplateId: values.subjectTemplateId || undefined,
         };
@@ -238,13 +231,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
               styles={{ input: { backgroundColor: 'var(--mantine-color-default-hover)' } }}
             />
           )}
-
-          <Select
-            id="student-form-academic-year"
-            label={t('academicYear')}
-            data={academicYears.map((y) => ({ value: y.id, label: y.name }))}
-            {...form.getInputProps('academicYearId')}
-          />
 
           <Group grow>
             <Select

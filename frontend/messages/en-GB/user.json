@@ -45,6 +45,7 @@
   "invalidEmail": "Invalid email",
   "passwordMinLength": "Password must be at least 6 characters",
   "fullNameRequired": "Full name is required",
+  "roleRequired": "At least one role is required",
   "update": "Update",
   "create": "Create",
   "parentAssociationTitle": "Parent-Student Association",

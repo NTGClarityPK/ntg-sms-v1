@@ -45,6 +45,7 @@
     "invalidEmail": "بريد إلكتروني غير صحيح",
     "passwordMinLength": "يجب أن تكون كلمة المرور 6 أحرف على الأقل",
     "fullNameRequired": "الاسم الكامل مطلوب",
+    "roleRequired": "مطلوب اختيار دور واحد على الأقل",
     "update": "تحديث",
     "create": "إنشاء",
     "parentAssociationTitle": "ربط ولي الأمر بالطالب",

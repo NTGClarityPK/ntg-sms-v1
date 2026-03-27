@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsDateString, IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class RegisterDto {
@@ -43,6 +43,20 @@ export class RegisterDto {
   @IsEmail()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   branchEmail?: string;
+
+  // Academic Year (required at signup)
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  academicYearName!: string;
+
+  @IsDateString()
+  @IsNotEmpty()
+  academicYearStartDate!: string;
+
+  @IsDateString()
+  @IsNotEmpty()
+  academicYearEndDate!: string;
 
   // Admin User Information
   @IsEmail()

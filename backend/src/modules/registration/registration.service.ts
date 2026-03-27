@@ -3,6 +3,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { RegisterDto } from './dto/register.dto';
 import { RegisterResponseDto } from './dto/register-response.dto';
+import { AcademicYearsService } from '../academic-years/academic-years.service';
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
@@ -11,7 +12,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class RegistrationService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly academicYearsService: AcademicYearsService,
+  ) {}
 
   async register(input: RegisterDto): Promise<RegisterResponseDto> {
     const supabase = this.supabaseConfig.getClient();
@@ -20,6 +24,7 @@ export class RegistrationService {
     let tenantId: string | null = null;
     let branchId: string | null = null;
     let userId: string | null = null;
+    let academicYearId: string | null = null;
 
     try {
       // Step 1: Create Tenant
@@ -125,6 +130,7 @@ export class RegistrationService {
       const { error: profileError } = await supabase.from('profiles').insert({
         id: user.id,
         full_name: input.fullName,
+        email: input.email,
         phone: input.phone ?? null,
         is_active: true,
         current_branch_id: branchId,
@@ -189,7 +195,20 @@ export class RegistrationService {
         throw new BadRequestException(`Failed to assign role: ${roleAssignmentError.message}`);
       }
 
-      // Step 8: Return user info - frontend will handle login
+      // Step 8: Create & activate Academic Year (required for core flows)
+      const createdAcademicYear = await this.academicYearsService.create(
+        {
+          name: input.academicYearName,
+          startDate: input.academicYearStartDate,
+          endDate: input.academicYearEndDate,
+        },
+        tenantId,
+        input.email,
+      );
+      academicYearId = createdAcademicYear.id;
+      await this.academicYearsService.activate(createdAcademicYear.id, tenantId, input.email);
+
+      // Step 9: Return user info - frontend will handle login
       // We can't generate tokens from admin API, so user needs to login after registration
       return {
         user: {
@@ -219,6 +238,17 @@ export class RegistrationService {
           await supabase.from('branches').delete().eq('id', branchId);
         } catch (cleanupError) {
           console.error('Error during branch cleanup:', cleanupError);
+        }
+      }
+      if (academicYearId && tenantId) {
+        try {
+          await supabase
+            .from('academic_years')
+            .delete()
+            .eq('id', academicYearId)
+            .eq('tenant_id', tenantId);
+        } catch (cleanupError) {
+          console.error('Error during academic year cleanup:', cleanupError);
         }
       }
       if (tenantId) {

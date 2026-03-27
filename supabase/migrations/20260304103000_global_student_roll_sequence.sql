@@ -7,7 +7,7 @@ CREATE SEQUENCE IF NOT EXISTS public.student_roll_repair_seq;
 SELECT setval(
   'public.student_roll_repair_seq',
   COALESCE(
-    (SELECT MAX(student_id::integer) FROM public.students WHERE student_id ~ '^\d+$'),
+    (SELECT MAX(student_id::integer) FROM public.students WHERE student_id ~ '^[0-9]+$'),
     0
   )
 );
@@ -20,7 +20,7 @@ WITH numbered AS (
       ORDER BY created_at ASC NULLS LAST, id
     ) AS rn
   FROM public.students
-  WHERE student_id ~ '^\d+$'
+  WHERE student_id ~ '^[0-9]+$'
 )
 UPDATE public.students s
 SET student_id = LPAD(nextval('public.student_roll_repair_seq')::text, 4, '0')
@@ -43,7 +43,7 @@ CREATE SEQUENCE IF NOT EXISTS public.student_roll_seq;
 SELECT setval(
   'public.student_roll_seq',
   COALESCE(
-    (SELECT MAX(student_id::integer) FROM public.students WHERE student_id ~ '^\d+$'),
+    (SELECT MAX(student_id::integer) FROM public.students WHERE student_id ~ '^[0-9]+$'),
     0
   )
 );

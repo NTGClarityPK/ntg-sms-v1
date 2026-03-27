@@ -233,6 +233,30 @@ export class UsersService {
     // fall back to empty emails (or future profile-backed emails).
     const emailMap = new Map<string, string>();
 
+    // If profile emails are missing, resolve only for the current page users.
+    // This keeps list performance stable while fixing tenants where profiles.email was never populated.
+    const missingEmailIds = (profilesData || [])
+      .filter((p: ProfileRow) => !p.email)
+      .map((p: ProfileRow) => p.id);
+
+    const fetchEmailBatch = async (ids: string[]) => {
+      await Promise.all(
+        ids.map(async (id) => {
+          const { data, error } = await supabase.auth.admin.getUserById(id);
+          if (!error && data?.user?.email) {
+            emailMap.set(id, data.user.email);
+          }
+        }),
+      );
+    };
+
+    // Batch to reduce transient fetch failures
+    const batchSize = 10;
+    for (let i = 0; i < missingEmailIds.length; i += batchSize) {
+      // eslint-disable-next-line no-await-in-loop
+      await fetchEmailBatch(missingEmailIds.slice(i, i + batchSize));
+    }
+
     // Step 6: Filter by email search if needed (client-side after fetching emails)
     let filteredProfiles = profilesData || [];
     if (query.search) {
@@ -269,7 +293,7 @@ export class UsersService {
 
       return new UserDto({
         id: profile.id,
-        email: profile.email ?? '',
+        email: profile.email ?? emailMap.get(profile.id) ?? '',
         fullName: profile.full_name,
         avatarUrl: profile.avatar_url ?? undefined,
         phone: profile.phone ?? undefined,
@@ -377,6 +401,10 @@ export class UsersService {
   ): Promise<UserDto> {
     const supabase = this.supabaseConfig.getClient();
 
+    if (!input.roleIds || input.roleIds.length === 0) {
+      throw new BadRequestException('Role is required');
+    }
+
     // Create auth user
     const {
       data: { user },
@@ -405,6 +433,7 @@ export class UsersService {
         .insert({
           id: user.id,
           full_name: input.fullName,
+          email: input.email,
           avatar_url: input.avatarUrl ?? null,
           phone: input.phone ?? null,
           address: input.address ?? null,
@@ -442,45 +471,43 @@ export class UsersService {
       }
 
       // Assign roles if provided
-      if (input.roleIds && input.roleIds.length > 0) {
-        const roleAssignments = input.roleIds.map((roleId) => ({
-          user_id: user.id,
-          role_id: roleId,
-          branch_id: branchId,
-        }));
+      const roleAssignments = input.roleIds.map((roleId) => ({
+        user_id: user.id,
+        role_id: roleId,
+        branch_id: branchId,
+      }));
 
-        const { error: rolesError } = await supabase.from('user_roles').insert(roleAssignments);
+      const { error: rolesError } = await supabase.from('user_roles').insert(roleAssignments);
 
-        if (rolesError) {
-          throw new BadRequestException(rolesError.message);
-        }
+      if (rolesError) {
+        throw new BadRequestException(rolesError.message);
+      }
 
-        for (const row of roleAssignments) {
-          const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
-          this.auditLogService
-            .logCreate('user_roles', recordId, userEmail, { ...row } as Record<string, unknown>, {
-              branchId,
-              tenantId,
-            })
-            .catch(() => {});
-        }
+      for (const row of roleAssignments) {
+        const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
+        this.auditLogService
+          .logCreate('user_roles', recordId, userEmail, { ...row } as Record<string, unknown>, {
+            branchId,
+            tenantId,
+          })
+          .catch(() => {});
+      }
 
-        // If any of the assigned roles are staff roles, ensure a staff record exists
-        const { data: rolesData, error: rolesLookupError } = await supabase
-          .from('roles')
-          .select('id,name')
-          .in('id', input.roleIds);
-        throwIfDbError(rolesLookupError);
+      // If any of the assigned roles are staff roles, ensure a staff record exists
+      const { data: rolesData, error: rolesLookupError } = await supabase
+        .from('roles')
+        .select('id,name')
+        .in('id', input.roleIds);
+      throwIfDbError(rolesLookupError);
 
-        const hasStaffRole =
-          (rolesData || []).some(
-            (r: { id: string; name: string }) =>
-              r.name === 'subject_teacher' || r.name === 'class_teacher',
-          );
+      const hasStaffRole =
+        (rolesData || []).some(
+          (r: { id: string; name: string }) =>
+            r.name === 'subject_teacher' || r.name === 'class_teacher',
+        );
 
-        if (hasStaffRole) {
-          await this.ensureStaffForUser(user.id, branchId);
-        }
+      if (hasStaffRole) {
+        await this.ensureStaffForUser(user.id, branchId);
       }
 
       return this.getUserById(user.id, branchId);

@@ -60,6 +60,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
             <SortableHeader field="studentId">{t('studentId')}</SortableHeader>
             <SortableHeader field="firstName">{t('firstName')}</SortableHeader>
             <SortableHeader field="lastName">{t('lastName')}</SortableHeader>
+            <Table.Th>{t('email')}</Table.Th>
             <SortableHeader field="className">{t('class')}</SortableHeader>
             <SortableHeader field="sectionName">{t('section')}</SortableHeader>
             <Table.Th>{t('subjectTemplate')}</Table.Th>
@@ -70,7 +71,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
         <Table.Tbody>
           {students.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={8}>
+              <Table.Td colSpan={9}>
                 <Text c="dimmed" ta="center" py="md">
                   {t('noStudentsFound')}
                 </Text>
@@ -87,6 +88,9 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                 </Table.Td>
                 <Table.Td>
                   <Text>{student.lastName ?? '—'}</Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="sm">{student.email || '—'}</Text>
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">{student.className || 'N/A'}</Text>

@@ -26,7 +26,7 @@ export interface CreateUserInput {
   address?: string;
   dateOfBirth?: string;
   gender?: 'male' | 'female';
-  roleIds?: string[];
+  roleIds: string[];
   isActive?: boolean;
 }
 

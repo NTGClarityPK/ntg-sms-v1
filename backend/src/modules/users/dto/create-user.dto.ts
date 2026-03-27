@@ -1,11 +1,13 @@
 import {
   IsEmail,
   IsString,
-  IsOptional,
   IsArray,
   IsBoolean,
   IsIn,
   MinLength,
+  ArrayNotEmpty,
+  IsUUID,
+  IsOptional,
 } from 'class-validator';
 
 export class CreateUserDto {
@@ -39,10 +41,10 @@ export class CreateUserDto {
   @IsIn(['male', 'female'])
   gender?: 'male' | 'female';
 
-  @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  roleIds?: string[];
+  @ArrayNotEmpty()
+  @IsUUID(undefined, { each: true })
+  roleIds!: string[];
 
   @IsOptional()
   @IsBoolean()
