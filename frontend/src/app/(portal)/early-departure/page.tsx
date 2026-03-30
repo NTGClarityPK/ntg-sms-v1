@@ -84,17 +84,21 @@ export default function EarlyDeparturePage() {
   if (isParent && children.length > 0) {
     // Create minimal Student objects from children data
     // The form only needs student.id (the UUID), so this is sufficient
-    availableStudents = children.map((c) => ({
-      id: c.studentId,
-      userId: '',
-      branchId: '',
-      studentId: c.studentStudentId || '',
-      isActive: true,
-      createdAt: c.createdAt,
-      updatedAt: c.createdAt,
-      firstName: (c as { firstName?: string }).firstName ?? (c.studentName?.split(' ')[0] ?? ''),
-      lastName: (c as { lastName?: string }).lastName ?? (c.studentName?.split(' ').slice(1).join(' ') ?? ''),
-    } as Student));
+    availableStudents = children.map(
+      (c) =>
+        ({
+          id: c.studentId,
+          userId: '',
+          branchId: '',
+          studentId: c.studentStudentId || '',
+          isActive: true,
+          accountStatus: 'active' as const,
+          createdAt: c.createdAt,
+          updatedAt: c.createdAt,
+          firstName: (c as { firstName?: string }).firstName ?? (c.studentName?.split(' ')[0] ?? ''),
+          lastName: (c as { lastName?: string }).lastName ?? (c.studentName?.split(' ').slice(1).join(' ') ?? ''),
+        }) satisfies Student,
+    );
   } else if (!isParent && studentsData?.data) {
     availableStudents = studentsData.data;
   }

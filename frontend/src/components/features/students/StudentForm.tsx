@@ -2,18 +2,19 @@
 
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Badge, Alert, Text } from '@mantine/core';
+import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Badge, Alert, Text, Radio, Checkbox } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
-import { useCreateStudent, useUpdateStudent } from '@/hooks/useStudents';
+import { useCreateStudentWithInvitation, useUpdateStudent } from '@/hooks/useStudents';
 import { useClasses, useSections } from '@/hooks/useCoreLookups';
 import { useTemplatesForClass, useStudentTemplate } from '@/hooks/useSubjectTemplates';
 import { useAuth } from '@/hooks/useAuth';
-import type { Student, CreateStudentInput, UpdateStudentInput } from '@/types/students';
+import type { Student, CreateStudentWithInvitationInput, UpdateStudentInput } from '@/types/students';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStudentGuardians } from '@/hooks/useParentAssociations';
 import { IconPhone, IconUser } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
 
 interface StudentFormProps {
   opened: boolean;
@@ -28,12 +29,11 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const queryClient = useQueryClient();
-  const createStudent = useCreateStudent();
+  const createStudent = useCreateStudentWithInvitation();
   const updateStudent = useUpdateStudent();
 
   const createStudentSchema = z.object({
     email: z.string().email(t('invalidEmail')),
-    password: z.string().min(6, t('passwordMinLength')),
     firstName: z.string().min(1, t('firstNameRequired')),
     lastName: z.string().min(1, t('secondNameRequired')),
     phone: z.string().optional(),
@@ -46,6 +46,14 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     medicalNotes: z.string().optional(),
     admissionDate: z.string().optional(),
     isActive: z.boolean().optional(),
+    invitationType: z.enum(['parent', 'student']),
+    invitationRecipientEmail: z.string().email(t('invalidEmail')),
+    createParentAccount: z.boolean().optional(),
+    // Allow empty string when parent account creation is not enabled
+    parentEmail: z.union([z.string().email(t('invalidEmail')), z.literal('')]).optional(),
+    parentName: z.string().optional(),
+    parentPhone: z.string().optional(),
+    parentRelationship: z.enum(['father', 'mother', 'guardian']).optional(),
   });
 
   const updateStudentSchema = z.object({
@@ -71,7 +79,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const form = useForm({
     initialValues: {
       email: '',
-      password: '',
       firstName: '',
       lastName: '',
       phone: '',
@@ -85,6 +92,13 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       admissionDate: '',
       isActive: true,
       subjectTemplateId: '',
+      invitationType: 'parent' as 'parent' | 'student',
+      invitationRecipientEmail: '',
+      createParentAccount: false,
+      parentEmail: '',
+      parentName: '',
+      parentPhone: '',
+      parentRelationship: 'guardian' as 'father' | 'mother' | 'guardian',
     },
     validate: zodResolver(isEdit ? updateStudentSchema : createStudentSchema),
   });
@@ -129,7 +143,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
       form.setValues({
         email: student.email || '',
-        password: '',
         firstName: student.firstName || '',
         lastName: student.lastName || '',
         phone: student.phone || '',
@@ -171,9 +184,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
         await updateStudent.mutateAsync({ id: student.id, input: updateData });
       } else {
-        const createData: CreateStudentInput = {
+        const createData: CreateStudentWithInvitationInput = {
           email: values.email,
-          password: values.password,
           firstName: values.firstName,
           lastName: values.lastName,
           phone: values.phone || undefined,
@@ -187,6 +199,13 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           admissionDate: values.admissionDate || undefined,
           isActive: values.isActive,
           subjectTemplateId: values.subjectTemplateId || undefined,
+          invitationType: values.invitationType,
+          invitationRecipientEmail: values.invitationRecipientEmail,
+          createParentAccount: values.createParentAccount || undefined,
+          parentEmail: values.createParentAccount ? values.parentEmail || undefined : undefined,
+          parentName: values.createParentAccount ? values.parentName || undefined : undefined,
+          parentPhone: values.createParentAccount ? values.parentPhone || undefined : undefined,
+          parentRelationship: values.createParentAccount ? values.parentRelationship : undefined,
         };
 
         await createStudent.mutateAsync(createData);
@@ -203,19 +222,94 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
   return (
     <Modal opened={opened} onClose={onClose} title={isEdit ? t('editStudent') : t('createStudent')} size="lg">
-      <form id="student-form" onSubmit={form.onSubmit(handleSubmit)}>
+      <form
+        id="student-form"
+        onSubmit={form.onSubmit(handleSubmit, (errors) => {
+          const firstKey = Object.keys(errors)[0];
+          const firstMessage =
+            firstKey && typeof (errors as Record<string, unknown>)[firstKey] === 'string'
+              ? ((errors as Record<string, string>)[firstKey] as string)
+              : null;
+
+          notifications.show({
+            title: 'Missing information',
+            message:
+              firstMessage ??
+              'Please fix the highlighted fields and try again.',
+            color: 'red',
+          });
+        })}
+      >
         <Stack gap="md">
           {!isEdit && (
             <>
               <TextInput id="student-form-email" label={t('email')} placeholder={t('emailPlaceholder')} required {...form.getInputProps('email')} />
+              <Radio.Group
+                id="student-form-invite-type"
+                label="Send invitation to"
+                value={form.values.invitationType}
+                onChange={(value) => form.setFieldValue('invitationType', value as 'parent' | 'student')}
+              >
+                <Group mt="xs">
+                  <Radio value="parent" label="Parent/Guardian" />
+                  <Radio value="student" label="Student" />
+                </Group>
+              </Radio.Group>
+
               <TextInput
-                id="student-form-password"
-                label={t('password')}
-                type="password"
-                placeholder={t('passwordPlaceholder')}
+                id="student-form-invite-recipient-email"
+                label="Invitation recipient email"
+                placeholder="name@example.com"
                 required
-                {...form.getInputProps('password')}
+                {...form.getInputProps('invitationRecipientEmail')}
               />
+
+              {form.values.invitationType === 'parent' && (
+                <Checkbox
+                  id="student-form-create-parent"
+                  label="Parent account doesn’t exist — create parent account"
+                  checked={form.values.createParentAccount}
+                  onChange={(e) => form.setFieldValue('createParentAccount', e.currentTarget.checked)}
+                />
+              )}
+
+              {form.values.invitationType === 'parent' && form.values.createParentAccount && (
+                <Paper withBorder p="md" radius="md">
+                  <Stack gap="sm">
+                    <Text fw={600} size="sm">Parent account details</Text>
+                    <TextInput
+                      id="student-form-parent-email"
+                      label="Parent login email"
+                      placeholder="parent@gmail.com"
+                      required
+                      {...form.getInputProps('parentEmail')}
+                    />
+                    <TextInput
+                      id="student-form-parent-name"
+                      label="Parent name"
+                      placeholder="Parent name"
+                      required
+                      {...form.getInputProps('parentName')}
+                    />
+                    <TextInput
+                      id="student-form-parent-phone"
+                      label="Parent phone"
+                      placeholder="+123..."
+                      {...form.getInputProps('parentPhone')}
+                    />
+                    <Select
+                      id="student-form-parent-relationship"
+                      label="Relationship"
+                      data={[
+                        { value: 'father', label: 'Father' },
+                        { value: 'mother', label: 'Mother' },
+                        { value: 'guardian', label: 'Guardian' },
+                      ]}
+                      {...form.getInputProps('parentRelationship')}
+                    />
+                  </Stack>
+                </Paper>
+              )}
             </>
           )}
 

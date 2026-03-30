@@ -1,6 +1,8 @@
+export type StudentAccountStatus = 'active' | 'pending_verification' | 'link_expired';
+
 export interface Student {
   id: string;
-  userId: string;
+  userId?: string;
   branchId: string;
   studentId: string;
   classId?: string;
@@ -10,6 +12,7 @@ export interface Student {
   admissionDate?: string;
   academicYearId?: string;
   isActive: boolean;
+  accountStatus: StudentAccountStatus;
   createdAt: string;
   updatedAt: string;
   firstName?: string;
@@ -50,6 +53,33 @@ export interface CreateStudentInput {
   academicYearId?: string;
   isActive?: boolean;
   subjectTemplateId?: string;
+}
+
+export interface CreateStudentWithInvitationInput {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female';
+  classId?: string;
+  sectionId?: string;
+  bloodGroup?: string;
+  medicalNotes?: string;
+  admissionDate?: string;
+  academicYearId?: string;
+  isActive?: boolean;
+  subjectTemplateId?: string;
+
+  invitationRecipientEmail: string;
+  invitationType: 'parent' | 'student';
+
+  createParentAccount?: boolean;
+  parentEmail?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentRelationship?: 'father' | 'mother' | 'guardian';
 }
 
 export interface UpdateStudentInput {

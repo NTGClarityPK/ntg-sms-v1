@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule as NestCronScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -48,6 +49,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BulkImportModule } from './modules/bulk-import/bulk-import.module';
 import { StudentSelfModule } from './modules/student-self/student-self.module';
 import { SettingsImportModule } from './modules/settings-import/settings-import.module';
+import { InvitationsModule } from './modules/invitations/invitations.module';
 
 @Module({
   imports: [
@@ -55,6 +57,7 @@ import { SettingsImportModule } from './modules/settings-import/settings-import.
       isGlobal: true,
       envFilePath: '.env',
     }),
+    NestCronScheduleModule.forRoot(),
     GlobalJwtModule,
     AuditLogModule,
     AuthModule,
@@ -98,6 +101,7 @@ import { SettingsImportModule } from './modules/settings-import/settings-import.
     BulkImportModule,
     SettingsImportModule,
     StudentSelfModule,
+    InvitationsModule,
   ],
   controllers: [AppController],
   providers: [

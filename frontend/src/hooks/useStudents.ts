@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import type { Student, CreateStudentInput, UpdateStudentInput } from '@/types/students';
+import type {
+  Student,
+  CreateStudentInput,
+  CreateStudentWithInvitationInput,
+  UpdateStudentInput,
+} from '@/types/students';
 import { useAuth } from './useAuth';
 import { notifications } from '@mantine/notifications';
 
@@ -150,6 +155,97 @@ export function useCreateStudent() {
       notifications.show({
         title: 'Error',
         message: error.message || 'Failed to create student',
+        color: 'red',
+      });
+    },
+  });
+}
+
+export interface ReinviteStudentInput {
+  email: string;
+  invitationRecipientEmail: string;
+  invitationType: 'parent' | 'student';
+}
+
+export function useReinviteStudentAfterExpiry() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useMutation({
+    mutationFn: async ({
+      studentId,
+      input,
+    }: {
+      studentId: string;
+      input: ReinviteStudentInput;
+    }) => {
+      const response = await apiClient.post<{
+        student: Student;
+        studentInvitation: {
+          token: string;
+          recipientEmail: string;
+          invitationType: 'parent' | 'student';
+          expiresAt: string;
+        };
+      }>(`/api/v1/students/${studentId}/reinvite-invitation`, input);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students', branchId] });
+      notifications.show({
+        title: 'Success',
+        message: 'New invitation sent successfully',
+        color: 'green',
+      });
+    },
+    onError: (error: Error) => {
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'Failed to send invitation',
+        color: 'red',
+      });
+    },
+  });
+}
+
+export function useCreateStudentWithInvitation() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useMutation({
+    mutationFn: async (input: CreateStudentWithInvitationInput) => {
+      const response = await apiClient.post<{
+        student: Student;
+        studentInvitation: {
+          token: string;
+          recipientEmail: string;
+          invitationType: 'parent' | 'student';
+          expiresAt: string;
+        };
+        parentInvitation?: {
+          token: string;
+          recipientEmail: string;
+          expiresAt: string;
+          parentUserId: string;
+        };
+      }>('/api/v1/students/with-invitation', input);
+
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students', branchId] });
+      notifications.show({
+        title: 'Success',
+        message: 'Invitation sent successfully',
+        color: 'green',
+      });
+    },
+    onError: (error: Error) => {
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'Failed to send invitation',
         color: 'red',
       });
     },

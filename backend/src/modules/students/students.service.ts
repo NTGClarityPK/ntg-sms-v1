@@ -11,12 +11,18 @@ import { StudentDto } from './dto/student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { CreateStudentWithInvitationDto } from './dto/create-student-with-invitation.dto';
+import { ReinviteStudentDto } from './dto/reinvite-student.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
+import { InvitationsService } from '../invitations/invitations.service';
+import { ParentsService } from '../parents/parents.service';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import crypto from 'crypto';
 
 type StudentRow = {
   id: string;
-  user_id: string;
+  user_id: string | null;
   branch_id: string;
   student_id: string;
   class_id: string | null;
@@ -30,7 +36,13 @@ type StudentRow = {
   updated_at: string;
   first_name: string | null;
   last_name: string | null;
+  account_status?: string | null;
 };
+
+function accountStatusFromRow(v: unknown): 'active' | 'pending_verification' | 'link_expired' {
+  if (v === 'pending_verification' || v === 'link_expired' || v === 'active') return v;
+  return 'active';
+}
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
@@ -43,7 +55,20 @@ export class StudentsService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly invitationsService: InvitationsService,
+    private readonly parentsService: ParentsService,
   ) {}
+
+  private randomTempPassword(): string {
+    // >= 24 chars, includes letters+numbers to satisfy common policies.
+    return crypto.randomBytes(24).toString('base64url');
+  }
+
+  private nameFromEmail(email: string): string {
+    const local = email.split('@')[0] || email;
+    const cleaned = local.replace(/[._-]+/g, ' ').trim();
+    return cleaned ? cleaned.replace(/\b\w/g, (c) => c.toUpperCase()) : email;
+  }
 
   async listStudents(
     query: QueryStudentsDto,
@@ -153,9 +178,9 @@ export class StudentsService {
 
     throwIfDbError(error);
 
-    const userIds = (data as unknown as Array<{ user_id: string }>)
+    const userIds = (data as unknown as Array<{ user_id: string | null }>)
       .map((s) => s.user_id)
-      .filter((id): id is string => !!id);
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
     // OPTIMISED: Fetch emails only for needed users via batched individual lookups
     // (instead of fetching ALL auth users and filtering client-side)
@@ -199,7 +224,7 @@ export class StudentsService {
 
     const students = (data as unknown as Array<{
       id: string;
-      user_id: string;
+      user_id: string | null;
       branch_id: string;
       student_id: string;
       class_id: string | null;
@@ -209,6 +234,7 @@ export class StudentsService {
       admission_date: string | null;
       academic_year_id: string | null;
       is_active: boolean;
+      account_status?: string | null;
       created_at: string;
       updated_at: string;
       first_name: string | null;
@@ -222,7 +248,7 @@ export class StudentsService {
 
       return new StudentDto({
         id: row.id,
-        userId: row.user_id,
+        userId: row.user_id ?? undefined,
         branchId: row.branch_id,
         studentId: row.student_id,
         classId: row.class_id ?? undefined,
@@ -232,11 +258,12 @@ export class StudentsService {
         admissionDate: row.admission_date ?? undefined,
         academicYearId: row.academic_year_id ?? undefined,
         isActive: row.is_active,
+        accountStatus: accountStatusFromRow(row.account_status),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         firstName: row.first_name ?? undefined,
         lastName: row.last_name ?? undefined,
-        email: emailMap.get(row.user_id),
+        email: row.user_id ? emailMap.get(row.user_id) : undefined,
         className: classData?.display_name ?? classData?.name,
         sectionName: sectionData?.name,
         subjectTemplateId: templateInfo?.templateId,
@@ -287,7 +314,7 @@ export class StudentsService {
 
     const row = data as unknown as {
       id: string;
-      user_id: string;
+      user_id: string | null;
       branch_id: string;
       student_id: string;
       class_id: string | null;
@@ -297,6 +324,7 @@ export class StudentsService {
       admission_date: string | null;
       academic_year_id: string | null;
       is_active: boolean;
+      account_status?: string | null;
       created_at: string;
       updated_at: string;
       first_name: string | null;
@@ -308,7 +336,9 @@ export class StudentsService {
     const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
     const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
 
-    const { data: authUser } = await supabase.auth.admin.getUserById(row.user_id);
+    const { data: authUser } = row.user_id
+      ? await supabase.auth.admin.getUserById(row.user_id)
+      : { data: { user: null } };
 
     const { data: templateAssignment } = await supabase
       .from('student_subject_template_assignments')
@@ -322,7 +352,7 @@ export class StudentsService {
 
     return new StudentDto({
       id: row.id,
-      userId: row.user_id,
+      userId: row.user_id ?? undefined,
       branchId: row.branch_id,
       studentId: row.student_id,
       classId: row.class_id ?? undefined,
@@ -332,6 +362,7 @@ export class StudentsService {
       admissionDate: row.admission_date ?? undefined,
       academicYearId: row.academic_year_id ?? undefined,
       isActive: row.is_active,
+      accountStatus: accountStatusFromRow(row.account_status),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       firstName: row.first_name ?? undefined,
@@ -446,6 +477,7 @@ export class StudentsService {
           admission_date: input.admissionDate ?? null,
           academic_year_id: academicYearId,
           is_active: input.isActive ?? true,
+          account_status: 'active',
           created_by: username,
           updated_by: username,
         })
@@ -505,6 +537,432 @@ export class StudentsService {
     }
   }
 
+  async createStudentWithInvitation(
+    input: CreateStudentWithInvitationDto,
+    branchId: string,
+    adminUser: CurrentUserPayload,
+  ): Promise<{
+    student: StudentDto;
+    studentInvitation: { token: string; recipientEmail: string; invitationType: 'parent' | 'student'; expiresAt: string };
+    parentInvitation?: { token: string; recipientEmail: string; expiresAt: string; parentUserId: string };
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(adminUser.email);
+
+    // Active academic year fallback (same logic as createStudent)
+    let academicYearId: string | null = input.academicYearId ?? null;
+    if (!academicYearId) {
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+      academicYearId = activeYear?.id ?? null;
+    }
+
+    const studentTempPassword = this.randomTempPassword();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.admin.createUser({
+      email: input.email,
+      password: studentTempPassword,
+      email_confirm: true,
+    });
+    if (authError) {
+      if (authError.message.includes('already registered')) {
+        throw new ConflictException('User with this email already exists');
+      }
+      throw new BadRequestException(authError.message);
+    }
+    if (!user) throw new BadRequestException('Failed to create user');
+
+    const displayName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+
+    try {
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: user.id,
+        full_name: displayName,
+        avatar_url: null,
+        phone: input.phone ?? null,
+        address: input.address ?? null,
+        date_of_birth: input.dateOfBirth ?? null,
+        gender: input.gender ?? null,
+        is_active: input.isActive ?? true,
+        created_by: username,
+        updated_by: username,
+      });
+      throwIfDbError(profileError);
+
+      const { error: branchError } = await supabase.from('user_branches').insert({
+        user_id: user.id,
+        branch_id: branchId,
+        is_primary: false,
+        created_by: username,
+      });
+      if (branchError) throw new BadRequestException(branchError.message);
+
+      const { data: studentRole } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'student')
+        .single();
+      if (studentRole) {
+        await supabase.from('user_roles').insert({
+          user_id: user.id,
+          role_id: studentRole.id,
+          branch_id: branchId,
+          created_by: username,
+        });
+      }
+
+      let generatedStudentId: string | null = null;
+      const { data: rollData, error: rollError } = await supabase.rpc('next_student_roll');
+      if (!rollError && typeof rollData === 'string' && rollData.trim() !== '') {
+        generatedStudentId = rollData.trim();
+      }
+
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .insert({
+          user_id: user.id,
+          branch_id: branchId,
+          student_id: generatedStudentId ?? undefined,
+          first_name: input.firstName.trim(),
+          last_name: input.lastName.trim(),
+          class_id: input.classId ?? null,
+          section_id: input.sectionId ?? null,
+          blood_group: input.bloodGroup ?? null,
+          medical_notes: input.medicalNotes ?? null,
+          admission_date: input.admissionDate ?? null,
+          academic_year_id: academicYearId,
+          is_active: false,
+          account_status: 'pending_verification',
+          created_by: username,
+          updated_by: username,
+        })
+        .select()
+        .single();
+
+      if (studentError) {
+        if (studentError.code === '23505' && studentError.message.includes('students_student_id_key')) {
+          throw new ConflictException('Student ID already exists. Please try again.');
+        }
+        throwIfDbError(studentError);
+      }
+      if (!student) throw new BadRequestException('Failed to create student record');
+
+      const studentRow = student as StudentRow;
+
+      // Optional: template assignment
+      if (input.subjectTemplateId) {
+        if (!academicYearId) {
+          throw new BadRequestException(
+            'Cannot assign subject template: No active academic year found. Please set an academic year in Settings.',
+          );
+        }
+        const { error: assignmentError } = await supabase
+          .from('student_subject_template_assignments')
+          .upsert(
+            {
+              student_id: studentRow.id,
+              subject_template_id: input.subjectTemplateId,
+              academic_year_id: academicYearId,
+              branch_id: branchId,
+              created_by: username,
+              updated_by: username,
+            },
+            { onConflict: 'student_id,academic_year_id' },
+          );
+        throwIfDbError(assignmentError);
+      }
+
+      // Scenario 3: create parent account if requested (and email provided)
+      let parentInvitation:
+        | { token: string; recipientEmail: string; expiresAt: string; parentUserId: string }
+        | undefined;
+
+      if (input.createParentAccount) {
+        const parentEmail = (input.parentEmail ?? '').trim();
+        if (!parentEmail) {
+          throw new BadRequestException('Parent email is required to create a parent account');
+        }
+        const parentName = (input.parentName ?? '').trim() || this.nameFromEmail(parentEmail);
+
+        const parentTempPassword = this.randomTempPassword();
+        const {
+          data: { user: parentUser },
+          error: parentAuthError,
+        } = await supabase.auth.admin.createUser({
+          email: parentEmail,
+          password: parentTempPassword,
+          email_confirm: true,
+        });
+        if (parentAuthError) throw new BadRequestException(parentAuthError.message);
+        if (!parentUser) throw new BadRequestException('Failed to create parent user');
+
+        const { error: parentProfileError } = await supabase.from('profiles').insert({
+          id: parentUser.id,
+          full_name: parentName,
+          avatar_url: null,
+          phone: input.parentPhone ?? null,
+          address: null,
+          date_of_birth: null,
+          gender: null,
+          is_active: true,
+          created_by: username,
+          updated_by: username,
+        });
+        throwIfDbError(parentProfileError);
+
+        const { error: parentBranchError } = await supabase.from('user_branches').insert({
+          user_id: parentUser.id,
+          branch_id: branchId,
+          is_primary: false,
+          created_by: username,
+        });
+        if (parentBranchError) throw new BadRequestException(parentBranchError.message);
+
+        const { data: parentRole } = await supabase
+          .from('roles')
+          .select('id')
+          .eq('name', 'parent')
+          .maybeSingle();
+        if (parentRole?.id) {
+          await supabase.from('user_roles').insert({
+            user_id: parentUser.id,
+            role_id: parentRole.id,
+            branch_id: branchId,
+            created_by: username,
+          });
+        }
+
+        // Link parent to student
+        await this.parentsService.linkChild(
+          parentUser.id,
+          {
+            studentId: studentRow.id,
+            relationship: input.parentRelationship ?? 'guardian',
+            isPrimary: true,
+            canApprove: true,
+          },
+          adminUser.email,
+          branchId,
+          null,
+        );
+
+        // Parent invitation (self setup) -> use invitation_type 'student'
+        const parentInv = await this.invitationsService.createInvitation({
+          userId: parentUser.id,
+          recipientEmail: parentEmail,
+          invitationType: 'student',
+          createdByUserId: adminUser.id,
+        });
+        await this.invitationsService.sendInvitationEmail({
+          invitation: parentInv,
+          recipientName: parentName,
+          loginEmail: parentEmail,
+          userEmailForAudit: adminUser.email,
+          branchId,
+        });
+        parentInvitation = {
+          token: parentInv.token,
+          recipientEmail: parentInv.recipient_email,
+          expiresAt: parentInv.expires_at,
+          parentUserId: parentUser.id,
+        };
+      }
+
+      // Student invitation (scenario 1 or 2)
+      const recipientEmail = input.invitationRecipientEmail.trim();
+      const invitationType = input.invitationType;
+      const recipientName =
+        invitationType === 'parent'
+          ? this.nameFromEmail(recipientEmail)
+          : displayName;
+
+      const inv = await this.invitationsService.createInvitation({
+        userId: user.id,
+        recipientEmail,
+        invitationType: invitationType === 'parent' ? 'parent' : 'student',
+        createdByUserId: adminUser.id,
+      });
+
+      await this.invitationsService.sendInvitationEmail({
+        invitation: inv,
+        recipientName,
+        loginEmail: input.email,
+        studentName: displayName,
+        userEmailForAudit: adminUser.email,
+        branchId,
+      });
+
+      const studentDto = await this.getStudentById(studentRow.id, branchId);
+
+      return {
+        student: studentDto,
+        studentInvitation: {
+          token: inv.token,
+          recipientEmail: inv.recipient_email,
+          invitationType,
+          expiresAt: inv.expires_at,
+        },
+        parentInvitation,
+      };
+    } catch (error) {
+      await supabase.auth.admin.deleteUser(user.id);
+      throw error;
+    }
+  }
+
+  /**
+   * After an unused invitation expired and auth was purged, create a new auth user and invitation.
+   * Requires the admin to supply the student login email again (it is not stored on the student row).
+   */
+  async reinviteStudentAfterLinkExpired(
+    studentId: string,
+    branchId: string,
+    input: ReinviteStudentDto,
+    adminUser: CurrentUserPayload,
+  ): Promise<{
+    student: StudentDto;
+    studentInvitation: {
+      token: string;
+      recipientEmail: string;
+      invitationType: 'parent' | 'student';
+      expiresAt: string;
+    };
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(adminUser.email);
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from('students')
+      .select('*')
+      .eq('id', studentId)
+      .eq('branch_id', branchId)
+      .single();
+    throwIfDbError(fetchErr);
+    if (!existing) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const row = existing as StudentRow;
+    if (row.account_status !== 'link_expired' || row.user_id != null) {
+      throw new BadRequestException(
+        'Re-invite is only available for students whose setup link expired and whose login account was removed',
+      );
+    }
+
+    const displayName = `${(row.first_name ?? '').trim()} ${(row.last_name ?? '').trim()}`.trim();
+    if (!displayName) {
+      throw new BadRequestException('Student record is missing a name');
+    }
+
+    const studentTempPassword = this.randomTempPassword();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.admin.createUser({
+      email: input.email.trim(),
+      password: studentTempPassword,
+      email_confirm: true,
+    });
+    if (authError) {
+      if (authError.message.includes('already registered')) {
+        throw new ConflictException('User with this email already exists');
+      }
+      throw new BadRequestException(authError.message);
+    }
+    if (!user) throw new BadRequestException('Failed to create user');
+
+    try {
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: user.id,
+        full_name: displayName,
+        avatar_url: null,
+        phone: null,
+        address: null,
+        date_of_birth: null,
+        gender: null,
+        is_active: false,
+        created_by: username,
+        updated_by: username,
+      });
+      throwIfDbError(profileError);
+
+      const { error: branchError } = await supabase.from('user_branches').insert({
+        user_id: user.id,
+        branch_id: branchId,
+        is_primary: false,
+        created_by: username,
+      });
+      if (branchError) throw new BadRequestException(branchError.message);
+
+      const { data: studentRole } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'student')
+        .single();
+      if (studentRole) {
+        await supabase.from('user_roles').insert({
+          user_id: user.id,
+          role_id: studentRole.id,
+          branch_id: branchId,
+          created_by: username,
+        });
+      }
+
+      const { error: updErr } = await supabase
+        .from('students')
+        .update({
+          user_id: user.id,
+          account_status: 'pending_verification',
+          is_active: false,
+          updated_at: new Date().toISOString(),
+          updated_by: username,
+        })
+        .eq('id', studentId)
+        .eq('branch_id', branchId);
+      throwIfDbError(updErr);
+
+      const recipientEmail = input.invitationRecipientEmail.trim();
+      const invitationType = input.invitationType;
+      const recipientName =
+        invitationType === 'parent'
+          ? this.nameFromEmail(recipientEmail)
+          : displayName;
+
+      const inv = await this.invitationsService.createInvitation({
+        userId: user.id,
+        recipientEmail,
+        invitationType: invitationType === 'parent' ? 'parent' : 'student',
+        createdByUserId: adminUser.id,
+      });
+
+      await this.invitationsService.sendInvitationEmail({
+        invitation: inv,
+        recipientName,
+        loginEmail: input.email.trim(),
+        studentName: displayName,
+        userEmailForAudit: adminUser.email,
+        branchId,
+      });
+
+      const studentDto = await this.getStudentById(studentId, branchId);
+
+      return {
+        student: studentDto,
+        studentInvitation: {
+          token: inv.token,
+          recipientEmail: inv.recipient_email,
+          invitationType,
+          expiresAt: inv.expires_at,
+        },
+      };
+    } catch (error) {
+      await supabase.auth.admin.deleteUser(user.id);
+      throw error;
+    }
+  }
+
   async updateStudent(
     id: string,
     input: UpdateStudentDto,
@@ -525,7 +983,11 @@ export class StudentsService {
       throw new NotFoundException('Student not found');
     }
 
-    const oldRowWithName = oldRow as { first_name?: string | null; last_name?: string | null; user_id: string };
+    const oldRowWithName = oldRow as {
+      first_name?: string | null;
+      last_name?: string | null;
+      user_id: string | null;
+    };
     const newFirst = input.firstName !== undefined ? input.firstName.trim() : (oldRowWithName.first_name ?? '');
     const newLast = input.lastName !== undefined ? input.lastName.trim() : (oldRowWithName.last_name ?? '');
     const displayName = `${newFirst} ${newLast}`.trim();
@@ -537,7 +999,8 @@ export class StudentsService {
         .eq('id', id)
         .single();
 
-      if (student) {
+      const stuUserId = (student as { user_id: string | null }).user_id;
+      if (stuUserId) {
         const profilePayload: Record<string, unknown> = {
           updated_at: new Date().toISOString(),
           updated_by: username,
@@ -551,7 +1014,7 @@ export class StudentsService {
         const { error: profileError } = await supabase
           .from('profiles')
           .update(profilePayload)
-          .eq('id', (student as { user_id: string }).user_id);
+          .eq('id', stuUserId);
 
         throwIfDbError(profileError);
       }

@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core';
-import { IconEdit, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
+import { Table, Badge, Group, ActionIcon, Pagination, Text, Modal, Stack, TextInput, Radio, Button } from '@mantine/core';
+import { IconEdit, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import type { Student } from '@/types/students';
 import { StudentForm } from './StudentForm';
+import { useResendInvitationForUser } from '@/hooks/useInvitationsAdmin';
+import { useReinviteStudentAfterExpiry } from '@/hooks/useStudents';
 
 interface StudentTableProps {
   students: Student[];
@@ -27,10 +29,52 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
   const t = useTranslations('students');
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [resendOpened, resendModal] = useDisclosure(false);
+  const [resendStudent, setResendStudent] = useState<Student | null>(null);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [studentLoginEmail, setStudentLoginEmail] = useState('');
+  const [invitationRecipientEmail, setInvitationRecipientEmail] = useState('');
+  const [invitationType, setInvitationType] = useState<'student' | 'parent'>('student');
+  const resend = useResendInvitationForUser();
+  const reinvite = useReinviteStudentAfterExpiry();
+
+  const needsReinviteFlow = (s: Student | null) =>
+    Boolean(s && (s.accountStatus === 'link_expired' || !s.userId));
 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student);
     open();
+  };
+
+  const handleResend = (student: Student) => {
+    setResendStudent(student);
+    setRecipientEmail('');
+    setStudentLoginEmail('');
+    setInvitationRecipientEmail('');
+    setInvitationType('student');
+    resendModal.open();
+  };
+
+  const statusBadge = (student: Student) => {
+    if (student.accountStatus === 'link_expired') {
+      return (
+        <Badge color="red" variant="light">
+          {t('linkExpired')}
+        </Badge>
+      );
+    }
+    if (student.accountStatus === 'pending_verification') {
+      return (
+        <Badge color="yellow" variant="light">
+          {t('pendingVerification')}
+        </Badge>
+      );
+    }
+    return (
+      <Badge color={student.isActive ? 'green' : 'red'} variant="light">
+        {student.isActive ? t('active') : t('inactive')}
+      </Badge>
+    );
   };
 
   const SortableHeader = ({ field, children }: { field: string; children: React.ReactNode }) => {
@@ -101,16 +145,17 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                 <Table.Td>
                   <Text size="sm">{student.subjectTemplateName || 'N/A'}</Text>
                 </Table.Td>
-                <Table.Td>
-                  <Badge color={student.isActive ? 'green' : 'red'} variant="light">
-                    {student.isActive ? t('active') : t('inactive')}
-                  </Badge>
-                </Table.Td>
+                <Table.Td>{statusBadge(student)}</Table.Td>
                 <Table.Td>
                   {canEdit && (
-                    <ActionIcon variant="light" onClick={() => handleEdit(student)}>
-                      <IconEdit size={16} />
-                    </ActionIcon>
+                    <Group gap={6}>
+                      <ActionIcon variant="light" onClick={() => handleEdit(student)} aria-label="Edit student">
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon variant="light" onClick={() => handleResend(student)} aria-label="Resend invitation">
+                        <IconMailForward size={16} />
+                      </ActionIcon>
+                    </Group>
                   )}
                 </Table.Td>
               </Table.Tr>
@@ -133,6 +178,115 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
         }}
         student={selectedStudent}
       />
+
+      <Modal
+        opened={resendOpened}
+        onClose={() => {
+          resendModal.close();
+          setResendStudent(null);
+        }}
+        title={t('resendInvitationTitle')}
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            {needsReinviteFlow(resendStudent)
+              ? t('reinviteAfterExpiryIntro')
+              : t('resendInvitationIntro', {
+                  name:
+                    `${resendStudent?.firstName ?? ''} ${resendStudent?.lastName ?? ''}`.trim() ||
+                    resendStudent?.studentId ||
+                    '—',
+                })}
+          </Text>
+
+          {needsReinviteFlow(resendStudent) ? (
+            <>
+              <TextInput
+                id="students-reinvite-login-email"
+                label={t('studentLoginEmail')}
+                placeholder={t('emailPlaceholder')}
+                value={studentLoginEmail}
+                onChange={(e) => setStudentLoginEmail(e.currentTarget.value)}
+                required
+              />
+              <TextInput
+                id="students-reinvite-invitation-email"
+                label={t('invitationRecipientEmail')}
+                placeholder={t('emailPlaceholder')}
+                value={invitationRecipientEmail}
+                onChange={(e) => setInvitationRecipientEmail(e.currentTarget.value)}
+                required
+              />
+            </>
+          ) : null}
+
+          <Radio.Group
+            value={invitationType}
+            onChange={(v) => setInvitationType(v as 'student' | 'parent')}
+            label={t('invitationTemplateLabel')}
+          >
+            <Stack gap="xs" mt="xs">
+              <Radio value="student" label={t('invitationTemplateStudent')} />
+              <Radio value="parent" label={t('invitationTemplateParent')} />
+            </Stack>
+          </Radio.Group>
+
+          {!needsReinviteFlow(resendStudent) ? (
+            <TextInput
+              id="students-resend-recipient-email"
+              label={t('sendToOptional')}
+              placeholder="recipient@example.com"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.currentTarget.value)}
+            />
+          ) : null}
+
+          <Group justify="flex-end">
+            <Button
+              variant="subtle"
+              onClick={() => {
+                resendModal.close();
+                setResendStudent(null);
+              }}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              id="students-resend-submit"
+              loading={resend.isPending || reinvite.isPending}
+              disabled={
+                !resendStudent ||
+                (needsReinviteFlow(resendStudent) &&
+                  (!studentLoginEmail.trim() || !invitationRecipientEmail.trim()))
+              }
+              onClick={async () => {
+                if (!resendStudent) return;
+                if (needsReinviteFlow(resendStudent)) {
+                  await reinvite.mutateAsync({
+                    studentId: resendStudent.id,
+                    input: {
+                      email: studentLoginEmail.trim(),
+                      invitationRecipientEmail: invitationRecipientEmail.trim(),
+                      invitationType,
+                    },
+                  });
+                } else {
+                  if (!resendStudent.userId) return;
+                  await resend.mutateAsync({
+                    userId: resendStudent.userId,
+                    invitationType,
+                    recipientEmail: recipientEmail.trim() || undefined,
+                  });
+                }
+                resendModal.close();
+                setResendStudent(null);
+              }}
+            >
+              {needsReinviteFlow(resendStudent) ? t('sendNewInvitation') : t('resend')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

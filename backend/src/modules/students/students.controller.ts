@@ -19,7 +19,9 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { CreateStudentWithInvitationDto } from './dto/create-student-with-invitation.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { ReinviteStudentDto } from './dto/reinvite-student.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @Controller('api/v1/students')
@@ -95,6 +97,21 @@ export class StudentsController {
     return { data };
   }
 
+  @Post('with-invitation')
+  async createStudentWithInvitation(
+    @Body() input: CreateStudentWithInvitationDto,
+    @CurrentBranch() branch: { branchId: string; tenantId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'students');
+    const data = await this.studentsService.createStudentWithInvitation(
+      input,
+      branch.branchId,
+      user,
+    );
+    return { data };
+  }
+
   @Post()
   async createStudent(
     @Body() input: CreateStudentDto,
@@ -114,6 +131,23 @@ export class StudentsController {
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'students');
     const data = await this.studentsService.bulkImport(input.students, branch.branchId, user.email);
+    return { data };
+  }
+
+  @Post(':id/reinvite-invitation')
+  async reinviteStudent(
+    @Param('id') id: string,
+    @Body() input: ReinviteStudentDto,
+    @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'students');
+    const data = await this.studentsService.reinviteStudentAfterLinkExpired(
+      id,
+      branch.branchId,
+      input,
+      user,
+    );
     return { data };
   }
 

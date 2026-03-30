@@ -1,6 +1,6 @@
 export class StudentDto {
   id!: string;
-  userId!: string;
+  userId?: string;
   branchId!: string;
   studentId!: string;
   classId?: string;
@@ -10,6 +10,8 @@ export class StudentDto {
   admissionDate?: string;
   academicYearId?: string;
   isActive!: boolean;
+  /** Invitation / login lifecycle (independent of admin is_active for suspended accounts). */
+  accountStatus!: 'active' | 'pending_verification' | 'link_expired';
   createdAt!: string;
   updatedAt!: string;
   // Joined data
