@@ -1,11 +1,13 @@
-import { IsEmail, IsIn, IsString } from 'class-validator';
+import { IsIn, IsString, Matches, ValidateIf } from 'class-validator';
 
 export class ReinviteStudentDto {
-  /** Student login email (Supabase Auth identifier). */
-  @IsEmail()
-  email!: string;
+  /** Student login username (without domain). */
+  @IsString()
+  @Matches(/^[a-z0-9]+$/i, { message: 'Username must be alphanumeric (no spaces or special characters)' })
+  username!: string;
 
-  @IsEmail()
+  @ValidateIf((o: ReinviteStudentDto) => o.invitationType === 'parent')
+  @Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, { message: 'Invalid email address' })
   invitationRecipientEmail!: string;
 
   @IsIn(['parent', 'student'])

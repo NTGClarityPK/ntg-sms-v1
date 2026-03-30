@@ -383,7 +383,7 @@ export class StaffService {
 
     if (authError) {
       if (authError.message.includes('already registered')) {
-        throw new ConflictException('User with this email already exists');
+        throw new ConflictException('A user with this email address already exists.');
       }
       throw new BadRequestException(authError.message);
     }

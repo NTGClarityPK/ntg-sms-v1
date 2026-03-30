@@ -3,6 +3,24 @@ import { apiClient } from '@/lib/api-client';
 import type { User, CreateUserInput, UpdateUserInput, UpdateUserRolesInput } from '@/types/users';
 import { useAuth } from './useAuth';
 import { notifications } from '@mantine/notifications';
+import axios from 'axios';
+
+/** Extract backend error message from Axios response. Nest HttpExceptionFilter returns { error: { code, message } }. */
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as unknown;
+    if (data && typeof data === 'object') {
+      const obj = data as {
+        error?: { message?: string | string[] };
+        message?: string | string[];
+      };
+      const msg = obj.error?.message ?? obj.message;
+      if (msg) return Array.isArray(msg) ? msg.join(', ') : msg;
+    }
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
 
 interface QueryUsersParams {
   page?: number;
@@ -82,10 +100,10 @@ export function useCreateUser() {
         color: 'green',
       });
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       notifications.show({
         title: 'Error',
-        message: error.message || 'Failed to create user',
+        message: getApiErrorMessage(error, 'Failed to create user'),
         color: 'red',
       });
     },
@@ -111,10 +129,10 @@ export function useUpdateUser() {
         color: 'green',
       });
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       notifications.show({
         title: 'Error',
-        message: error.message || 'Failed to update user',
+        message: getApiErrorMessage(error, 'Failed to update user'),
         color: 'red',
       });
     },
@@ -140,10 +158,10 @@ export function useUpdateUserRoles() {
         color: 'green',
       });
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       notifications.show({
         title: 'Error',
-        message: error.message || 'Failed to update user roles',
+        message: getApiErrorMessage(error, 'Failed to update user roles'),
         color: 'red',
       });
     },
@@ -167,10 +185,10 @@ export function useDeleteUser() {
         color: 'green',
       });
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       notifications.show({
         title: 'Error',
-        message: error.message || 'Failed to deactivate user',
+        message: getApiErrorMessage(error, 'Failed to deactivate user'),
         color: 'red',
       });
     },

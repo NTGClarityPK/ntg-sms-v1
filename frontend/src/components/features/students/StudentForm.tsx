@@ -15,6 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useStudentGuardians } from '@/hooks/useParentAssociations';
 import { IconPhone, IconUser } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
+import { useTenantMe } from '@/hooks/useTenant';
 
 interface StudentFormProps {
   opened: boolean;
@@ -31,9 +32,15 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const queryClient = useQueryClient();
   const createStudent = useCreateStudentWithInvitation();
   const updateStudent = useUpdateStudent();
+  const tenantMe = useTenantMe();
+  const tenantDomain = tenantMe.data?.data?.domain?.trim() || '';
 
   const createStudentSchema = z.object({
-    email: z.string().email(t('invalidEmail')),
+    username: z
+      .string()
+      .trim()
+      .min(1, t('usernameRequired'))
+      .regex(/^[a-z0-9]+$/i, t('usernameInvalid')),
     firstName: z.string().min(1, t('firstNameRequired')),
     lastName: z.string().min(1, t('secondNameRequired')),
     phone: z.string().optional(),
@@ -47,13 +54,39 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     admissionDate: z.string().optional(),
     isActive: z.boolean().optional(),
     invitationType: z.enum(['parent', 'student']),
-    invitationRecipientEmail: z.string().email(t('invalidEmail')),
+    // Parent invite: must be a real email address.
+    // Student invite: allow blank/username; we'll auto-build `${username}@${tenantDomain}` on submit.
+    invitationRecipientEmail: z.string().optional(),
     createParentAccount: z.boolean().optional(),
     // Allow empty string when parent account creation is not enabled
     parentEmail: z.union([z.string().email(t('invalidEmail')), z.literal('')]).optional(),
     parentName: z.string().optional(),
     parentPhone: z.string().optional(),
     parentRelationship: z.enum(['father', 'mother', 'guardian']).optional(),
+  }).superRefine((values, ctx) => {
+    const raw = (values.invitationRecipientEmail ?? '').trim();
+    const isEmail = raw.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+
+    if (values.invitationType === 'parent') {
+      if (!isEmail) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['invitationRecipientEmail'],
+          message: t('invalidEmail'),
+        });
+      }
+      return;
+    }
+
+    // invitationType === 'student'
+    // If user entered something containing '@', it must be a valid email.
+    if (raw.includes('@') && !isEmail) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['invitationRecipientEmail'],
+        message: t('invalidEmail'),
+      });
+    }
   });
 
   const updateStudentSchema = z.object({
@@ -78,7 +111,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
   const form = useForm({
     initialValues: {
-      email: '',
+      username: '',
       firstName: '',
       lastName: '',
       phone: '',
@@ -142,7 +175,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       }
 
       form.setValues({
-        email: student.email || '',
+        username: '',
         firstName: student.firstName || '',
         lastName: student.lastName || '',
         phone: student.phone || '',
@@ -184,8 +217,17 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
         await updateStudent.mutateAsync({ id: student.id, input: updateData });
       } else {
+        const recipientEmail = (() => {
+          const raw = (values.invitationRecipientEmail ?? '').trim();
+          if (values.invitationType === 'parent') return raw;
+          // Student invite: if blank or username-like, send to login email.
+          if (!raw) return `${values.username.trim()}@${tenantDomain}`;
+          if (!raw.includes('@')) return `${raw}@${tenantDomain}`;
+          return raw;
+        })();
+
         const createData: CreateStudentWithInvitationInput = {
-          email: values.email,
+          username: values.username,
           firstName: values.firstName,
           lastName: values.lastName,
           phone: values.phone || undefined,
@@ -200,7 +242,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           isActive: values.isActive,
           subjectTemplateId: values.subjectTemplateId || undefined,
           invitationType: values.invitationType,
-          invitationRecipientEmail: values.invitationRecipientEmail,
+          invitationRecipientEmail: recipientEmail,
           createParentAccount: values.createParentAccount || undefined,
           parentEmail: values.createParentAccount ? values.parentEmail || undefined : undefined,
           parentName: values.createParentAccount ? values.parentName || undefined : undefined,
@@ -243,7 +285,25 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         <Stack gap="md">
           {!isEdit && (
             <>
-              <TextInput id="student-form-email" label={t('email')} placeholder={t('emailPlaceholder')} required {...form.getInputProps('email')} />
+              <Group grow align="flex-end">
+                <TextInput
+                  id="student-form-username"
+                  label={t('username')}
+                  placeholder={t('usernamePlaceholder')}
+                  required
+                  {...form.getInputProps('username')}
+                />
+                <TextInput
+                  id="student-form-domain"
+                  label={t('domain')}
+                  value={tenantDomain ? `@${tenantDomain}` : '—'}
+                  readOnly
+                  styles={{ input: { backgroundColor: 'var(--mantine-color-default-hover)' } }}
+                />
+              </Group>
+              <Text size="xs" c="dimmed">
+                Login email will be: <strong>{`${(form.values.username || 'username').trim()}@${tenantDomain || 'domain'}`}</strong>
+              </Text>
               <Radio.Group
                 id="student-form-invite-type"
                 label="Send invitation to"

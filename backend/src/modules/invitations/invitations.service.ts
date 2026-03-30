@@ -66,19 +66,9 @@ export class InvitationsService {
     return `${this.getFrontendUrl()}/setup?token=${encodeURIComponent(token)}`;
   }
 
-  /** Public URL for the NTG Alma mark in invitation emails (must load in the recipient’s inbox). */
-  private invitationNtgLogoUrl(): string {
-    const explicit = this.configService.get<string>('INVITATION_NTG_LOGO_URL')?.trim();
-    if (explicit) {
-      return explicit;
-    }
-    return `${this.getFrontendUrl()}/NTGTempLogo.svg`;
-  }
-
   private async resolveInvitationBranding(branchId?: string): Promise<InvitationEmailBranding> {
-    const ntgLogoUrl = this.invitationNtgLogoUrl();
     if (!branchId) {
-      return { ntgLogoUrl, schoolLogoUrl: null, schoolName: null, branchName: null };
+      return { schoolName: null, branchName: null };
     }
 
     const supabase = this.supabaseConfig.getClient();
@@ -89,14 +79,12 @@ export class InvitationsService {
       .maybeSingle();
 
     if (branchError || !branch) {
-      return { ntgLogoUrl, schoolLogoUrl: null, schoolName: null, branchName: null };
+      return { schoolName: null, branchName: null };
     }
 
     const b = branch as { name: string | null; tenant_id: string | null };
     if (!b.tenant_id) {
       return {
-        ntgLogoUrl,
-        schoolLogoUrl: null,
         schoolName: b.name,
         branchName: b.name,
       };
@@ -110,8 +98,6 @@ export class InvitationsService {
 
     const t = tenant as { name: string | null; logo_url: string | null } | null;
     return {
-      ntgLogoUrl,
-      schoolLogoUrl: t?.logo_url ?? null,
       schoolName: t?.name ?? b.name,
       branchName: b.name,
     };
@@ -435,6 +421,7 @@ export class InvitationsService {
     invitationId?: string;
     token?: string;
     recipientEmailOverride?: string;
+    invitationTypeOverride?: InvitationType;
     createdByUserId: string;
     userEmailForAudit: string;
     branchId?: string;
@@ -470,6 +457,8 @@ export class InvitationsService {
 
     const recipientEmail =
       input.recipientEmailOverride?.trim() || existing.recipient_email;
+    const invitationType =
+      input.invitationTypeOverride ?? existing.invitation_type;
 
     // Rotate token on the existing record to keep a single invitation row.
     let newToken: string | null = null;
@@ -483,6 +472,7 @@ export class InvitationsService {
         .update({
           token: tokenCandidate,
           recipient_email: recipientEmail,
+          invitation_type: invitationType,
           expires_at: expiresAt,
         })
         .eq('id', existing.id)
@@ -547,7 +537,6 @@ export class InvitationsService {
       .from('invitations')
       .select('*')
       .eq('user_id', input.userId)
-      .eq('invitation_type', input.invitationType)
       .is('used_at', null)
       .order('created_at', { ascending: false })
       .limit(1);
@@ -561,6 +550,7 @@ export class InvitationsService {
     return this.resendInvitation({
       invitationId: existing.id,
       recipientEmailOverride: input.recipientEmailOverride,
+      invitationTypeOverride: input.invitationType,
       createdByUserId: input.createdByUserId,
       userEmailForAudit: input.userEmailForAudit,
       branchId: input.branchId,

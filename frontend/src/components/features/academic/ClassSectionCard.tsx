@@ -18,6 +18,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { CreateClassSectionModal } from './CreateClassSectionModal';
 import { ClassSectionStudentsModal } from './ClassSectionStudentsModal';
 import { AssignClassTeacherModal } from './AssignClassTeacherModal';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 
 interface ClassSectionCardProps {
   classSection: ClassSection;
@@ -32,6 +33,7 @@ export function ClassSectionCard({
 }: ClassSectionCardProps) {
   const t = useTranslations('class');
   const colors = useThemeColors();
+  const { canEdit } = useFeaturePermission('class_sections');
   const deleteClassSection = useDeleteClassSection();
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
   const [studentsOpened, { open: openStudents, close: closeStudents }] = useDisclosure(false);
@@ -94,23 +96,29 @@ export function ClassSectionCard({
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item leftSection={<IconEdit size={16} />} onClick={openEdit}>
-                {t('edit')}
-              </Menu.Item>
+              {canEdit && (
+                <Menu.Item leftSection={<IconEdit size={16} />} onClick={openEdit}>
+                  {t('edit')}
+                </Menu.Item>
+              )}
               <Menu.Item leftSection={<IconUsers size={16} />} onClick={openStudents}>
                 {t('viewStudents')}
               </Menu.Item>
-              <Menu.Item leftSection={<IconUser size={16} />} onClick={openTeacher}>
-                {classSection.classTeacherId ? t('changeTeacher') : t('assignTeacher')}
-              </Menu.Item>
-              <Menu.Divider />
-              <Menu.Item
-                leftSection={<IconTrash size={16} />}
-                color="red"
-                onClick={handleDelete}
-              >
-                {t('delete')}
-              </Menu.Item>
+              {canEdit && (
+                <>
+                  <Menu.Item leftSection={<IconUser size={16} />} onClick={openTeacher}>
+                    {classSection.classTeacherId ? t('changeTeacher') : t('assignTeacher')}
+                  </Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item
+                    leftSection={<IconTrash size={16} />}
+                    color="red"
+                    onClick={handleDelete}
+                  >
+                    {t('delete')}
+                  </Menu.Item>
+                </>
+              )}
             </Menu.Dropdown>
           </Menu>
         </Group>

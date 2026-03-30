@@ -1,15 +1,17 @@
 import {
-  IsEmail,
   IsString,
   IsOptional,
   IsBoolean,
   MinLength,
   IsUUID,
+  Matches,
 } from 'class-validator';
 
 export class CreateStudentDto {
-  @IsEmail()
-  email!: string;
+  /** School login username (without domain). Alphanumeric only. */
+  @IsString()
+  @Matches(/^[a-z0-9]+$/i, { message: 'Username must be alphanumeric (no spaces or special characters)' })
+  username!: string;
 
   @IsString()
   @MinLength(6)

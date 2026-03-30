@@ -162,7 +162,7 @@ export function useCreateStudent() {
 }
 
 export interface ReinviteStudentInput {
-  email: string;
+  username: string;
   invitationRecipientEmail: string;
   invitationType: 'parent' | 'student';
 }

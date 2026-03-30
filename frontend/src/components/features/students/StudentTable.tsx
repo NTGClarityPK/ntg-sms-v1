@@ -32,7 +32,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
   const [resendOpened, resendModal] = useDisclosure(false);
   const [resendStudent, setResendStudent] = useState<Student | null>(null);
   const [recipientEmail, setRecipientEmail] = useState('');
-  const [studentLoginEmail, setStudentLoginEmail] = useState('');
+  const [studentUsername, setStudentUsername] = useState('');
   const [invitationRecipientEmail, setInvitationRecipientEmail] = useState('');
   const [invitationType, setInvitationType] = useState<'student' | 'parent'>('student');
   const resend = useResendInvitationForUser();
@@ -49,7 +49,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
   const handleResend = (student: Student) => {
     setResendStudent(student);
     setRecipientEmail('');
-    setStudentLoginEmail('');
+    setStudentUsername('');
     setInvitationRecipientEmail('');
     setInvitationType('student');
     resendModal.open();
@@ -204,9 +204,9 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
               <TextInput
                 id="students-reinvite-login-email"
                 label={t('studentLoginEmail')}
-                placeholder={t('emailPlaceholder')}
-                value={studentLoginEmail}
-                onChange={(e) => setStudentLoginEmail(e.currentTarget.value)}
+                placeholder={t('usernamePlaceholder')}
+                value={studentUsername}
+                onChange={(e) => setStudentUsername(e.currentTarget.value)}
                 required
               />
               <TextInput
@@ -257,7 +257,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
               disabled={
                 !resendStudent ||
                 (needsReinviteFlow(resendStudent) &&
-                  (!studentLoginEmail.trim() || !invitationRecipientEmail.trim()))
+                  (!studentUsername.trim() || !invitationRecipientEmail.trim()))
               }
               onClick={async () => {
                 if (!resendStudent) return;
@@ -265,7 +265,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                   await reinvite.mutateAsync({
                     studentId: resendStudent.id,
                     input: {
-                      email: studentLoginEmail.trim(),
+                      username: studentUsername.trim(),
                       invitationRecipientEmail: invitationRecipientEmail.trim(),
                       invitationType,
                     },

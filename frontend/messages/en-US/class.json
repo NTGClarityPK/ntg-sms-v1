@@ -67,4 +67,7 @@
   "assignmentSubmission": "Assignment Submission",
   "classTimetableTitle": "Class Timetable",
   "timetable": "Timetable"
+  ,
+  "viewOnly": "View only",
+  "viewOnlyMessage": "You have view-only access. Create, update, and delete actions are disabled."
 }

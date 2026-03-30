@@ -1,15 +1,18 @@
 import {
   IsBoolean,
-  IsEmail,
   IsIn,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateStudentWithInvitationDto {
-  @IsEmail()
-  email!: string; // student's school login email
+  /** School login username (without domain). Alphanumeric only. */
+  @IsString()
+  @Matches(/^[a-z0-9]+$/i, { message: 'Username must be alphanumeric (no spaces or special characters)' })
+  username!: string;
 
   @IsString()
   firstName!: string;
@@ -65,7 +68,14 @@ export class CreateStudentWithInvitationDto {
   @IsUUID()
   subjectTemplateId?: string;
 
-  @IsEmail()
+  /**
+   * Email to send the invitation to.
+   * - For `invitationType='parent'`: must be a valid email.
+   * - For `invitationType='student'`: may be a valid email OR a username (we will append tenant domain server-side).
+   */
+  @IsString()
+  @ValidateIf((o: CreateStudentWithInvitationDto) => o.invitationType === 'parent')
+  @Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, { message: 'Invalid email address' })
   invitationRecipientEmail!: string;
 
   @IsIn(['parent', 'student'])
@@ -77,7 +87,8 @@ export class CreateStudentWithInvitationDto {
   createParentAccount?: boolean;
 
   @IsOptional()
-  @IsEmail()
+  @ValidateIf((o: CreateStudentWithInvitationDto) => Boolean(o.createParentAccount))
+  @Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, { message: 'Invalid email address' })
   parentEmail?: string;
 
   @IsOptional()

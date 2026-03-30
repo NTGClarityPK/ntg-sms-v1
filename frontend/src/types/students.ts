@@ -35,7 +35,7 @@ export function formatStudentName(s: { firstName?: string | null; lastName?: str
 }
 
 export interface CreateStudentInput {
-  email: string;
+  username: string;
   password: string;
   firstName: string;
   lastName: string;
@@ -56,7 +56,7 @@ export interface CreateStudentInput {
 }
 
 export interface CreateStudentWithInvitationInput {
-  email: string;
+  username: string;
   firstName: string;
   lastName: string;
   phone?: string;

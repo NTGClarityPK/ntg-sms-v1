@@ -3,6 +3,24 @@ import { apiClient } from '@/lib/api-client';
 import type { Staff, CreateStaffInput, UpdateStaffInput } from '@/types/staff';
 import { useAuth } from './useAuth';
 import { notifications } from '@mantine/notifications';
+import axios from 'axios';
+
+/** Extract backend error message from Axios response. Nest HttpExceptionFilter returns { error: { code, message } }. */
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as unknown;
+    if (data && typeof data === 'object') {
+      const obj = data as {
+        error?: { message?: string | string[] };
+        message?: string | string[];
+      };
+      const msg = obj.error?.message ?? obj.message;
+      if (msg) return Array.isArray(msg) ? msg.join(', ') : msg;
+    }
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
 
 interface QueryStaffParams {
   page?: number;
@@ -62,10 +80,10 @@ export function useCreateStaff() {
         color: 'green',
       });
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       notifications.show({
         title: 'Error',
-        message: error.message || 'Failed to create staff member',
+        message: getApiErrorMessage(error, 'Failed to create staff member'),
         color: 'red',
       });
     },
@@ -115,10 +133,10 @@ export function useUpdateStaff() {
         color: 'green',
       });
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       notifications.show({
         title: 'Error',
-        message: error.message || 'Failed to update staff member',
+        message: getApiErrorMessage(error, 'Failed to update staff member'),
         color: 'red',
       });
     },

@@ -112,6 +112,12 @@ export default function SignupPage() {
     validateInputOnChange: false,
     validate: {
       schoolName: (value) => (value.length < 2 ? 'School name must be at least 2 characters' : null),
+      schoolDomain: (value) => {
+        const v = value.trim().toLowerCase();
+        if (!v) return 'Domain is required';
+        const ok = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(v);
+        return ok ? null : 'Enter a valid domain (e.g. example.edu)';
+      },
       branchName: (value) => (value.length < 2 ? 'Branch name must be at least 2 characters' : null),
       academicYearName: (value) => (value.length < 2 ? 'Academic year name must be at least 2 characters' : null),
       academicYearStartDate: (value, values) => {
@@ -508,13 +514,14 @@ export default function SignupPage() {
 
               <TextInput
                 id="signup-school-domain"
-                label="Domain (Optional)"
+                label="Domain"
                 placeholder="alekaf.edu"
-                description="School website domain"
+                description="Unique school domain (used for student login emails)"
                 leftSection={<IconMail size={18} />}
                 size="lg"
                 radius="md"
                 disabled={loading}
+                required
                 {...form.getInputProps('schoolDomain')}
               />
             </Stack>

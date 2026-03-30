@@ -726,42 +726,32 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       }
       
       /* Radio Component Styles */
+      /* Mantine v7 uses data attributes on the root for checked/disabled states. */
       .mantine-Radio-radio {
         border-color: ${config.components.radio.uncheckedColor} !important;
         background-color: transparent !important;
       }
-      
-      .mantine-Radio-input:checked + .mantine-Radio-radio {
+
+      .mantine-Radio-root[data-checked] .mantine-Radio-radio {
         border-color: ${config.components.radio.checkedColor} !important;
         background-color: ${config.components.radio.checkedColor} !important;
       }
-      
-      .mantine-Radio-input:disabled + .mantine-Radio-radio,
-      .mantine-Radio-radio[data-disabled] {
+
+      .mantine-Radio-root[data-disabled] .mantine-Radio-radio {
         border-color: ${config.components.radio.disabledColor ?? config.components.radio.uncheckedColor} !important;
         background-color: transparent !important;
         opacity: 0.6 !important;
       }
-      
-      .mantine-Radio-input:checked:disabled + .mantine-Radio-radio,
-      .mantine-Radio-input:checked + .mantine-Radio-radio[data-disabled] {
+
+      .mantine-Radio-root[data-checked][data-disabled] .mantine-Radio-radio {
         background-color: ${config.components.radio.disabledColor ?? config.components.radio.checkedColor} !important;
         opacity: 0.6 !important;
       }
-      
-      .mantine-Radio-inner {
-        background-color: ${config.components.radio.dotColor ?? config.components.radio.checkedColor} !important;
-      }
-      
-      .mantine-Radio-input:checked + .mantine-Radio-radio .mantine-Radio-inner {
-        background-color: ${config.components.radio.dotColor ?? config.components.radio.checkedColor} !important;
-      }
-      
-      .mantine-Radio-input:disabled + .mantine-Radio-radio .mantine-Radio-inner,
-      .mantine-Radio-input:checked:disabled + .mantine-Radio-radio .mantine-Radio-inner,
-      .mantine-Radio-radio[data-disabled] .mantine-Radio-inner {
-        background-color: ${config.components.radio.disabledColor ?? config.components.radio.dotColor ?? config.components.radio.checkedColor} !important;
-        opacity: 0.6 !important;
+
+      /* Make sure the inner checked indicator is visible across Mantine versions. */
+      .mantine-Radio-root[data-checked] .mantine-Radio-inner,
+      .mantine-Radio-root[data-checked] .mantine-Radio-icon {
+        color: ${config.components.radio.dotColor ?? '#ffffff'} !important;
       }
       
       .mantine-Radio-label {

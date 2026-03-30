@@ -29,6 +29,7 @@ export class RegistrationService {
     try {
       // Step 1: Create Tenant
       const tenantCode = input.schoolCode || this.generateCode(input.schoolName);
+      const tenantDomain = input.schoolDomain.trim().toLowerCase();
       
       // Check if tenant code already exists
       const { data: existingTenant } = await supabase
@@ -41,12 +42,22 @@ export class RegistrationService {
         throw new ConflictException(`School code "${tenantCode}" already exists. Please choose a different code.`);
       }
 
+      // Check if tenant domain already exists (global uniqueness)
+      const { data: existingDomain } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('domain', tenantDomain)
+        .maybeSingle();
+      if (existingDomain) {
+        throw new ConflictException(`Domain "${tenantDomain}" already exists. Please choose a different domain.`);
+      }
+
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
         .insert({
           name: input.schoolName,
           code: tenantCode,
-          domain: input.schoolDomain ?? null,
+          domain: tenantDomain,
           is_active: true,
         })
         .select('id')

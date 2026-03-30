@@ -22,7 +22,7 @@ import {
 import { IconUser, IconRefresh } from '@tabler/icons-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { useStudents } from '@/hooks/useStudents';
+import { useMyStudent, useStudents } from '@/hooks/useStudents';
 import { useLeaveRequests, useStudentLeaveStats, useLeaveQuota } from '@/hooks/useLeaveRequests';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useSchoolDays, usePublicHolidays, useVacations } from '@/hooks/useScheduleSettings';
@@ -31,6 +31,7 @@ import { LeaveRequestTable } from '@/components/features/leaves/LeaveRequestTabl
 import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
 import type { Student } from '@/types/students';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 
 interface ParentChild {
   id: string; // parent_student association ID
@@ -50,6 +51,8 @@ export default function LeavesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
+  const isStudent = user?.roles?.some((r) => r.roleName === 'student');
+  const { canEdit } = useFeaturePermission('leaves');
   const [page, setPage] = useState(1);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -80,8 +83,10 @@ export default function LeavesPage() {
     page: 1,
     limit: 100,
   });
+  const myStudentQuery = useMyStudent();
 
   // For parents: create Student objects from children (form only needs id)
+  // For students: use their own student record only
   // For staff: use all students from API
   let availableStudents: Student[] = [];
   if (isParent && children.length > 0) {
@@ -102,6 +107,9 @@ export default function LeavesPage() {
           lastName: (c as { lastName?: string }).lastName ?? (c.studentName?.split(' ').slice(1).join(' ') ?? ''),
         }) satisfies Student,
     );
+  } else if (isStudent) {
+    const myStudent = myStudentQuery.data?.data ?? null;
+    availableStudents = myStudent ? [myStudent] : [];
   } else if (!isParent && studentsData?.data) {
     availableStudents = studentsData.data;
   }
@@ -115,7 +123,9 @@ export default function LeavesPage() {
 
   const selectedStudent = availableStudents.find((s) => s.id === selectedStudentId) ?? availableStudents[0] ?? null;
   
-  const isLoading = isLoadingChildren || (isParent ? false : isLoadingStudents);
+  const isLoading =
+    isLoadingChildren ||
+    (isParent ? false : isStudent ? myStudentQuery.isLoading : isLoadingStudents);
 
   // Fetch student leave statistics
   const studentStats = useStudentLeaveStats(selectedStudentId);
@@ -129,6 +139,7 @@ export default function LeavesPage() {
   const leaveQuery = useLeaveRequests({
     page,
     limit: 20,
+    studentId: isParent || isStudent ? (selectedStudentId ?? undefined) : undefined,
   });
   const schoolDaysQuery = useSchoolDays();
   const activeSchoolDays = schoolDaysQuery.data?.data ?? [];
@@ -197,7 +208,7 @@ export default function LeavesPage() {
         }}
       >
         <Tabs
-          value={activeTab ?? (isParent ? 'my-requests' : 'all-requests')}
+          value={activeTab ?? ((isParent || isStudent) ? 'my-requests' : 'all-requests')}
           onChange={(value) => {
             setActiveTab(value);
             if (value === 'all-requests') {
@@ -206,11 +217,15 @@ export default function LeavesPage() {
           }}
         >
           <Tabs.List>
-            {isParent && <Tabs.Tab id="leaves-tab-my-requests" value="my-requests">{t('tabRaiseRequest')}</Tabs.Tab>}
+            {(isParent || isStudent) && (
+              <Tabs.Tab id="leaves-tab-my-requests" value="my-requests">
+                {t('tabRaiseRequest')}
+              </Tabs.Tab>
+            )}
             <Tabs.Tab id="leaves-tab-all-requests" value="all-requests">{t('tabAllRequests')}</Tabs.Tab>
           </Tabs.List>
 
-          {isParent && (
+          {(isParent || isStudent) && (
             <Tabs.Panel value="my-requests" pt="md">
               <Stack gap="md">
                 {isLoading ? (
@@ -229,6 +244,10 @@ export default function LeavesPage() {
                       </Stack>
                     </Card>
                   </Stack>
+                ) : !canEdit ? (
+                  <Alert color="blue" title={t('viewOnly')}>
+                    <Text size="sm">{t('viewOnlyMessage')}</Text>
+                  </Alert>
                 ) : availableStudents.length > 0 ? (
                   <>
                     {availableStudents.length > 1 && (
@@ -421,7 +440,8 @@ export default function LeavesPage() {
                   requests={requests}
                   meta={leaveQuery.data?.meta}
                   onPageChange={setPage}
-                  isStaffView={!isParent}
+                  isStaffView={!(isParent || isStudent)}
+                  canEdit={canEdit}
                   studentNameMap={studentNameMap}
                   activeSchoolDays={activeSchoolDays}
                   excludedDates={excludedDates}

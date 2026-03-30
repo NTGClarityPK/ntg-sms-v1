@@ -72,4 +72,7 @@
   "quota": "Quota",
   "save": "Save",
   "tabLeaveQuota": "Leave quota"
+  ,
+  "viewOnly": "View only",
+  "viewOnlyMessage": "You have view-only access. Request and approval actions are disabled."
 }

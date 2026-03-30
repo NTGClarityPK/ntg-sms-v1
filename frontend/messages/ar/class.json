@@ -64,4 +64,7 @@
     "assignmentViewing": "عرض الواجب",
     "assignmentSubmission": "تسليم الواجب",
     "classTimetableTitle": "جدول الصف"
+    ,
+    "viewOnly": "عرض فقط",
+    "viewOnlyMessage": "لديك صلاحية عرض فقط. تم تعطيل إجراءات الإنشاء والتحديث والحذف."
   }

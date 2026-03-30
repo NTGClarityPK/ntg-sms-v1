@@ -64,6 +64,49 @@ export class StudentsService {
     return crypto.randomBytes(24).toString('base64url');
   }
 
+  /**
+   * Normalise login emails so duplicates can't slip in due to casing or whitespace.
+   * Supabase Auth stores emails as provided, so we always canonicalise to lowercase.
+   */
+  private normalizeLoginEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private normalizeUsername(username: string): string {
+    return username.trim().toLowerCase();
+  }
+
+  private async getTenantDomainForBranch(branchId: string): Promise<string> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch, error: branchError } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    throwIfDbError(branchError);
+
+    const tenantId = (branch as { tenant_id: string | null } | null)?.tenant_id ?? null;
+    if (!tenantId) {
+      throw new BadRequestException('Tenant not resolved for this branch');
+    }
+
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('domain')
+      .eq('id', tenantId)
+      .maybeSingle();
+    throwIfDbError(tenantError);
+    const domain = (tenant as { domain: string } | null)?.domain?.trim().toLowerCase();
+    if (!domain) {
+      throw new BadRequestException('Tenant domain is not configured');
+    }
+    return domain;
+  }
+
+  private buildLoginEmail(username: string, domain: string): string {
+    return `${this.normalizeUsername(username)}@${domain.trim().toLowerCase()}`;
+  }
+
   private nameFromEmail(email: string): string {
     const local = email.split('@')[0] || email;
     const cleaned = local.replace(/[._-]+/g, ' ').trim();
@@ -156,20 +199,59 @@ export class StudentsService {
     const dbSortColumn = sortColumnMap[sortBy] || 'created_at';
     dbQuery = dbQuery.order(dbSortColumn, { ascending });
 
-    // Search: by student_id, first_name, last_name (DB filter for name; client-side for student_id + email)
+    // Search:
+    // - We can filter by first_name/last_name/student_id at DB level.
+    // - Email is not stored in the students table (resolved via Supabase auth admin), so email search
+    //   must be done client-side after we resolve emails. When the search looks like an email, we avoid
+    //   DB-level name filters to prevent excluding the correct rows.
     const searchTerms = (query.search ?? '')
       .trim()
       .split(/\s+/)
       .map((t) => t.trim())
       .filter(Boolean);
     const hasSearch = searchTerms.length > 0;
+    const isEmailLikeSearch =
+      hasSearch && searchTerms.some((t) => t.includes('@'));
+    const isSingleToken = searchTerms.length === 1;
+    const singleToken = isSingleToken ? searchTerms[0] : '';
+    const isUsernameLikeToken =
+      isSingleToken && /^[a-z0-9]+$/i.test(singleToken) && singleToken.length >= 3;
     if (hasSearch) {
-      const nameOrFilter = searchTerms
-        .map((t) => `first_name.ilike.%${t}%,last_name.ilike.%${t}%`)
-        .join(',');
-      dbQuery = dbQuery.or(nameOrFilter);
+      if (!isEmailLikeSearch) {
+        // When searching by a single username-like token (e.g. "john221"), users typically
+        // expect it to match the email local-part too. Email isn't in the students table,
+        // so do NOT apply DB-level name filters here (which would exclude the right row).
+        // We'll fetch a larger candidate set and filter client-side (including email).
+        if (!isUsernameLikeToken) {
+          // Include student_id so searching by ID works without relying on client-side filtering.
+          const orFilter = searchTerms
+            .map((t) => `first_name.ilike.%${t}%,last_name.ilike.%${t}%,student_id.ilike.%${t}%`)
+            .join(',');
+          dbQuery = dbQuery.or(orFilter);
+        }
+      } else {
+        // Email search: use profiles.email (fast) to resolve matching auth IDs,
+        // then filter students by user_id.
+        // NOTE: profiles.email must be populated (we now set it when creating students).
+        const emailTerm = searchTerms.join(' ').toLowerCase();
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', `%${emailTerm}%`)
+          .limit(200);
+        throwIfDbError(profilesError);
+        const matchedUserIds = (profiles || []).map((p: { id: string }) => p.id);
+        if (matchedUserIds.length === 0) {
+          return {
+            data: [],
+            meta: { total: 0, page, limit, totalPages: 0 },
+          };
+        }
+        dbQuery = dbQuery.in('user_id', matchedUserIds);
+      }
     }
 
+    // When searching (especially by email), we need a larger candidate set for client-side filtering.
     const fetchLimit = hasSearch ? 1000 : limit;
     const fetchTo = hasSearch ? from + fetchLimit - 1 : to;
     let dbQueryWithLimit = dbQuery.range(from, fetchTo);
@@ -379,6 +461,11 @@ export class StudentsService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
+    const tenantDomain = await this.getTenantDomainForBranch(branchId);
+    const normalizedLoginEmail = this.normalizeLoginEmail(
+      this.buildLoginEmail(input.username, tenantDomain),
+    );
+
     // Get active academic year if not provided.
     // Fresh tenants may not have one configured yet; allow creating a student without it.
     let academicYearId: string | null = input.academicYearId ?? null;
@@ -392,7 +479,7 @@ export class StudentsService {
       data: { user },
       error: authError,
     } = await supabase.auth.admin.createUser({
-      email: input.email,
+      email: normalizedLoginEmail,
       password: input.password,
       email_confirm: true,
     });
@@ -414,6 +501,7 @@ export class StudentsService {
       const { error: profileError } = await supabase.from('profiles').insert({
         id: user.id,
         full_name: displayName,
+        email: normalizedLoginEmail,
         avatar_url: input.avatarUrl ?? null,
         phone: input.phone ?? null,
         address: input.address ?? null,
@@ -549,6 +637,11 @@ export class StudentsService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(adminUser.email);
 
+    const tenantDomain = await this.getTenantDomainForBranch(branchId);
+    const normalizedLoginEmail = this.normalizeLoginEmail(
+      this.buildLoginEmail(input.username, tenantDomain),
+    );
+
     // Active academic year fallback (same logic as createStudent)
     let academicYearId: string | null = input.academicYearId ?? null;
     if (!academicYearId) {
@@ -562,7 +655,7 @@ export class StudentsService {
       data: { user },
       error: authError,
     } = await supabase.auth.admin.createUser({
-      email: input.email,
+      email: normalizedLoginEmail,
       password: studentTempPassword,
       email_confirm: true,
     });
@@ -580,6 +673,7 @@ export class StudentsService {
       const { error: profileError } = await supabase.from('profiles').insert({
         id: user.id,
         full_name: displayName,
+        email: normalizedLoginEmail,
         avatar_url: null,
         phone: input.phone ?? null,
         address: input.address ?? null,
@@ -680,7 +774,7 @@ export class StudentsService {
         | undefined;
 
       if (input.createParentAccount) {
-        const parentEmail = (input.parentEmail ?? '').trim();
+        const parentEmail = this.normalizeLoginEmail(input.parentEmail ?? '');
         if (!parentEmail) {
           throw new BadRequestException('Parent email is required to create a parent account');
         }
@@ -771,7 +865,17 @@ export class StudentsService {
       }
 
       // Student invitation (scenario 1 or 2)
-      const recipientEmail = input.invitationRecipientEmail.trim();
+      const recipientEmail = (() => {
+        const raw = (input.invitationRecipientEmail ?? '').trim();
+        // Parent invitations must always be a real email address (validated in DTO).
+        if (input.invitationType === 'parent') return this.normalizeLoginEmail(raw);
+
+        // Student invitations: allow empty/username; build a valid email using tenant domain.
+        // If raw already looks like an email, normalise it and use as-is.
+        if (raw.includes('@')) return this.normalizeLoginEmail(raw);
+        const fallbackUsername = raw || input.username;
+        return this.normalizeLoginEmail(this.buildLoginEmail(fallbackUsername, tenantDomain));
+      })();
       const invitationType = input.invitationType;
       const recipientName =
         invitationType === 'parent'
@@ -788,7 +892,7 @@ export class StudentsService {
       await this.invitationsService.sendInvitationEmail({
         invitation: inv,
         recipientName,
-        loginEmail: input.email,
+        loginEmail: normalizedLoginEmail,
         studentName: displayName,
         userEmailForAudit: adminUser.email,
         branchId,
@@ -832,6 +936,10 @@ export class StudentsService {
   }> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(adminUser.email);
+    const tenantDomain = await this.getTenantDomainForBranch(branchId);
+    const normalizedLoginEmail = this.normalizeLoginEmail(
+      this.buildLoginEmail(input.username, tenantDomain),
+    );
 
     const { data: existing, error: fetchErr } = await supabase
       .from('students')
@@ -861,7 +969,7 @@ export class StudentsService {
       data: { user },
       error: authError,
     } = await supabase.auth.admin.createUser({
-      email: input.email.trim(),
+      email: normalizedLoginEmail,
       password: studentTempPassword,
       email_confirm: true,
     });
@@ -877,6 +985,7 @@ export class StudentsService {
       const { error: profileError } = await supabase.from('profiles').insert({
         id: user.id,
         full_name: displayName,
+        email: normalizedLoginEmail,
         avatar_url: null,
         phone: null,
         address: null,
@@ -923,7 +1032,13 @@ export class StudentsService {
         .eq('branch_id', branchId);
       throwIfDbError(updErr);
 
-      const recipientEmail = input.invitationRecipientEmail.trim();
+      const recipientEmail = (() => {
+        const raw = (input.invitationRecipientEmail ?? '').trim();
+        if (input.invitationType === 'parent') return this.normalizeLoginEmail(raw);
+        if (raw.includes('@')) return this.normalizeLoginEmail(raw);
+        const fallbackUsername = raw || input.username;
+        return this.normalizeLoginEmail(this.buildLoginEmail(fallbackUsername, tenantDomain));
+      })();
       const invitationType = input.invitationType;
       const recipientName =
         invitationType === 'parent'
@@ -940,7 +1055,7 @@ export class StudentsService {
       await this.invitationsService.sendInvitationEmail({
         invitation: inv,
         recipientName,
-        loginEmail: input.email.trim(),
+        loginEmail: normalizedLoginEmail,
         studentName: displayName,
         userEmailForAudit: adminUser.email,
         branchId,

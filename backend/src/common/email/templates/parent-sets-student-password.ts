@@ -21,7 +21,7 @@ export function parentSetsStudentPasswordTemplate(input: {
   const subject = `Set up your child's account · ${schoolShort}`;
 
   const ctaGreen =
-    'display:inline-block;background:linear-gradient(180deg,#10b981 0%,#059669 100%);color:#ffffff!important;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:15px;font-weight:700;letter-spacing:0.02em;box-shadow:0 3px 12px rgba(5,150,105,0.35);border:1px solid #047857;';
+    'display:inline-block;background-color:#059669;background:#059669;color:#ffffff!important;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:15px;font-weight:700;letter-spacing:0.02em;box-shadow:0 3px 12px rgba(5,150,105,0.35);border:1px solid #047857;line-height:1.2;white-space:nowrap;';
 
   const bodyHtml = `
     <p style="margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#059669;">

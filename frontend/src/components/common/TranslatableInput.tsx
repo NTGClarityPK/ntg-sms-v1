@@ -29,8 +29,12 @@ export function TranslatableInput({
 }: TranslatableInputProps) {
   const enFilled = (value.en ?? '').trim().length > 0;
   const arFilled = (value.ar ?? '').trim().length > 0;
-  const enWarning = required && !enFilled;
-  const arWarning = required && !arFilled;
+  // "required" here means: at least one language must be provided (not both).
+  // Do NOT set the HTML `required` attribute on both inputs, otherwise the browser will
+  // block submission until both fields are filled.
+  const missingBoth = required && !enFilled && !arFilled;
+  const enWarning = missingBoth;
+  const arWarning = missingBoth;
 
   return (
     <Tabs defaultValue="en" id={id}>
@@ -67,7 +71,7 @@ export function TranslatableInput({
           value={value.en ?? ''}
           onChange={(e) => onChange({ ...value, en: e.target.value })}
           placeholder={placeholder?.en}
-          required={required}
+          withAsterisk={required}
           dir="ltr"
         />
       </Tabs.Panel>
@@ -78,7 +82,7 @@ export function TranslatableInput({
           value={value.ar ?? ''}
           onChange={(e) => onChange({ ...value, ar: e.target.value })}
           placeholder={placeholder?.ar}
-          required={required}
+          withAsterisk={required}
           dir="rtl"
         />
       </Tabs.Panel>

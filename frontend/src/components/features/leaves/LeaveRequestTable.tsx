@@ -18,6 +18,8 @@ interface LeaveRequestTableProps {
   };
   onPageChange?: (page: number) => void;
   isStaffView?: boolean;
+  /** Whether the current user can perform edit actions (approve/reject/cancel). */
+  canEdit?: boolean;
   studentNameMap?: Map<string, string>;
   /** Active school days (0–6, 0=Sun). When set, Days column shows only these days in the range. */
   activeSchoolDays?: number[];
@@ -160,6 +162,7 @@ export function LeaveRequestTable({
   meta,
   onPageChange,
   isStaffView = false,
+  canEdit = true,
   studentNameMap,
   activeSchoolDays,
   excludedDates,
@@ -253,9 +256,9 @@ export function LeaveRequestTable({
           ) : (
             requests.map((request) => {
               const studentName = studentNameMap?.get(request.studentId);
-              const canReview = isStaffView && request.status === 'pending';
+              const canReview = canEdit && isStaffView && request.status === 'pending';
               // Can cancel only if: parent view, status is pending, and not yet reviewed
-              const canCancel = !isStaffView && request.status === 'pending' && !request.reviewedBy;
+              const canCancel = canEdit && !isStaffView && request.status === 'pending' && !request.reviewedBy;
 
               return (
                 <Table.Tr key={request.id}>

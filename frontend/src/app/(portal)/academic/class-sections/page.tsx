@@ -9,9 +9,15 @@ import { ClassSectionGrid } from '@/components/features/academic/ClassSectionGri
 import { useClasses } from '@/hooks/useCoreLookups';
 import { useSections } from '@/hooks/useCoreLookups';
 import { modals } from '@mantine/modals';
+import { Alert } from '@mantine/core';
+import { usePermissions, useFeaturePermission } from '@/hooks/usePermissions';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function ClassSectionsPage() {
   const t = useTranslations('class');
+  const colors = useThemeColors();
+  const { isLoading: permissionsLoading } = usePermissions();
+  const { canEdit } = useFeaturePermission('class_sections');
   const [isBulkCreating, setIsBulkCreating] = useState(false);
   const { data, isLoading, error } = useClassSections();
   const { data: classesData } = useClasses();
@@ -167,7 +173,7 @@ export default function ClassSectionsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>{t('title')}</Title>
-          {missingCombinations.length > 0 && (
+          {canEdit && missingCombinations.length > 0 && (
             <Button
               leftSection={<IconChecklist size={16} />}
               variant="light"
@@ -189,6 +195,11 @@ export default function ClassSectionsPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
+        {!permissionsLoading && !canEdit && (
+          <Alert color={colors.info} title={t('viewOnly')} mb="md">
+            <Text size="sm">{t('viewOnlyMessage')}</Text>
+          </Alert>
+        )}
         <ClassSectionGrid classSections={classSections} />
       </div>
     </>
