@@ -6,6 +6,7 @@ import { Box, Stack, Text, Loader, Stepper, Button, Alert, Group, useMantineThem
 import { IconAlertCircle, IconCheck, IconBrandGoogle, IconLayoutDashboard } from '@tabler/icons-react';
 import { supabase } from '@/lib/supabase/client';
 import { apiClient } from '@/lib/api-client';
+import { clearLocalSupabaseSession } from '@/lib/auth';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 
@@ -201,6 +202,19 @@ export default function AuthCallbackPage() {
         const msg =
           data?.error?.message ?? data?.message ?? (err instanceof Error ? err.message : 'Unknown error');
         const msgLower = typeof msg === 'string' ? msg.toLowerCase() : '';
+
+        if (status === 403) {
+          try {
+            await clearLocalSupabaseSession();
+          } catch {
+            // ignore
+          }
+          if (typeof window !== 'undefined' && typeof msg === 'string') {
+            window.sessionStorage.setItem('ntg_auth_inactive_message', msg);
+          }
+          router.replace('/login');
+          return;
+        }
 
         if (status === 404 || msgLower.includes('user not found')) {
           router.replace('/signup?google=not_found');

@@ -26,6 +26,19 @@ export class BranchGuard implements CanActivate {
     const supabase = this.supabaseConfig.getClient();
 
     let branchId = headerBranchId;
+    const selectFirstAccessibleBranch = async (): Promise<string | undefined> => {
+      const { data: userBranches } = await supabase
+        .from('user_branches')
+        .select('branch_id')
+        .eq('user_id', userId)
+        .limit(1);
+      return userBranches?.[0]?.branch_id ?? undefined;
+    };
+
+    const persistCurrentBranch = async (newBranchId: string): Promise<void> => {
+      await supabase.from('profiles').update({ current_branch_id: newBranchId }).eq('id', userId);
+    };
+
     if (!branchId) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -42,17 +55,9 @@ export class BranchGuard implements CanActivate {
 
       // Auto-select first branch when none set (e.g. non–school-admin users who skip branch modal)
       if (!branchId) {
-        const { data: userBranches } = await supabase
-          .from('user_branches')
-          .select('branch_id')
-          .eq('user_id', userId)
-          .limit(1);
-        const firstBranchId = userBranches?.[0]?.branch_id;
+        const firstBranchId = await selectFirstAccessibleBranch();
         if (firstBranchId) {
-          await supabase
-            .from('profiles')
-            .update({ current_branch_id: firstBranchId })
-            .eq('id', userId);
+          await persistCurrentBranch(firstBranchId);
           branchId = firstBranchId;
         }
       }
@@ -75,7 +80,15 @@ export class BranchGuard implements CanActivate {
     }
 
     if (!userBranch) {
-      throw new BadRequestException('You do not have access to this branch');
+      // Frontend can keep a stale currentBranchId in localStorage across accounts.
+      // Recover gracefully by selecting the first accessible branch for this user.
+      const firstBranchId = await selectFirstAccessibleBranch();
+      if (!firstBranchId) {
+        throw new BadRequestException('You do not have access to this branch');
+      }
+
+      await persistCurrentBranch(firstBranchId);
+      branchId = firstBranchId;
     }
 
     // Resolve tenantId from branches table

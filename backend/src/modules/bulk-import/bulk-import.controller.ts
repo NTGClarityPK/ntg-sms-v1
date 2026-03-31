@@ -14,6 +14,7 @@ import { BulkStudentRowDto } from './dto/bulk-student-row.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
+import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -64,6 +65,7 @@ export class BulkImportController {
   async importStudents(
     @Body() body: { rows: BulkStudentRowDto[]; academicYearId: string },
     @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     if (!body.rows || body.rows.length === 0) {
       throw new BadRequestException('No rows to import');
@@ -75,6 +77,7 @@ export class BulkImportController {
       body.rows,
       branch.branchId,
       body.academicYearId,
+      user,
     );
   }
 
@@ -84,16 +87,45 @@ export class BulkImportController {
     return {
       data: {
         columns: [
-          { key: 'first_name', label: 'First Name', example: 'Ahmed' },
-          { key: 'last_name', label: 'Last Name', example: 'Ali' },
-          { key: 'email', label: 'Email', example: 'ahmed.ali@example.com' },
-          { key: 'phone', label: 'Phone (optional)', example: '+9647701234567' },
-          { key: 'date_of_birth', label: 'Date of Birth (optional)', example: '2010-05-15' },
-          { key: 'gender', label: 'Gender', example: 'male' },
           {
-            key: 'student_id',
-            label: 'Student ID (optional, leave blank for auto e.g. 0001)',
-            example: '0001',
+            key: 'username',
+            label: 'Username',
+            example: 'ahmedali',
+          },
+          {
+            key: 'first_name',
+            label: 'First Name',
+            example: 'Ahmed',
+          },
+          {
+            key: 'last_name',
+            label: 'Last Name',
+            example: 'Ali',
+          },
+          {
+            key: 'gender',
+            label: 'Gender',
+            example: 'male',
+          },
+          {
+            key: 'invitation_type',
+            label: 'Invitation Type',
+            example: 'student',
+          },
+          {
+            key: 'invitation_recipient_email',
+            label: 'Invitation Recipient Email (optional)',
+            example: 'parent.personal@example.com',
+          },
+          {
+            key: 'phone',
+            label: 'Phone (optional)',
+            example: '+9647701234567',
+          },
+          {
+            key: 'date_of_birth',
+            label: 'Date of Birth (optional)',
+            example: '2010-05-15',
           },
           {
             key: 'class_name_or_id',
@@ -111,19 +143,29 @@ export class BulkImportController {
             example: 'Primary Curriculum',
           },
           {
+            key: 'create_parent_account',
+            label: 'Create Parent Account',
+            example: 'no',
+          },
+          {
+            key: 'parent_email',
+            label: 'Parent Email (for new parent account)',
+            example: 'parent@example.com',
+          },
+          {
             key: 'parent_name',
             label: 'Parent Name (optional)',
             example: 'Ali Ahmed',
           },
           {
-            key: 'parent_email',
-            label: 'Parent Email (optional)',
-            example: 'parent@example.com',
-          },
-          {
             key: 'parent_phone',
             label: 'Parent Phone (optional)',
             example: '+9647709876543',
+          },
+          {
+            key: 'parent_relationship',
+            label: 'Parent Relationship (optional)',
+            example: 'guardian',
           },
         ],
       },

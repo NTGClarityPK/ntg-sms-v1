@@ -15,9 +15,10 @@ import { AuditLogService } from '../../common/services/audit-log.service';
 import { MailjetService } from '../../common/services/email/mailjet.service';
 import { parentSetsStudentPasswordTemplate } from '../../common/email/templates/parent-sets-student-password';
 import { studentSetsOwnPasswordTemplate } from '../../common/email/templates/student-sets-own-password';
+import { parentSetsOwnPasswordTemplate } from '../../common/email/templates/parent-sets-own-password';
 import type { InvitationEmailBranding } from '../../common/email/templates/invitation-email-layout';
 
-type InvitationType = 'student' | 'parent';
+type InvitationType = 'student' | 'parent' | 'parent_account';
 
 type InvitationRow = {
   id: string;
@@ -200,23 +201,34 @@ export class InvitationsService {
     const link = this.invitationLink(input.invitation.token);
     const expiresInDays = 7;
 
-    const template =
-      input.invitation.invitation_type === 'parent'
-        ? parentSetsStudentPasswordTemplate({
-            parentName: input.recipientName,
-            studentName: studentName ?? 'Student',
-            loginEmail: input.loginEmail,
-            invitationLink: link,
-            expiresInDays,
-            branding,
-          })
-        : studentSetsOwnPasswordTemplate({
-            studentName: input.recipientName,
-            loginEmail: input.loginEmail,
-            invitationLink: link,
-            expiresInDays,
-            branding,
-          });
+    const template = (() => {
+      if (input.invitation.invitation_type === 'parent') {
+        return parentSetsStudentPasswordTemplate({
+          parentName: input.recipientName,
+          studentName: studentName ?? 'Student',
+          loginEmail: input.loginEmail,
+          invitationLink: link,
+          expiresInDays,
+          branding,
+        });
+      }
+      if (input.invitation.invitation_type === 'parent_account') {
+        return parentSetsOwnPasswordTemplate({
+          parentName: input.recipientName,
+          loginEmail: input.loginEmail,
+          invitationLink: link,
+          expiresInDays,
+          branding,
+        });
+      }
+      return studentSetsOwnPasswordTemplate({
+        studentName: input.recipientName,
+        loginEmail: input.loginEmail,
+        invitationLink: link,
+        expiresInDays,
+        branding,
+      });
+    })();
 
     try {
       await this.mailjetService.sendEmail({
@@ -331,7 +343,9 @@ export class InvitationsService {
       .eq('id', inv.id);
     throwIfDbError(usedError);
 
-    await this.activateStudentAfterPasswordSetup(inv.user_id);
+    if (inv.invitation_type !== 'parent_account') {
+      await this.activateStudentAfterPasswordSetup(inv.user_id);
+    }
 
     return { success: true };
   }

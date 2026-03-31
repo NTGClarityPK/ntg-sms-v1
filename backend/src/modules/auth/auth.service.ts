@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { UserResponseDto } from './dto/user-response.dto';
 import { BranchSummaryDto } from './dto/branch-summary.dto';
@@ -87,7 +92,9 @@ export class AuthService {
       // Get profile from public.profiles (only needed fields)
       supabase
         .from('profiles')
-        .select('full_name, avatar_url, current_branch_id, preferred_locale, onboarding_seen_tours_modal')
+        .select(
+          'full_name, avatar_url, current_branch_id, preferred_locale, onboarding_seen_tours_modal, is_active',
+        )
         .eq('id', userId)
         .maybeSingle(),
       // Get user branch mappings
@@ -110,6 +117,13 @@ export class AuthService {
     const { data: profile, error: profileError } = profileResult;
     if (profileError && profileError.code !== 'PGRST116') {
       throw new NotFoundException('Profile not found');
+    }
+
+    const profileActiveFlag = (profile as { is_active?: boolean | null } | null)?.is_active;
+    if (profileActiveFlag === false) {
+      throw new ForbiddenException(
+        'Your account has been marked as inactive by an administrator. Please contact your school if you need help.',
+      );
     }
 
     const { data: userBranchesData, error: userBranchesError } = userBranchesResult;
@@ -159,6 +173,25 @@ export class AuthService {
         roleName: roleMap.get(ur.role_id) || '',
         branchId: ur.branch_id,
       }));
+    }
+
+    const isStudentUser = roles.some((r) => (r.roleName || '').toLowerCase() === 'student');
+    if (isStudentUser) {
+      const { data: studentRows, error: studentRowsError } = await supabase
+        .from('students')
+        .select('is_active')
+        .eq('user_id', userId);
+
+      if (studentRowsError) {
+        throw new BadRequestException(`Failed to verify student status: ${studentRowsError.message}`);
+      }
+
+      const rows = (studentRows || []) as Array<{ is_active: boolean }>;
+      if (rows.length > 0 && rows.some((row) => !row.is_active)) {
+        throw new ForbiddenException(
+          'Your account has been marked as inactive by an administrator. Please contact your school if you need help.',
+        );
+      }
     }
 
     // Use current_branch_id from profile (already fetched, no extra query needed)
@@ -607,7 +640,7 @@ export class AuthService {
 
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, student_id, first_name, last_name, branch_id')
+      .select('id, student_id, first_name, last_name, branch_id, is_active')
       .eq('id', studentId)
       .maybeSingle();
 
@@ -621,7 +654,14 @@ export class AuthService {
       first_name: string | null;
       last_name: string | null;
       branch_id: string | null;
+      is_active: boolean;
     };
+
+    if (row.is_active === false) {
+      throw new ForbiddenException(
+        'This student account has been marked as inactive by an administrator. Please contact your school if you need help.',
+      );
+    }
 
     // Keep existing behaviour of storing current_student_id for convenience
     const { error: updateError } = await supabase

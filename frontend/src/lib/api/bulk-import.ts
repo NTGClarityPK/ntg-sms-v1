@@ -21,9 +21,14 @@ export interface BulkImportResult {
 }
 
 export interface BulkStudentRowDto {
+  row_number?: number;
+  username: string;
   first_name: string;
   last_name: string;
-  email: string;
+  invitation_type: 'parent' | 'student';
+  invitation_recipient_email?: string;
+  create_parent_account: boolean;
+  parent_relationship?: 'father' | 'mother' | 'guardian';
   phone?: string;
   date_of_birth?: string;
   gender: string;

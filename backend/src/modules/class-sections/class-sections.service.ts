@@ -96,7 +96,31 @@ export class ClassSectionsService {
     }
 
     if (query.classTeacherId) {
-      dbQuery = dbQuery.eq('class_teacher_id', query.classTeacherId);
+      const staffId = query.classTeacherId;
+
+      // Teachers can be mapped to class-sections in two ways:
+      // - As a class teacher via class_sections.class_teacher_id
+      // - As a subject teacher via teacher_assignments.class_section_id
+      //
+      // Attendance screens rely on seeing mapped class-sections, so include both sources.
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('teacher_assignments')
+        .select('class_section_id')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', activeYearId)
+        .eq('staff_id', staffId);
+      throwIfDbError(assignmentsError);
+
+      const assignedClassSectionIds = (assignments || [])
+        .map((a) => (a as { class_section_id: string }).class_section_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+      const orParts = [`class_teacher_id.eq.${staffId}`];
+      if (assignedClassSectionIds.length > 0) {
+        // PostgREST "in" syntax: in.(a,b,c)
+        orParts.push(`id.in.(${assignedClassSectionIds.join(',')})`);
+      }
+      dbQuery = dbQuery.or(orParts.join(','));
     }
 
     // Apply sorting

@@ -89,6 +89,16 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
+    const flash = typeof window !== 'undefined'
+      ? window.sessionStorage.getItem('ntg_auth_inactive_message')
+      : null;
+    if (flash) {
+      window.sessionStorage.removeItem('ntg_auth_inactive_message');
+      setError(flash);
+    }
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     async function checkAnyPin() {
       try {

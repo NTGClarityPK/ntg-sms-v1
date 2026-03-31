@@ -88,8 +88,14 @@ export default function BulkImportStudentsPage() {
       return;
     }
     const validRows = preview.rows
-      .filter((r) => r.data.first_name?.trim() && r.data.last_name?.trim() && r.data.email?.trim() && r.data.gender?.trim())
-      .map((r) => r.data);
+      .filter(
+        (r) =>
+          r.data.first_name?.trim() &&
+          r.data.last_name?.trim() &&
+          r.data.username?.trim() &&
+          r.data.gender?.trim()
+      )
+      .map((r) => ({ ...r.data, row_number: r.rowNumber }));
     if (validRows.length === 0) {
       notifications.show({
         title: t('bulkNoValidRows'),
@@ -128,19 +134,30 @@ export default function BulkImportStudentsPage() {
 
   const handleDownloadTemplate = () => {
     const columns = templateData?.columns ?? [
-      { key: 'First Name', label: 'First Name', example: 'Ahmed' },
-      { key: 'Last Name', label: 'Last Name', example: 'Ali' },
-      { key: 'Email', label: 'Email', example: 'ahmed.ali@example.com' },
-      { key: 'Phone', label: 'Phone (optional)', example: '+9647701234567' },
-      { key: 'Date of Birth', label: 'Date of Birth (optional)', example: '2010-05-15' },
-      { key: 'Gender', label: 'Gender', example: 'male' },
-      { key: 'Student ID', label: 'Student ID (optional, leave blank for auto e.g. 0001)', example: '0001' },
-      { key: 'Class', label: 'Class name or ID (optional)', example: 'Grade 1' },
-      { key: 'Section', label: 'Section name or ID (optional)', example: 'A' },
-      { key: 'Subject Template', label: 'Subject Template name or ID (optional)', example: 'Primary Curriculum' },
-      { key: 'Parent Name', label: 'Parent Name (optional)', example: 'Ali Ahmed' },
-      { key: 'Parent Email', label: 'Parent Email (optional)', example: 'parent@example.com' },
-      { key: 'Parent Phone', label: 'Parent Phone (optional)', example: '+9647709876543' },
+      { key: 'username', label: 'Username', example: 'ahmedali' },
+      { key: 'first_name', label: 'First Name', example: 'Ahmed' },
+      { key: 'last_name', label: 'Last Name', example: 'Ali' },
+      { key: 'gender', label: 'Gender', example: 'male' },
+      { key: 'invitation_type', label: 'Invitation Type', example: 'student' },
+      {
+        key: 'invitation_recipient_email',
+        label: 'Invitation Recipient Email (optional)',
+        example: 'parent.personal@example.com',
+      },
+      { key: 'phone', label: 'Phone (optional)', example: '+9647701234567' },
+      { key: 'date_of_birth', label: 'Date of Birth (optional)', example: '2010-05-15' },
+      { key: 'class_name_or_id', label: 'Class name or ID (optional)', example: 'Grade 1' },
+      { key: 'section_name_or_id', label: 'Section name or ID (optional)', example: 'A' },
+      {
+        key: 'subject_template_name_or_id',
+        label: 'Subject Template name or ID (optional)',
+        example: 'Primary Curriculum',
+      },
+      { key: 'create_parent_account', label: 'Create Parent Account', example: 'no' },
+      { key: 'parent_email', label: 'Parent Email (for new parent account)', example: 'parent@example.com' },
+      { key: 'parent_name', label: 'Parent Name (optional)', example: 'Ali Ahmed' },
+      { key: 'parent_phone', label: 'Parent Phone (optional)', example: '+9647709876543' },
+      { key: 'parent_relationship', label: 'Parent Relationship (optional)', example: 'guardian' },
     ];
     const sampleRow: Record<string, string> = {};
     columns.forEach((col) => {
@@ -162,10 +179,14 @@ export default function BulkImportStudentsPage() {
     (rowIndex: number, field: keyof BulkStudentRowDto, value: string | undefined) => {
       setPreview((prev) => {
         if (!prev) return prev;
+        const patch: Partial<BulkStudentRowDto> =
+          field === 'invitation_type'
+            ? { invitation_type: (value === 'parent' ? 'parent' : 'student') }
+            : { [field]: value ?? '' } as Partial<BulkStudentRowDto>;
         return {
           ...prev,
           rows: prev.rows.map((r, i) =>
-            i === rowIndex ? { ...r, data: { ...r.data, [field]: value ?? '' } } : r
+            i === rowIndex ? { ...r, data: { ...r.data, ...patch } } : r
           ),
         };
       });
@@ -178,7 +199,7 @@ export default function BulkImportStudentsPage() {
       (r) =>
         r.data.first_name?.trim() &&
         r.data.last_name?.trim() &&
-        r.data.email?.trim() &&
+        r.data.username?.trim() &&
         r.data.gender?.trim()
     ).length ?? 0;
 
@@ -294,7 +315,8 @@ export default function BulkImportStudentsPage() {
                   <div>
                     <Title order={4}>Preview — edit any cell before importing</Title>
                     <Text size="sm" c="dimmed">
-                      {editableValidCount} valid / {preview.totalRows} total rows (required: First name, Last name, Email, Gender)
+                      {editableValidCount} valid / {preview.totalRows} total rows (required: Username, First
+                      name, Last name, Gender)
                     </Text>
                   </div>
                   <Button
@@ -318,10 +340,13 @@ export default function BulkImportStudentsPage() {
                       <Table.Tr>
                         <Table.Th>Row</Table.Th>
                         <Table.Th>Status</Table.Th>
+                        <Table.Th>Username</Table.Th>
                         <Table.Th>First Name</Table.Th>
                         <Table.Th>Last Name</Table.Th>
-                        <Table.Th>Email</Table.Th>
                         <Table.Th>Gender</Table.Th>
+                        <Table.Th>Invite type</Table.Th>
+                        <Table.Th>Invite email</Table.Th>
+                        <Table.Th>DOB</Table.Th>
                         <Table.Th>Class</Table.Th>
                         <Table.Th>Section</Table.Th>
                         <Table.Th>Subject Template</Table.Th>
@@ -333,7 +358,7 @@ export default function BulkImportStudentsPage() {
                         const hasRequired =
                           row.data.first_name?.trim() &&
                           row.data.last_name?.trim() &&
-                          row.data.email?.trim() &&
+                          row.data.username?.trim() &&
                           row.data.gender?.trim();
                         return (
                           <Table.Tr
@@ -348,6 +373,17 @@ export default function BulkImportStudentsPage() {
                               >
                                 {hasRequired ? 'Valid' : 'Error'}
                               </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                id={`bulk-import-row-${rowIndex}-username`}
+                                size="xs"
+                                value={row.data.username ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(rowIndex, 'username', e.target.value)
+                                }
+                                placeholder="Username"
+                              />
                             </Table.Td>
                             <Table.Td>
                               <TextInput
@@ -372,17 +408,6 @@ export default function BulkImportStudentsPage() {
                               />
                             </Table.Td>
                             <Table.Td>
-                              <TextInput
-                                id={`bulk-import-row-${rowIndex}-email`}
-                                size="xs"
-                                value={row.data.email ?? ''}
-                                onChange={(e) =>
-                                  updatePreviewRow(rowIndex, 'email', e.target.value)
-                                }
-                                placeholder="Email"
-                              />
-                            </Table.Td>
-                            <Table.Td>
                               <Select
                                 id={`bulk-import-row-${rowIndex}-gender`}
                                 size="xs"
@@ -393,9 +418,48 @@ export default function BulkImportStudentsPage() {
                                 data={[
                                   { value: 'male', label: 'Male' },
                                   { value: 'female', label: 'Female' },
-                                  { value: 'other', label: 'Other' },
                                 ]}
                                 placeholder="Gender"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <Select
+                                id={`bulk-import-row-${rowIndex}-invitation-type`}
+                                size="xs"
+                                value={row.data.invitation_type ?? 'student'}
+                                onChange={(v) =>
+                                  updatePreviewRow(rowIndex, 'invitation_type', v ?? 'student')
+                                }
+                                data={[
+                                  { value: 'student', label: 'Student' },
+                                  { value: 'parent', label: 'Parent' },
+                                ]}
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                id={`bulk-import-row-${rowIndex}-invitation-email`}
+                                size="xs"
+                                value={row.data.invitation_recipient_email ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(
+                                    rowIndex,
+                                    'invitation_recipient_email',
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Required if invite type is Parent"
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <TextInput
+                                id={`bulk-import-row-${rowIndex}-dob`}
+                                size="xs"
+                                value={row.data.date_of_birth ?? ''}
+                                onChange={(e) =>
+                                  updatePreviewRow(rowIndex, 'date_of_birth', e.target.value)
+                                }
+                                placeholder="YYYY-MM-DD"
                               />
                             </Table.Td>
                             <Table.Td>

@@ -25,7 +25,7 @@ export class AuthPublicController {
     // Use limit(1) and handle array result explicitly to avoid errors when multiple rows exist.
     const { data: students, error: studentError } = await supabase
       .from('students')
-      .select('id, user_id')
+      .select('id, user_id, is_active')
       .eq('student_id', rollNumber)
       .limit(1);
 
@@ -34,8 +34,12 @@ export class AuthPublicController {
       throw new BadRequestException('No student found');
     }
 
-    const studentRow = students[0] as { id: string; user_id: string | null };
+    const studentRow = students[0] as { id: string; user_id: string | null; is_active: boolean };
     if (!studentRow.user_id) {
+      throw new BadRequestException('No student found');
+    }
+
+    if (studentRow.is_active === false) {
       throw new BadRequestException('No student found');
     }
 

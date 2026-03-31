@@ -27,6 +27,14 @@ export async function signOut() {
   }
 }
 
+/** Clear Supabase session in this browser only; does not redirect (for login flows that must show an error first). */
+export async function clearLocalSupabaseSession(): Promise<void> {
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  if (error) {
+    throw error;
+  }
+}
+
 export async function getSession() {
   const {
     data: { session },

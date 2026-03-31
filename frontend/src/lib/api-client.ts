@@ -163,6 +163,38 @@ class ApiClient {
           }
         }
 
+        // Student (or other) account blocked while session still exists locally — clear session and return to login.
+        if (error.response?.status === 403 && typeof window !== 'undefined') {
+          const reqUrl = error.config?.url ?? '';
+          const isAuthMe =
+            reqUrl.includes('/api/v1/auth/me') && !reqUrl.includes('/api/v1/auth/me/');
+          if (isAuthMe) {
+            const body = error.response.data as {
+              error?: { message?: string | string[] };
+              message?: string | string[];
+            };
+            const raw = body?.error?.message ?? body?.message;
+            const text = Array.isArray(raw) ? raw.join(', ') : typeof raw === 'string' ? raw : '';
+            if (text.toLowerCase().includes('inactive')) {
+              try {
+                await supabase.auth.signOut({ scope: 'local' });
+                window.sessionStorage.setItem('ntg_auth_inactive_message', text);
+                const path = window.location.pathname;
+                const stayPut =
+                  path === '/login' ||
+                  path.startsWith('/auth/callback') ||
+                  path === '/signup' ||
+                  path.startsWith('/signup/');
+                if (!stayPut) {
+                  window.location.href = '/login';
+                }
+              } catch {
+                // Non-blocking — still reject so callers can handle.
+              }
+            }
+          }
+        }
+
         return Promise.reject(error);
       },
     );

@@ -39,12 +39,18 @@ export function AttendanceHistoryContent() {
   const { data: myStaffData } = useMyStaff();
   const staffData = myStaffData?.data;
 
-  const isClassTeacher = userTyped?.roles?.some((r) => r.roleName === 'class_teacher');
-  const isAdmin = userTyped?.roles?.some((r) => r.roleName === 'school_admin' || r.roleName === 'principal');
+  const isTeacher = userTyped?.roles?.some((r) => {
+    const role = r.roleName?.toLowerCase();
+    return role === 'class_teacher' || role === 'subject_teacher';
+  });
+  const isAdmin = userTyped?.roles?.some((r) => {
+    const role = r.roleName?.toLowerCase();
+    return role === 'school_admin' || role === 'principal';
+  });
 
   const { data: classSectionsData } = useClassSections({
     isActive: true,
-    classTeacherId: isClassTeacher && !isAdmin && staffData?.id ? staffData.id : undefined,
+    classTeacherId: isTeacher && !isAdmin && staffData?.id ? staffData.id : undefined,
   });
   const classSections = classSectionsData?.data || [];
 

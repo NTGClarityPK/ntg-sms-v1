@@ -18,9 +18,12 @@ export default function AttendancePage() {
   const { canEdit } = useFeaturePermission('attendance');
   const userTyped = user as User | undefined;
   const isTeacher = userTyped?.roles?.some(
-    (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher',
+    (r) => {
+      const role = r.roleName?.toLowerCase();
+      return role === 'class_teacher' || role === 'subject_teacher';
+    },
   );
-  const isParent = userTyped?.roles?.some((r) => r.roleName === 'parent');
+  const isParent = userTyped?.roles?.some((r) => r.roleName?.toLowerCase() === 'parent');
 
   return (
     <>

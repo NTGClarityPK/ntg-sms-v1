@@ -4,8 +4,8 @@ export class ResendInvitationForUserDto {
   @IsUUID()
   userId!: string;
 
-  @IsIn(['student', 'parent'])
-  invitationType!: 'student' | 'parent';
+  @IsIn(['student', 'parent', 'parent_account'])
+  invitationType!: 'student' | 'parent' | 'parent_account';
 
   @IsOptional()
   @IsEmail()

@@ -51,6 +51,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class StudentsService {
+  // Simple in-memory caches (Nest provider is a singleton).
+  private readonly tenantDomainByBranchId = new Map<string, string>();
+  private readonly roleIdByName = new Map<string, string>();
+
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
@@ -77,6 +81,8 @@ export class StudentsService {
   }
 
   private async getTenantDomainForBranch(branchId: string): Promise<string> {
+    const cached = this.tenantDomainByBranchId.get(branchId);
+    if (cached) return cached;
     const supabase = this.supabaseConfig.getClient();
     const { data: branch, error: branchError } = await supabase
       .from('branches')
@@ -100,7 +106,23 @@ export class StudentsService {
     if (!domain) {
       throw new BadRequestException('Tenant domain is not configured');
     }
+    this.tenantDomainByBranchId.set(branchId, domain);
     return domain;
+  }
+
+  private async getRoleIdByName(roleName: string): Promise<string | null> {
+    const key = roleName.trim().toLowerCase();
+    const cached = this.roleIdByName.get(key);
+    if (cached) return cached;
+    const supabase = this.supabaseConfig.getClient();
+    const { data } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', key)
+      .maybeSingle();
+    const id = (data as { id: string } | null)?.id ?? null;
+    if (id) this.roleIdByName.set(key, id);
+    return id;
   }
 
   private buildLoginEmail(username: string, domain: string): string {
@@ -527,16 +549,11 @@ export class StudentsService {
       }
 
       // Assign student role
-      const { data: studentRole } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('name', 'student')
-        .single();
-
-      if (studentRole) {
+      const studentRoleId = await this.getRoleIdByName('student');
+      if (studentRoleId) {
         await supabase.from('user_roles').insert({
           user_id: user.id,
-          role_id: studentRole.id,
+          role_id: studentRoleId,
           branch_id: branchId,
           created_by: username,
         });
@@ -693,15 +710,11 @@ export class StudentsService {
       });
       if (branchError) throw new BadRequestException(branchError.message);
 
-      const { data: studentRole } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('name', 'student')
-        .single();
-      if (studentRole) {
+      const studentRoleId = await this.getRoleIdByName('student');
+      if (studentRoleId) {
         await supabase.from('user_roles').insert({
           user_id: user.id,
-          role_id: studentRole.id,
+          role_id: studentRoleId,
           branch_id: branchId,
           created_by: username,
         });
@@ -780,57 +793,82 @@ export class StudentsService {
         }
         const parentName = (input.parentName ?? '').trim() || this.nameFromEmail(parentEmail);
 
-        const parentTempPassword = this.randomTempPassword();
-        const {
-          data: { user: parentUser },
-          error: parentAuthError,
-        } = await supabase.auth.admin.createUser({
-          email: parentEmail,
-          password: parentTempPassword,
-          email_confirm: true,
+        // If the parent already exists (same email), reuse and just link.
+        const { data: existingParentUserId } = await supabase.rpc('auth_user_id_by_email', {
+          p_email: parentEmail,
         });
-        if (parentAuthError) throw new BadRequestException(parentAuthError.message);
-        if (!parentUser) throw new BadRequestException('Failed to create parent user');
 
-        const { error: parentProfileError } = await supabase.from('profiles').insert({
-          id: parentUser.id,
-          full_name: parentName,
-          avatar_url: null,
-          phone: input.parentPhone ?? null,
-          address: null,
-          date_of_birth: null,
-          gender: null,
-          is_active: true,
-          created_by: username,
-          updated_by: username,
-        });
+        const parentUserId: string = (() => {
+          if (typeof existingParentUserId === 'string' && existingParentUserId.trim() !== '') {
+            return existingParentUserId.trim();
+          }
+          return '';
+        })();
+
+        let createdNewParent = false;
+        let parentUserIdToUse = parentUserId;
+
+        if (!parentUserIdToUse) {
+          const parentTempPassword = this.randomTempPassword();
+          const {
+            data: { user: parentUser },
+            error: parentAuthError,
+          } = await supabase.auth.admin.createUser({
+            email: parentEmail,
+            password: parentTempPassword,
+            email_confirm: true,
+          });
+          if (parentAuthError) throw new BadRequestException(parentAuthError.message);
+          if (!parentUser) throw new BadRequestException('Failed to create parent user');
+          parentUserIdToUse = parentUser.id;
+          createdNewParent = true;
+        }
+
+        // Ensure parent has profile, branch, role (idempotent)
+        const { error: parentProfileError } = await supabase.from('profiles').upsert(
+          {
+            id: parentUserIdToUse,
+            full_name: parentName,
+            avatar_url: null,
+            phone: input.parentPhone ?? null,
+            address: null,
+            date_of_birth: null,
+            gender: null,
+            is_active: true,
+            created_by: username,
+            updated_by: username,
+          },
+          { onConflict: 'id' },
+        );
         throwIfDbError(parentProfileError);
 
-        const { error: parentBranchError } = await supabase.from('user_branches').insert({
-          user_id: parentUser.id,
-          branch_id: branchId,
-          is_primary: false,
-          created_by: username,
-        });
+        const { error: parentBranchError } = await supabase.from('user_branches').upsert(
+          {
+            user_id: parentUserIdToUse,
+            branch_id: branchId,
+            is_primary: false,
+            created_by: username,
+          },
+          { onConflict: 'user_id,branch_id' },
+        );
         if (parentBranchError) throw new BadRequestException(parentBranchError.message);
 
-        const { data: parentRole } = await supabase
-          .from('roles')
-          .select('id')
-          .eq('name', 'parent')
-          .maybeSingle();
-        if (parentRole?.id) {
-          await supabase.from('user_roles').insert({
-            user_id: parentUser.id,
-            role_id: parentRole.id,
-            branch_id: branchId,
-            created_by: username,
-          });
+        const parentRoleId = await this.getRoleIdByName('parent');
+        if (parentRoleId) {
+          await supabase.from('user_roles').upsert(
+            {
+              user_id: parentUserIdToUse,
+              role_id: parentRoleId,
+              branch_id: branchId,
+              created_by: username,
+            },
+            { onConflict: 'user_id,role_id,branch_id' },
+          );
         }
 
         // Link parent to student
         await this.parentsService.linkChild(
-          parentUser.id,
+          parentUserIdToUse,
           {
             studentId: studentRow.id,
             relationship: input.parentRelationship ?? 'guardian',
@@ -842,26 +880,46 @@ export class StudentsService {
           null,
         );
 
-        // Parent invitation (self setup) -> use invitation_type 'student'
-        const parentInv = await this.invitationsService.createInvitation({
-          userId: parentUser.id,
-          recipientEmail: parentEmail,
-          invitationType: 'student',
-          createdByUserId: adminUser.id,
-        });
-        await this.invitationsService.sendInvitationEmail({
-          invitation: parentInv,
-          recipientName: parentName,
-          loginEmail: parentEmail,
-          userEmailForAudit: adminUser.email,
-          branchId,
-        });
-        parentInvitation = {
-          token: parentInv.token,
-          recipientEmail: parentInv.recipient_email,
-          expiresAt: parentInv.expires_at,
-          parentUserId: parentUser.id,
-        };
+        // Parent invitation (self setup) -> only send if:
+        // - we just created the parent, OR
+        // - the latest unused invitation is expired (resend policy)
+        const nowIso = new Date().toISOString();
+        const { data: latestParentInv } = await supabase
+          .from('invitations')
+          .select('id, token, user_id, recipient_email, invitation_type, created_by, created_at, expires_at, used_at')
+          .eq('user_id', parentUserIdToUse)
+          .eq('invitation_type', 'parent_account')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const latest = latestParentInv as
+          | { expires_at: string; used_at: string | null }
+          | null;
+        const latestIsExpired =
+          !!latest?.expires_at && latest.expires_at < nowIso && latest.used_at == null;
+
+        if (createdNewParent || latestIsExpired) {
+          const parentInv = await this.invitationsService.createInvitation({
+            userId: parentUserIdToUse,
+            recipientEmail: parentEmail,
+            invitationType: 'parent_account',
+            createdByUserId: adminUser.id,
+          });
+          await this.invitationsService.sendInvitationEmail({
+            invitation: parentInv,
+            recipientName: parentName,
+            loginEmail: parentEmail,
+            userEmailForAudit: adminUser.email,
+            branchId,
+          });
+          parentInvitation = {
+            token: parentInv.token,
+            recipientEmail: parentInv.recipient_email,
+            expiresAt: parentInv.expires_at,
+            parentUserId: parentUserIdToUse,
+          };
+        }
       }
 
       // Student invitation (scenario 1 or 2)

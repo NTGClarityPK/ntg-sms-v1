@@ -1,5 +1,17 @@
 import { apiClient } from '@/lib/api-client';
 import type { Tenant } from '@/types/tenant';
+import { clearLocalSupabaseSession } from '@/lib/auth';
+
+function formatApiErrorBodyMessage(
+  data: { error?: { message?: string | string[] }; message?: string | string[] } | undefined,
+  fallback: string,
+): string {
+  if (!data) return fallback;
+  const raw = data.error?.message ?? data.message;
+  if (Array.isArray(raw)) return raw.join(', ');
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  return fallback;
+}
 
 export interface BranchForSelection {
   id: string;
@@ -97,6 +109,17 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       '';
     const msg = typeof message === 'string' ? message.toLowerCase() : '';
 
+    if (status === 403) {
+      try {
+        await clearLocalSupabaseSession();
+      } catch {
+        // Session clear best-effort; still show backend message
+      }
+      setError(formatApiErrorBodyMessage(err.response?.data, err.message || 'Access denied.'));
+      setLoading?.(false);
+      return;
+    }
+
     if (status === 404 || msg.includes('user not found')) {
       router.push('/signup?google=not_found');
       setLoading?.(false);
@@ -126,7 +149,21 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
 
     onMultiBranch(Array.from(new Map(userBranches.map((b) => [b.id, b])).values()));
     setLoading?.(false);
-  } catch (branchError) {
+  } catch (branchError: unknown) {
+    const err = branchError as {
+      response?: { status?: number; data?: { error?: { message?: string }; message?: string } };
+      message?: string;
+    };
+    if (err.response?.status === 403) {
+      try {
+        await clearLocalSupabaseSession();
+      } catch {
+        // ignore
+      }
+      setError(formatApiErrorBodyMessage(err.response?.data, 'Access denied.'));
+      setLoading?.(false);
+      return;
+    }
     console.error('Failed to fetch branches:', branchError);
     setError('Failed to fetch branches. Please try again.');
     setLoading?.(false);

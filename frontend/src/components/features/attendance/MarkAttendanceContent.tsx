@@ -27,11 +27,14 @@ export function MarkAttendanceContent() {
   const { data: myStaffData } = useMyStaff();
   const staffData = myStaffData?.data;
 
-  const isClassTeacher = userTyped?.roles?.some((r) => r.roleName === 'class_teacher');
+  const isTeacher = userTyped?.roles?.some((r) => {
+    const role = r.roleName?.toLowerCase();
+    return role === 'class_teacher' || role === 'subject_teacher';
+  });
 
   const { data: classSectionsData } = useClassSections({
     isActive: true,
-    classTeacherId: isClassTeacher && staffData?.id ? staffData.id : undefined,
+    classTeacherId: isTeacher && staffData?.id ? staffData.id : undefined,
   });
   const classSections = classSectionsData?.data || [];
 
