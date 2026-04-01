@@ -493,6 +493,8 @@
   "setupWizardAssessmentRangeMinPlaceholder": "مثال: 90",
   "setupWizardAssessmentRangeMaxPlaceholder": "مثال: 100",
   "setupWizardAssessmentLeaveQuotaPlaceholder": "أيام في السنة، مثال: 7",
+  "setupWizardRemoveAssessmentType": "إزالة نوع التقييم",
+  "setupWizardRemoveGradeTemplate": "إزالة قالب الدرجات",
 
   "setupWizardBehaviorAttributePlaceholder": "سلوك للتقييم، مثال: الاحترام",
 

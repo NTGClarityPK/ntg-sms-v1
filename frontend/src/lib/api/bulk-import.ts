@@ -18,6 +18,17 @@ export interface BulkImportResult {
   successCount: number;
   failureCount: number;
   errors: Array<{ row: number; message: string }>;
+  created?: Array<{
+    row: number;
+    username: string;
+    studentName: string;
+    loginEmail: string;
+    recipientEmail: string;
+    invitationType: 'parent' | 'student';
+    expiresAt: string;
+    parentRecipientEmail?: string;
+    parentExpiresAt?: string;
+  }>;
 }
 
 export interface BulkStudentRowDto {

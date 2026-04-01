@@ -234,11 +234,11 @@ export function useCreateStudentWithInvitation() {
 
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['students', branchId] });
       notifications.show({
         title: 'Success',
-        message: 'Invitation sent successfully',
+        message: `Invitation sent to ${result.studentInvitation.recipientEmail}`,
         color: 'green',
       });
     },

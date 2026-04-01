@@ -7,6 +7,7 @@ import {
   Matches,
   ValidateIf,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateStudentWithInvitationDto {
   /** School login username (without domain). Alphanumeric only. */
@@ -73,9 +74,19 @@ export class CreateStudentWithInvitationDto {
    * - For `invitationType='parent'`: must be a valid email.
    * - For `invitationType='student'`: may be a valid email OR a username (we will append tenant domain server-side).
    */
+  @Transform(({ value }) => {
+    if (value == null) return value;
+    const cleaned = String(value)
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .trim();
+    if (!cleaned) return cleaned;
+    // If multiple values/newlines were pasted, take the first token.
+    return cleaned.split(/[\r\n,; ]+/).filter(Boolean)[0] ?? cleaned;
+  })
   @IsString()
   @ValidateIf((o: CreateStudentWithInvitationDto) => o.invitationType === 'parent')
-  @Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, { message: 'Invalid email address' })
+  @Matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'Invalid invitation recipient email address' })
   invitationRecipientEmail!: string;
 
   @IsIn(['parent', 'student'])
@@ -88,7 +99,16 @@ export class CreateStudentWithInvitationDto {
 
   @IsOptional()
   @ValidateIf((o: CreateStudentWithInvitationDto) => Boolean(o.createParentAccount))
-  @Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, { message: 'Invalid email address' })
+  @Transform(({ value }) => {
+    if (value == null) return value;
+    const cleaned = String(value)
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .trim();
+    if (!cleaned) return cleaned;
+    return cleaned.split(/[\r\n,; ]+/).filter(Boolean)[0] ?? cleaned;
+  })
+  @Matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'Invalid parent email address' })
   parentEmail?: string;
 
   @IsOptional()

@@ -2,6 +2,8 @@
   "title": "User",
   "createUser": "Create User",
   "refresh": "Refresh",
+  "totalUsers": "Total users: {count}",
+  "showingFilteredUsers": "Showing {filtered} of {total}",
   "viewOnly": "View only",
   "viewOnlyMessage": "You have view access for User Management. Create, update, and deactivate actions are disabled.",
   "searchPlaceholder": "Search users...",

@@ -53,6 +53,7 @@ export default function LoginPage() {
   const themeColors = generateThemeColors(primaryColor, isDark);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInactiveFlashError, setIsInactiveFlashError] = useState(false);
   const [forgotPasswordOpened, setForgotPasswordOpened] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
@@ -95,8 +96,18 @@ export default function LoginPage() {
     if (flash) {
       window.sessionStorage.removeItem('ntg_auth_inactive_message');
       setError(flash);
+      setIsInactiveFlashError(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isInactiveFlashError || !error) return;
+    const t = window.setTimeout(() => {
+      setError(null);
+      setIsInactiveFlashError(false);
+    }, 5000);
+    return () => window.clearTimeout(t);
+  }, [isInactiveFlashError, error]);
 
   useEffect(() => {
     let cancelled = false;

@@ -46,6 +46,30 @@ export class TenantDto {
   @IsString()
   primaryColor?: string | null;
 
+  @IsOptional()
+  @IsString()
+  deletionStatus?: 'none' | 'pending' | 'executing' | null;
+
+  @IsOptional()
+  @IsString()
+  deletionRequestedAt?: string | null;
+
+  @IsOptional()
+  @IsString()
+  deletionExecuteAt?: string | null;
+
+  @IsOptional()
+  @IsString()
+  deletionCancelledAt?: string | null;
+
+  @IsOptional()
+  @IsString()
+  deletionRequestedBy?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  preDeletionIsActive?: boolean | null;
+
   constructor(partial: Partial<TenantDto>) {
     Object.assign(this, partial);
   }

@@ -215,7 +215,7 @@ export function ScheduleStep({ data, onChange, onNext, onBack }: ScheduleStepPro
             </Group>
 
             {/* Add Slot Form */}
-            <Paper withBorder p="sm" bg="gray.0">
+            <Paper withBorder p="sm">
               <Stack gap="xs">
                 <TextInput
                   id="schedule-step-slot-name"

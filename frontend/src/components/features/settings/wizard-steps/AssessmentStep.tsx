@@ -1,7 +1,8 @@
 'use client';
 
-import { Button, Group, Stack, Text, TextInput, NumberInput } from '@mantine/core';
+import { ActionIcon, Button, Group, Stack, Text, TextInput, NumberInput } from '@mantine/core';
 import { useState } from 'react';
+import { IconTrash } from '@tabler/icons-react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { AssessmentData } from './types';
 import { useTranslations } from 'next-intl';
@@ -34,6 +35,13 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
     }
   };
 
+  const handleRemoveAssessmentType = (index: number) => {
+    onChange({
+      ...data,
+      assessmentTypes: data.assessmentTypes.filter((_, i) => i !== index),
+    });
+  };
+
   const handleAddGradeTemplate = () => {
     if (newGradeTemplate.name.trim()) {
       onChange({
@@ -50,6 +58,20 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
       });
       setNewGradeTemplate({ name: '' });
     }
+  };
+
+  const handleRemoveGradeTemplate = (index: number) => {
+    const removed = data.gradeTemplates[index];
+    if (!removed) return;
+    const templateName = removed.name;
+    onChange({
+      ...data,
+      gradeTemplates: data.gradeTemplates.filter((_, i) => i !== index),
+      gradeRanges: data.gradeRanges.filter((gr) => gr.templateId !== templateName),
+      classGradeAssignments: data.classGradeAssignments.filter(
+        (a) => a.templateId !== templateName,
+      ),
+    });
   };
 
   const handleAddRange = () => {
@@ -128,9 +150,20 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
           {data.assessmentTypes.length > 0 && (
             <Stack gap="xs">
               {data.assessmentTypes.map((at, idx) => (
-                <Text key={idx} size="sm">
-                  {at.name}
-                </Text>
+                <Group key={idx} justify="space-between" wrap="nowrap" align="center">
+                  <Text size="sm" style={{ flex: 1, minWidth: 0 }}>
+                    {at.name}
+                  </Text>
+                  <ActionIcon
+                    id={`assessment-step-remove-type-${idx}`}
+                    variant="subtle"
+                    color={colors.error}
+                    onClick={() => handleRemoveAssessmentType(idx)}
+                    aria-label={tSettings('setupWizardRemoveAssessmentType')}
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Group>
               ))}
             </Stack>
           )}
@@ -156,9 +189,20 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
             <Stack gap="md" mt="xs">
               {data.gradeTemplates.map((template, templateIdx) => (
                 <div key={templateIdx}>
-                  <Text size="sm" fw={500} mb="xs">
-                    {template.name} ({template.ranges.length} ranges)
-                  </Text>
+                  <Group justify="space-between" wrap="nowrap" align="flex-start" mb="xs">
+                    <Text size="sm" fw={500} style={{ flex: 1, minWidth: 0 }}>
+                      {template.name} ({template.ranges.length} ranges)
+                    </Text>
+                    <ActionIcon
+                      id={`assessment-step-remove-template-${templateIdx}`}
+                      variant="subtle"
+                      color={colors.error}
+                      onClick={() => handleRemoveGradeTemplate(templateIdx)}
+                      aria-label={tSettings('setupWizardRemoveGradeTemplate')}
+                    >
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Group>
                   {template.ranges.length > 0 && (
                     <Stack gap="xs" mb="xs" pl="md">
                       {template.ranges.map((range, rangeIdx) => (

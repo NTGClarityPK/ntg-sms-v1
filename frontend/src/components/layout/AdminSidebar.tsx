@@ -18,6 +18,7 @@ import {
   IconHome,
   IconLockOpen,
   IconHistory,
+  IconBuildings,
   type IconProps,
 } from '@tabler/icons-react';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
@@ -34,6 +35,7 @@ const NAV_ICON_SIZE = 22;
 const adminNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/adminportal', icon: IconHome },
   { label: 'Assign Branch', href: '/adminportal/assign-branch', icon: IconBuilding },
+  { label: 'Tenants', href: '/adminportal/tenants', icon: IconBuildings },
   { label: 'Unlock Academic Year', href: '/adminportal/unlock-academic-year', icon: IconLockOpen },
   { label: 'Payment Model', href: '/adminportal/payment-models', icon: IconCreditCard },
   { label: 'Audit Trail', href: '/adminportal/audit-trail', icon: IconHistory },
@@ -64,12 +66,15 @@ export function AdminSidebar({
 
   const renderNavItem = (item: NavItem) => {
     const active = isActive(item.href);
+
+    const navId = `nav-link-${item.href.replace(/^\//, '').replaceAll('/', '-')}`;
     
     // Apply active styling ONLY when collapsed (like RMS)
     const shouldShowActive = collapsed && active;
     
     const content = (
       <Button
+        id={navId}
         component="button"
         type="button"
         variant="subtle"

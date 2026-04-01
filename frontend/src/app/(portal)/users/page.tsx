@@ -1,6 +1,6 @@
 'use client';
 
-import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip, Tooltip, ActionIcon } from '@mantine/core';
+import { Badge, Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip, Tooltip, ActionIcon } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState, useMemo } from 'react';
@@ -98,6 +98,7 @@ export default function UsersPage() {
   );
 
   const hasActiveFilter = statusFilter !== undefined || roleFilter.length > 0 || !!debouncedSearch;
+  const totalUsers = allUsers.length;
 
   const { data: rolesData } = useRoles();
   const roles = rolesData?.data || [];
@@ -116,6 +117,11 @@ export default function UsersPage() {
             <Title order={1}>{t('title')}</Title>
           </div>
           <Group gap="sm">
+            <Badge variant="light" color="gray" id="users-total-count">
+              {hasActiveFilter
+                ? t('showingFilteredUsers', { filtered: totalFiltered, total: totalUsers })
+                : t('totalUsers', { count: totalUsers })}
+            </Badge>
             <Tooltip label={t('refresh')}>
               <ActionIcon
                 variant="light"

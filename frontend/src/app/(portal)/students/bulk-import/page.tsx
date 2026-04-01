@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import {
+  alpha,
   Button,
   FileInput,
   Alert,
@@ -16,6 +17,9 @@ import {
   Select,
   Skeleton,
   TextInput,
+  Divider,
+  useComputedColorScheme,
+  useMantineTheme,
 } from '@mantine/core';
 import { IconUpload, IconCheck, IconX, IconAlertCircle, IconDownload } from '@tabler/icons-react';
 import { useBulkImportPreview, useBulkImport, useBulkImportTemplate } from '@/hooks/useBulkImport';
@@ -23,9 +27,12 @@ import { useAcademicYearsList } from '@/hooks/useAcademicYears';
 import { notifications } from '@mantine/notifications';
 import * as XLSX from 'xlsx';
 import type { BulkImportPreview, BulkImportResult, BulkStudentRowDto } from '@/hooks/useBulkImport';
+import { modals } from '@mantine/modals';
 
 export default function BulkImportStudentsPage() {
   const t = useTranslations('students');
+  const theme = useMantineTheme();
+  const computedColorScheme = useComputedColorScheme();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<BulkImportPreview | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
@@ -118,6 +125,62 @@ export default function BulkImportStudentsPage() {
         color: result.failureCount === 0 ? 'green' : 'yellow',
         icon: <IconCheck size={16} />,
       });
+
+      if ((result.created?.length ?? 0) > 0) {
+        modals.open({
+          title: 'Invitations sent',
+          size: 'xl',
+          centered: true,
+          children: (
+            <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+              <Stack gap="sm">
+                {result.created!.map((c) => (
+                  <Paper key={`${c.row}-${c.username}`} withBorder p="md">
+                    <Group justify="space-between" align="flex-start">
+                      <div>
+                        <Text fw={600}>
+                          Row {c.row} — {c.studentName} ({c.username})
+                        </Text>
+                        {c.loginEmail && (
+                          <Text size="sm" c="dimmed">
+                            Login: {c.loginEmail}
+                          </Text>
+                        )}
+                      </div>
+                      <Badge color={c.invitationType === 'parent' ? 'blue' : 'green'}>
+                        {c.invitationType}
+                      </Badge>
+                    </Group>
+                    <Divider my="sm" />
+                    <Text size="sm">
+                      <strong>Recipient email:</strong> {c.recipientEmail}
+                    </Text>
+                    <Text size="sm">
+                      <strong>Expires at:</strong> {new Date(c.expiresAt).toLocaleString()}
+                    </Text>
+
+                    {c.parentRecipientEmail && (
+                      <>
+                        <Divider my="sm" />
+                        <Text size="sm">
+                          <strong>Parent setup recipient:</strong> {c.parentRecipientEmail}
+                        </Text>
+                        {c.parentExpiresAt && (
+                          <Text size="sm">
+                            <strong>Parent invite expires at:</strong>{' '}
+                            {new Date(c.parentExpiresAt).toLocaleString()}
+                          </Text>
+                        )}
+                      </>
+                    )}
+                  </Paper>
+                ))}
+              </Stack>
+            </div>
+          ),
+        });
+      }
+
       setFile(null);
       setPreview(null);
       setSelectedYear(null);
@@ -360,10 +423,16 @@ export default function BulkImportStudentsPage() {
                           row.data.last_name?.trim() &&
                           row.data.username?.trim() &&
                           row.data.gender?.trim();
+                        const errorRowBg =
+                          !hasRequired &&
+                          (computedColorScheme === 'dark'
+                            ? alpha(theme.colors.red[8], 0.25)
+                            : theme.colors.red[0]);
+
                         return (
                           <Table.Tr
                             key={row.rowNumber}
-                            bg={hasRequired ? undefined : 'red.0'}
+                            bg={errorRowBg || undefined}
                           >
                             <Table.Td>{row.rowNumber}</Table.Td>
                             <Table.Td>
@@ -501,7 +570,11 @@ export default function BulkImportStudentsPage() {
                             </Table.Td>
                             <Table.Td>
                               {row.errors.length > 0 && (
-                                <Text size="xs" c="red">
+                                <Text
+                                  size="xs"
+                                  c={computedColorScheme === 'dark' ? 'red.3' : 'red.8'}
+                                  fw={500}
+                                >
                                   {row.errors.join(', ')}
                                 </Text>
                               )}

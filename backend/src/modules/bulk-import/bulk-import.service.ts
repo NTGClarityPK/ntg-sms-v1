@@ -28,6 +28,17 @@ export interface ImportResult {
   successCount: number;
   failureCount: number;
   errors: Array<{ row: number; message: string }>;
+  created?: Array<{
+    row: number;
+    username: string;
+    studentName: string;
+    loginEmail: string;
+    recipientEmail: string;
+    invitationType: 'parent' | 'student';
+    expiresAt: string;
+    parentRecipientEmail?: string;
+    parentExpiresAt?: string;
+  }>;
 }
 
 /**
@@ -84,6 +95,7 @@ const COLUMN_MAP: Record<string, string[]> = {
   parent_relationship: [
     'parent_relationship',
     'Parent Relationship',
+    'Parent Relationship (optional)',
     'parent relationship',
     'Relationship',
     'relationship',
@@ -629,6 +641,7 @@ export class BulkImportService {
       successCount: 0,
       failureCount: 0,
       errors: [],
+      created: [],
     };
 
     if (rows.length === 0) {
@@ -669,7 +682,7 @@ export class BulkImportService {
             branchId,
           );
 
-          await this.studentsService.createStudentWithInvitation(
+          const created = await this.studentsService.createStudentWithInvitation(
             {
               username: row.username.trim(),
               firstName: row.first_name.trim(),
@@ -696,6 +709,17 @@ export class BulkImportService {
           );
 
           results.successCount += 1;
+          results.created?.push({
+            row: rowLabel,
+            username: row.username.trim(),
+            studentName: `${row.first_name.trim()} ${row.last_name.trim()}`.trim(),
+            loginEmail: created.student.email ?? '',
+            recipientEmail: created.studentInvitation.recipientEmail,
+            invitationType: created.studentInvitation.invitationType,
+            expiresAt: created.studentInvitation.expiresAt,
+            parentRecipientEmail: created.parentInvitation?.recipientEmail,
+            parentExpiresAt: created.parentInvitation?.expiresAt,
+          });
           if (placement.warnings.length > 0) {
             results.errors.push({
               row: rowLabel,

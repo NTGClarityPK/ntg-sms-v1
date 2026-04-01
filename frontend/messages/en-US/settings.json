@@ -493,6 +493,8 @@
   "setupWizardAssessmentRangeMinPlaceholder": "e.g. 90",
   "setupWizardAssessmentRangeMaxPlaceholder": "e.g. 100",
   "setupWizardAssessmentLeaveQuotaPlaceholder": "Days per year, e.g. 7",
+  "setupWizardRemoveAssessmentType": "Remove assessment type",
+  "setupWizardRemoveGradeTemplate": "Remove grade template",
 
   "setupWizardBehaviorAttributePlaceholder": "Trait to assess, e.g. Respect",
 

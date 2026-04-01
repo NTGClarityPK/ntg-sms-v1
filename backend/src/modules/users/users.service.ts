@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import crypto from 'crypto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
@@ -13,6 +14,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
+import { InvitationsService } from '../invitations/invitations.service';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 type ProfileRow = {
   id: string;
@@ -48,10 +51,69 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class UsersService {
+  private readonly tenantDomainByBranchId = new Map<string, string>();
+
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
+    private readonly invitationsService: InvitationsService,
   ) {}
+
+  private randomTempPassword(): string {
+    // >= 24 chars, includes letters+numbers to satisfy common policies.
+    return crypto.randomBytes(24).toString('base64url');
+  }
+
+  private normalizeLoginEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private normalizeUsername(username: string): string {
+    return username.trim().toLowerCase();
+  }
+
+  private async getTenantDomainForBranch(branchId: string): Promise<string> {
+    const cached = this.tenantDomainByBranchId.get(branchId);
+    if (cached) return cached;
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch, error: branchError } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    throwIfDbError(branchError);
+
+    const tenantId = (branch as { tenant_id: string | null } | null)?.tenant_id ?? null;
+    if (!tenantId) {
+      throw new BadRequestException('Tenant not resolved for this branch');
+    }
+
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('domain')
+      .eq('id', tenantId)
+      .maybeSingle();
+    throwIfDbError(tenantError);
+
+    const domain = (tenant as { domain: string } | null)?.domain?.trim().toLowerCase();
+    if (!domain) {
+      throw new BadRequestException('Tenant domain is not configured');
+    }
+
+    this.tenantDomainByBranchId.set(branchId, domain);
+    return domain;
+  }
+
+  private buildLoginEmail(username: string, domain: string): string {
+    return `${this.normalizeUsername(username)}@${domain.trim().toLowerCase()}`;
+  }
+
+  private nameFromEmail(email: string): string {
+    const local = email.split('@')[0] || email;
+    const cleaned = local.replace(/[._-]+/g, ' ').trim();
+    return cleaned ? cleaned.replace(/\b\w/g, (c) => c.toUpperCase()) : email;
+  }
 
   /**
    * Ensure a basic staff record exists for a user in a given branch.
@@ -396,7 +458,7 @@ export class UsersService {
   async createUser(
     input: CreateUserDto,
     branchId: string,
-    userEmail: string,
+    adminUser: CurrentUserPayload,
     tenantId?: string | null,
   ): Promise<UserDto> {
     const supabase = this.supabaseConfig.getClient();
@@ -405,13 +467,56 @@ export class UsersService {
       throw new BadRequestException('Role is required');
     }
 
-    // Create auth user
+    const { data: rolesData, error: rolesLookupError } = await supabase
+      .from('roles')
+      .select('id,name')
+      .in('id', input.roleIds);
+    throwIfDbError(rolesLookupError);
+
+    const roleRows = (rolesData || []) as Array<{ id: string; name: string }>;
+    const parentRoleNames = new Set(['parent', 'guardian', 'father', 'mother']);
+    const selectedRoleNames = new Set(
+      roleRows.map((r) => (r.name || '').trim().toLowerCase()).filter(Boolean),
+    );
+
+    const isParentUser = Array.from(selectedRoleNames).some((n) => parentRoleNames.has(n));
+    const isStaffUser = Array.from(selectedRoleNames).some((n) => !parentRoleNames.has(n));
+
+    if (isParentUser && isStaffUser) {
+      throw new BadRequestException(
+        'Parent roles cannot be combined with staff roles. Please choose either parent roles or staff roles.',
+      );
+    }
+
+    const userType: 'parent' | 'staff' = isParentUser ? 'parent' : 'staff';
+
+    const resolvedLoginEmail = await (async () => {
+      if (userType === 'parent') {
+        const email = this.normalizeLoginEmail((input.email ?? '').trim());
+        if (!email) throw new BadRequestException('Email is required for parent users');
+        return email;
+      }
+      const username = (input.username ?? '').trim();
+      if (!username) {
+        throw new BadRequestException('School email username is required for staff users');
+      }
+      const domain = await this.getTenantDomainForBranch(branchId);
+      return this.normalizeLoginEmail(this.buildLoginEmail(username, domain));
+    })();
+
+    const invitationRecipientEmail = await (async () => {
+      if (userType === 'parent') return resolvedLoginEmail;
+      const email = this.normalizeLoginEmail((input.invitationEmail ?? '').trim());
+      if (!email) throw new BadRequestException('Invitation email is required for staff users');
+      return email;
+    })();
+
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.admin.createUser({
-      email: input.email,
-      password: input.password,
+      email: resolvedLoginEmail,
+      password: this.randomTempPassword(),
       email_confirm: true,
     });
 
@@ -427,13 +532,12 @@ export class UsersService {
     }
 
     try {
-      // Create profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: user.id,
           full_name: input.fullName,
-          email: input.email,
+          email: resolvedLoginEmail,
           avatar_url: input.avatarUrl ?? null,
           phone: input.phone ?? null,
           address: input.address ?? null,
@@ -453,24 +557,21 @@ export class UsersService {
         .logCreate(
           'profiles',
           (profile as { id: string }).id,
-          userEmail,
+          adminUser.email,
           { ...(profile as Record<string, unknown>) },
           { branchId, tenantId },
         )
         .catch(() => {});
 
-      // Assign to branch
       const { error: branchError } = await supabase.from('user_branches').insert({
         user_id: user.id,
         branch_id: branchId,
         is_primary: false,
       });
-
       if (branchError) {
         throw new BadRequestException(branchError.message);
       }
 
-      // Assign roles if provided
       const roleAssignments = input.roleIds.map((roleId) => ({
         user_id: user.id,
         role_id: roleId,
@@ -478,7 +579,6 @@ export class UsersService {
       }));
 
       const { error: rolesError } = await supabase.from('user_roles').insert(roleAssignments);
-
       if (rolesError) {
         throw new BadRequestException(rolesError.message);
       }
@@ -486,33 +586,43 @@ export class UsersService {
       for (const row of roleAssignments) {
         const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
         this.auditLogService
-          .logCreate('user_roles', recordId, userEmail, { ...row } as Record<string, unknown>, {
-            branchId,
-            tenantId,
-          })
+          .logCreate(
+            'user_roles',
+            recordId,
+            adminUser.email,
+            { ...row } as Record<string, unknown>,
+            { branchId, tenantId },
+          )
           .catch(() => {});
       }
 
-      // If any of the assigned roles are staff roles, ensure a staff record exists
-      const { data: rolesData, error: rolesLookupError } = await supabase
-        .from('roles')
-        .select('id,name')
-        .in('id', input.roleIds);
-      throwIfDbError(rolesLookupError);
-
-      const hasStaffRole =
-        (rolesData || []).some(
-          (r: { id: string; name: string }) =>
-            r.name === 'subject_teacher' || r.name === 'class_teacher',
-        );
-
-      if (hasStaffRole) {
+      if (userType === 'staff') {
         await this.ensureStaffForUser(user.id, branchId);
       }
 
+      const invitationType = userType === 'parent' ? 'parent_account' : 'staff';
+      const recipientName =
+        userType === 'parent'
+          ? this.nameFromEmail(invitationRecipientEmail)
+          : input.fullName;
+
+      const inv = await this.invitationsService.createInvitation({
+        userId: user.id,
+        recipientEmail: invitationRecipientEmail,
+        invitationType,
+        createdByUserId: adminUser.id,
+      });
+
+      await this.invitationsService.sendInvitationEmail({
+        invitation: inv,
+        recipientName,
+        loginEmail: resolvedLoginEmail,
+        userEmailForAudit: adminUser.email,
+        branchId,
+      });
+
       return this.getUserById(user.id, branchId);
     } catch (error) {
-      // Rollback: delete auth user if profile creation fails
       await supabase.auth.admin.deleteUser(user.id);
       throw error;
     }

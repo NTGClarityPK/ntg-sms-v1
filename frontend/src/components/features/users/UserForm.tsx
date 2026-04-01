@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group } from '@mantine/core';
+import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group, Text, Alert } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl';
 import { useCreateUser, useUpdateUser, useUpdateUserRoles } from '@/hooks/useUsers';
 import type { User, CreateUserInput, UpdateUserInput } from '@/types/users';
 import type { Role } from '@/types/permissions';
+import { useTenantMe } from '@/hooks/useTenant';
 
 interface UserFormProps {
   opened: boolean;
@@ -20,20 +21,79 @@ interface UserFormProps {
 export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
   const t = useTranslations('user');
   const tCommon = useTranslations('common');
+  const tenantMe = useTenantMe();
+  const tenantDomain = tenantMe.data?.data?.domain?.trim() || '';
+
+  const parentRoleNames = useMemo(() => new Set(['parent', 'guardian', 'father', 'mother']), []);
+  const roleNameById = useMemo(() => new Map(roles.map((r) => [r.id, r.name])), [roles]);
+  const classifyUserType = (roleIds: string[]) => {
+    const names = roleIds.map((id) => (roleNameById.get(id) || '').trim().toLowerCase()).filter(Boolean);
+    const isParent = names.some((n) => parentRoleNames.has(n));
+    const isStaff = names.some((n) => !parentRoleNames.has(n));
+    if (isParent && isStaff) return 'mixed' as const;
+    if (isParent) return 'parent' as const;
+    return 'staff' as const;
+  };
+
   const createUserSchema = useMemo(
     () =>
-      z.object({
-        email: z.string().email(t('invalidEmail')),
-        password: z.string().min(6, t('passwordMinLength')),
-        fullName: z.string().min(1, t('fullNameRequired')),
-        phone: z.string().optional(),
-        address: z.string().optional(),
-        dateOfBirth: z.string().optional(),
-        gender: z.enum(['male', 'female']).optional(),
-        roleIds: z.array(z.string()).min(1, t('roleRequired')),
-        isActive: z.boolean().optional(),
-      }),
-    [t],
+      z
+        .object({
+          roleIds: z.array(z.string()).min(1, t('roleRequired')),
+          email: z.string().optional(),
+          username: z.string().optional(),
+          invitationEmail: z.string().optional(),
+          fullName: z.string().min(1, t('fullNameRequired')),
+          phone: z.string().optional(),
+          address: z.string().optional(),
+          dateOfBirth: z.string().optional(),
+          gender: z.enum(['male', 'female']).optional(),
+          isActive: z.boolean().optional(),
+        })
+        .superRefine((values, ctx) => {
+          const userType = classifyUserType(values.roleIds);
+          if (userType === 'mixed') {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['roleIds'],
+              message: 'Parent roles cannot be combined with staff roles.',
+            });
+            return;
+          }
+
+          if (userType === 'parent') {
+            const raw = (values.email ?? '').trim();
+            const isEmail = raw.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+            if (!isEmail) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['email'],
+                message: t('invalidEmail'),
+              });
+            }
+            return;
+          }
+
+          // staff
+          const username = (values.username ?? '').trim();
+          if (!username || !/^[a-z0-9]+$/i.test(username)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['username'],
+              message: 'Username must be alphanumeric.',
+            });
+          }
+          const inv = (values.invitationEmail ?? '').trim();
+          const isEmail = inv.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inv);
+          if (!isEmail) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['invitationEmail'],
+              message: t('invalidEmail'),
+            });
+          }
+        }),
+    [t, classifyUserType],
   );
   const updateUserSchema = useMemo(
     () =>
@@ -55,7 +115,8 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
   const form = useForm({
     initialValues: {
       email: '',
-      password: '',
+      username: '',
+      invitationEmail: '',
       fullName: '',
       phone: '',
       address: '',
@@ -72,7 +133,8 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
     if (user) {
       form.setValues({
         email: user.email || '',
-        password: '',
+        username: '',
+        invitationEmail: '',
         fullName: user.fullName || '',
         phone: user.phone || '',
         address: user.address || '',
@@ -108,9 +170,11 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
           });
         }
       } else {
+        const userType = classifyUserType(values.roleIds);
         const createData: CreateUserInput = {
-          email: values.email,
-          password: values.password,
+          email: userType === 'parent' ? values.email : undefined,
+          username: userType === 'staff' ? values.username : undefined,
+          invitationEmail: userType === 'staff' ? values.invitationEmail : undefined,
           fullName: values.fullName,
           phone: values.phone || undefined,
           address: values.address || undefined,
@@ -143,21 +207,60 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
         <Stack gap="md">
           {!isEdit && (
             <>
-              <TextInput
-                id="user-form-email"
-                label={t('email')}
-                placeholder={t('emailPlaceholder')}
+              <MultiSelect
+                id="user-form-roles-top"
+                label={t('roles')}
+                data={roles.map((r) => ({ value: r.id, label: tCommon(`roleName.${r.name}` as any) || r.displayName }))}
                 required
-                {...form.getInputProps('email')}
+                {...form.getInputProps('roleIds')}
               />
-              <TextInput
-                id="user-form-password"
-                label={t('password')}
-                type="password"
-                placeholder={t('passwordPlaceholder')}
-                required={!isEdit}
-                {...form.getInputProps('password')}
-              />
+
+              {classifyUserType(form.values.roleIds) === 'mixed' && (
+                <Alert id="user-form-role-mixed-alert" color="red" variant="light">
+                  Parent roles cannot be combined with staff roles.
+                </Alert>
+              )}
+
+              {classifyUserType(form.values.roleIds) === 'parent' && (
+                <TextInput
+                  id="user-form-parent-email"
+                  label={t('email')}
+                  placeholder={t('emailPlaceholder')}
+                  required
+                  {...form.getInputProps('email')}
+                />
+              )}
+
+              {classifyUserType(form.values.roleIds) === 'staff' && (
+                <>
+                  <Group grow align="flex-end">
+                    <TextInput
+                      id="user-form-username"
+                      label="Username"
+                      placeholder="john.smith"
+                      required
+                      {...form.getInputProps('username')}
+                    />
+                    <TextInput
+                      id="user-form-domain"
+                      label="Domain"
+                      value={tenantDomain ? `@${tenantDomain}` : '—'}
+                      readOnly
+                      styles={{ input: { backgroundColor: 'var(--mantine-color-default-hover)' } }}
+                    />
+                  </Group>
+                  <Text size="xs" c="dimmed">
+                    Login email will be: <strong>{`${(form.values.username || 'username').trim()}@${tenantDomain || 'domain'}`}</strong>
+                  </Text>
+                  <TextInput
+                    id="user-form-invitation-email"
+                    label="Invitation email"
+                    placeholder="name@example.com"
+                    required
+                    {...form.getInputProps('invitationEmail')}
+                  />
+                </>
+              )}
             </>
           )}
 
@@ -200,13 +303,15 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
             {...form.getInputProps('gender')}
           />
 
-          <MultiSelect
-            id="user-form-roles"
-            label={t('roles')}
-            data={roles.map((r) => ({ value: r.id, label: tCommon(`roleName.${r.name}` as any) || r.displayName }))}
-            required
-            {...form.getInputProps('roleIds')}
-          />
+          {isEdit && (
+            <MultiSelect
+              id="user-form-roles"
+              label={t('roles')}
+              data={roles.map((r) => ({ value: r.id, label: tCommon(`roleName.${r.name}` as any) || r.displayName }))}
+              required
+              {...form.getInputProps('roleIds')}
+            />
+          )}
 
           <Select
             id="user-form-status"

@@ -22,6 +22,12 @@ type TenantRow = {
   vat_number: string | null;
   is_active: boolean;
   logo_url: string | null;
+  deletion_status: 'none' | 'pending' | 'executing' | null;
+  deletion_requested_at: string | null;
+  deletion_execute_at: string | null;
+  deletion_cancelled_at: string | null;
+  deletion_requested_by: string | null;
+  pre_deletion_is_active: boolean | null;
 };
 
 type SystemSettingRow = {
@@ -43,8 +49,17 @@ function mapTenant(row: TenantRow, primaryColor?: string | null): TenantDto {
     isActive: row.is_active,
     logoUrl: row.logo_url,
     primaryColor: primaryColor ?? null,
+    deletionStatus: row.deletion_status ?? 'none',
+    deletionRequestedAt: row.deletion_requested_at,
+    deletionExecuteAt: row.deletion_execute_at,
+    deletionCancelledAt: row.deletion_cancelled_at,
+    deletionRequestedBy: row.deletion_requested_by,
+    preDeletionIsActive: row.pre_deletion_is_active,
   });
 }
+
+const TENANT_SELECT =
+  'id, name, code, domain, email, phone, timezone, fiscal_year_start, vat_number, is_active, logo_url, deletion_status, deletion_requested_at, deletion_execute_at, deletion_cancelled_at, deletion_requested_by, pre_deletion_is_active';
 
 type UploadedLogoFile = {
   originalname: string;
@@ -69,7 +84,7 @@ export class TenantsService {
 
     const { data, error } = await supabase
       .from('tenants')
-      .select('id, name, code, domain, email, phone, timezone, fiscal_year_start, vat_number, is_active, logo_url')
+      .select(TENANT_SELECT)
       .eq('id', tenantId)
       .maybeSingle();
 
@@ -143,7 +158,7 @@ export class TenantsService {
         .from('tenants')
         .update(updateData)
         .eq('id', tenantId)
-        .select('id, name, code, domain, email, phone, timezone, fiscal_year_start, vat_number, is_active, logo_url')
+        .select(TENANT_SELECT)
         .single();
 
       throwIfDbError(error);
@@ -165,7 +180,7 @@ export class TenantsService {
     } else {
       const { data, error } = await supabase
         .from('tenants')
-        .select('id, name, code, domain, email, phone, timezone, fiscal_year_start, vat_number, is_active, logo_url')
+        .select(TENANT_SELECT)
         .eq('id', tenantId)
         .single();
       throwIfDbError(error);
@@ -237,7 +252,7 @@ export class TenantsService {
       .from('tenants')
       .update({ logo_url: publicUrl })
       .eq('id', tenantId)
-      .select('id, name, code, domain, email, phone, timezone, fiscal_year_start, vat_number, is_active, logo_url')
+      .select(TENANT_SELECT)
       .single();
 
     throwIfDbError(error);
@@ -274,7 +289,7 @@ export class TenantsService {
 
     const { data, error } = await supabase
       .from('tenants')
-      .select('id, name, code, domain, email, phone, timezone, fiscal_year_start, vat_number, is_active, logo_url')
+      .select(TENANT_SELECT)
       .order('name', { ascending: true });
 
     throwIfDbError(error);
@@ -309,7 +324,8 @@ export class TenantsService {
     // Get all tenants
     const { data: tenants, error: tenantsError } = await supabase
       .from('tenants')
-      .select('id, name, code, domain, email, phone')
+      .select('id, name, code, domain, email, phone, is_active')
+      .eq('is_active', true)
       .order('name', { ascending: true });
 
     throwIfDbError(tenantsError);
@@ -332,8 +348,9 @@ export class TenantsService {
     // Get all branches per tenant
     const { data: branches, error: branchesError } = await supabase
       .from('branches')
-      .select('id, tenant_id')
-      .in('tenant_id', tenantIds);
+      .select('id, tenant_id, is_active')
+      .in('tenant_id', tenantIds)
+      .eq('is_active', true);
 
     throwIfDbError(branchesError);
 
@@ -371,11 +388,26 @@ export class TenantsService {
     const studentRoleId = (studentRoleResult.data as { id: string } | null)?.id;
     const staffRoleIds = ((staffRolesResult.data || []) as { id: string }[]).map((r) => r.id);
 
+    // Fetch school_admin user_roles separately (small set, avoids PostgREST row caps on big datasets)
+    const { data: adminUserRolesRows, error: adminUserRolesError } = adminRoleId
+      ? await supabase
+          .from('user_roles')
+          .select('user_id, branch_id')
+          .eq('role_id', adminRoleId)
+          .in('branch_id', branchIds)
+          .range(0, 5000)
+      : { data: [], error: null };
+
+    throwIfDbError(adminUserRolesError);
+
     // Get all users with roles in branches (for user count)
     const { data: userRoles, error: userRolesError } = await supabase
       .from('user_roles')
       .select('user_id, role_id, branch_id')
-      .in('branch_id', branchIds);
+      .in('branch_id', branchIds)
+      // PostgREST can default to returning only ~1000 rows; explicitly request a larger range
+      // so tenant statistics (incl. school admins) are complete.
+      .range(0, 5000);
 
     throwIfDbError(userRolesError);
 
@@ -391,29 +423,25 @@ export class TenantsService {
     const allAdminUserIds = new Set<string>();
     (tenants as TenantBasicInfo[]).forEach((tenant) => {
       const tenantBranchIds = branchesByTenant.get(tenant.id) || [];
-      const adminUserRoles = (userRoles || []).filter(
-        (ur: { branch_id: string; role_id: string }) =>
-          tenantBranchIds.includes(ur.branch_id) && adminRoleId && ur.role_id === adminRoleId,
+      const tenantAdminUserRoles = (adminUserRolesRows || []).filter((ur: { branch_id: string }) =>
+        tenantBranchIds.includes(ur.branch_id),
       );
-      adminUserRoles.forEach((ur: { user_id: string }) => allAdminUserIds.add(ur.user_id));
+      tenantAdminUserRoles.forEach((ur: { user_id: string }) => allAdminUserIds.add(ur.user_id));
     });
 
-    // Fetch profiles and emails only for admin users
+    // Fetch profiles + emails for admin users (batch, reliable)
     const adminUserIdsArray = Array.from(allAdminUserIds);
-    const [profilesResult, ...authUserResults] = await Promise.all([
+    const [profilesResult, emailsResult] = await Promise.all([
       adminUserIdsArray.length > 0
         ? supabase.from('profiles').select('id, full_name').in('id', adminUserIdsArray)
         : Promise.resolve({ data: [], error: null }),
-      ...adminUserIdsArray.map((userId) =>
-        supabase.auth.admin.getUserById(userId).then((res) => ({
-          userId,
-          email: res.data.user?.email || null,
-          error: res.error,
-        })),
-      ),
+      adminUserIdsArray.length > 0
+        ? supabase.rpc('get_auth_user_emails', { p_user_ids: adminUserIdsArray })
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     throwIfDbError(profilesResult.error);
+    throwIfDbError((emailsResult as { error: PostgrestError | null }).error);
 
     const profileMap = new Map<string, string | null>();
     ((profilesResult.data || []) as { id: string; full_name: string | null }[]).forEach((p) => {
@@ -421,10 +449,11 @@ export class TenantsService {
     });
 
     const authUserMap = new Map<string, string>();
-    authUserResults.forEach((result) => {
-      if (result.email) {
-        authUserMap.set(result.userId, result.email);
-      }
+    (((emailsResult as { data: Array<{ id: string; email: string | null }> | null }).data || []) as Array<{
+      id: string;
+      email: string | null;
+    }>).forEach((row) => {
+      if (row.email) authUserMap.set(row.id, row.email);
     });
 
     // Build statistics per tenant
@@ -447,11 +476,10 @@ export class TenantsService {
       const totalStudents = tenantStudents.length;
 
       // Get school admins
-      const adminUserRoles = (userRoles || []).filter(
-        (ur: { branch_id: string; role_id: string }) =>
-          tenantBranchIds.includes(ur.branch_id) && adminRoleId && ur.role_id === adminRoleId,
+      const tenantAdminUserRoles = (adminUserRolesRows || []).filter((ur: { branch_id: string }) =>
+        tenantBranchIds.includes(ur.branch_id),
       );
-      const adminUserIds = new Set(adminUserRoles.map((ur: { user_id: string }) => ur.user_id));
+      const adminUserIds = new Set(tenantAdminUserRoles.map((ur: { user_id: string }) => ur.user_id));
 
       const schoolAdmins: TenantAdminInfo[] = Array.from(adminUserIds).map((userId: string) => ({
         userId,
@@ -483,6 +511,172 @@ export class TenantsService {
     });
 
     return { data: statistics };
+  }
+
+  async setTenantActivation(
+    tenantId: string,
+    isActive: boolean,
+    userEmail: string,
+  ): Promise<{ data: TenantDto }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: oldRow } = await supabase.from('tenants').select('*').eq('id', tenantId).maybeSingle();
+
+    const { data, error } = await supabase
+      .from('tenants')
+      .update({ is_active: isActive })
+      .eq('id', tenantId)
+      .select(TENANT_SELECT)
+      .single();
+
+    throwIfDbError(error);
+
+    if (oldRow && data) {
+      this.auditLogService
+        .logUpdate(
+          'tenants',
+          tenantId,
+          userEmail,
+          oldRow as Record<string, unknown>,
+          data as Record<string, unknown>,
+          ['is_active'],
+          { tenantId },
+        )
+        .catch(() => {});
+    }
+
+    const themeSettingKey = this.getThemeSettingKey(tenantId);
+    const { data: themeSetting, error: themeError } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .eq('key', themeSettingKey)
+      .maybeSingle();
+    throwIfDbError(themeError);
+
+    const primaryColor =
+      themeSetting && typeof (themeSetting as SystemSettingRow).value === 'string'
+        ? ((themeSetting as SystemSettingRow).value as string)
+        : null;
+
+    return { data: mapTenant(data as TenantRow, primaryColor) };
+  }
+
+  async requestTenantDeletion(tenantId: string, userEmail: string): Promise<{ data: TenantDto }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: tenant, error: getError } = await supabase
+      .from('tenants')
+      .select('id, is_active')
+      .eq('id', tenantId)
+      .maybeSingle();
+    throwIfDbError(getError);
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const now = new Date();
+    const executeAt = new Date(now.getTime() + 2 * 60 * 1000);
+
+    // Fields added by upcoming migration; safe as soon as migration is applied.
+    const { data, error } = await supabase
+      .from('tenants')
+      .update({
+        is_active: false,
+        deletion_status: 'pending',
+        deletion_requested_at: now.toISOString(),
+        deletion_execute_at: executeAt.toISOString(),
+        deletion_cancelled_at: null,
+        deletion_requested_by: userEmail,
+        pre_deletion_is_active: (tenant as { is_active: boolean }).is_active,
+      })
+      .eq('id', tenantId)
+      .select(TENANT_SELECT)
+      .single();
+
+    throwIfDbError(error);
+
+    const themeSettingKey = this.getThemeSettingKey(tenantId);
+    const { data: themeSetting, error: themeError } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .eq('key', themeSettingKey)
+      .maybeSingle();
+    throwIfDbError(themeError);
+
+    const primaryColor =
+      themeSetting && typeof (themeSetting as SystemSettingRow).value === 'string'
+        ? ((themeSetting as SystemSettingRow).value as string)
+        : null;
+
+    return { data: mapTenant(data as TenantRow, primaryColor) };
+  }
+
+  async cancelTenantDeletion(tenantId: string, userEmail: string): Promise<{ data: TenantDto }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: tenant, error: getError } = await supabase
+      .from('tenants')
+      .select('id, deletion_status, pre_deletion_is_active')
+      .eq('id', tenantId)
+      .maybeSingle();
+    throwIfDbError(getError);
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const row = tenant as { deletion_status: string | null; pre_deletion_is_active: boolean | null };
+    if ((row.deletion_status || 'none') !== 'pending') {
+      throw new BadRequestException('Tenant is not pending deletion');
+    }
+
+    const now = new Date();
+    const { data, error } = await supabase
+      .from('tenants')
+      .update({
+        deletion_status: 'none',
+        deletion_cancelled_at: now.toISOString(),
+        deletion_execute_at: null,
+        deletion_requested_at: null,
+        deletion_requested_by: null,
+        is_active: row.pre_deletion_is_active ?? true,
+        pre_deletion_is_active: null,
+      })
+      .eq('id', tenantId)
+      .select(TENANT_SELECT)
+      .single();
+
+    throwIfDbError(error);
+
+    this.auditLogService
+      .logUpdate(
+        'tenants',
+        tenantId,
+        userEmail,
+        tenant as unknown as Record<string, unknown>,
+        data as Record<string, unknown>,
+        [
+          'deletion_status',
+          'deletion_cancelled_at',
+          'deletion_execute_at',
+          'deletion_requested_at',
+          'deletion_requested_by',
+          'is_active',
+          'pre_deletion_is_active',
+        ],
+        { tenantId },
+      )
+      .catch(() => {});
+
+    const themeSettingKey = this.getThemeSettingKey(tenantId);
+    const { data: themeSetting, error: themeError } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .eq('key', themeSettingKey)
+      .maybeSingle();
+    throwIfDbError(themeError);
+
+    const primaryColor =
+      themeSetting && typeof (themeSetting as SystemSettingRow).value === 'string'
+        ? ((themeSetting as SystemSettingRow).value as string)
+        : null;
+
+    return { data: mapTenant(data as TenantRow, primaryColor) };
   }
 }
 

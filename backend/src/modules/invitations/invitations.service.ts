@@ -16,9 +16,10 @@ import { MailjetService } from '../../common/services/email/mailjet.service';
 import { parentSetsStudentPasswordTemplate } from '../../common/email/templates/parent-sets-student-password';
 import { studentSetsOwnPasswordTemplate } from '../../common/email/templates/student-sets-own-password';
 import { parentSetsOwnPasswordTemplate } from '../../common/email/templates/parent-sets-own-password';
+import { staffSetsOwnPasswordTemplate } from '../../common/email/templates/staff-sets-own-password';
 import type { InvitationEmailBranding } from '../../common/email/templates/invitation-email-layout';
 
-type InvitationType = 'student' | 'parent' | 'parent_account';
+type InvitationType = 'student' | 'parent' | 'parent_account' | 'staff';
 
 type InvitationRow = {
   id: string;
@@ -215,6 +216,15 @@ export class InvitationsService {
       if (input.invitation.invitation_type === 'parent_account') {
         return parentSetsOwnPasswordTemplate({
           parentName: input.recipientName,
+          loginEmail: input.loginEmail,
+          invitationLink: link,
+          expiresInDays,
+          branding,
+        });
+      }
+      if (input.invitation.invitation_type === 'staff') {
+        return staffSetsOwnPasswordTemplate({
+          staffName: input.recipientName,
           loginEmail: input.loginEmail,
           invitationLink: link,
           expiresInDays,

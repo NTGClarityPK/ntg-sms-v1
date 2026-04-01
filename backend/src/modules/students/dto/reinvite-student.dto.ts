@@ -7,7 +7,7 @@ export class ReinviteStudentDto {
   username!: string;
 
   @ValidateIf((o: ReinviteStudentDto) => o.invitationType === 'parent')
-  @Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/, { message: 'Invalid email address' })
+  @Matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'Invalid email address' })
   invitationRecipientEmail!: string;
 
   @IsIn(['parent', 'student'])

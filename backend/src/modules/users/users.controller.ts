@@ -123,7 +123,7 @@ export class UsersController {
     const data = await this.usersService.createUser(
       input,
       branch.branchId,
-      user.email,
+      user,
       branch.tenantId,
     );
     return { data };

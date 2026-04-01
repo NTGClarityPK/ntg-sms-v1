@@ -8,3 +8,11 @@
   - `.mantine-Radio-root[data-disabled] ...`
   - Ensure the inner indicator (`.mantine-Radio-inner` / `.mantine-Radio-icon`) remains visible.
 - **Lesson**: When overriding Mantine components globally, **verify selectors against the exact Mantine version’s rendered markup**. Prefer stable state selectors (`[data-checked]`, `[data-disabled]`) over fragile `input:checked + ...` patterns, and keep a quick visual QA checklist for form controls after theme changes.
+
+### Regex escaping broke email validation (DTO @Matches)
+- **Issue**: Manual student creation (and re-invite) failed with HTTP 400 “Invalid invitation recipient email address” for valid emails (notably emails containing the letter `s`, e.g. `...shaheer...@gmail.com`).
+- **Cause**: Regex used `\\s` inside a JavaScript regex literal: `@Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/...)`. In regex literals, `\\s` matches a *literal* `\s`, so the character class `[^\\s@]` unintentionally excluded the letter `s` (and `\`) rather than excluding whitespace. This created a “works for some emails, fails for others” bug.
+- **Fix**: Use the correct whitespace escape in regex literals: `@Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/...)` → `@Matches(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/...)` with single `\s` (i.e. `^[^\\s@]` becomes `^[^\\s@]` where `\s` is a real whitespace token). Updated both:
+  - `backend/src/modules/students/dto/create-student-with-invitation.dto.ts`
+  - `backend/src/modules/students/dto/reinvite-student.dto.ts`
+- **Lesson**: **Be extremely careful with escaping in regex literals vs string regexes.** If the symptom is “valid input fails for a specific character”, suspect an accidental character class restriction. Also ensure backend errors are specific (field-level) so debugging doesn’t stall on generic “Invalid email address”.

@@ -2,6 +2,8 @@
     "title": "المستخدمون",
     "createUser": "إنشاء مستخدم",
     "refresh": "تحديث",
+    "totalUsers": "إجمالي المستخدمين: {count}",
+    "showingFilteredUsers": "عرض {filtered} من {total}",
     "viewOnly": "عرض فقط",
     "viewOnlyMessage": "لديك صلاحية عرض لإدارة المستخدمين. تم تعطيل إجراءات الإنشاء والتحديث وإلغاء التفعيل.",
     "searchPlaceholder": "ابحث عن المستخدمين...",

@@ -78,6 +78,53 @@ export function useAllTenants() {
   });
 }
 
+export function useSetTenantActive() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { tenantId: string; isActive: boolean }) => {
+      const res = await apiClient.patch<Tenant>(`/api/v1/tenants/${payload.tenantId}/activation`, {
+        isActive: payload.isActive,
+      });
+      return res;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: [...tenantKeys.all, 'all'] });
+      await qc.invalidateQueries({ queryKey: [...tenantKeys.all, 'statistics'] });
+    },
+  });
+}
+
+export function useRequestTenantDeletion() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { tenantId: string }) => {
+      const res = await apiClient.post<Tenant>(`/api/v1/tenants/${payload.tenantId}/deletion-request`);
+      return res;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: [...tenantKeys.all, 'all'] });
+      await qc.invalidateQueries({ queryKey: [...tenantKeys.all, 'statistics'] });
+    },
+  });
+}
+
+export function useCancelTenantDeletion() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { tenantId: string }) => {
+      const res = await apiClient.post<Tenant>(`/api/v1/tenants/${payload.tenantId}/deletion-cancel`);
+      return res;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: [...tenantKeys.all, 'all'] });
+      await qc.invalidateQueries({ queryKey: [...tenantKeys.all, 'statistics'] });
+    },
+  });
+}
+
 export interface TenantAdminInfo {
   userId: string;
   email: string;

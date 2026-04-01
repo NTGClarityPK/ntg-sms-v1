@@ -18,8 +18,9 @@ export interface User {
 }
 
 export interface CreateUserInput {
-  email: string;
-  password: string;
+  email?: string;
+  username?: string;
+  invitationEmail?: string;
   fullName: string;
   avatarUrl?: string;
   phone?: string;

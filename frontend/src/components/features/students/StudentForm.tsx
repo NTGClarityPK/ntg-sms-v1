@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Badge, Alert, Text, Radio, Checkbox } from '@mantine/core';
+import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Badge, Alert, Text, Radio, Checkbox, CopyButton, Table } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
@@ -16,6 +16,7 @@ import { useStudentGuardians } from '@/hooks/useParentAssociations';
 import { IconPhone, IconUser } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useTenantMe } from '@/hooks/useTenant';
+import { modals } from '@mantine/modals';
 
 interface StudentFormProps {
   opened: boolean;
@@ -86,6 +87,19 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         path: ['invitationRecipientEmail'],
         message: t('invalidEmail'),
       });
+    }
+
+    if (values.createParentAccount) {
+      const parentEmailRaw = (values.parentEmail ?? '').trim();
+      const parentIsEmail =
+        parentEmailRaw.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmailRaw);
+      if (!parentIsEmail) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['parentEmail'],
+          message: t('invalidEmail'),
+        });
+      }
     }
   });
 
@@ -244,19 +258,97 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           invitationType: values.invitationType,
           invitationRecipientEmail: recipientEmail,
           createParentAccount: values.createParentAccount || undefined,
-          parentEmail: values.createParentAccount ? values.parentEmail || undefined : undefined,
+          parentEmail: values.createParentAccount ? values.parentEmail?.trim() || undefined : undefined,
           parentName: values.createParentAccount ? values.parentName || undefined : undefined,
           parentPhone: values.createParentAccount ? values.parentPhone || undefined : undefined,
           parentRelationship: values.createParentAccount ? values.parentRelationship : undefined,
         };
 
-        await createStudent.mutateAsync(createData);
+        const created = await createStudent.mutateAsync(createData);
+        // Close creation modal, then show a separate summary modal.
+        if (!isEdit) form.reset();
+        onClose();
+
+        modals.open({
+          title: 'Invitation sent',
+          size: 'lg',
+          centered: true,
+          children: (
+            <Stack gap="sm">
+              <Table withTableBorder withColumnBorders>
+                <Table.Tbody>
+                  <Table.Tr>
+                    <Table.Th w={180}>Recipient email</Table.Th>
+                    <Table.Td>
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="sm">{created.studentInvitation.recipientEmail}</Text>
+                        <CopyButton value={created.studentInvitation.recipientEmail}>
+                          {({ copy }) => (
+                            <Button
+                              id="invitation-sent-copy-recipient-email"
+                              size="xs"
+                              variant="light"
+                              onClick={copy}
+                            >
+                              Copy
+                            </Button>
+                          )}
+                        </CopyButton>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Th>Invitation type</Table.Th>
+                    <Table.Td>
+                      <Text size="sm">{created.studentInvitation.invitationType}</Text>
+                    </Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Th>Expires at</Table.Th>
+                    <Table.Td>
+                      <Text size="sm">
+                        {new Date(created.studentInvitation.expiresAt).toLocaleString()}
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                </Table.Tbody>
+              </Table>
+
+              {created.parentInvitation && (
+                <Alert color="blue" title="Parent account invitation">
+                  <Stack gap={6}>
+                    <Group justify="space-between" wrap="nowrap">
+                      <Text size="sm">
+                        <strong>Recipient email:</strong> {created.parentInvitation.recipientEmail}
+                      </Text>
+                      <CopyButton value={created.parentInvitation.recipientEmail}>
+                        {({ copy }) => (
+                          <Button
+                            id="invitation-sent-copy-parent-recipient-email"
+                            size="xs"
+                            variant="light"
+                            onClick={copy}
+                          >
+                            Copy
+                          </Button>
+                        )}
+                      </CopyButton>
+                    </Group>
+                    <Text size="sm">
+                      <strong>Expires at:</strong>{' '}
+                      {new Date(created.parentInvitation.expiresAt).toLocaleString()}
+                    </Text>
+                  </Stack>
+                </Alert>
+              )}
+            </Stack>
+          ),
+        });
       }
 
-      if (!isEdit) {
-        form.reset();
+      if (!isEdit && !opened) {
+        // no-op
       }
-      onClose();
     } catch (error) {
       // Error handling is done in the mutation hooks
     }

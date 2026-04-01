@@ -17,6 +17,7 @@ import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 import { InvitationsService } from '../invitations/invitations.service';
 import { ParentsService } from '../parents/parents.service';
+import { MessagesService } from '../messages/messages.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import crypto from 'crypto';
 
@@ -61,6 +62,7 @@ export class StudentsService {
     private readonly academicYearsService: AcademicYearsService,
     private readonly invitationsService: InvitationsService,
     private readonly parentsService: ParentsService,
+    private readonly messagesService: MessagesService,
   ) {}
 
   private randomTempPassword(): string {
@@ -133,6 +135,79 @@ export class StudentsService {
     const local = email.split('@')[0] || email;
     const cleaned = local.replace(/[._-]+/g, ' ').trim();
     return cleaned ? cleaned.replace(/\b\w/g, (c) => c.toUpperCase()) : email;
+  }
+
+  private formatInvitationMessage(input: {
+    recipientDisplayName: string;
+    loginEmail: string;
+    inviteEmail: string;
+    expiresAt: string;
+    accountLabel: 'student' | 'parent';
+    studentNameForParent?: string;
+  }): { subject: string; body: string } {
+    const expires = new Date(input.expiresAt).toLocaleString();
+    const subject =
+      input.accountLabel === 'parent'
+        ? 'Parent account created — setup link sent'
+        : 'Student account created — setup link sent';
+
+    const intro =
+      input.accountLabel === 'parent'
+        ? `Hi ${input.recipientDisplayName},\n\nWe have created your parent account for NTG Alma.`
+        : `Hi ${input.recipientDisplayName},\n\nWe have created your NTG Alma student account.`;
+
+    const childLine =
+      input.accountLabel === 'parent' && input.studentNameForParent
+        ? `\n\nStudent: ${input.studentNameForParent}`
+        : '';
+
+    const body =
+      `${intro}${childLine}\n\n` +
+      `Login email: ${input.loginEmail}\n` +
+      `Activation link was sent to: ${input.inviteEmail}\n` +
+      `This link expires at: ${expires}\n\n` +
+      `Next steps:\n` +
+      `1) Open the activation link and set your password.\n` +
+      `2) Sign in to the portal using the login email above.\n\n` +
+      `If you need a new link, please contact the school office.\n`;
+
+    return { subject, body };
+  }
+
+  private async sendInvitationDetailsMessage(input: {
+    branchId: string;
+    adminUser: CurrentUserPayload;
+    recipientUserId: string;
+    recipientDisplayName: string;
+    loginEmail: string;
+    inviteEmail: string;
+    expiresAt: string;
+    accountLabel: 'student' | 'parent';
+    studentNameForParent?: string;
+  }): Promise<void> {
+    const roles = input.adminUser.roles ?? [];
+    const { subject, body } = this.formatInvitationMessage({
+      recipientDisplayName: input.recipientDisplayName,
+      loginEmail: input.loginEmail,
+      inviteEmail: input.inviteEmail,
+      expiresAt: input.expiresAt,
+      accountLabel: input.accountLabel,
+      studentNameForParent: input.studentNameForParent,
+    });
+
+    const conv = await this.messagesService.createConversation(
+      { type: 'one_to_one', recipientUserId: input.recipientUserId },
+      input.adminUser.id,
+      input.branchId,
+    );
+
+    await this.messagesService.sendMessage(
+      conv.id,
+      { messageType: 'other', subject, body },
+      input.adminUser.id,
+      input.branchId,
+      roles,
+    );
   }
 
   async listStudents(
@@ -653,6 +728,9 @@ export class StudentsService {
   }> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(adminUser.email);
+    // If we create a brand-new parent account during this flow and later fail,
+    // we must roll it back to avoid orphan parent records for failed imports.
+    let createdParentUserId: string | null = null;
 
     const tenantDomain = await this.getTenantDomainForBranch(branchId);
     const normalizedLoginEmail = this.normalizeLoginEmail(
@@ -822,6 +900,7 @@ export class StudentsService {
           if (!parentUser) throw new BadRequestException('Failed to create parent user');
           parentUserIdToUse = parentUser.id;
           createdNewParent = true;
+          createdParentUserId = parentUserIdToUse;
         }
 
         // Ensure parent has profile, branch, role (idempotent)
@@ -835,6 +914,7 @@ export class StudentsService {
             date_of_birth: null,
             gender: null,
             is_active: true,
+            current_branch_id: branchId,
             created_by: username,
             updated_by: username,
           },
@@ -958,6 +1038,38 @@ export class StudentsService {
 
       const studentDto = await this.getStudentById(studentRow.id, branchId);
 
+      // Also send a curated in-app message so admins can see it in Messages.
+      // Student always gets a message; parent only if a parent account is created (registered).
+      try {
+        await this.sendInvitationDetailsMessage({
+          branchId,
+          adminUser,
+          recipientUserId: user.id,
+          recipientDisplayName: displayName,
+          loginEmail: normalizedLoginEmail,
+          inviteEmail: inv.recipient_email,
+          expiresAt: inv.expires_at,
+          accountLabel: 'student',
+        });
+        if (parentInvitation?.parentUserId) {
+          const parentLoginEmail = this.normalizeLoginEmail(input.parentEmail ?? '') || parentInvitation.recipientEmail;
+          const parentName = (input.parentName ?? '').trim() || this.nameFromEmail(parentLoginEmail);
+          await this.sendInvitationDetailsMessage({
+            branchId,
+            adminUser,
+            recipientUserId: parentInvitation.parentUserId,
+            recipientDisplayName: parentName,
+            loginEmail: parentLoginEmail,
+            inviteEmail: parentInvitation.recipientEmail,
+            expiresAt: parentInvitation.expiresAt,
+            accountLabel: 'parent',
+            studentNameForParent: displayName,
+          });
+        }
+      } catch {
+        // non-fatal
+      }
+
       return {
         student: studentDto,
         studentInvitation: {
@@ -969,6 +1081,20 @@ export class StudentsService {
         parentInvitation,
       };
     } catch (error) {
+      // If we created a *new* parent account during this flow and the student row ultimately failed,
+      // roll back the parent so we do not create parent records for failed imports.
+      if (createdParentUserId) {
+        try {
+          await supabase.from('parent_students').delete().eq('parent_user_id', createdParentUserId);
+          await supabase.from('user_roles').delete().eq('user_id', createdParentUserId).eq('branch_id', branchId);
+          await supabase.from('user_branches').delete().eq('user_id', createdParentUserId).eq('branch_id', branchId);
+          await supabase.from('invitations').delete().eq('user_id', createdParentUserId);
+          await supabase.from('profiles').delete().eq('id', createdParentUserId);
+          await supabase.auth.admin.deleteUser(createdParentUserId);
+        } catch {
+          // best-effort rollback; do not mask the original failure
+        }
+      }
       await supabase.auth.admin.deleteUser(user.id);
       throw error;
     }

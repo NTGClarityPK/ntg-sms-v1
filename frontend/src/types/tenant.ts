@@ -11,6 +11,12 @@ export interface Tenant {
   isActive?: boolean;
   logoUrl?: string | null;
   primaryColor?: string | null;
+  deletionStatus?: 'none' | 'pending' | 'executing' | null;
+  deletionRequestedAt?: string | null;
+  deletionExecuteAt?: string | null;
+  deletionCancelledAt?: string | null;
+  deletionRequestedBy?: string | null;
+  preDeletionIsActive?: boolean | null;
 }
 
 
