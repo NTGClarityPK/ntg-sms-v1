@@ -458,6 +458,8 @@ export class ParentsService {
       limit: number;
       parentId?: string;
       studentId?: string;
+      /** Free-text: matches student first/last name or student_id, or parent profile full_name / email */
+      search?: string;
     },
     branchId: string,
   ): Promise<{
@@ -500,6 +502,67 @@ export class ParentsService {
     // Filter by student if provided
     if (query.studentId) {
       dbQuery = dbQuery.eq('student_id', query.studentId);
+    }
+
+    const searchRaw = (query.search ?? '').trim();
+    const searchTerms = searchRaw
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (searchTerms.length > 0 && branchId) {
+      const isEmailLikeSearch = searchTerms.some((t) => t.includes('@'));
+      let matchingStudentIds: string[] = [];
+      let matchingParentProfileIds: string[] = [];
+
+      if (isEmailLikeSearch) {
+        const emailTerm = searchTerms.join(' ').toLowerCase();
+        const { data: emailProfiles, error: emailProfilesError } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', `%${emailTerm}%`)
+          .limit(200);
+        throwIfDbError(emailProfilesError);
+        matchingParentProfileIds = (emailProfiles || []).map((p: { id: string }) => p.id);
+      } else {
+        const orFilter = searchTerms
+          .map(
+            (t) =>
+              `first_name.ilike.%${t}%,last_name.ilike.%${t}%,student_id.ilike.%${t}%`,
+          )
+          .join(',');
+        const { data: nameStudents, error: nameStudentsError } = await supabase
+          .from('students')
+          .select('id')
+          .eq('branch_id', branchId)
+          .or(orFilter);
+        throwIfDbError(nameStudentsError);
+        matchingStudentIds = (nameStudents || []).map((s: { id: string }) => s.id);
+
+        const { data: nameProfiles, error: nameProfilesError } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('full_name', `%${searchRaw}%`)
+          .limit(200);
+        throwIfDbError(nameProfilesError);
+        matchingParentProfileIds = (nameProfiles || []).map((p: { id: string }) => p.id);
+      }
+
+      if (matchingStudentIds.length === 0 && matchingParentProfileIds.length === 0) {
+        return {
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 0 },
+        };
+      }
+
+      if (matchingStudentIds.length > 0 && matchingParentProfileIds.length > 0) {
+        dbQuery = dbQuery.or(
+          `student_id.in.(${matchingStudentIds.join(',')}),parent_user_id.in.(${matchingParentProfileIds.join(',')})`,
+        );
+      } else if (matchingStudentIds.length > 0) {
+        dbQuery = dbQuery.in('student_id', matchingStudentIds);
+      } else {
+        dbQuery = dbQuery.in('parent_user_id', matchingParentProfileIds);
+      }
     }
 
     // Apply pagination

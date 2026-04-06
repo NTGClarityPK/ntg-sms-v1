@@ -47,6 +47,7 @@ export function UserMenu() {
 
   const autoOpenEnabled = autoOpenSetting.data?.data?.value === true;
   const hasSeenToursModal = userTyped?.onboardingSeenToursModal === true;
+  const localSeenKey = 'ntg_alma_seen_tours_modal';
 
   const branches = Array.from(
     new Map(((userTyped?.branches || []) as Branch[]).map((b) => [b.id, b])).values(),
@@ -78,12 +79,41 @@ export function UserMenu() {
     if (hasSeenToursModal) return;
 
     const key = 'ntg_alma_show_tours_modal';
+    const hasSeenLocally = window.localStorage.getItem(localSeenKey) === '1';
+    if (hasSeenLocally) {
+      // Clean up stale open-request so it doesn't keep trying.
+      window.sessionStorage.removeItem(key);
+      return;
+    }
     const shouldOpen = window.sessionStorage.getItem(key) === '1';
     if (!shouldOpen) return;
 
     window.sessionStorage.removeItem(key);
     setToursModalOpened(true);
   }, [autoOpenEnabled, hasSeenToursModal]);
+
+  const markToursSeenLocally = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(localSeenKey, '1');
+      // Also clear any pending auto-open request.
+      window.sessionStorage.removeItem('ntg_alma_show_tours_modal');
+    } catch {
+      // Non-blocking
+    }
+  };
+
+  const handleCloseToursModal = async () => {
+    // Requirement: show only once based on local browser cache.
+    markToursSeenLocally();
+    setToursModalOpened(false);
+    // Best-effort: also persist to backend so it stays "seen" across devices.
+    try {
+      await apiClient.put('/api/v1/auth/profile', { onboardingSeenToursModal: true });
+    } catch {
+      // Non-blocking
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -240,7 +270,7 @@ export function UserMenu() {
         onClose={() => setShowBranchModal(false)}
       />
 
-      <OnboardingToursModal opened={toursModalOpened} onClose={() => setToursModalOpened(false)} />
+      <OnboardingToursModal opened={toursModalOpened} onClose={() => void handleCloseToursModal()} />
     </Menu>
   );
 }

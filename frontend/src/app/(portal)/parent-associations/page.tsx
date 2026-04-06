@@ -43,22 +43,12 @@ export default function ParentAssociationsPage() {
   const parents = usersData?.data || [];
   const students = (studentsData as { data?: Array<{ id: string; firstName?: string | null; lastName?: string | null; studentId: string }> } | null | undefined)?.data || [];
 
-  // Filter by search term
-  const filteredParentId = useMemo(() => {
-    if (!debouncedSearch || !parents.length) return parentFilter;
-    const found = parents.find(
-      (p) =>
-        p.fullName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        p.email?.toLowerCase().includes(debouncedSearch.toLowerCase()),
-    );
-    return found?.id || parentFilter;
-  }, [debouncedSearch, parents, parentFilter]);
-
   const associationsQuery = useParentAssociations({
     page,
     limit: 20,
-    parentId: filteredParentId,
+    parentId: parentFilter,
     studentId: studentFilter,
+    search: debouncedSearch.trim() || undefined,
   });
 
   return (

@@ -85,6 +85,7 @@ export class ParentsController {
     @Query('limit') limit?: string,
     @Query('parentId') parentId?: string,
     @Query('studentId') studentId?: string,
+    @Query('search') search?: string,
     @CurrentBranch() branch?: { branchId: string; tenantId: string },
   ) {
     const data = await this.parentsService.listAssociations(
@@ -93,6 +94,7 @@ export class ParentsController {
         limit: limit ? parseInt(limit, 10) : 20,
         parentId,
         studentId,
+        search: search?.trim() ? search.trim().slice(0, 200) : undefined,
       },
       branch?.branchId || '',
     );

@@ -281,14 +281,19 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
                 {visibleFeatures.map((feature) => {
                   const key = `${role.id}-${feature.id}`;
                   const currentPermission = localPermissions.get(key) || 'none';
+                  const isStudentRole = role.name?.toLowerCase() === 'student';
+                  // Students should not be granted management "Assessment" permissions (they use "My Assessments").
+                  const isDisabledForStudent = isStudentRole && feature.code === 'assessment';
 
                   return (
                     <Table.Td key={feature.id}>
                       <Select
                         value={currentPermission}
-                        onChange={(value) =>
-                          handlePermissionChange(role.id, feature.id, value as Permission)
-                        }
+                        disabled={isDisabledForStudent}
+                        onChange={(value) => {
+                          if (isDisabledForStudent) return;
+                          handlePermissionChange(role.id, feature.id, value as Permission);
+                        }}
                         data={[
                           { value: 'none', label: tSettings('permissionsOptionNone') },
                           { value: 'view', label: tSettings('permissionsOptionView') },

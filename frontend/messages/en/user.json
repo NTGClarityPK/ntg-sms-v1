@@ -52,7 +52,7 @@
   "create": "Create",
   "parentAssociationTitle": "Parent-Student Association",
   "createAssociation": "Create Association",
-  "searchPlaceholderParent": "Search by parent name or email...",
+  "searchPlaceholderParent": "Search by parent name, email, or student name...",
   "filterByParent": "Filter by parent",
   "filterByStudent": "Filter by student",
   "failedToLoadAssociations": "Failed to load associations",

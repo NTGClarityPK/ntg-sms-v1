@@ -70,8 +70,19 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_ROWS_PER_SHEET = 5000;
 const TOKEN_TTL_MS = 30 * 60 * 1000;
 
+/** Values that must not be committed as real tenant names (template samples). */
+const DISALLOWED_SCHOOL_NAME_PLACEHOLDERS = new Set(
+  ['ntg international school', 'your school name', 'your school name here', 'example school'].map((s) =>
+    s.toLowerCase(),
+  ),
+);
+
+function isPlaceholderSchoolName(value: string | undefined): boolean {
+  const n = value?.trim().toLowerCase();
+  return Boolean(n && DISALLOWED_SCHOOL_NAME_PLACEHOLDERS.has(n));
+}
+
 const SHEET_NAMES = {
-  meta: 'meta',
   schoolInfo: 'school_info',
   academicYears: 'academic_years',
   subjects: 'subjects',
@@ -100,18 +111,134 @@ function asNumber(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function normalizeDate(value: unknown): string {
-  const v = asString(value);
-  if (!v) return '';
-  const iso = /^\d{4}-\d{2}-\d{2}$/.test(v);
-  if (iso) return v;
-  const ddmmyy = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (ddmmyy) {
-    const day = ddmmyy[1].padStart(2, '0');
-    const month = ddmmyy[2].padStart(2, '0');
-    return `${ddmmyy[3]}-${month}-${day}`;
+function formatDateParts(year: number, month: number, day: number): string {
+  const mo = String(month).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${year}-${mo}-${d}`;
+}
+
+function isValidYMD(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const dt = new Date(year, month - 1, day);
+  return dt.getFullYear() === year && dt.getMonth() === month - 1 && dt.getDate() === day;
+}
+
+/** Excel serial day (sheet cell number) → YYYY-MM-DD (UTC). */
+function excelSerialToIsoDate(serial: number): string | undefined {
+  if (!Number.isFinite(serial)) return undefined;
+  const whole = Math.floor(serial);
+  if (whole < 1 || whole > 2958465) return undefined;
+  const utcMs = (whole - 25569) * 86400 * 1000;
+  const d = new Date(utcMs);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return formatDateParts(
+    d.getUTCFullYear(),
+    d.getUTCMonth() + 1,
+    d.getUTCDate(),
+  );
+}
+
+/**
+ * Workbook / Excel cell value → YYYY-MM-DD. Handles:
+ * - Excel serial numbers (number or numeric string)
+ * - Date objects (with cellDates in sheet_to_json)
+ * - ISO dates and ISO datetimes
+ * - DD/MM/YYYY, MM/DD/YYYY when unambiguous, YYYY/MM/DD, dotted forms
+ * - 2-digit years
+ * - Strings Date.parse accepts (e.g. locale month names)
+ */
+function parseFlexibleDateToIso(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === 'boolean') return undefined;
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return excelSerialToIsoDate(value);
   }
-  return '';
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return undefined;
+    return formatDateParts(value.getFullYear(), value.getMonth() + 1, value.getDate());
+  }
+
+  const raw = typeof value === 'string' ? value.trim() : String(value).trim();
+  if (!raw) return undefined;
+
+  if (/^\d+(\.\d+)?$/.test(raw)) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 1 && n < 1000000) {
+      const fromSerial = excelSerialToIsoDate(n);
+      if (fromSerial) return fromSerial;
+    }
+  }
+
+  let s = raw;
+  if (s.includes('T')) {
+    const head = s.split('T')[0];
+    if (head && /^\d{4}-\d{2}-\d{2}$/.test(head)) {
+      s = head;
+    }
+  }
+  if (/^\d{4}-\d{2}-\d{2}\s/.test(s)) {
+    s = s.slice(0, 10);
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map((x) => parseInt(x, 10));
+    return isValidYMD(y, m, d) ? s : undefined;
+  }
+
+  let m = s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+  if (m) {
+    const year = parseInt(m[1], 10);
+    const month = parseInt(m[2], 10);
+    const day = parseInt(m[3], 10);
+    return isValidYMD(year, month, day) ? formatDateParts(year, month, day) : undefined;
+  }
+
+  m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (m) {
+    const a = parseInt(m[1], 10);
+    const b = parseInt(m[2], 10);
+    const year = parseInt(m[3], 10);
+    if (a > 12) {
+      return isValidYMD(year, b, a) ? formatDateParts(year, b, a) : undefined;
+    }
+    if (b > 12) {
+      return isValidYMD(year, a, b) ? formatDateParts(year, a, b) : undefined;
+    }
+    if (isValidYMD(year, b, a)) return formatDateParts(year, b, a);
+    if (isValidYMD(year, a, b)) return formatDateParts(year, a, b);
+    return undefined;
+  }
+
+  m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2})$/);
+  if (m) {
+    const a = parseInt(m[1], 10);
+    const b = parseInt(m[2], 10);
+    const yy = parseInt(m[3], 10);
+    const year = yy + (yy >= 70 ? 1900 : 2000);
+    if (a > 12) {
+      return isValidYMD(year, b, a) ? formatDateParts(year, b, a) : undefined;
+    }
+    if (b > 12) {
+      return isValidYMD(year, a, b) ? formatDateParts(year, a, b) : undefined;
+    }
+    if (isValidYMD(year, b, a)) return formatDateParts(year, b, a);
+    if (isValidYMD(year, a, b)) return formatDateParts(year, a, b);
+    return undefined;
+  }
+
+  const parsedMs = Date.parse(raw);
+  if (!Number.isNaN(parsedMs)) {
+    const d = new Date(parsedMs);
+    return formatDateParts(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  }
+
+  return undefined;
+}
+
+function normalizeDate(value: unknown): string {
+  return parseFlexibleDateToIso(value) ?? '';
 }
 
 @Injectable()
@@ -133,7 +260,6 @@ export class SettingsImportService {
       data: {
         workbookName: 'settings-onboarding-template.xlsx',
         sheets: [
-          { name: SHEET_NAMES.meta, columns: ['template_version', 'branch_code', 'dry_run'], sample: { template_version: '1.0', branch_code: 'MAIN', dry_run: 'true' } },
           {
             name: SHEET_NAMES.schoolInfo,
             columns: [
@@ -150,17 +276,17 @@ export class SettingsImportService {
               'branch_email',
             ],
             sample: {
-              school_name: 'NTG International School',
-              domain: 'ntg.edu',
-              email: 'info@ntg.edu',
-              phone: '+9647700000000',
+              school_name: 'Your School Name',
+              domain: 'school.example.edu',
+              email: 'admin@school.example.edu',
+              phone: '+1234567890',
               timezone: 'Asia/Baghdad',
               fiscal_year_start: '2026-09-01',
               vat_number: '',
               branch_name: 'Main Branch',
-              branch_address: 'Baghdad, Iraq',
-              branch_phone: '+9647700000001',
-              branch_email: 'main@ntg.edu',
+              branch_address: 'City, Country',
+              branch_phone: '+1234567891',
+              branch_email: 'main@school.example.edu',
             },
           },
           { name: SHEET_NAMES.academicYears, columns: ['name', 'start_date', 'end_date', 'set_active'], sample: { name: '2026-2027', start_date: '2026-09-01', end_date: '2027-06-30', set_active: 'true' } },
@@ -186,27 +312,13 @@ export class SettingsImportService {
     this.ensureValidUpload(file);
     this.cleanupExpiredTokens();
 
-    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const workbook = XLSX.read(file.buffer, {
+      type: 'buffer',
+      cellDates: true,
+    });
     const errors: ValidationError[] = [];
     const warnings: string[] = [];
     const summaryBySheet: Record<string, SheetSummary> = {};
-
-    const metaRows = this.readSheet(workbook, SHEET_NAMES.meta);
-    const meta = metaRows[0] ?? {};
-    const templateVersion = asString(meta.template_version);
-    const requestedBranchCode = asString(meta.branch_code);
-    if (templateVersion && templateVersion !== '1.0') {
-      warnings.push(`Template version '${templateVersion}' is not current. Expected 1.0.`);
-    }
-
-    const branch = await this.branchesService.getById(branchId, 'en');
-    if (requestedBranchCode && branch.code && requestedBranchCode !== branch.code) {
-      errors.push({
-        sheet: SHEET_NAMES.meta,
-        rowNumber: 2,
-        message: `branch_code '${requestedBranchCode}' does not match current branch '${branch.code}'.`,
-      });
-    }
 
     const schoolInfoRows = this.readSheet(workbook, SHEET_NAMES.schoolInfo);
     const academicYearRows = this.readSheet(workbook, SHEET_NAMES.academicYears);
@@ -356,7 +468,9 @@ export class SettingsImportService {
       await this.tenantsService.updateMe(
         prepared.tenantId,
         {
-          name: prepared.schoolInfo.schoolName,
+          ...(isPlaceholderSchoolName(prepared.schoolInfo.schoolName)
+            ? {}
+            : { name: prepared.schoolInfo.schoolName }),
           domain: prepared.schoolInfo.domain,
           email: prepared.schoolInfo.email,
           phone: prepared.schoolInfo.phone,
@@ -562,6 +676,13 @@ export class SettingsImportService {
         sheet: SHEET_NAMES.schoolInfo,
         rowNumber: 2,
         message: 'school_name is required',
+      });
+    } else if (isPlaceholderSchoolName(schoolName)) {
+      errors.push({
+        sheet: SHEET_NAMES.schoolInfo,
+        rowNumber: 2,
+        message:
+          'school_name must be your real organisation name. Replace the template example before importing.',
       });
     }
     return {

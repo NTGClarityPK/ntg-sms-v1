@@ -52,7 +52,7 @@
   "create": "إنشاء",
   "parentAssociationTitle": "ربط ولي الأمر بالطالب",
   "createAssociation": "إنشاء ربط",
-  "searchPlaceholderParent": "ابحث باسم ولي الأمر أو بريده الإلكتروني...",
+  "searchPlaceholderParent": "ابحث باسم ولي الأمر أو بريده الإلكتروني أو اسم الطالب...",
   "filterByParent": "تصفية حسب ولي الأمر",
   "filterByStudent": "تصفية حسب الطالب",
   "failedToLoadAssociations": "فشل تحميل الروابط",

@@ -19,7 +19,7 @@ const DEFAULT_VALUE: BehavioralAssessmentValue = {
   attributes: [],
 };
 
-export function BehaviorSettings() {
+export function BehaviorSettings({ showHeader = true }: { showHeader?: boolean }) {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
   const tSettings = useTranslations('settings');
@@ -100,9 +100,20 @@ export function BehaviorSettings() {
   }
 
   return (
-    <Paper withBorder p="md">
-      <Stack gap="md">
-        <Text fw={600}>{tSettings('behaviorTitle')}</Text>
+    <Stack gap="xs">
+      {showHeader && (
+        <Stack gap={4}>
+          <Text size="lg" fw={600}>
+            {tSettings('generalBehaviorTitle')}
+          </Text>
+          <Text size="sm" c="dimmed">
+            {tSettings('generalBehaviorDescription')}
+          </Text>
+        </Stack>
+      )}
+      <Paper withBorder p="md">
+        <Stack gap="md">
+          {!showHeader && <Text fw={600}>{tSettings('behaviorTitle')}</Text>}
 
         <Switch
           id="behavior-settings-enabled"
@@ -168,7 +179,8 @@ export function BehaviorSettings() {
             {tCommon('save')}
           </Button>
         </Group>
-      </Stack>
-    </Paper>
+        </Stack>
+      </Paper>
+    </Stack>
   );
 }

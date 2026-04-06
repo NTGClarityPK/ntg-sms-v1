@@ -109,15 +109,25 @@ export function LeaveRequestForm({ student, onSuccess }: LeaveRequestFormProps) 
           <DatePickerInput
             id="leave-request-start-date"
             label={t('startDate')}
-            {...form.getInputProps('startDate')}
+            value={form.values.startDate}
+            onChange={(value) => {
+              if (!value) return;
+              form.setFieldValue('startDate', value);
+              if (form.values.endDate && form.values.endDate < value) {
+                form.setFieldValue('endDate', value);
+              }
+            }}
             placeholder={t('selectStartDate')}
             leftSection={<IconCalendar size={16} />}
-            maxDate={form.values.endDate || undefined}
           />
           <DatePickerInput
             id="leave-request-end-date"
             label={t('endDate')}
-            {...form.getInputProps('endDate')}
+            value={form.values.endDate}
+            onChange={(value) => {
+              if (!value) return;
+              form.setFieldValue('endDate', value);
+            }}
             placeholder={t('selectEndDate')}
             leftSection={<IconCalendar size={16} />}
             minDate={form.values.startDate || undefined}

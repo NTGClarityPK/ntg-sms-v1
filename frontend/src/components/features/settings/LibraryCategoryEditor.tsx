@@ -8,8 +8,9 @@ import { IconCheck, IconPencil, IconTrash, IconX } from '@tabler/icons-react';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
 
-export function LibraryCategoryEditor() {
+export function LibraryCategoryEditor({ showHeader = true }: { showHeader?: boolean }) {
   const t = useTranslations('library');
+  const tSettings = useTranslations('settings');
   const tCommon = useTranslations('common');
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
@@ -105,9 +106,20 @@ export function LibraryCategoryEditor() {
   }
 
   return (
-    <Paper withBorder p="md">
-      <Stack gap="md">
-        <Text fw={600}>{t('libraryCategories')}</Text>
+    <Stack gap="xs">
+      {showHeader && (
+        <Stack gap={4}>
+          <Text size="lg" fw={600}>
+            {tSettings('generalLibraryCategoriesTitle')}
+          </Text>
+          <Text size="sm" c="dimmed">
+            {tSettings('generalLibraryCategoriesDescription')}
+          </Text>
+        </Stack>
+      )}
+      <Paper withBorder p="md">
+        <Stack gap="md">
+          {!showHeader && <Text fw={600}>{t('libraryCategories')}</Text>}
 
         <Group align="flex-end">
           <TextInput
@@ -205,8 +217,9 @@ export function LibraryCategoryEditor() {
             {t('save')}
           </Button>
         </Group>
-      </Stack>
-    </Paper>
+        </Stack>
+      </Paper>
+    </Stack>
   );
 }
 

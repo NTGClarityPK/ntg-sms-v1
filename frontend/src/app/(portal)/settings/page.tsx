@@ -292,9 +292,6 @@ export default function SettingsPage() {
                 <Tabs.Tab value="schedule" leftSection={<IconClock size={16} />}>
                   {tSettings('tabSchedule')}
                 </Tabs.Tab>
-                <Tabs.Tab value="general" leftSection={<IconAdjustments size={16} />}>
-                  {tSettings('tabGeneral')}
-                </Tabs.Tab>
                 <Tabs.Tab value="assessment" leftSection={<IconClipboardList size={16} />}>
                   {tSettings('tabAssessment')}
                 </Tabs.Tab>
@@ -312,6 +309,9 @@ export default function SettingsPage() {
                     {tSettings('tabPublicStatistics')}
                   </Tabs.Tab>
                 )}
+                <Tabs.Tab value="general" leftSection={<IconAdjustments size={16} />}>
+                  {tSettings('tabGeneral')}
+                </Tabs.Tab>
               </Tabs.List>
 
               {/* Permissions Tab */}
@@ -339,11 +339,6 @@ export default function SettingsPage() {
                 <ScheduleTabContent />
               </Tabs.Panel>
 
-              {/* General: leave quota, library categories, behaviour */}
-              <Tabs.Panel value="general" pt="md" px="md" pb="md">
-                <GeneralTabContent />
-              </Tabs.Panel>
-
               {/* Assessment Tab */}
               <Tabs.Panel value="assessment" pt="md" px="md" pb="md">
                 <AssessmentTabContent />
@@ -369,6 +364,11 @@ export default function SettingsPage() {
                   <PublicStatsSettings />
                 </Tabs.Panel>
               )}
+
+              {/* General: leave quota, library categories, behaviour */}
+              <Tabs.Panel value="general" pt="md" px="md" pb="md">
+                <GeneralTabContent />
+              </Tabs.Panel>
             </Tabs>
           </>
         )}

@@ -38,6 +38,8 @@ interface QueryParentAssociationsParams {
   limit?: number;
   parentId?: string;
   studentId?: string;
+  /** Server-side: parent name/email or student name / student ID */
+  search?: string;
 }
 
 export function useParentAssociations(params?: QueryParentAssociationsParams) {
@@ -53,6 +55,7 @@ export function useParentAssociations(params?: QueryParentAssociationsParams) {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.parentId) queryParams.append('parentId', params.parentId);
       if (params?.studentId) queryParams.append('studentId', params.studentId);
+      if (params?.search) queryParams.append('search', params.search);
 
       const response = await apiClient.get<ParentAssociation[]>(
         `/api/v1/parents/associations?${queryParams.toString()}`,

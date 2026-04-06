@@ -9,9 +9,10 @@ import { useLeaveQuota, useSetLeaveQuota } from '@/hooks/useAssessmentSettings';
 
 interface LeaveQuotaSettingProps {
   academicYearId?: string;
+  showHeader?: boolean;
 }
 
-export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
+export function LeaveQuotaSetting({ academicYearId, showHeader = true }: LeaveQuotaSettingProps) {
   const t = useTranslations('leave');
   const tCommon = useTranslations('common');
   const colors = useThemeColors();
@@ -51,11 +52,17 @@ export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
   };
 
   return (
-    <>
-      <Text size="lg" fw={500} mb="xs">{t('leaveQuotaTitle')}</Text>
-      <Text size="sm" c="dimmed" mb="md">
-        {t('leaveQuotaDescription')}
-      </Text>
+    <Stack gap="xs">
+      {showHeader && (
+        <Stack gap={4}>
+          <Text size="lg" fw={600}>
+            {t('leaveQuotaTitle')}
+          </Text>
+          <Text size="sm" c="dimmed">
+            {t('leaveQuotaDescription')}
+          </Text>
+        </Stack>
+      )}
       <Paper withBorder p="md">
         <Stack gap="md">
           <Text fw={600}>{t('annualLeaveQuota')}</Text>
@@ -67,7 +74,7 @@ export function LeaveQuotaSetting({ academicYearId }: LeaveQuotaSettingProps) {
         </Group>
       </Stack>
     </Paper>
-    </>
+    </Stack>
   );
 }
 

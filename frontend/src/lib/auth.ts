@@ -1,5 +1,27 @@
 import { supabase } from './supabase/client';
 
+const LOCALE_COOKIE = 'NEXT_LOCALE';
+const LOCALE_COOKIE_MAX_AGE = 31536000; // 1 year
+
+function setLocaleCookie(locale: string): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+function clearAuthClientState(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    // Prevent stale branch/student-mode state from leaking into login screen.
+    window.localStorage.removeItem('currentBranchId');
+    window.localStorage.removeItem('studentToken');
+
+    // Prevent showing an old "inactive/deactivated" flash on logout.
+    window.sessionStorage.removeItem('ntg_auth_inactive_message');
+  } catch {
+    // Non-blocking: storage can throw in some privacy modes.
+  }
+}
+
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -23,6 +45,13 @@ export async function signOut() {
   }
 
   if (typeof window !== 'undefined') {
+    // Keep the user's last-selected language on the login screen.
+    // (Server renders from NEXT_LOCALE cookie; localStorage alone isn't enough.)
+    const storedLocale = window.localStorage.getItem('locale');
+    if (storedLocale) {
+      setLocaleCookie(storedLocale);
+    }
+    clearAuthClientState();
     window.location.href = '/login';
   }
 }
@@ -33,6 +62,7 @@ export async function clearLocalSupabaseSession(): Promise<void> {
   if (error) {
     throw error;
   }
+  clearAuthClientState();
 }
 
 export async function getSession() {

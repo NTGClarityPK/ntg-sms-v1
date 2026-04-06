@@ -1127,6 +1127,12 @@ export class AssessmentsService {
       throw new BadRequestException('No student record found for current user');
     }
 
+    // In some tenants, student records may exist before being fully assigned to a class/section/year.
+    // Avoid sending "null" into UUID filters (PostgREST rejects it) and treat as "no assessments yet".
+    if (!student.class_id || !student.section_id || !student.academic_year_id) {
+      return [];
+    }
+
     // Find class_section for this student's class/section/year
     const { data: classSection, error: csError } = await supabase
       .from('class_sections')
