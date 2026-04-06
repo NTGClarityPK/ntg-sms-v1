@@ -209,8 +209,7 @@ export default function BulkImportStudentsPage() {
       },
       { key: 'phone', label: 'Phone (optional)', example: '+9647701234567' },
       { key: 'date_of_birth', label: 'Date of Birth (optional)', example: '2010-05-15' },
-      { key: 'class_name_or_id', label: 'Class name or ID (optional)', example: 'Grade 1' },
-      { key: 'section_name_or_id', label: 'Section name or ID (optional)', example: 'A' },
+      { key: 'class_section', label: 'Class-Section (optional)', example: 'Grade 1 - A' },
       {
         key: 'subject_template_name_or_id',
         label: 'Subject Template name or ID (optional)',

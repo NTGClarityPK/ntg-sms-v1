@@ -305,7 +305,7 @@ export class AuthService {
       email: user.email || '',
       fullName: profile?.full_name || user.email || 'User',
       avatarUrl: profile?.avatar_url || undefined,
-      preferredLocale: profileRow?.preferred_locale ?? 'ar',
+      preferredLocale: profileRow?.preferred_locale ?? 'en-US',
       onboardingSeenToursModal:
         (profile as { onboarding_seen_tours_modal?: boolean | null } | null)
           ?.onboarding_seen_tours_modal ?? false,

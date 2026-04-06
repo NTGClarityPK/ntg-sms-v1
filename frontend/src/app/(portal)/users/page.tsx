@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip, Tooltip, ActionIcon } from '@mantine/core';
+import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip, Tooltip, ActionIcon } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState, useMemo } from 'react';
@@ -117,11 +117,6 @@ export default function UsersPage() {
             <Title order={1}>{t('title')}</Title>
           </div>
           <Group gap="sm">
-            <Badge variant="light" color="gray" id="users-total-count">
-              {hasActiveFilter
-                ? t('showingFilteredUsers', { filtered: totalFiltered, total: totalUsers })
-                : t('totalUsers', { count: totalUsers })}
-            </Badge>
             <Tooltip label={t('refresh')}>
               <ActionIcon
                 variant="light"
@@ -255,28 +250,33 @@ export default function UsersPage() {
             </Text>
           </Alert>
         ) : (
-          <UserTable
-            users={paginatedUsers}
-            meta={{
-              total: totalFiltered,
-              page,
-              limit: PAGE_SIZE,
-              totalPages,
-            }}
-            onPageChange={setPage}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSort={(field) => {
-              if (sortBy === field) {
-                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-              } else {
-                setSortBy(field);
-                setSortOrder('asc');
-              }
-              setPage(1);
-            }}
-            canEdit={canEdit}
-          />
+          <>
+            <Text size="sm" c="dimmed" id="users-count">
+              {t('userCount', { count: hasActiveFilter ? totalFiltered : totalUsers })}
+            </Text>
+            <UserTable
+              users={paginatedUsers}
+              meta={{
+                total: totalFiltered,
+                page,
+                limit: PAGE_SIZE,
+                totalPages,
+              }}
+              onPageChange={setPage}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSort={(field) => {
+                if (sortBy === field) {
+                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                } else {
+                  setSortBy(field);
+                  setSortOrder('asc');
+                }
+                setPage(1);
+              }}
+              canEdit={canEdit}
+            />
+          </>
         )}
         </Stack>
       </div>

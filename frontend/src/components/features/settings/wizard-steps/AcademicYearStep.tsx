@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button, Group, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -8,11 +9,13 @@ import { useTranslations } from 'next-intl';
 
 interface AcademicYearStepProps {
   data: AcademicYearData | null;
+  /** Shown when the parent loaded name/dates from an existing academic year (e.g. from signup). */
+  prefillHint?: boolean;
   onChange: (data: AcademicYearData) => void;
   onNext: () => void;
 }
 
-export function AcademicYearStep({ data, onChange, onNext }: AcademicYearStepProps) {
+export function AcademicYearStep({ data, prefillHint = false, onChange, onNext }: AcademicYearStepProps) {
   const colors = useThemeColors();
   const tSettings = useTranslations('settings');
 
@@ -35,6 +38,14 @@ export function AcademicYearStep({ data, onChange, onNext }: AcademicYearStepPro
     },
   });
 
+  const name = data?.name ?? '';
+  const startDate = data?.startDate ?? '';
+  const endDate = data?.endDate ?? '';
+
+  useEffect(() => {
+    form.setValues({ name, startDate, endDate });
+  }, [name, startDate, endDate]);
+
   const handleNext = () => {
     if (form.validate().hasErrors) return;
     onChange(form.values);
@@ -49,6 +60,11 @@ export function AcademicYearStep({ data, onChange, onNext }: AcademicYearStepPro
       <Text size="sm" c="dimmed">
         Create and activate an academic year for your school. This will be the active year used throughout the system.
       </Text>
+      {prefillHint ? (
+        <Text size="sm" c="dimmed">
+          {tSettings('setupWizardAcademicYearPrefilledHint')}
+        </Text>
+      ) : null}
 
       <form id="wizard-academic-year-form" onSubmit={form.onSubmit(handleNext)}>
         <Stack gap="md">

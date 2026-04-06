@@ -10,7 +10,10 @@ const academicYearsKeys = {
   active: () => [...academicYearsKeys.all, 'active'] as const,
 };
 
-export function useAcademicYearsList(params?: Partial<{ page: number; limit: number; search: string }>) {
+export function useAcademicYearsList(
+  params?: Partial<{ page: number; limit: number; search: string }>,
+  options?: { enabled?: boolean },
+) {
   const page = params?.page ?? 1;
   const limit = params?.limit ?? 20;
   const search = params?.search ?? '';
@@ -24,10 +27,11 @@ export function useAcademicYearsList(params?: Partial<{ page: number; limit: num
       return res;
     },
     staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   });
 }
 
-export function useActiveAcademicYear() {
+export function useActiveAcademicYear(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: academicYearsKeys.active(),
     queryFn: async () => {
@@ -35,6 +39,7 @@ export function useActiveAcademicYear() {
       return res;
     },
     staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   });
 }
 

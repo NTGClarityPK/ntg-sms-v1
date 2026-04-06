@@ -1,16 +1,14 @@
 'use client';
 
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Group, Tabs, Title } from '@mantine/core';
+import { Alert, Anchor, Group, Tabs, Title } from '@mantine/core';
+import { IconInfoCircle } from '@tabler/icons-react';
 import { AssessmentTypeList } from '@/components/features/settings/AssessmentTypeList';
 import { GradeTemplateBuilder } from '@/components/features/settings/GradeTemplateBuilder';
-import { LeaveQuotaSetting } from '@/components/features/settings/LeaveQuotaSetting';
-import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 
 export default function AssessmentSettingsPage() {
-  const tLeave = useTranslations('leave');
-  const activeYearQuery = useActiveAcademicYear();
-  const activeYearId = activeYearQuery.data?.data?.id;
+  const tSettings = useTranslations('settings');
 
   return (
     <>
@@ -29,11 +27,22 @@ export default function AssessmentSettingsPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
+        <Alert
+          icon={<IconInfoCircle size={18} />}
+          color="blue"
+          mb="md"
+          title={tSettings('assessmentStandaloneLeaveQuotaTitle')}
+        >
+          {tSettings('assessmentStandaloneLeaveQuotaBody')}{' '}
+          <Anchor component={Link} href="/settings" id="assessment-settings-link-main-settings">
+            {tSettings('assessmentStandaloneLeaveQuotaLink')}
+          </Anchor>
+        </Alert>
+
         <Tabs defaultValue="types">
           <Tabs.List>
             <Tabs.Tab value="types">Assessment types</Tabs.Tab>
             <Tabs.Tab value="templates">Grade templates</Tabs.Tab>
-            <Tabs.Tab value="leave">{tLeave('tabLeaveQuota')}</Tabs.Tab>
           </Tabs.List>
 
           <Tabs.Panel value="types" pt="md" px="md" pb="md">
@@ -41,9 +50,6 @@ export default function AssessmentSettingsPage() {
           </Tabs.Panel>
           <Tabs.Panel value="templates" pt="md" px="md" pb="md">
             <GradeTemplateBuilder />
-          </Tabs.Panel>
-          <Tabs.Panel value="leave" pt="md" px="md" pb="md">
-            <LeaveQuotaSetting academicYearId={activeYearId} />
           </Tabs.Panel>
         </Tabs>
       </div>

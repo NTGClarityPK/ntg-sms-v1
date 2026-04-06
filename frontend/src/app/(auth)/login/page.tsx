@@ -19,7 +19,7 @@ import {
   Group,
 } from '@mantine/core';
 import { IconAlertCircle, IconBrandGoogle, IconMail, IconLock, IconCheck } from '@tabler/icons-react';
-import { signIn, resetPasswordForEmail } from '@/lib/auth';
+import { signIn } from '@/lib/auth';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
@@ -298,10 +298,20 @@ export default function LoginPage() {
     setResetError(null);
 
     try {
-      await resetPasswordForEmail(values.email);
+      const email = values.email.normalize('NFKC').trim().toLowerCase();
+      await apiClient.post<{ ok: true }>('/api/v1/public/request-password-reset', { email });
+      forgotPasswordForm.setFieldValue('email', email);
       setResetEmailSent(true);
-    } catch (err: any) {
-      setResetError(err.message || 'Failed to send reset email. Please try again.');
+    } catch (err: unknown) {
+      const ax = err as {
+        response?: { data?: { error?: { message?: string } } };
+        message?: string;
+      };
+      setResetError(
+        ax.response?.data?.error?.message ||
+          (typeof ax.message === 'string' ? ax.message : '') ||
+          'Failed to send reset email. Please try again.',
+      );
     } finally {
       setResetLoading(false);
     }

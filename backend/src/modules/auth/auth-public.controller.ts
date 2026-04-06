@@ -1,9 +1,14 @@
-import { BadRequestException, Controller, Post, Body } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { PasswordResetService } from './password-reset.service';
 
 @Controller('api/v1/public')
 export class AuthPublicController {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly passwordResetService: PasswordResetService,
+  ) {}
 
   /**
    * Resolve a student roll number to their email address.
@@ -54,6 +59,18 @@ export class AuthPublicController {
     }
 
     return { data: { email } };
+  }
+
+  /**
+   * Password reset by email. Sends the same style of link as Supabase recovery,
+   * but email is delivered via Mailjet to avoid GoTrue strict recipient validation.
+   */
+  @Post('request-password-reset')
+  async requestPasswordReset(
+    @Body() body: RequestPasswordResetDto,
+  ): Promise<{ data: { ok: true } }> {
+    await this.passwordResetService.requestPasswordReset(body.email);
+    return { data: { ok: true } };
   }
 }
 

@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Button, Group, Modal, Stepper, Stack, Text } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Button, Group, Modal, Skeleton, Stepper, Stack, Text } from '@mantine/core';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useActiveAcademicYear, useAcademicYearsList } from '@/hooks/useAcademicYears';
+import type { AcademicYear } from '@/types/settings';
 import { AcademicYearStep } from './wizard-steps/AcademicYearStep';
 import { AcademicStep } from './wizard-steps/AcademicStep';
 import { ScheduleStep } from './wizard-steps/ScheduleStep';
@@ -11,8 +13,16 @@ import { CommunicationStep } from './wizard-steps/CommunicationStep';
 import { BehaviorStep } from './wizard-steps/BehaviorStep';
 import { PermissionsStep } from './wizard-steps/PermissionsStep';
 import { SetupReviewForm } from './SetupReviewForm';
-import type { SetupWizardData } from './wizard-steps/types';
+import type { AcademicYearData, SetupWizardData } from './wizard-steps/types';
 import { useSaveSetupWizard } from '@/hooks/useSetupWizard';
+
+function mapAcademicYearToWizardData(year: AcademicYear): AcademicYearData {
+  return {
+    name: year.name,
+    startDate: year.startDate,
+    endDate: year.endDate,
+  };
+}
 
 interface SetupWizardProps {
   opened: boolean;
@@ -26,6 +36,22 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
   const colors = useThemeColors();
   const saveWizard = useSaveSetupWizard();
   const [activeStep, setActiveStep] = useState(0);
+  const [academicYearPrefillHint, setAcademicYearPrefillHint] = useState(false);
+
+  const activeYearQuery = useActiveAcademicYear({ enabled: opened });
+  const activeSettled = !opened || activeYearQuery.isSuccess || activeYearQuery.isError;
+  const hasActiveYear =
+    activeYearQuery.isSuccess &&
+    activeYearQuery.data?.data !== null &&
+    activeYearQuery.data?.data !== undefined;
+
+  const listEnabled = opened && activeSettled && !hasActiveYear;
+  const listQuery = useAcademicYearsList({ page: 1, limit: 50, search: '' }, { enabled: listEnabled });
+
+  const listSettled = !listEnabled || listQuery.isSuccess || listQuery.isError;
+  const preloadDone = activeSettled && listSettled;
+  const academicYearStepLoading = opened && !preloadDone;
+
   const [wizardData, setWizardData] = useState<SetupWizardData>({
     academicYear: null,
     academic: {
@@ -52,6 +78,49 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
     permissions: [],
   });
 
+  useEffect(() => {
+    if (!opened) {
+      setAcademicYearPrefillHint(false);
+    }
+  }, [opened]);
+
+  useEffect(() => {
+    if (!opened || !preloadDone) return;
+
+    const fromActive =
+      activeYearQuery.isSuccess && activeYearQuery.data?.data != null
+        ? activeYearQuery.data.data
+        : null;
+    const listRows =
+      listQuery.isSuccess && Array.isArray(listQuery.data?.data) ? listQuery.data.data : [];
+    const source = fromActive ?? listRows[0] ?? null;
+
+    const hadAcademicYear = wizardData.academicYear !== null;
+
+    setWizardData((prev) => {
+      if (prev.academicYear !== null) return prev;
+      if (!source) return prev;
+      return {
+        ...prev,
+        academicYear: mapAcademicYearToWizardData(source),
+      };
+    });
+
+    if (!source) {
+      setAcademicYearPrefillHint(false);
+    } else if (!hadAcademicYear) {
+      setAcademicYearPrefillHint(true);
+    }
+  }, [
+    opened,
+    preloadDone,
+    wizardData.academicYear,
+    activeYearQuery.isSuccess,
+    activeYearQuery.data,
+    listQuery.isSuccess,
+    listQuery.data,
+  ]);
+
   const handleStepDataChange = (step: number, data: Partial<SetupWizardData>) => {
     setWizardData((prev) => ({ ...prev, ...data }));
   };
@@ -77,6 +146,7 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
 
   const handleClose = () => {
     setActiveStep(0);
+    setAcademicYearPrefillHint(false);
     setWizardData({
       academicYear: null,
       academic: {
@@ -118,9 +188,23 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
   const renderStep = () => {
     switch (activeStep) {
       case 0:
+        if (academicYearStepLoading) {
+          return (
+            <Stack gap="md">
+              <Skeleton height={28} width="60%" />
+              <Skeleton height={16} width="100%" />
+              <Skeleton height={16} width="85%" />
+              <Skeleton height={40} mt="md" />
+              <Skeleton height={40} />
+              <Skeleton height={40} />
+              <Skeleton height={36} width={100} mt="xl" ml="auto" />
+            </Stack>
+          );
+        }
         return (
           <AcademicYearStep
             data={wizardData.academicYear}
+            prefillHint={academicYearPrefillHint}
             onChange={(data) => handleStepDataChange(0, { academicYear: data })}
             onNext={handleNext}
           />

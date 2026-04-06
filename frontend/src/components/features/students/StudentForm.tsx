@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Badge, Alert, Text, Radio, Checkbox, CopyButton, Table } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
 import { useCreateStudentWithInvitation, useUpdateStudent } from '@/hooks/useStudents';
-import { useClasses, useSections } from '@/hooks/useCoreLookups';
+import { useClassSections } from '@/hooks/useClassSections';
 import { useTemplatesForClass, useStudentTemplate } from '@/hooks/useSubjectTemplates';
 import { useAuth } from '@/hooks/useAuth';
 import type { Student, CreateStudentWithInvitationInput, UpdateStudentInput } from '@/types/students';
@@ -118,10 +118,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     isActive: z.boolean().optional(),
   });
 
-  const { data: classesData } = useClasses();
-  const { data: sectionsData } = useSections();
-  const classes = classesData?.data ?? [];
-  const sections = sectionsData?.data ?? [];
+  const { data: classSectionsData } = useClassSections({ isActive: true, minimal: true, limit: 500 });
+  const activeClassSections = classSectionsData?.data ?? [];
 
   const form = useForm({
     initialValues: {
@@ -149,6 +147,51 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     },
     validate: zodResolver(isEdit ? updateStudentSchema : createStudentSchema),
   });
+
+  const toClassSectionKey = (classId?: string | null, sectionId?: string | null): string =>
+    `${classId ?? ''}::${sectionId ?? ''}`;
+
+  const selectedClassSectionKey =
+    form.values.classId && form.values.sectionId
+      ? toClassSectionKey(form.values.classId, form.values.sectionId)
+      : '';
+
+  const classSectionOptions = useMemo(() => {
+    const base = [...activeClassSections]
+      .sort((a, b) => {
+        const aClass = a.classSortOrder ?? 0;
+        const bClass = b.classSortOrder ?? 0;
+        if (aClass !== bClass) return aClass - bClass;
+        const aSec = a.sectionSortOrder ?? 0;
+        const bSec = b.sectionSortOrder ?? 0;
+        if (aSec !== bSec) return aSec - bSec;
+        return (a.classDisplayName ?? a.className ?? '').localeCompare(b.classDisplayName ?? b.className ?? '');
+      })
+      .map((cs) => {
+        const classLabel = cs.classDisplayName ?? cs.className ?? '';
+        const sectionLabel = cs.sectionName ?? '';
+        return {
+          value: toClassSectionKey(cs.classId, cs.sectionId),
+          label: `${classLabel} - ${sectionLabel}`.trim(),
+          disabled: false,
+        };
+      });
+
+    // Edit mode: include current (possibly inactive) class-section so it remains visible.
+    if (student?.classId && student?.sectionId) {
+      const currentKey = toClassSectionKey(student.classId, student.sectionId);
+      const exists = base.some((o) => o.value === currentKey);
+      if (!exists) {
+        base.unshift({
+          value: currentKey,
+          label: `${t('class')} / ${t('section')} (${tCommon('inactive')})`,
+          disabled: true,
+        });
+      }
+    }
+
+    return base;
+  }, [activeClassSections, student?.classId, student?.sectionId, t, tCommon]);
 
   // Fetch available templates for selected class
   // Use student's classId if in edit mode and form hasn't been populated yet
@@ -480,16 +523,29 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
 
           <Group grow>
             <Select
-              id="student-form-class"
-              label={t('class')}
-              data={classes.map((c) => ({ value: c.id, label: c.displayName }))}
-              {...form.getInputProps('classId')}
-            />
-            <Select
-              id="student-form-section"
-              label={t('section')}
-              data={sections.map((s) => ({ value: s.id, label: s.name }))}
-              {...form.getInputProps('sectionId')}
+              id="student-form-class-section"
+              label="Class-Section"
+              placeholder={activeClassSections.length === 0 ? 'No active class-sections found' : 'Select class-section'}
+              data={classSectionOptions}
+              value={selectedClassSectionKey}
+              onChange={(v) => {
+                const key = (v ?? '').trim();
+                if (!key) {
+                  form.setFieldValue('classId', '');
+                  form.setFieldValue('sectionId', '');
+                  return;
+                }
+                const [classId, sectionId] = key.split('::');
+                form.setFieldValue('classId', classId ?? '');
+                form.setFieldValue('sectionId', sectionId ?? '');
+              }}
+              clearable
+              searchable
+              description={
+                activeClassSections.length === 0
+                  ? 'Go to Academic → Class Sections and activate at least one combination.'
+                  : undefined
+              }
             />
           </Group>
 

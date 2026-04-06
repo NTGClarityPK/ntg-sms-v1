@@ -44,7 +44,8 @@ export async function getSession() {
 }
 
 export async function resetPasswordForEmail(email: string) {
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+  const normalized = email.normalize('NFKC').trim().toLowerCase();
+  const { data, error } = await supabase.auth.resetPasswordForEmail(normalized, {
     redirectTo: `${window.location.origin}/reset-password`,
   });
 

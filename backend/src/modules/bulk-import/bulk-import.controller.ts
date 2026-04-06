@@ -128,14 +128,9 @@ export class BulkImportController {
             example: '2010-05-15',
           },
           {
-            key: 'class_name_or_id',
-            label: 'Class name or ID (optional)',
-            example: 'Grade 1',
-          },
-          {
-            key: 'section_name_or_id',
-            label: 'Section name or ID (optional)',
-            example: 'A',
+            key: 'class_section',
+            label: 'Class-Section (optional)',
+            example: 'Grade 1 - A',
           },
           {
             key: 'subject_template_name_or_id',

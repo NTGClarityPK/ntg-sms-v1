@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core';
-import { IconEdit, IconTrash, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
+import { Table, Badge, Group, ActionIcon, Pagination, Text, Modal, Stack, TextInput, Button } from '@mantine/core';
+import { IconEdit, IconTrash, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import { useTranslations } from 'next-intl';
@@ -10,6 +10,7 @@ import type { User } from '@/types/users';
 import { UserForm } from './UserForm';
 import { useRoles } from '@/hooks/useRoles';
 import { useDeleteUser } from '@/hooks/useUsers';
+import { useResendInvitationForUser } from '@/hooks/useInvitationsAdmin';
 
 interface UserTableProps {
   users: User[];
@@ -31,14 +32,24 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
   const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [resendOpened, resendModal] = useDisclosure(false);
+  const [resendUser, setResendUser] = useState<User | null>(null);
+  const [recipientEmail, setRecipientEmail] = useState('');
   const { data: rolesData } = useRoles();
   const deleteUser = useDeleteUser();
+  const resend = useResendInvitationForUser();
   const roles = rolesData?.data || [];
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);
     open();
+  };
+
+  const handleResend = (user: User) => {
+    setResendUser(user);
+    setRecipientEmail('');
+    resendModal.open();
   };
 
   const handleDelete = (user: User) => {
@@ -134,6 +145,14 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                       <ActionIcon variant="light" color="red" onClick={() => handleDelete(user)}>
                         <IconTrash size={16} />
                       </ActionIcon>
+                      <ActionIcon
+                        variant="light"
+                        onClick={() => handleResend(user)}
+                        aria-label="Resend invitation"
+                        id={`users-resend-invite-${user.id}`}
+                      >
+                        <IconMailForward size={16} />
+                      </ActionIcon>
                     </>
                   )}
                 </Group>
@@ -162,6 +181,63 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
         user={selectedUser}
         roles={roles}
       />
+
+      <Modal
+        opened={resendOpened}
+        onClose={() => {
+          resendModal.close();
+          setResendUser(null);
+          setRecipientEmail('');
+        }}
+        title={t('resendInvitationTitle')}
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            {t('resendInvitationIntro', {
+              name: resendUser?.fullName || resendUser?.email || '—',
+            })}
+          </Text>
+
+          <TextInput
+            id="users-resend-recipient-email"
+            label={t('sendToOptional')}
+            placeholder={resendUser?.email || t('emailPlaceholder')}
+            value={recipientEmail}
+            onChange={(e) => setRecipientEmail(e.currentTarget.value)}
+          />
+
+          <Group justify="flex-end">
+            <Button
+              variant="subtle"
+              onClick={() => {
+                resendModal.close();
+                setResendUser(null);
+                setRecipientEmail('');
+              }}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              id="users-resend-submit"
+              loading={resend.isPending}
+              disabled={!resendUser}
+              onClick={async () => {
+                if (!resendUser) return;
+                await resend.mutateAsync({
+                  userId: resendUser.id,
+                  invitationType: 'student',
+                  recipientEmail: recipientEmail.trim() || undefined,
+                });
+                resendModal.close();
+                setResendUser(null);
+                setRecipientEmail('');
+              }}
+            >
+              {t('resend')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { PostgrestError } from '@supabase/supabase-js';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import { TenantDto } from './dto/tenant.dto';
@@ -69,6 +69,8 @@ type UploadedLogoFile = {
 
 @Injectable()
 export class TenantsService {
+  private readonly logger = new Logger(TenantsService.name);
+
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
@@ -677,6 +679,188 @@ export class TenantsService {
         : null;
 
     return { data: mapTenant(data as TenantRow, primaryColor) };
+  }
+
+  /**
+   * Scheduled worker: execute pending tenant hard-deletes, then remove Supabase Auth users
+   * who no longer belong to any branch (orphaned after tenant removal).
+   */
+  async runDueTenantDeletions(): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    const nowIso = new Date().toISOString();
+
+    const { data: dueTenants, error } = await supabase
+      .from('tenants')
+      .select('id, deletion_status, deletion_execute_at')
+      .eq('deletion_status', 'pending')
+      .lte('deletion_execute_at', nowIso)
+      .limit(25);
+
+    if (error) {
+      this.logger.warn(`Failed to fetch due deletions: ${error.message}`);
+      return;
+    }
+
+    const rows = (dueTenants || []) as Array<{
+      id: string;
+      deletion_status: string | null;
+      deletion_execute_at: string | null;
+    }>;
+
+    await Promise.all(
+      rows.map(async (t) => {
+        try {
+          const { data: locked, error: lockError } = await supabase
+            .from('tenants')
+            .update({ deletion_status: 'executing' })
+            .eq('id', t.id)
+            .eq('deletion_status', 'pending')
+            .select('id')
+            .maybeSingle();
+
+          if (lockError) {
+            this.logger.warn(`Failed to lock tenant ${t.id} for deletion: ${lockError.message}`);
+            return;
+          }
+          if (!locked) return;
+
+          const candidateUserIds = await this.collectUserIdsLinkedToTenant(supabase, t.id);
+
+          const { error: rpcError } = await supabase.rpc('delete_tenant_cascade', {
+            p_tenant_id: t.id,
+          });
+
+          if (rpcError) {
+            this.logger.error(`Deletion RPC failed for tenant ${t.id}: ${rpcError.message}`);
+            const { error: revertError } = await supabase
+              .from('tenants')
+              .update({ deletion_status: 'pending' })
+              .eq('id', t.id)
+              .eq('deletion_status', 'executing');
+            if (revertError) {
+              this.logger.warn(`Failed to revert tenant ${t.id} deletion_status: ${revertError.message}`);
+            }
+            return;
+          }
+
+          await this.deleteOrphanAuthUsersAfterTenantRemoval(supabase, candidateUserIds);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : 'Unknown error';
+          this.logger.error(`Tenant deletion worker crashed for tenant ${t.id}: ${message}`);
+        }
+      }),
+    );
+  }
+
+  private async collectUserIdsLinkedToTenant(supabase: SupabaseClient, tenantId: string): Promise<string[]> {
+    const { data: branchRows, error: bErr } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('tenant_id', tenantId);
+    if (bErr) {
+      this.logger.warn(`collectUserIds: branches ${bErr.message}`);
+      return [];
+    }
+    const branchIds = (branchRows || []).map((r: { id: string }) => r.id);
+    if (branchIds.length === 0) return [];
+
+    const [
+      ubRes,
+      urRes,
+      stRes,
+      sfRes,
+      studIdsRes,
+    ] = await Promise.all([
+      supabase.from('user_branches').select('user_id').in('branch_id', branchIds).range(0, 10000),
+      supabase.from('user_roles').select('user_id').in('branch_id', branchIds).range(0, 10000),
+      supabase.from('students').select('user_id').in('branch_id', branchIds).not('user_id', 'is', null).range(0, 10000),
+      supabase.from('staff').select('user_id').in('branch_id', branchIds).range(0, 10000),
+      supabase.from('students').select('id').in('branch_id', branchIds).range(0, 10000),
+    ]);
+
+    const ids = new Set<string>();
+    for (const row of (ubRes.data || []) as { user_id: string }[]) {
+      if (row.user_id) ids.add(row.user_id);
+    }
+    for (const row of (urRes.data || []) as { user_id: string }[]) {
+      if (row.user_id) ids.add(row.user_id);
+    }
+    for (const row of (stRes.data || []) as { user_id: string | null }[]) {
+      if (row.user_id) ids.add(row.user_id);
+    }
+    for (const row of (sfRes.data || []) as { user_id: string }[]) {
+      if (row.user_id) ids.add(row.user_id);
+    }
+
+    const studentIds = (studIdsRes.data || []).map((r: { id: string }) => r.id);
+    if (studentIds.length > 0) {
+      const { data: psRows } = await supabase
+        .from('parent_students')
+        .select('parent_user_id')
+        .in('student_id', studentIds)
+        .range(0, 10000);
+      for (const row of (psRows || []) as { parent_user_id: string }[]) {
+        if (row.parent_user_id) ids.add(row.parent_user_id);
+      }
+    }
+
+    return Array.from(ids);
+  }
+
+  private async isAuthUserOrphaned(supabase: SupabaseClient, userId: string): Promise<boolean> {
+    const [ub, ur, st, sf, ps] = await Promise.all([
+      supabase.from('user_branches').select('user_id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('user_roles').select('user_id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('students').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('staff').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('parent_students').select('student_id', { count: 'exact', head: true }).eq('parent_user_id', userId),
+    ]);
+
+    const n = (c: { count: number | null } | null) => c?.count ?? 0;
+    return (
+      n(ub) === 0 &&
+      n(ur) === 0 &&
+      n(st) === 0 &&
+      n(sf) === 0 &&
+      n(ps) === 0
+    );
+  }
+
+  private async deleteOrphanAuthUsersAfterTenantRemoval(
+    supabase: SupabaseClient,
+    candidateUserIds: string[],
+  ): Promise<void> {
+    const unique = Array.from(new Set(candidateUserIds));
+    const concurrency = 5;
+
+    for (let i = 0; i < unique.length; i += concurrency) {
+      const batch = unique.slice(i, i + concurrency);
+      await Promise.all(
+        batch.map(async (userId) => {
+          try {
+            const orphaned = await this.isAuthUserOrphaned(supabase, userId);
+            if (!orphaned) return;
+
+            const { error: invDel1 } = await supabase.from('invitations').delete().eq('created_by', userId);
+            if (invDel1) {
+              this.logger.warn(`Failed to delete invitations by created_by for ${userId}: ${invDel1.message}`);
+            }
+            const { error: invDel2 } = await supabase.from('invitations').delete().eq('user_id', userId);
+            if (invDel2) {
+              this.logger.warn(`Failed to delete invitations by user_id for ${userId}: ${invDel2.message}`);
+            }
+
+            const { error: delErr } = await supabase.auth.admin.deleteUser(userId);
+            if (delErr) {
+              this.logger.warn(`auth.admin.deleteUser failed for ${userId}: ${delErr.message}`);
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : 'Unknown error';
+            this.logger.warn(`Orphan auth cleanup error for ${userId}: ${msg}`);
+          }
+        }),
+      );
+    }
   }
 }
 

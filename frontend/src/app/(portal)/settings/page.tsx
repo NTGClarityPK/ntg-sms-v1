@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconMoodHappy, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -292,14 +292,14 @@ export default function SettingsPage() {
                 <Tabs.Tab value="schedule" leftSection={<IconClock size={16} />}>
                   {tSettings('tabSchedule')}
                 </Tabs.Tab>
+                <Tabs.Tab value="general" leftSection={<IconAdjustments size={16} />}>
+                  {tSettings('tabGeneral')}
+                </Tabs.Tab>
                 <Tabs.Tab value="assessment" leftSection={<IconClipboardList size={16} />}>
                   {tSettings('tabAssessment')}
                 </Tabs.Tab>
                 <Tabs.Tab value="communication" leftSection={<IconMessage size={16} />}>
                   {tSettings('tabCommunication')}
-                </Tabs.Tab>
-                <Tabs.Tab value="behavior" leftSection={<IconMoodHappy size={16} />}>
-                  {tSettings('tabBehavior')}
                 </Tabs.Tab>
                 <Tabs.Tab value="inventory-management" leftSection={<IconPackage size={16} />}>
                   {tSettings('tabInventoryManagement')}
@@ -339,6 +339,11 @@ export default function SettingsPage() {
                 <ScheduleTabContent />
               </Tabs.Panel>
 
+              {/* General: leave quota, library categories, behaviour */}
+              <Tabs.Panel value="general" pt="md" px="md" pb="md">
+                <GeneralTabContent />
+              </Tabs.Panel>
+
               {/* Assessment Tab */}
               <Tabs.Panel value="assessment" pt="md" px="md" pb="md">
                 <AssessmentTabContent />
@@ -347,11 +352,6 @@ export default function SettingsPage() {
               {/* Communication Tab */}
               <Tabs.Panel value="communication" pt="md" px="md" pb="md">
                 <CommunicationTabContent />
-              </Tabs.Panel>
-
-              {/* Behavior Tab */}
-              <Tabs.Panel value="behavior" pt="md" px="md" pb="md">
-                <BehaviorTabContent />
               </Tabs.Panel>
 
               {/* Inventory Management Tab */}
@@ -1280,18 +1280,27 @@ function ScheduleTabContent() {
   );
 }
 
-function AssessmentTabContent() {
-  const tLeave = useTranslations('leave');
-  const tSettings = useTranslations('settings');
+function GeneralTabContent() {
   const activeYearQuery = useActiveAcademicYear();
   const activeYearId = activeYearQuery.data?.data?.id;
+
+  return (
+    <Stack gap="xl">
+      <LeaveQuotaSetting academicYearId={activeYearId} />
+      <LibraryCategoryEditor />
+      <BehaviorSettings />
+    </Stack>
+  );
+}
+
+function AssessmentTabContent() {
+  const tSettings = useTranslations('settings');
 
   return (
     <Tabs defaultValue="types">
       <Tabs.List>
         <Tabs.Tab value="types">{tSettings('assessmentTabTypes')}</Tabs.Tab>
         <Tabs.Tab value="templates">{tSettings('assessmentTabTemplates')}</Tabs.Tab>
-        <Tabs.Tab value="leave">{tLeave('tabLeaveQuota')}</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="types" pt="md">
@@ -1300,24 +1309,12 @@ function AssessmentTabContent() {
       <Tabs.Panel value="templates" pt="md">
         <GradeTemplateBuilder />
       </Tabs.Panel>
-      <Tabs.Panel value="leave" pt="md">
-        <LeaveQuotaSetting academicYearId={activeYearId} />
-      </Tabs.Panel>
     </Tabs>
   );
 }
 
 function CommunicationTabContent() {
-  return (
-    <Stack gap="xl">
-      <CommunicationSettings />
-      <LibraryCategoryEditor />
-    </Stack>
-  );
-}
-
-function BehaviorTabContent() {
-  return <BehaviorSettings />;
+  return <CommunicationSettings />;
 }
 
 function InventoryManagementTabContent() {

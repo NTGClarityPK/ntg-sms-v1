@@ -577,6 +577,33 @@ export class BulkImportService {
         }
       }
     }
+
+    // Support combined Class–Section column in templates and hand-made sheets.
+    // Accept patterns like:
+    // - "Grade 1 - A"
+    // - "Grade 1 / A"
+    // - "Grade 1::A"
+    // If the sheet also includes separate class/section columns, those take precedence.
+    if (
+      (mapped.class_name_or_id == null || String(mapped.class_name_or_id).trim() === '') &&
+      (mapped.section_name_or_id == null || String(mapped.section_name_or_id).trim() === '')
+    ) {
+      const combinedRaw =
+        lookup.get('class-section (optional)') ??
+        lookup.get('class-section') ??
+        lookup.get('class section') ??
+        lookup.get('class_section') ??
+        lookup.get('classsection');
+      if (combinedRaw != null && String(combinedRaw).trim() !== '') {
+        const cleaned = String(combinedRaw).trim();
+        const parts = cleaned.split(/\s*(?:-+|\/|::)\s*/).filter(Boolean);
+        if (parts.length >= 2) {
+          mapped.class_name_or_id = parts[0]!;
+          mapped.section_name_or_id = parts[1]!;
+        }
+      }
+    }
+
     return mapped;
   }
 

@@ -14,13 +14,18 @@ interface AssessmentStepProps {
   onBack: () => void;
 }
 
+const DEFAULT_LEAVE_QUOTA = 7;
+
 export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentStepProps) {
   const colors = useThemeColors();
   const tSettings = useTranslations('settings');
   const [newAssessmentType, setNewAssessmentType] = useState({ name: '', sortOrder: 0 });
   const [newGradeTemplate, setNewGradeTemplate] = useState({ name: '' });
   const [newRange, setNewRange] = useState({ letter: '', minPercentage: 0, maxPercentage: 100, sortOrder: 0 });
-  const [leaveQuota, setLeaveQuota] = useState(data.leaveQuota || 7);
+  const [leaveQuota, setLeaveQuota] = useState(data.leaveQuota ?? DEFAULT_LEAVE_QUOTA);
+
+  /** Parent may still have `leaveQuota: null` while the input shows the default; Next must use the effective value. */
+  const resolvedLeaveQuota = data.leaveQuota ?? leaveQuota;
 
   const handleAddAssessmentType = () => {
     if (newAssessmentType.name.trim()) {
@@ -108,8 +113,16 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
   };
 
   const handleNext = () => {
-    if (data.assessmentTypes.length === 0 || data.gradeTemplates.length === 0 || !data.leaveQuota) {
+    if (data.assessmentTypes.length === 0 || data.gradeTemplates.length === 0 || !resolvedLeaveQuota) {
       return;
+    }
+    if (data.leaveQuota == null) {
+      const n =
+        typeof resolvedLeaveQuota === 'number'
+          ? resolvedLeaveQuota
+          : parseInt(String(resolvedLeaveQuota), 10);
+      if (Number.isNaN(n)) return;
+      onChange({ ...data, leaveQuota: n });
     }
     onNext();
   };
@@ -270,7 +283,16 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
         <Button id="assessment-step-back" variant="light" onClick={onBack}>
           Back
         </Button>
-        <Button id="assessment-step-next" onClick={handleNext} color={colors.primary} disabled={data.assessmentTypes.length === 0 || data.gradeTemplates.length === 0 || !data.leaveQuota}>
+        <Button
+          id="assessment-step-next"
+          onClick={handleNext}
+          color={colors.primary}
+          disabled={
+            data.assessmentTypes.length === 0 ||
+            data.gradeTemplates.length === 0 ||
+            !resolvedLeaveQuota
+          }
+        >
           Next
         </Button>
       </Group>
