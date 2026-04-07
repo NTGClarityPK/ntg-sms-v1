@@ -13,6 +13,8 @@ import {
   Divider,
   ActionIcon,
   Tooltip,
+  useMantineColorScheme,
+  useMantineTheme,
 } from '@mantine/core';
 import { IconCheck, IconChecks, IconBell, IconBellOff, IconBellRinging } from '@tabler/icons-react';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '@/hooks/useNotifications';
@@ -34,7 +36,11 @@ export function NotificationDropdown({
 }: NotificationDropdownProps) {
   const t = useTranslations('notification');
   const router = useRouter();
+  const mantineTheme = useMantineTheme();
+  const { colorScheme } = useMantineColorScheme();
   const notifyColors = useThemeColors();
+  const notificationRowHoverBg =
+    colorScheme === 'dark' ? mantineTheme.colors.dark[5] : mantineTheme.colors.gray[0];
   const { data: notificationsData, isLoading } = useNotifications({
     limit: 20,
   });
@@ -183,14 +189,14 @@ export function NotificationDropdown({
                 key={notification.id}
                 p="sm"
                 withBorder
-                style={{ cursor: 'pointer' }}
                 onClick={() => handleNotificationClick(notification)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    'var(--mantine-color-gray-0)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                styles={{
+                  root: {
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: notificationRowHoverBg,
+                    },
+                  },
                 }}
               >
                 <Group justify="space-between" align="flex-start" gap="xs">

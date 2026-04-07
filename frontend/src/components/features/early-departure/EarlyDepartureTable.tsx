@@ -1,8 +1,22 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Table, Badge, Group, Button, Pagination, Text, Tooltip, Modal, Textarea, Stack, ActionIcon } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import {
+  Table,
+  Badge,
+  Group,
+  Button,
+  Pagination,
+  Text,
+  Tooltip,
+  Modal,
+  Textarea,
+  Stack,
+  ActionIcon,
+  ScrollArea,
+  useMantineTheme,
+} from '@mantine/core';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { useState } from 'react';
 import { IconX } from '@tabler/icons-react';
 import type { EarlyDepartureRequest } from '@/types/early-departure';
@@ -49,6 +63,8 @@ export function EarlyDepartureTable({
   isStaffView = false,
   studentNameMap,
 }: EarlyDepartureTableProps) {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('earlyDeparture');
   const [reviewModalOpened, { open: openReviewModal, close: closeReviewModal }] = useDisclosure(false);
   const [selectedRequest, setSelectedRequest] = useState<EarlyDepartureRequest | null>(null);
@@ -139,31 +155,32 @@ export function EarlyDepartureTable({
 
   return (
     <>
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>{t('dateRequested')}</Table.Th>
-            <Table.Th>{t('departureDateAndTime')}</Table.Th>
-            <Table.Th>{t('student')}</Table.Th>
-            <Table.Th>{t('reason')}</Table.Th>
-            <Table.Th>{t('status')}</Table.Th>
-            <Table.Th>{t('reviewedBy')}</Table.Th>
-            <Table.Th>{t('dateReviewed')}</Table.Th>
-            <Table.Th>{t('reviewNotes')}</Table.Th>
-            <Table.Th>{t('actions')}</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {requests.length === 0 ? (
+      <ScrollArea type="auto" scrollbars="x" w="100%">
+        <Table striped highlightOnHover style={{ minWidth: 960 }}>
+          <Table.Thead>
             <Table.Tr>
-              <Table.Td colSpan={9}>
-                <Text c="dimmed" ta="center" py="md">
-                  {t('noEarlyDepartureRequestsFound')}
-                </Text>
-              </Table.Td>
+              <Table.Th>{t('dateRequested')}</Table.Th>
+              <Table.Th>{t('departureDateAndTime')}</Table.Th>
+              <Table.Th>{t('student')}</Table.Th>
+              <Table.Th>{t('reason')}</Table.Th>
+              <Table.Th>{t('status')}</Table.Th>
+              <Table.Th>{t('reviewedBy')}</Table.Th>
+              <Table.Th>{t('dateReviewed')}</Table.Th>
+              <Table.Th>{t('reviewNotes')}</Table.Th>
+              <Table.Th>{t('actions')}</Table.Th>
             </Table.Tr>
-          ) : (
-            requests.map((request) => {
+          </Table.Thead>
+          <Table.Tbody>
+            {requests.length === 0 ? (
+              <Table.Tr>
+                <Table.Td colSpan={9}>
+                  <Text c="dimmed" ta="center" py="md">
+                    {t('noEarlyDepartureRequestsFound')}
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            ) : (
+              requests.map((request) => {
               const studentName = studentNameMap?.get(request.studentId);
               const canReview = isStaffView && request.status === 'pending';
               // Can cancel only if: parent view, status is pending, and not yet reviewed
@@ -270,18 +287,23 @@ export function EarlyDepartureTable({
                 </Table.Tr>
               );
             })
-          )}
-        </Table.Tbody>
-      </Table>
+            )}
+          </Table.Tbody>
+        </Table>
+      </ScrollArea>
 
       {meta && meta.totalPages > 1 && (
-        <Group justify="flex-end" mt="md">
-          <Pagination
-            value={meta.page}
-            onChange={(page) => onPageChange?.(page)}
-            total={meta.totalPages}
-          />
-        </Group>
+        <ScrollArea type="auto" scrollbars="x" w="100%" mt="md">
+          <Group justify="flex-end" wrap="nowrap" gap={4} style={{ minWidth: 'min-content' }}>
+            <Pagination
+              value={meta.page}
+              onChange={(page) => onPageChange?.(page)}
+              total={meta.totalPages}
+              size={isMobile ? 'sm' : 'md'}
+              withEdges={!isMobile}
+            />
+          </Group>
+        </ScrollArea>
       )}
 
       <Modal

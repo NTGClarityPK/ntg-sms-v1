@@ -1,7 +1,17 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Group, Paper, Stack, Text, Badge, Progress } from '@mantine/core';
+import {
+  Group,
+  Paper,
+  Stack,
+  Text,
+  Badge,
+  Progress,
+  SimpleGrid,
+  useMantineTheme,
+} from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import type { Attendance } from '@/types/attendance';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -14,6 +24,8 @@ export function AttendanceStats({
   attendance,
   totalStudents,
 }: AttendanceStatsProps) {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('attendance');
   const notifyColors = useThemeColors();
 
@@ -33,48 +45,96 @@ export function AttendanceStats({
         <Text fw={500} size="lg">
           {t('attendanceStatistics')}
         </Text>
-        <Group grow>
-          <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">
-              {t('present')}
-            </Text>
-            <Badge variant="light" color={notifyColors.success} size="lg">
-              {presentCount}
-            </Badge>
+        {isMobile ? (
+          <Stack gap="sm">
+            <SimpleGrid cols={2} spacing="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('present')}
+                </Text>
+                <Badge variant="light" color={notifyColors.success} size="lg">
+                  {presentCount}
+                </Badge>
+              </Stack>
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('absent')}
+                </Text>
+                <Badge variant="light" color={notifyColors.error} size="lg">
+                  {absentCount}
+                </Badge>
+              </Stack>
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('late')}
+                </Text>
+                <Badge variant="light" color={notifyColors.warning} size="lg">
+                  {lateCount}
+                </Badge>
+              </Stack>
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('excused')}
+                </Text>
+                <Badge variant="light" color={notifyColors.info} size="lg">
+                  {excusedCount}
+                </Badge>
+              </Stack>
+            </SimpleGrid>
+
+            <Group justify="space-between" wrap="nowrap">
+              <Text size="sm" c="dimmed">
+                {t('total')}
+              </Text>
+              <Text fw={700} size="lg">
+                {totalStudents}
+              </Text>
+            </Group>
           </Stack>
-          <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">
-              {t('absent')}
-            </Text>
-            <Badge variant="light" color={notifyColors.error} size="lg">
-              {absentCount}
-            </Badge>
-          </Stack>
-          <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">
-              {t('late')}
-            </Text>
-            <Badge variant="light" color={notifyColors.warning} size="lg">
-              {lateCount}
-            </Badge>
-          </Stack>
-          <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">
-              {t('excused')}
-            </Text>
-            <Badge variant="light" color={notifyColors.info} size="lg">
-              {excusedCount}
-            </Badge>
-          </Stack>
-          <Stack gap="xs" align="center">
-            <Text size="sm" c="dimmed">
-              {t('total')}
-            </Text>
-            <Text fw={600} size="lg">
-              {totalStudents}
-            </Text>
-          </Stack>
-        </Group>
+        ) : (
+          <Group grow>
+            <Stack gap="xs" align="center">
+              <Text size="sm" c="dimmed">
+                {t('present')}
+              </Text>
+              <Badge variant="light" color={notifyColors.success} size="lg">
+                {presentCount}
+              </Badge>
+            </Stack>
+            <Stack gap="xs" align="center">
+              <Text size="sm" c="dimmed">
+                {t('absent')}
+              </Text>
+              <Badge variant="light" color={notifyColors.error} size="lg">
+                {absentCount}
+              </Badge>
+            </Stack>
+            <Stack gap="xs" align="center">
+              <Text size="sm" c="dimmed">
+                {t('late')}
+              </Text>
+              <Badge variant="light" color={notifyColors.warning} size="lg">
+                {lateCount}
+              </Badge>
+            </Stack>
+            <Stack gap="xs" align="center">
+              <Text size="sm" c="dimmed">
+                {t('excused')}
+              </Text>
+              <Badge variant="light" color={notifyColors.info} size="lg">
+                {excusedCount}
+              </Badge>
+            </Stack>
+            <Stack gap="xs" align="center">
+              <Text size="sm" c="dimmed">
+                {t('total')}
+              </Text>
+              <Text fw={600} size="lg">
+                {totalStudents}
+              </Text>
+            </Stack>
+          </Group>
+        )}
         <Stack gap="xs">
           <Group justify="space-between">
             <Text size="sm" c="dimmed">

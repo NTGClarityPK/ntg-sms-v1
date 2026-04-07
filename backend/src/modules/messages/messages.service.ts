@@ -165,38 +165,7 @@ export class MessagesService {
     const total = count ?? 0;
     const rows = (convRows as ConversationRow[]) ?? [];
 
-    const result: ConversationListDto[] = [];
-    for (const row of rows) {
-      const participantUserIds = await this.getParticipantUserIds(supabase, row.id, userId);
-      const participantNames = await this.getParticipantNames(supabase, participantUserIds);
-      const { lastMessagePreview, lastMessageAt, lastMessageType } =
-        await this.getLastMessage(supabase, row.id);
-      const unreadCount = await this.getUnreadCountForConversation(supabase, row.id, userId);
-      let className: string | undefined;
-      let sectionName: string | undefined;
-      if (row.class_section_id) {
-        const names = await this.getClassSectionDisplayNames(supabase, row.class_section_id);
-        className = names.className;
-        sectionName = names.sectionName;
-      }
-      result.push(
-        new ConversationListDto({
-          id: row.id,
-          branchId: row.branch_id,
-          type: row.type as 'one_to_one' | 'broadcast',
-          classSectionId: row.class_section_id ?? undefined,
-          academicYearId: row.academic_year_id ?? undefined,
-          createdAt: row.created_at,
-          lastMessagePreview,
-          lastMessageAt,
-          lastMessageType: lastMessageType as MessageType | undefined,
-          unreadCount,
-          participantNames,
-          className,
-          sectionName,
-        }),
-      );
-    }
+    const result = await this.buildConversationListDtos(supabase, rows, userId);
 
     return {
       data: result,
@@ -210,19 +179,120 @@ export class MessagesService {
     };
   }
 
-  private async getParticipantUserIds(
+  /** Batched lookups for the current page of conversations (avoids N+1 per row). */
+  private async buildConversationListDtos(
     supabase: ReturnType<SupabaseConfig['getClient']>,
-    conversationId: string,
-    excludeUserId?: string,
-  ): Promise<string[]> {
-    let q = supabase
+    rows: ConversationRow[],
+    userId: string,
+  ): Promise<ConversationListDto[]> {
+    if (rows.length === 0) return [];
+
+    const pageIds = rows.map((r) => r.id);
+
+    const { data: partData, error: partErr } = await supabase
       .from('conversation_participants')
-      .select('user_id')
-      .eq('conversation_id', conversationId);
-    if (excludeUserId) q = q.neq('user_id', excludeUserId);
-    const { data, error } = await q;
-    throwIfDbError(error);
-    return (data || []).map((r: { user_id: string }) => r.user_id);
+      .select('conversation_id, user_id')
+      .in('conversation_id', pageIds);
+    throwIfDbError(partErr);
+
+    const participantsByConv = new Map<string, string[]>();
+    for (const r of partData || []) {
+      const row = r as { conversation_id: string; user_id: string };
+      const list = participantsByConv.get(row.conversation_id) ?? [];
+      list.push(row.user_id);
+      participantsByConv.set(row.conversation_id, list);
+    }
+
+    const otherUserIds = new Set<string>();
+    for (const cid of pageIds) {
+      for (const uid of participantsByConv.get(cid) ?? []) {
+        if (uid !== userId) otherUserIds.add(uid);
+      }
+    }
+    const orderedOtherIds = [...otherUserIds];
+    const namesList =
+      orderedOtherIds.length > 0
+        ? await this.getParticipantNames(supabase, orderedOtherIds)
+        : [];
+    const nameByUserId = new Map<string, string>();
+    orderedOtherIds.forEach((uid, idx) => {
+      nameByUserId.set(uid, namesList[idx] ?? 'Unknown');
+    });
+
+    const [{ data: lastRows, error: lastErr }, { data: unreadRows, error: unreadErr }] =
+      await Promise.all([
+        supabase.rpc('last_message_preview_for_conversations', {
+          p_conversation_ids: pageIds,
+        }),
+        supabase.rpc('count_unread_per_conversation', {
+          p_conversation_ids: pageIds,
+          p_user_id: userId,
+        }),
+      ]);
+    throwIfDbError(lastErr);
+    throwIfDbError(unreadErr);
+
+    type LastPreviewRow = {
+      conversation_id: string;
+      subject: string;
+      body: string;
+      created_at: string;
+      message_type: string;
+    };
+    const lastMap = new Map<string, LastPreviewRow>();
+    for (const r of (lastRows || []) as LastPreviewRow[]) {
+      lastMap.set(r.conversation_id, r);
+    }
+    const unreadMap = new Map<string, number>();
+    for (const r of (unreadRows || []) as { conversation_id: string; unread_count: number | string }[]) {
+      unreadMap.set(r.conversation_id, Number(r.unread_count));
+    }
+
+    const uniqueClassSectionIds = [
+      ...new Set(rows.map((r) => r.class_section_id).filter((id): id is string => Boolean(id))),
+    ];
+    const classSectionMap = await this.getClassSectionDisplayNamesMap(supabase, uniqueClassSectionIds);
+
+    return rows.map((row) => {
+      const otherIds = (participantsByConv.get(row.id) ?? []).filter((id) => id !== userId);
+      const participantNames = otherIds.map((id) => nameByUserId.get(id) ?? 'Unknown');
+
+      const last = lastMap.get(row.id);
+      let lastMessagePreview: string | undefined;
+      let lastMessageAt: string | undefined;
+      let lastMessageType: MessageType | undefined;
+      if (last) {
+        const preview = last.subject || last.body?.slice(0, 50) || '';
+        lastMessagePreview = preview.length > 60 ? preview.slice(0, 57) + '...' : preview;
+        lastMessageAt = last.created_at;
+        lastMessageType = last.message_type as MessageType;
+      }
+
+      const unreadCount = unreadMap.get(row.id) ?? 0;
+      let className: string | undefined;
+      let sectionName: string | undefined;
+      if (row.class_section_id) {
+        const cs = classSectionMap.get(row.class_section_id);
+        className = cs?.className;
+        sectionName = cs?.sectionName;
+      }
+
+      return new ConversationListDto({
+        id: row.id,
+        branchId: row.branch_id,
+        type: row.type as 'one_to_one' | 'broadcast',
+        classSectionId: row.class_section_id ?? undefined,
+        academicYearId: row.academic_year_id ?? undefined,
+        createdAt: row.created_at,
+        lastMessagePreview,
+        lastMessageAt,
+        lastMessageType,
+        unreadCount,
+        participantNames,
+        className,
+        sectionName,
+      });
+    });
   }
 
   private async getParticipantNames(
@@ -239,54 +309,6 @@ export class MessagesService {
       (data || []).map((r: { id: string; full_name: string | null }) => [r.id, r.full_name ?? '']),
     );
     return userIds.map((id) => map.get(id) ?? 'Unknown');
-  }
-
-  private async getLastMessage(
-    supabase: ReturnType<SupabaseConfig['getClient']>,
-    conversationId: string,
-  ): Promise<{
-    lastMessagePreview?: string;
-    lastMessageAt?: string;
-    lastMessageType?: string;
-  }> {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('subject, body, created_at, message_type')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    throwIfDbError(error);
-    if (!data) return {};
-    const row = data as { subject: string; body: string; created_at: string; message_type: string };
-    const preview = row.subject || row.body?.slice(0, 50) || '';
-    return {
-      lastMessagePreview: preview.length > 60 ? preview.slice(0, 57) + '...' : preview,
-      lastMessageAt: row.created_at,
-      lastMessageType: row.message_type,
-    };
-  }
-
-  private async getUnreadCountForConversation(
-    supabase: ReturnType<SupabaseConfig['getClient']>,
-    conversationId: string,
-    userId: string,
-  ): Promise<number> {
-    const { data: messageIds, error: msgError } = await supabase
-      .from('messages')
-      .select('id')
-      .eq('conversation_id', conversationId);
-    throwIfDbError(msgError);
-    const ids = (messageIds || []).map((m: { id: string }) => m.id);
-    if (ids.length === 0) return 0;
-    const { count, error } = await supabase
-      .from('message_reads')
-      .select('*', { count: 'exact', head: true })
-      .in('message_id', ids)
-      .eq('user_id', userId)
-      .is('read_at', null);
-    throwIfDbError(error);
-    return count ?? 0;
   }
 
   private async getClassSectionDisplayNames(
@@ -310,6 +332,33 @@ export class MessagesService {
       className: classes?.display_name || classes?.name || '',
       sectionName: sections?.name || '',
     };
+  }
+
+  private async getClassSectionDisplayNamesMap(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    classSectionIds: string[],
+  ): Promise<Map<string, { className: string; sectionName: string }>> {
+    const out = new Map<string, { className: string; sectionName: string }>();
+    if (classSectionIds.length === 0) return out;
+    const { data, error } = await supabase
+      .from('class_sections')
+      .select('id, class_id, section_id, classes:class_id(name, display_name), sections:section_id(name)')
+      .in('id', classSectionIds);
+    throwIfDbError(error);
+    for (const raw of data || []) {
+      const row = raw as {
+        id: string;
+        classes?: { name: string; display_name: string } | { name: string; display_name: string }[];
+        sections?: { name: string } | { name: string }[];
+      };
+      const cls = Array.isArray(row.classes) ? row.classes[0] : row.classes;
+      const sec = Array.isArray(row.sections) ? row.sections[0] : row.sections;
+      out.set(row.id, {
+        className: cls?.display_name || cls?.name || '',
+        sectionName: sec?.name || '',
+      });
+    }
+    return out;
   }
 
   async getConversation(
@@ -738,21 +787,11 @@ export class MessagesService {
       throw new ForbiddenException('You are not a participant in this conversation');
     }
 
-    const { data: messageRows, error: msgError } = await supabase
-      .from('messages')
-      .select('id')
-      .eq('conversation_id', conversationId);
-    throwIfDbError(msgError);
-    const messageIds = (messageRows || []).map((m: { id: string }) => m.id);
-    if (messageIds.length === 0) return;
-
-    const now = new Date().toISOString();
-    await supabase
-      .from('message_reads')
-      .update({ read_at: now })
-      .eq('user_id', userId)
-      .in('message_id', messageIds)
-      .is('read_at', null);
+    const { error: rpcError } = await supabase.rpc('mark_conversation_messages_read', {
+      p_conversation_id: conversationId,
+      p_user_id: userId,
+    });
+    throwIfDbError(rpcError);
   }
 
   /** Hide conversation from this user's list only (per-user; other participants still see it). */

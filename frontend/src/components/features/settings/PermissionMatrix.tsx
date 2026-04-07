@@ -1,14 +1,16 @@
 'use client';
 
-import { Table, Select, Button, Stack, Group, Text, MultiSelect } from '@mantine/core';
+import { Table, Select, Button, Stack, Group, Text, MultiSelect, Paper, Alert } from '@mantine/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { notifications } from '@mantine/notifications';
 import type { Role, Feature, PermissionMatrix, Permission, UpdatePermissionsPayload } from '@/types/permissions';
 import { useAuth } from '@/hooks/useAuth';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import type { User } from '@/types/auth';
+import { useClasses } from '@/hooks/useCoreLookups';
+import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
 
 const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
 const SUPER_ADMIN_ROLE_NAME = 'super_admin';
@@ -145,6 +147,49 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
     selectedRoleIds.length === 0
       ? rolesInMatrix
       : rolesInMatrix.filter((r) => selectedRoleIds.includes(r.id));
+
+  const studentRole = rolesInMatrix.find((r) => r.name?.toLowerCase() === 'student') ?? null;
+  const leavesFeature = managementFeatures.find((f) => f.code === 'leaves') ?? null;
+  const studentLeavesPermission: Permission =
+    studentRole && leavesFeature
+      ? localPermissions.get(`${studentRole.id}-${leavesFeature.id}`) || 'none'
+      : 'none';
+
+  const studentLeaveClassesKey =
+    branchId ? `student_leave_request_class_ids:${branchId}` : 'student_leave_request_class_ids:';
+  const classesQuery = useClasses();
+  const leaveClassesSettingQuery = useSystemSetting<string[]>(studentLeaveClassesKey);
+  const updateLeaveClassesSetting = useUpdateSystemSetting<string[]>(studentLeaveClassesKey);
+
+  const classOptions =
+    classesQuery.data?.data?.map((c) => ({
+      value: c.id,
+      label: c.displayName || c.name,
+    })) ?? [];
+
+  const remoteLeaveClassIds = useMemo(() => {
+    const v = leaveClassesSettingQuery.data?.data?.value;
+    return Array.isArray(v) ? (v.filter((x): x is string => typeof x === 'string') ?? []) : [];
+  }, [leaveClassesSettingQuery.data?.data?.value]);
+
+  const remoteLeaveClassIdsKey = useMemo(() => JSON.stringify([...remoteLeaveClassIds].sort()), [remoteLeaveClassIds]);
+
+  const [localLeaveClassIds, setLocalLeaveClassIds] = useState<string[]>([]);
+  useEffect(() => {
+    // Only sync local state when the remote value actually changes.
+    setLocalLeaveClassIds(remoteLeaveClassIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteLeaveClassIdsKey]);
+
+  const leaveClassIdsChanged = useMemo(() => {
+    const a = [...remoteLeaveClassIds].sort();
+    const b = [...localLeaveClassIds].sort();
+    if (a.length !== b.length) return true;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return true;
+    }
+    return false;
+  }, [remoteLeaveClassIds, localLeaveClassIds]);
 
   useEffect(() => {
     if (managementFeatures.length > 0 && !hasSetInitialDefault.current) {
@@ -310,6 +355,54 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
           </Table.Tbody>
         </Table>
       </div>
+
+      {/* Student leave request configuration (scoped to this branch) */}
+      {studentRole && leavesFeature && (
+        <Paper withBorder p="md">
+          <Stack gap="sm">
+            <Stack gap={4}>
+              <Text fw={700}>{tSettings('permissionsStudentLeavesTitle')}</Text>
+              <Text size="sm" c="dimmed">
+                {tSettings('permissionsStudentLeavesDescription')}
+              </Text>
+            </Stack>
+
+            {studentLeavesPermission !== 'edit' && (
+              <Alert color="yellow" variant="light">
+                {tSettings('permissionsStudentLeavesGrantEditHint')}
+              </Alert>
+            )}
+
+            <MultiSelect
+              label={tSettings('permissionsStudentLeavesClassesLabel')}
+              placeholder={tSettings('permissionsStudentLeavesClassesPlaceholder')}
+              data={classOptions}
+              value={localLeaveClassIds}
+              disabled={studentLeavesPermission !== 'edit' || !branchId}
+              onChange={setLocalLeaveClassIds}
+              searchable
+              clearable
+              nothingFoundMessage={tSettings('permissionsStudentLeavesNoClasses')}
+            />
+
+            <Group justify="flex-end">
+              <Button
+                variant="light"
+                disabled={
+                  studentLeavesPermission !== 'edit' ||
+                  !branchId ||
+                  !leaveClassIdsChanged ||
+                  updateLeaveClassesSetting.isPending
+                }
+                loading={updateLeaveClassesSetting.isPending}
+                onClick={() => updateLeaveClassesSetting.mutate(localLeaveClassIds)}
+              >
+                {tCommon('save')}
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
+      )}
     </Stack>
   );
 }

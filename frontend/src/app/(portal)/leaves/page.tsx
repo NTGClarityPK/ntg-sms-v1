@@ -13,6 +13,7 @@ import {
   Paper,
   Skeleton,
   Table,
+  ScrollArea,
   Badge,
   Alert,
   Button,
@@ -32,6 +33,7 @@ import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
 import type { Student } from '@/types/students';
 import { useFeaturePermission } from '@/hooks/usePermissions';
+import { useSystemSetting } from '@/hooks/useSystemSettings';
 
 interface ParentChild {
   id: string; // parent_student association ID
@@ -52,6 +54,7 @@ export default function LeavesPage() {
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
   const isStudent = user?.roles?.some((r) => r.roleName === 'student');
+  const branchId = (user as User | undefined)?.currentBranch?.id ?? null;
   const { canEdit } = useFeaturePermission('leaves');
   const [page, setPage] = useState(1);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -84,6 +87,10 @@ export default function LeavesPage() {
     limit: 100,
   });
   const myStudentQuery = useMyStudent();
+  const studentLeaveClassesKey = branchId ? `student_leave_request_class_ids:${branchId}` : null;
+  const studentLeaveClassesQuery = useSystemSetting<string[]>(
+    studentLeaveClassesKey ?? 'student_leave_request_class_ids:',
+  );
 
   // For parents: create Student objects from children (form only needs id)
   // For students: use their own student record only
@@ -113,6 +120,17 @@ export default function LeavesPage() {
   } else if (!isParent && studentsData?.data) {
     availableStudents = studentsData.data;
   }
+
+  const myStudent = isStudent ? (myStudentQuery.data?.data ?? null) : null;
+  const allowedStudentLeaveClassIds = Array.isArray(studentLeaveClassesQuery.data?.data?.value)
+    ? (studentLeaveClassesQuery.data?.data?.value ?? [])
+    : [];
+  const studentClassId = myStudent?.classId ?? null;
+  const isStudentLeaveEnabledForClass =
+    !!studentClassId && allowedStudentLeaveClassIds.includes(studentClassId);
+  const canRaiseRequest = Boolean(
+    isParent || (isStudent && canEdit && isStudentLeaveEnabledForClass),
+  );
 
   // Set default selected student when students load
   useEffect(() => {
@@ -217,7 +235,7 @@ export default function LeavesPage() {
           }}
         >
           <Tabs.List>
-            {(isParent || isStudent) && (
+            {canRaiseRequest && (
               <Tabs.Tab id="leaves-tab-my-requests" value="my-requests">
                 {t('tabRaiseRequest')}
               </Tabs.Tab>
@@ -225,7 +243,7 @@ export default function LeavesPage() {
             <Tabs.Tab id="leaves-tab-all-requests" value="all-requests">{t('tabAllRequests')}</Tabs.Tab>
           </Tabs.List>
 
-          {(isParent || isStudent) && (
+          {canRaiseRequest && (
             <Tabs.Panel value="my-requests" pt="md">
               <Stack gap="md">
                 {isLoading ? (
@@ -397,36 +415,38 @@ export default function LeavesPage() {
           <Tabs.Panel value="all-requests" pt="md">
             <Stack gap="md">
               {leaveQuery.isLoading || leaveQuery.isRefetching ? (
-                <Table striped highlightOnHover>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>{t('dateRequested')}</Table.Th>
-                      <Table.Th>{t('leavePeriod')}</Table.Th>
-                      <Table.Th>{t('student')}</Table.Th>
-                      <Table.Th>{t('reason')}</Table.Th>
-                      <Table.Th>{t('status')}</Table.Th>
-                      <Table.Th>{t('reviewedBy')}</Table.Th>
-                      <Table.Th>{t('dateReviewed')}</Table.Th>
-                      <Table.Th>{t('reviewNotes')}</Table.Th>
-                      <Table.Th>{t('actions')}</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <Table.Tr key={i}>
-                        <Table.Td><Skeleton height={20} /></Table.Td>
-                        <Table.Td><Skeleton height={20} /></Table.Td>
-                        <Table.Td><Skeleton height={20} /></Table.Td>
-                        <Table.Td><Skeleton height={20} /></Table.Td>
-                        <Table.Td><Skeleton height={20} width={60} /></Table.Td>
-                        <Table.Td><Skeleton height={20} /></Table.Td>
-                        <Table.Td><Skeleton height={20} /></Table.Td>
-                        <Table.Td><Skeleton height={20} /></Table.Td>
-                        <Table.Td><Skeleton height={20} width={100} /></Table.Td>
+                <ScrollArea type="auto" scrollbars="x" w="100%">
+                  <Table striped highlightOnHover style={{ minWidth: 880 }}>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>{t('dateRequested')}</Table.Th>
+                        <Table.Th>{t('leavePeriod')}</Table.Th>
+                        <Table.Th>{t('student')}</Table.Th>
+                        <Table.Th>{t('reason')}</Table.Th>
+                        <Table.Th>{t('status')}</Table.Th>
+                        <Table.Th>{t('reviewedBy')}</Table.Th>
+                        <Table.Th>{t('dateReviewed')}</Table.Th>
+                        <Table.Th>{t('reviewNotes')}</Table.Th>
+                        <Table.Th>{t('actions')}</Table.Th>
                       </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Table.Tr key={i}>
+                          <Table.Td><Skeleton height={20} /></Table.Td>
+                          <Table.Td><Skeleton height={20} /></Table.Td>
+                          <Table.Td><Skeleton height={20} /></Table.Td>
+                          <Table.Td><Skeleton height={20} /></Table.Td>
+                          <Table.Td><Skeleton height={20} width={60} /></Table.Td>
+                          <Table.Td><Skeleton height={20} /></Table.Td>
+                          <Table.Td><Skeleton height={20} /></Table.Td>
+                          <Table.Td><Skeleton height={20} /></Table.Td>
+                          <Table.Td><Skeleton height={20} width={100} /></Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </ScrollArea>
               ) : leaveQuery.isError ? (
                 <Text size="sm" c="red">
                   {t('errorLoadingLeaveRequests')}

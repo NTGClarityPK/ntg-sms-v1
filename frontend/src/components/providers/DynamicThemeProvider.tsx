@@ -167,17 +167,21 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         border-inline-start: none !important;
       }
       
-      /* Header */
+      /* Header — safe-area for PWA / iOS notch; height comes from AppShell (calc + inset) */
       .mantine-AppShell-header {
         background-color: ${config.components.header.backgroundColor} !important;
         border-bottom-color: ${config.components.header.borderColor} !important;
         color: ${config.components.header.textColor} !important;
+        padding-top: env(safe-area-inset-top, 0px) !important;
+        padding-left: env(safe-area-inset-left, 0px) !important;
+        padding-right: env(safe-area-inset-right, 0px) !important;
+        box-sizing: border-box !important;
       }
       
       /* Page Title Bar */
       .page-title-bar {
         position: fixed !important;
-        top: 60px !important; /* Below header */
+        top: calc(60px + env(safe-area-inset-top, 0px)) !important; /* Below header */
         left: 270px !important; /* To the right of navbar (expanded) */
         right: 0 !important;
         height: 60px !important; /* Same height as header */
@@ -189,8 +193,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         transition: left 0.3s ease !important;
         border-top-left-radius: 12px !important;
         overflow: hidden !important;
-        padding-left: var(--mantine-spacing-md) !important;
-        padding-right: var(--mantine-spacing-md) !important;
+        padding-left: max(var(--mantine-spacing-md), env(safe-area-inset-left, 0px)) !important;
+        padding-right: max(var(--mantine-spacing-md), env(safe-area-inset-right, 0px)) !important;
       }
 
       /* Force visible inner rounded join with sidebar/header edge */
@@ -209,7 +213,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* Page Sub Title Bar - Same position as title bar */
       .page-sub-title-bar {
         position: fixed !important;
-        top: 60px !important; /* Same position as title bar */
+        top: calc(60px + env(safe-area-inset-top, 0px)) !important; /* Same position as title bar */
         left: 270px !important; /* To the right of navbar (expanded) */
         right: 0 !important;
         height: 60px !important; /* Same height as title bar */
@@ -245,8 +249,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         width: calc(100% - 270px) !important;
         border-top-left-radius: 0 !important;
         border-top-right-radius: 12px !important;
-        padding-left: var(--mantine-spacing-md) !important;
-        padding-right: var(--mantine-spacing-md) !important;
+        padding-left: max(var(--mantine-spacing-md), env(safe-area-inset-left, 0px)) !important;
+        padding-right: max(var(--mantine-spacing-md), env(safe-area-inset-right, 0px)) !important;
         transition: right 0.3s ease, width 0.3s ease !important;
       }
 
@@ -326,8 +330,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* Add top margin to main content to account for title bar */
       /* Note: Horizontal padding comes from AppShell padding="md" prop (like RMS) */
       .mantine-AppShell-main {
-        /* Header (60px) + Title bar (60px) + spacing */
-        padding-top: calc(120px + var(--mantine-spacing-md)) !important;
+        /* Header + Title bar + safe-area + spacing */
+        padding-top: calc(120px + env(safe-area-inset-top, 0px) + var(--mantine-spacing-md)) !important;
       }
       
       /* Reduce margin-top for content div after title bar */

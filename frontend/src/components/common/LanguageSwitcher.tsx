@@ -8,6 +8,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { useMantineTheme } from '@mantine/core';
 import { apiClient } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
+import { supabase } from '@/lib/supabase/client';
 const LOCALE_COOKIE = 'NEXT_LOCALE';
 const COOKIE_MAX_AGE = 31536000; // 1 year
 
@@ -39,6 +40,14 @@ export function LanguageSwitcher() {
       localStorage.setItem('locale', value);
     }
     try {
+      // Avoid noisy 401s during logout/expired sessions: only persist to backend when authenticated.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        router.refresh();
+        return;
+      }
       await apiClient.patch('/api/v1/users/me/preferences', {
         preferred_locale: value,
       });

@@ -184,10 +184,51 @@ export class LeaveRequestsService {
     branchId: string,
     userEmail: string,
     tenantId?: string | null,
+    requester?: { isParent?: boolean; isStudent?: boolean },
   ): Promise<LeaveRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    await this.ensureParentCanAccessStudent(userId, input.studentId);
+    const isParent = requester?.isParent === true;
+    const isStudent = requester?.isStudent === true;
+
+    if (isStudent && !isParent) {
+      // Students can request leave only for themselves, and only if their class is enabled.
+      const { data: meStudent, error: studentError } = await supabase
+        .from('students')
+        .select('id, class_id')
+        .eq('user_id', userId)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(studentError);
+      if (!meStudent) {
+        throw new ForbiddenException('No student record found for current user');
+      }
+      const meStudentRow = meStudent as { id: string; class_id: string | null };
+      if (input.studentId !== meStudentRow.id) {
+        throw new ForbiddenException('Students can only request leave for themselves');
+      }
+
+      const settingKey = `student_leave_request_class_ids:${branchId}`;
+      const { data: allowedSetting, error: allowedError } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', settingKey)
+        .maybeSingle();
+      throwIfDbError(allowedError);
+      const allowedClassIds = Array.isArray((allowedSetting as { value?: unknown } | null)?.value)
+        ? (((allowedSetting as { value: unknown }).value as unknown[]) || []).filter(
+            (v): v is string => typeof v === 'string' && v.length > 0,
+          )
+        : [];
+
+      const classId = meStudentRow.class_id;
+      if (!classId || allowedClassIds.length === 0 || !allowedClassIds.includes(classId)) {
+        throw new ForbiddenException('Leave requests are not enabled for your class');
+      }
+    } else {
+      // Default: parent flow (and staff creating for a student via UI uses parent link check)
+      await this.ensureParentCanAccessStudent(userId, input.studentId);
+    }
 
     const activeYear =
       await this.academicYearsService.getActiveForBranch(branchId);
@@ -379,35 +420,15 @@ export class LeaveRequestsService {
     query: QueryLeaveRequestsDto,
     userId: string,
     branchId: string,
-    isParent: boolean = false,
+    requester?: { isParent?: boolean; isStudent?: boolean },
   ): Promise<{
     data: LeaveRequestDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Check if user is a parent by querying user_roles and roles
-    if (!isParent) {
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('role_id')
-        .eq('user_id', userId)
-        .eq('branch_id', branchId);
-
-      if (userRoles && userRoles.length > 0) {
-        const roleIds = userRoles.map((ur) => ur.role_id);
-        const { data: roles } = await supabase
-          .from('roles')
-          .select('name')
-          .in('id', roleIds)
-          .eq('name', 'parent')
-          .limit(1);
-
-        if (roles && roles.length > 0) {
-          isParent = true;
-        }
-      }
-    }
+    const isParent = requester?.isParent === true;
+    const isStudent = requester?.isStudent === true;
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -422,8 +443,22 @@ export class LeaveRequestsService {
       )
       .eq('branch_id', branchId);
 
-    // For parents, only show their own requests
-    if (isParent) {
+    if (isStudent && !isParent) {
+      // Students can only see leave requests related to themselves (their student record).
+      const { data: meStudent, error: studentError } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(studentError);
+      if (!meStudent) {
+        return { data: [], meta: { total: 0, page, limit, totalPages: 1 } };
+      }
+      const myStudentId = (meStudent as { id: string }).id;
+      dbQuery = dbQuery.eq('student_id', myStudentId);
+    } else if (isParent) {
+      // Parents: only show requests they raised (for linked children via UI).
       dbQuery = dbQuery.eq('requested_by', userId);
     }
 
@@ -563,6 +598,8 @@ export class LeaveRequestsService {
   async getLeaveRequestById(
     id: string,
     branchId: string,
+    userId?: string,
+    requester?: { isParent?: boolean; isStudent?: boolean },
   ): Promise<LeaveRequestDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -579,6 +616,24 @@ export class LeaveRequestsService {
     }
 
     const row = data as LeaveRequestRow;
+
+    const isParent = requester?.isParent === true;
+    const isStudent = requester?.isStudent === true;
+
+    if (isStudent && !isParent && userId) {
+      const { data: meStudent, error: studentError } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(studentError);
+      const myStudentId = (meStudent as { id: string } | null)?.id ?? null;
+      if (!myStudentId || row.student_id !== myStudentId) {
+        throw new ForbiddenException('You do not have access to this leave request');
+      }
+    }
+
     return this.mapRowToDto(row);
   }
 

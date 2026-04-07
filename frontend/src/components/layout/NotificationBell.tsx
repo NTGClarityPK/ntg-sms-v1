@@ -1,10 +1,10 @@
 'use client';
 
-import { ActionIcon, Badge, Popover } from '@mantine/core';
+import { ActionIcon, Badge, Popover, useMantineColorScheme, useMantineTheme } from '@mantine/core';
 import { IconBell, IconBellOff } from '@tabler/icons-react';
 import { useUnreadCount } from '@/hooks/useNotifications';
 import { NotificationDropdown } from './NotificationDropdown';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotificationAlertSettings } from '@/hooks/useNotificationAlertSettings';
 import { primeNotificationSound } from '@/lib/notifications/sound';
@@ -14,6 +14,9 @@ export function NotificationBell() {
   const { data: unreadCount = 0 } = useUnreadCount();
   const { user } = useAuth();
   const { alertsEnabled, toggleAlertsEnabled } = useNotificationAlertSettings(user?.id);
+  const theme = useMantineTheme();
+  const { colorScheme } = useMantineColorScheme();
+  const isMobileNav = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
   return (
     <Popover
@@ -26,14 +29,14 @@ export function NotificationBell() {
       <Popover.Target>
         <ActionIcon
           variant="subtle"
-          size="lg"
+          size={isMobileNav ? 'md' : 'lg'}
           onClick={() => {
             void primeNotificationSound();
             toggle();
           }}
           style={{ position: 'relative' }}
         >
-          {alertsEnabled ? <IconBell size={20} /> : <IconBellOff size={20} />}
+          {alertsEnabled ? <IconBell size={isMobileNav ? 18 : 20} /> : <IconBellOff size={isMobileNav ? 18 : 20} />}
           {unreadCount > 0 && (
             <Badge
               size="xs"
@@ -57,7 +60,11 @@ export function NotificationBell() {
           )}
         </ActionIcon>
       </Popover.Target>
-      <Popover.Dropdown p={0} style={{ width: '380px', maxHeight: '500px', overflow: 'hidden' }}>
+      <Popover.Dropdown
+        p={0}
+        bg={colorScheme === 'dark' ? theme.colors.dark[7] : undefined}
+        style={{ width: '380px', maxHeight: '500px', overflow: 'hidden' }}
+      >
         <NotificationDropdown
           onClose={close}
           alertsEnabled={alertsEnabled}

@@ -80,22 +80,26 @@ export class LeaveRequestsController {
     @CurrentBranch() branch: { branchId: string },
   ) {
     const isParent = user.roles?.includes('parent');
+    const isStudent = user.roles?.includes('student');
     return this.leaveRequestsService.listLeaveRequests(
       query,
       user.id,
       branch.branchId,
-      isParent,
+      { isParent, isStudent },
     );
   }
 
   @Get(':id')
   async getLeaveRequestById(
     @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
     @CurrentBranch() branch: { branchId: string },
   ) {
     const data = await this.leaveRequestsService.getLeaveRequestById(
       id,
       branch.branchId,
+      user.id,
+      { isParent: user.roles?.includes('parent') ?? false, isStudent: user.roles?.includes('student') ?? false },
     );
     return { data };
   }
@@ -107,12 +111,15 @@ export class LeaveRequestsController {
     @CurrentBranch() branch: { branchId: string; tenantId: string | null },
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'leaves');
+    const isParent = user.roles?.includes('parent') ?? false;
+    const isStudent = user.roles?.includes('student') ?? false;
     const data = await this.leaveRequestsService.createLeaveRequest(
       input,
       user.id,
       branch.branchId,
       user.email,
       branch.tenantId,
+      { isParent, isStudent },
     );
     return { data };
   }

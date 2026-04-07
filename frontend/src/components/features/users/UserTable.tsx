@@ -1,9 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { Table, Badge, Group, ActionIcon, Pagination, Text, Modal, Stack, TextInput, Button } from '@mantine/core';
+import {
+  Table,
+  Badge,
+  Group,
+  ActionIcon,
+  Pagination,
+  Text,
+  Modal,
+  Stack,
+  TextInput,
+  Button,
+  ScrollArea,
+  useMantineTheme,
+} from '@mantine/core';
 import { IconEdit, IconTrash, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import { useTranslations } from 'next-intl';
 import type { User } from '@/types/users';
@@ -28,6 +41,8 @@ interface UserTableProps {
 }
 
 export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: UserTableProps) {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('user');
   const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
@@ -110,66 +125,72 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
 
   return (
     <>
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <SortableHeader field="fullName">{t('name')}</SortableHeader>
-            <SortableHeader field="email">{t('email')}</SortableHeader>
-            <Table.Th>{t('roles')}</Table.Th>
-            <SortableHeader field="isActive">{t('status')}</SortableHeader>
-            <Table.Th>{t('actions')}</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {users.map((user) => (
-            <Table.Tr key={user.id}>
-              <Table.Td>
-                <Text fw={500}>{user.fullName}</Text>
-              </Table.Td>
-              <Table.Td>
-                <Text size="sm">{user.email}</Text>
-              </Table.Td>
-              <Table.Td>{getRoleBadges(user.roles)}</Table.Td>
-              <Table.Td>
-                <Badge color={user.isActive ? 'green' : 'red'} variant="light">
-                  {user.isActive ? t('active') : t('inactive')}
-                </Badge>
-              </Table.Td>
-              <Table.Td>
-                <Group gap="xs">
-                  {canEdit && (
-                    <>
-                      <ActionIcon variant="light" onClick={() => handleEdit(user)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                      <ActionIcon variant="light" color="red" onClick={() => handleDelete(user)}>
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        variant="light"
-                        onClick={() => handleResend(user)}
-                        aria-label="Resend invitation"
-                        id={`users-resend-invite-${user.id}`}
-                      >
-                        <IconMailForward size={16} />
-                      </ActionIcon>
-                    </>
-                  )}
-                </Group>
-              </Table.Td>
+      <ScrollArea type="auto" scrollbars="x" w="100%">
+        <Table striped highlightOnHover style={{ minWidth: 800 }}>
+          <Table.Thead>
+            <Table.Tr>
+              <SortableHeader field="fullName">{t('name')}</SortableHeader>
+              <SortableHeader field="email">{t('email')}</SortableHeader>
+              <Table.Th>{t('roles')}</Table.Th>
+              <SortableHeader field="isActive">{t('status')}</SortableHeader>
+              <Table.Th>{t('actions')}</Table.Th>
             </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
+          </Table.Thead>
+          <Table.Tbody>
+            {users.map((user) => (
+              <Table.Tr key={user.id}>
+                <Table.Td>
+                  <Text fw={500}>{user.fullName}</Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="sm">{user.email}</Text>
+                </Table.Td>
+                <Table.Td>{getRoleBadges(user.roles)}</Table.Td>
+                <Table.Td>
+                  <Badge color={user.isActive ? 'green' : 'red'} variant="light">
+                    {user.isActive ? t('active') : t('inactive')}
+                  </Badge>
+                </Table.Td>
+                <Table.Td>
+                  <Group gap="xs">
+                    {canEdit && (
+                      <>
+                        <ActionIcon variant="light" onClick={() => handleEdit(user)}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                        <ActionIcon variant="light" color="red" onClick={() => handleDelete(user)}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="light"
+                          onClick={() => handleResend(user)}
+                          aria-label="Resend invitation"
+                          id={`users-resend-invite-${user.id}`}
+                        >
+                          <IconMailForward size={16} />
+                        </ActionIcon>
+                      </>
+                    )}
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </ScrollArea>
 
       {meta && meta.totalPages > 1 && (
-        <Group justify="center" mt="md">
-          <Pagination
-            total={meta.totalPages}
-            value={meta.page}
-            onChange={onPageChange}
-          />
-        </Group>
+        <ScrollArea type="auto" scrollbars="x" w="100%" mt="md">
+          <Group justify="center" wrap="nowrap" gap={4} style={{ minWidth: 'min-content' }}>
+            <Pagination
+              total={meta.totalPages}
+              value={meta.page}
+              onChange={onPageChange}
+              size={isMobile ? 'sm' : 'md'}
+              withEdges={!isMobile}
+            />
+          </Group>
+        </ScrollArea>
       )}
 
       <UserForm

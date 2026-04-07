@@ -7,10 +7,11 @@ import {
   ScrollArea,
   Skeleton,
   Text,
-  Group,
   Button,
   Paper,
+  useMantineTheme,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { StarRating } from './StarRating';
 import type { BehavioralMatrixRow, BehavioralMatrixResponse } from '@/types/behavioral';
 import { useCreateBehavioralMutation, useUpdateBehavioralMutation } from '@/hooks/useBehavioral';
@@ -26,6 +27,8 @@ interface BehavioralMatrixProps {
  * Save per row: create or update assessment for that student/month.
  */
 export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixProps) {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('behavioral');
   const createMutation = useCreateBehavioralMutation();
   const updateMutation = useUpdateBehavioralMutation();
@@ -95,6 +98,14 @@ export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixP
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  const tableMinWidth = useMemo(() => {
+    const n = attributes.length;
+    const studentCol = isMobile ? 140 : 160;
+    const attrCol = isMobile ? 108 : 128;
+    const actionsCol = isMobile ? 120 : 96;
+    return Math.max(320, studentCol + n * attrCol + actionsCol);
+  }, [attributes.length, isMobile]);
+
   if (isLoading) {
     return (
       <Paper withBorder p="md">
@@ -120,9 +131,9 @@ export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixP
   }
 
   return (
-    <Paper withBorder p="md">
-      <ScrollArea>
-        <Table withTableBorder withColumnBorders striped>
+    <Paper withBorder p={{ base: 'sm', sm: 'md' }}>
+      <ScrollArea type="auto" scrollbars="x" w="100%">
+        <Table withTableBorder withColumnBorders striped style={{ minWidth: tableMinWidth }}>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>{t('student')}</Table.Th>
@@ -146,13 +157,16 @@ export function BehavioralMatrix({ data, isLoading, onSaved }: BehavioralMatrixP
                       value={getScoresForRow(row)[attr] ?? 0}
                       onChange={(score) => setScoreForRow(row.studentId, attr, score)}
                       readonly={false}
+                      size={isMobile ? 18 : 22}
                     />
                   </Table.Td>
                 ))}
-                <Table.Td>
+                <Table.Td style={{ width: 1, verticalAlign: 'middle' }}>
                   <Button
                     size="xs"
                     variant="light"
+                    fullWidth={isMobile}
+                    maw={isMobile ? 120 : undefined}
                     loading={isSaving}
                     onClick={() => handleSaveRow(row)}
                   >

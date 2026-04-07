@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Group, Select, Stack, Alert, Paper } from '@mantine/core';
+import { Group, Select, Stack, Alert, Paper, useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useBehavioralMatrix } from '@/hooks/useBehavioral';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -28,6 +29,8 @@ const defaultMonth = new Date().toISOString().slice(0, 7) + '-01';
  * Used on the main Behavioral page (Matrix tab) and on /behavioral/assess.
  */
 export function BehavioralAssessContent() {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('behavioral');
   const colors = useThemeColors();
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
@@ -54,24 +57,43 @@ export function BehavioralAssessContent() {
   return (
     <Stack gap="md">
       <Paper withBorder p="md">
-        <Group align="flex-end" wrap="wrap" gap="md">
-          <Select
-            label={t('classSection')}
-            placeholder={t('selectClassSection')}
-            data={classSectionOptions}
-            value={classSectionId}
-            onChange={(v) => setClassSectionId(v)}
-            clearable
-            style={{ minWidth: 200 }}
-          />
-          <Select
-            label={t('month')}
-            data={monthOptions}
-            value={month}
-            onChange={(v) => setMonth(v ?? defaultMonth)}
-            style={{ minWidth: 140 }}
-          />
-        </Group>
+        {isMobile ? (
+          <Stack gap="md">
+            <Select
+              label={t('classSection')}
+              placeholder={t('selectClassSection')}
+              data={classSectionOptions}
+              value={classSectionId}
+              onChange={(v) => setClassSectionId(v)}
+              clearable
+            />
+            <Select
+              label={t('month')}
+              data={monthOptions}
+              value={month}
+              onChange={(v) => setMonth(v ?? defaultMonth)}
+            />
+          </Stack>
+        ) : (
+          <Group align="flex-end" wrap="wrap" gap="md">
+            <Select
+              label={t('classSection')}
+              placeholder={t('selectClassSection')}
+              data={classSectionOptions}
+              value={classSectionId}
+              onChange={(v) => setClassSectionId(v)}
+              clearable
+              style={{ minWidth: 200 }}
+            />
+            <Select
+              label={t('month')}
+              data={monthOptions}
+              value={month}
+              onChange={(v) => setMonth(v ?? defaultMonth)}
+              style={{ minWidth: 140 }}
+            />
+          </Group>
+        )}
       </Paper>
 
       {!classSectionId ? (

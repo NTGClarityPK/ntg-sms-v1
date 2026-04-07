@@ -184,6 +184,7 @@ export class CoreLookupsService {
     input: {
       name: string;
       nameAr?: string;
+      name_translations?: Record<string, string>;
       code?: string;
       isActive?: boolean;
       sortOrder?: number;
@@ -208,11 +209,12 @@ export class CoreLookupsService {
       if (existing) return mapSubject(existing as SubjectRow, 'ar');
     }
 
-    const nameTranslations = (input as { name_translations?: Record<string, string> }).name_translations;
+    const nameTranslations = input.name_translations;
+    const resolvedNameAr = input.nameAr ?? nameTranslations?.ar;
     const insertPayload = {
       name: input.name,
-      name_ar: input.nameAr ?? null,
-      name_translations: nameTranslations ?? { en: input.name, ar: input.nameAr ?? input.name },
+      name_ar: resolvedNameAr ?? null,
+      name_translations: nameTranslations ?? { en: input.name, ar: resolvedNameAr ?? input.name },
       code: code || null,
       is_active: input.isActive ?? true,
       sort_order: input.sortOrder ?? 0,
@@ -257,6 +259,9 @@ export class CoreLookupsService {
     if (input.name !== undefined) updates.name = input.name;
     if (input.nameAr !== undefined) updates.name_ar = input.nameAr || null;
     if (input.name_translations !== undefined) updates.name_translations = input.name_translations;
+    if (input.nameAr === undefined && input.name_translations?.ar !== undefined) {
+      updates.name_ar = input.name_translations.ar || null;
+    }
     if (input.code !== undefined) updates.code = input.code || null;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;

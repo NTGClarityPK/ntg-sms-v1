@@ -1,12 +1,11 @@
 'use client';
 
-import { Title, Text, Stack, Skeleton, Group, Alert, Paper, Modal, Badge } from '@mantine/core';
+import { Title, Text, Stack, Skeleton, Group, Alert, Paper, Modal, Badge, useMantineColorScheme, useMantineTheme } from '@mantine/core';
 import { useStudentTimetable, useTimingTemplateInfo } from '@/hooks/useTimetable';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useStudentTemplate } from '@/hooks/useSubjectTemplates';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getThemeColorShade } from '@/lib/utils/theme';
 
 // Helper to convert hex to RGB for rgba calculations (local copy since it's not exported)
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -20,7 +19,6 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
     : null;
 }
 import { useTranslations } from 'next-intl';
-import { useThemeStore } from '@/lib/store/theme-store';
 import { TimetableGrid } from '@/components/features/timetable/TimetableGrid';
 import { useMyStudent } from '@/hooks/useStudents';
 import { useClassSections } from '@/hooks/useClassSections';
@@ -32,16 +30,13 @@ import { IconX, IconClock } from '@tabler/icons-react';
 export default function MyTimetablePage() {
   const t = useTranslations('timetable');
   const colors = useThemeColors();
-  const { themeVersion } = useThemeStore();
+  const theme = useMantineTheme();
+  const { colorScheme } = useMantineColorScheme();
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const { data: activeYearResponse } = useActiveAcademicYear();
   const activeYear = activeYearResponse?.data ?? null;
   const activeYearId = activeYear?.id;
-
-  // Get light background color for banner (similar to blue-0 shade)
-  // Reactive to theme changes via themeVersion dependency
-  const bannerBackgroundColor = useMemo(() => getThemeColorShade(0), [themeVersion]);
 
   // Get light background colors for badges (light variant backgrounds)
   const currentBadgeBg = useMemo(() => {
@@ -49,14 +44,14 @@ export default function MyTimetablePage() {
     const rgb = hexToRgb(colors.success);
     if (!rgb) return colors.success;
     return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`;
-  }, [colors.success, themeVersion]);
+  }, [colors.success]);
 
   const upcomingBadgeBg = useMemo(() => {
     // Mix info color with white for light background
     const rgb = hexToRgb(colors.info);
     if (!rgb) return colors.info;
     return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`;
-  }, [colors.info, themeVersion]);
+  }, [colors.info]);
 
   // Get current student
   const { data: myStudentData, isLoading: myStudentLoading, error: myStudentError } = useMyStudent();
@@ -404,7 +399,15 @@ export default function MyTimetablePage() {
       >
         <Stack gap="md">
           {/* Student Info Banner */}
-          <Paper p="md" withBorder style={{ backgroundColor: bannerBackgroundColor }}>
+          <Paper
+            p="md"
+            withBorder
+            bg={
+              colorScheme === 'dark'
+                ? theme.colors.dark[6]
+                : theme.colors[theme.primaryColor]?.[0] ?? theme.white
+            }
+          >
             <Text size="sm" fw={500}>
               {t('showingTimetableFor')} <Text component="span" fw={600}>{[myStudentData.data.firstName, myStudentData.data.lastName].filter(Boolean).join(' ') || t('student')}</Text>{' '}
               <Text component="span" fw={600}>{subjectTemplate?.name || t('unknownTemplate')}</Text>{' '}

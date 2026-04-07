@@ -1,8 +1,21 @@
 'use client';
 
-import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Tooltip, ActionIcon } from '@mantine/core';
+import {
+  Group,
+  Title,
+  Skeleton,
+  Stack,
+  Alert,
+  Text,
+  Button,
+  TextInput,
+  MultiSelect,
+  Tooltip,
+  ActionIcon,
+  useMantineTheme,
+} from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch, IconUpload } from '@tabler/icons-react';
-import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
+import { useDisclosure, useDebouncedValue, useMediaQuery } from '@mantine/hooks';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,6 +30,8 @@ import type { ClassEntity } from '@/types/settings';
 import type { Student } from '@/types/students';
 
 export default function StudentsPage() {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const tStudents = useTranslations('students');
@@ -61,11 +76,11 @@ export default function StudentsPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <div>
-            <Title order={1}>{tStudents('title')}</Title>
-          </div>
-          <Group gap="sm">
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center" gap="sm">
+          <Title order={1} style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
+            {tStudents('title')}
+          </Title>
+          <Group gap="sm" wrap="nowrap" style={{ flexShrink: 0 }}>
             <Tooltip label={tStudents('refresh')}>
               <ActionIcon
                 variant="light"
@@ -76,9 +91,15 @@ export default function StudentsPage() {
                 <IconRefresh size={18} />
               </ActionIcon>
             </Tooltip>
-            {canEdit && (
+            {canEdit && !isMobile && (
               <>
-                <Button id="students-link-bulk-import" component={Link} href="/students/bulk-import" variant="light" leftSection={<IconUpload size={16} />}>
+                <Button
+                  id="students-link-bulk-import"
+                  component={Link}
+                  href="/students/bulk-import"
+                  variant="light"
+                  leftSection={<IconUpload size={16} />}
+                >
                   {tStudents('bulkImport')}
                 </Button>
                 <Button id="students-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
@@ -108,7 +129,32 @@ export default function StudentsPage() {
             </Alert>
           )}
 
-          <Group>
+          {canEdit && isMobile && (
+            <Stack gap="xs">
+              <Button
+                id="students-link-bulk-import-mobile"
+                component={Link}
+                href="/students/bulk-import"
+                variant="light"
+                leftSection={<IconUpload size={16} />}
+                fullWidth
+                size="sm"
+              >
+                {tStudents('bulkImport')}
+              </Button>
+              <Button
+                id="students-btn-create-mobile"
+                leftSection={<IconPlus size={16} />}
+                onClick={open}
+                fullWidth
+                size="sm"
+              >
+                {tStudents('createStudent')}
+              </Button>
+            </Stack>
+          )}
+
+          <Stack gap="sm">
             <TextInput
               id="students-search"
               placeholder={tStudents('searchPlaceholder')}
@@ -118,42 +164,72 @@ export default function StudentsPage() {
                 setSearch(e.target.value);
                 handleFilterChange();
               }}
-              style={{ flex: 1 }}
+              style={{ width: '100%' }}
             />
-            <div style={{ width: 200, flexShrink: 0 }}>
-              <MultiSelect
-                id="students-filter-class"
-                placeholder={tStudents('filterByClass')}
-                data={classes.map((c) => {
-                  const classEntity = c as ClassEntity;
-                  return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
-                })}
-                value={classFilter}
-                onChange={(value) => {
-                  setClassFilter(value);
-                  handleFilterChange();
-                }}
-                clearable
-                searchable
-                style={{ width: '100%' }}
-              />
-            </div>
-            <div style={{ width: 180, flexShrink: 0 }}>
-              <MultiSelect
-                id="students-filter-section"
-                placeholder={tStudents('filterBySection')}
-                data={sections.map((s) => ({ value: s.id, label: s.name }))}
-                value={sectionFilter}
-                onChange={(value) => {
-                  setSectionFilter(value);
-                  handleFilterChange();
-                }}
-                clearable
-                searchable
-                style={{ width: '100%' }}
-              />
-            </div>
-          </Group>
+            {isMobile ? (
+              <Stack gap="sm">
+                <MultiSelect
+                  id="students-filter-class"
+                  placeholder={tStudents('filterByClass')}
+                  data={classes.map((c) => {
+                    const classEntity = c as ClassEntity;
+                    return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
+                  })}
+                  value={classFilter}
+                  onChange={(value) => {
+                    setClassFilter(value);
+                    handleFilterChange();
+                  }}
+                  clearable
+                  searchable
+                />
+                <MultiSelect
+                  id="students-filter-section"
+                  placeholder={tStudents('filterBySection')}
+                  data={sections.map((s) => ({ value: s.id, label: s.name }))}
+                  value={sectionFilter}
+                  onChange={(value) => {
+                    setSectionFilter(value);
+                    handleFilterChange();
+                  }}
+                  clearable
+                  searchable
+                />
+              </Stack>
+            ) : (
+              <Group grow align="flex-start" wrap="nowrap" gap="sm">
+                <MultiSelect
+                  id="students-filter-class"
+                  placeholder={tStudents('filterByClass')}
+                  data={classes.map((c) => {
+                    const classEntity = c as ClassEntity;
+                    return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
+                  })}
+                  value={classFilter}
+                  onChange={(value) => {
+                    setClassFilter(value);
+                    handleFilterChange();
+                  }}
+                  clearable
+                  searchable
+                  style={{ flex: '1 1 200px', minWidth: 200 }}
+                />
+                <MultiSelect
+                  id="students-filter-section"
+                  placeholder={tStudents('filterBySection')}
+                  data={sections.map((s) => ({ value: s.id, label: s.name }))}
+                  value={sectionFilter}
+                  onChange={(value) => {
+                    setSectionFilter(value);
+                    handleFilterChange();
+                  }}
+                  clearable
+                  searchable
+                  style={{ flex: '1 1 180px', minWidth: 180 }}
+                />
+              </Group>
+            )}
+          </Stack>
 
           {studentsQuery.isLoading || studentsQuery.isRefetching || !studentsResponse ? (
             <Stack gap="md">

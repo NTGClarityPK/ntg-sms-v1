@@ -47,7 +47,10 @@ export class SystemSettingsService {
     const { data, error } = await supabase.from('system_settings').select('*').eq('key', key).maybeSingle();
     throwIfDbError(error);
     if (!data) {
-      if (SystemSettingsService.OPTIONAL_LIST_KEYS.includes(key)) {
+      const isOptionalListKey =
+        SystemSettingsService.OPTIONAL_LIST_KEYS.includes(key) ||
+        key.startsWith('student_leave_request_class_ids:');
+      if (isOptionalListKey) {
         const now = new Date().toISOString();
         return {
           data: new SystemSettingDto({

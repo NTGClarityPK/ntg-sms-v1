@@ -2,9 +2,23 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Table, Badge, Group, ActionIcon, Pagination, Text, Modal, Stack, TextInput, Radio, Button } from '@mantine/core';
+import {
+  Table,
+  Badge,
+  Group,
+  ActionIcon,
+  Pagination,
+  Text,
+  Modal,
+  Stack,
+  TextInput,
+  Radio,
+  Button,
+  ScrollArea,
+  useMantineTheme,
+} from '@mantine/core';
 import { IconEdit, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import type { Student } from '@/types/students';
 import { StudentForm } from './StudentForm';
 import { useResendInvitationForUser } from '@/hooks/useInvitationsAdmin';
@@ -26,6 +40,8 @@ interface StudentTableProps {
 }
 
 export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: StudentTableProps) {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('students');
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -98,76 +114,88 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
 
   return (
     <>
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <SortableHeader field="studentId">{t('studentId')}</SortableHeader>
-            <SortableHeader field="firstName">{t('firstName')}</SortableHeader>
-            <SortableHeader field="lastName">{t('lastName')}</SortableHeader>
-            <Table.Th>{t('email')}</Table.Th>
-            <SortableHeader field="className">{t('class')}</SortableHeader>
-            <SortableHeader field="sectionName">{t('section')}</SortableHeader>
-            <Table.Th>{t('subjectTemplate')}</Table.Th>
-            <SortableHeader field="isActive">{t('status')}</SortableHeader>
-            <Table.Th>{t('actions')}</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {students.length === 0 ? (
+      <ScrollArea type="auto" scrollbars="x" w="100%">
+        <Table striped highlightOnHover style={{ minWidth: 960 }}>
+          <Table.Thead>
             <Table.Tr>
-              <Table.Td colSpan={9}>
-                <Text c="dimmed" ta="center" py="md">
-                  {t('noStudentsFound')}
-                </Text>
-              </Table.Td>
+              <SortableHeader field="studentId">{t('studentId')}</SortableHeader>
+              <SortableHeader field="firstName">{t('firstName')}</SortableHeader>
+              <SortableHeader field="lastName">{t('lastName')}</SortableHeader>
+              <Table.Th>{t('email')}</Table.Th>
+              <SortableHeader field="className">{t('class')}</SortableHeader>
+              <SortableHeader field="sectionName">{t('section')}</SortableHeader>
+              <Table.Th>{t('subjectTemplate')}</Table.Th>
+              <SortableHeader field="isActive">{t('status')}</SortableHeader>
+              <Table.Th>{t('actions')}</Table.Th>
             </Table.Tr>
-          ) : (
-            students.map((student) => (
-              <Table.Tr key={student.id}>
-                <Table.Td>
-                  <Text fw={500}>{student.studentId}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text>{student.firstName ?? '—'}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text>{student.lastName ?? '—'}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">{student.email || '—'}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">{student.className || 'N/A'}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">{student.sectionName || 'N/A'}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">{student.subjectTemplateName || 'N/A'}</Text>
-                </Table.Td>
-                <Table.Td>{statusBadge(student)}</Table.Td>
-                <Table.Td>
-                  {canEdit && (
-                    <Group gap={6}>
-                      <ActionIcon variant="light" onClick={() => handleEdit(student)} aria-label="Edit student">
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                      <ActionIcon variant="light" onClick={() => handleResend(student)} aria-label="Resend invitation">
-                        <IconMailForward size={16} />
-                      </ActionIcon>
-                    </Group>
-                  )}
+          </Table.Thead>
+          <Table.Tbody>
+            {students.length === 0 ? (
+              <Table.Tr>
+                <Table.Td colSpan={9}>
+                  <Text c="dimmed" ta="center" py="md">
+                    {t('noStudentsFound')}
+                  </Text>
                 </Table.Td>
               </Table.Tr>
-            ))
-          )}
-        </Table.Tbody>
-      </Table>
+            ) : (
+              students.map((student) => (
+                <Table.Tr key={student.id}>
+                  <Table.Td>
+                    <Text fw={500} size={isMobile ? 'sm' : 'md'}>
+                      {student.studentId}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size={isMobile ? 'sm' : 'md'}>{student.firstName ?? '—'}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size={isMobile ? 'sm' : 'md'}>{student.lastName ?? '—'}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{student.email || '—'}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{student.className || 'N/A'}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{student.sectionName || 'N/A'}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{student.subjectTemplateName || 'N/A'}</Text>
+                  </Table.Td>
+                  <Table.Td>{statusBadge(student)}</Table.Td>
+                  <Table.Td>
+                    {canEdit && (
+                      <Group gap={6} wrap="nowrap">
+                        <ActionIcon variant="light" size={isMobile ? 'sm' : 'md'} onClick={() => handleEdit(student)} aria-label="Edit student">
+                          <IconEdit size={isMobile ? 14 : 16} />
+                        </ActionIcon>
+                        <ActionIcon variant="light" size={isMobile ? 'sm' : 'md'} onClick={() => handleResend(student)} aria-label="Resend invitation">
+                          <IconMailForward size={isMobile ? 14 : 16} />
+                        </ActionIcon>
+                      </Group>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              ))
+            )}
+          </Table.Tbody>
+        </Table>
+      </ScrollArea>
 
       {meta && meta.totalPages > 1 && (
-        <Group justify="center" mt="md">
-          <Pagination total={meta.totalPages} value={meta.page} onChange={onPageChange} />
-        </Group>
+        <ScrollArea type="auto" scrollbars="x" w="100%" mt="md">
+          <Group justify="center" wrap="nowrap" gap={4} style={{ minWidth: 'min-content' }}>
+            <Pagination
+              total={meta.totalPages}
+              value={meta.page}
+              onChange={onPageChange}
+              size={isMobile ? 'sm' : 'md'}
+              withEdges={!isMobile}
+            />
+          </Group>
+        </ScrollArea>
       )}
 
       <StudentForm

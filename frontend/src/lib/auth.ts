@@ -8,6 +8,14 @@ function setLocaleCookie(locale: string): void {
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
 }
 
+export function syncLocaleCookieFromStorage(): void {
+  if (typeof window === 'undefined') return;
+  const storedLocale = window.localStorage.getItem('locale');
+  if (storedLocale) {
+    setLocaleCookie(storedLocale);
+  }
+}
+
 function clearAuthClientState(): void {
   if (typeof window === 'undefined') return;
   try {
@@ -47,10 +55,7 @@ export async function signOut() {
   if (typeof window !== 'undefined') {
     // Keep the user's last-selected language on the login screen.
     // (Server renders from NEXT_LOCALE cookie; localStorage alone isn't enough.)
-    const storedLocale = window.localStorage.getItem('locale');
-    if (storedLocale) {
-      setLocaleCookie(storedLocale);
-    }
+    syncLocaleCookieFromStorage();
     clearAuthClientState();
     window.location.href = '/login';
   }
@@ -62,6 +67,7 @@ export async function clearLocalSupabaseSession(): Promise<void> {
   if (error) {
     throw error;
   }
+  syncLocaleCookieFromStorage();
   clearAuthClientState();
 }
 

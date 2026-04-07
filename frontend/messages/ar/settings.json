@@ -103,6 +103,13 @@
   "permissionsUpdatedSuccess": "تم تحديث الصلاحيات بنجاح.",
   "permissionsUpdatedError": "فشل تحديث الصلاحيات.",
 
+  "permissionsStudentLeavesTitle": "طلبات الإجازة للطلاب",
+  "permissionsStudentLeavesDescription": "اختر الصفوف المسموح لها بتقديم طلبات إجازة كطلاب. لا يؤثر ذلك على أولياء الأمور.",
+  "permissionsStudentLeavesGrantEditHint": "لتفعيل طلبات الإجازة للطلاب، اضبط الطالب ← الإجازات على (تعديل) أولاً.",
+  "permissionsStudentLeavesClassesLabel": "الصفوف المسموح بها",
+  "permissionsStudentLeavesClassesPlaceholder": "اختر الصفوف…",
+  "permissionsStudentLeavesNoClasses": "لا توجد صفوف",
+
   "roleFilterLabel": "الدور",
   "roleFilterPlaceholder": "اختر دورًا",
   "roleSearchTabsLabel": "بحث في التبويبات",

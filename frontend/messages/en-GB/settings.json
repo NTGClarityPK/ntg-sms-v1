@@ -103,6 +103,13 @@
   "permissionsUpdatedSuccess": "Permissions updated successfully.",
   "permissionsUpdatedError": "Failed to update permissions.",
 
+  "permissionsStudentLeavesTitle": "Student leave requests",
+  "permissionsStudentLeavesDescription": "Choose which classes are allowed to submit leave requests as students. Parents are unaffected.",
+  "permissionsStudentLeavesGrantEditHint": "To enable student leave requests, set Student → Leaves to Edit first.",
+  "permissionsStudentLeavesClassesLabel": "Allowed classes",
+  "permissionsStudentLeavesClassesPlaceholder": "Select classes…",
+  "permissionsStudentLeavesNoClasses": "No classes found",
+
   "roleFilterLabel": "Role",
   "roleFilterPlaceholder": "Select a role",
   "roleSearchTabsLabel": "Search tabs",

@@ -11,7 +11,10 @@ import {
   Group,
   Button,
   Box,
+  SimpleGrid,
+  useMantineTheme,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconDownload } from '@tabler/icons-react';
 import type { Attendance } from '@/types/attendance';
 import { displayStudentId } from '@/lib/utils/student-display';
@@ -29,6 +32,8 @@ export function AttendanceReport({
   startDate,
   endDate,
 }: AttendanceReportProps) {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('attendance');
   if (isLoading) {
     return (
@@ -105,58 +110,123 @@ export function AttendanceReport({
           </Text>
         ) : null}
 
-        <Group grow wrap="wrap" gap="sm">
-          <Paper withBorder p="sm">
-            <Stack gap="xs" align="center">
-              <Text size="sm" c="dimmed">
-                {t('totalRecords')}
-              </Text>
-              <Text fw={600} size="xl">
-                {total}
-              </Text>
-            </Stack>
-          </Paper>
-          <Paper withBorder p="sm">
-            <Stack gap="xs" align="center">
-              <Text size="sm" c="dimmed">
-                {t('present')}
-              </Text>
-              <Badge variant="filled" color="green" size="lg">
-                {String(presentCount)}
-              </Badge>
-            </Stack>
-          </Paper>
-          <Paper withBorder p="sm">
-            <Stack gap="xs" align="center">
-              <Text size="sm" c="dimmed">
-                {t('absent')}
-              </Text>
-              <Badge variant="filled" color="red" size="lg">
-                {String(absentCount)}
-              </Badge>
-            </Stack>
-          </Paper>
-          <Paper withBorder p="sm">
-            <Stack gap="xs" align="center">
-              <Text size="sm" c="dimmed">
-                {t('late')}
-              </Text>
-              <Badge variant="filled" color="yellow" size="lg">
-                {String(lateCount)}
-              </Badge>
-            </Stack>
-          </Paper>
-          <Paper withBorder p="sm">
-            <Stack gap="xs" align="center">
-              <Text size="sm" c="dimmed">
-                {t('attendanceRate')}
-              </Text>
-              <Text fw={600} size="xl">
-                {presentPercentage}%
-              </Text>
-            </Stack>
-          </Paper>
-        </Group>
+        {isMobile ? (
+          <SimpleGrid cols={2} spacing="sm">
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('totalRecords')}
+                </Text>
+                <Text fw={700} size="xl">
+                  {total}
+                </Text>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('attendanceRate')}
+                </Text>
+                <Text fw={700} size="xl">
+                  {presentPercentage}%
+                </Text>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('present')}
+                </Text>
+                <Badge variant="filled" color="green" size="lg">
+                  {String(presentCount)}
+                </Badge>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('absent')}
+                </Text>
+                <Badge variant="filled" color="red" size="lg">
+                  {String(absentCount)}
+                </Badge>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('late')}
+                </Text>
+                <Badge variant="filled" color="yellow" size="lg">
+                  {String(lateCount)}
+                </Badge>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('excused')}
+                </Text>
+                <Badge variant="filled" color="blue" size="lg">
+                  {String(excusedCount)}
+                </Badge>
+              </Stack>
+            </Paper>
+          </SimpleGrid>
+        ) : (
+          <Group grow wrap="wrap" gap="sm">
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('totalRecords')}
+                </Text>
+                <Text fw={600} size="xl">
+                  {total}
+                </Text>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('present')}
+                </Text>
+                <Badge variant="filled" color="green" size="lg">
+                  {String(presentCount)}
+                </Badge>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('absent')}
+                </Text>
+                <Badge variant="filled" color="red" size="lg">
+                  {String(absentCount)}
+                </Badge>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('late')}
+                </Text>
+                <Badge variant="filled" color="yellow" size="lg">
+                  {String(lateCount)}
+                </Badge>
+              </Stack>
+            </Paper>
+            <Paper withBorder p="sm">
+              <Stack gap="xs" align="center">
+                <Text size="sm" c="dimmed">
+                  {t('attendanceRate')}
+                </Text>
+                <Text fw={600} size="xl">
+                  {presentPercentage}%
+                </Text>
+              </Stack>
+            </Paper>
+          </Group>
+        )}
 
         {attendance.length === 0 ? (
           <Text c="dimmed" ta="center" py="xl">

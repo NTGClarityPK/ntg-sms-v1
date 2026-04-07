@@ -46,7 +46,7 @@ export function SubjectList() {
   const openEdit = (s: Subject) => {
     setEditSubject(s);
     form.setValues({
-      nameTranslations: { en: s.name ?? '', ar: s.name ?? '' },
+      nameTranslations: { en: s.name ?? '', ar: s.nameAr ?? '' },
       code: s.code ?? '',
     });
     open();
@@ -62,6 +62,7 @@ export function SubjectList() {
     const name = values.nameTranslations.en || values.nameTranslations.ar || '';
     const payload = {
       name,
+      nameAr: values.nameTranslations.ar || undefined,
       name_translations: values.nameTranslations,
       code: values.code || undefined,
     };

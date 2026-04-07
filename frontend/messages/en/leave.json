@@ -74,5 +74,7 @@
   "tabLeaveQuota": "Leave quota"
   ,
   "viewOnly": "View only",
-  "viewOnlyMessage": "You have view-only access. Request and approval actions are disabled."
+  "viewOnlyMessage": "You have view-only access. Request and approval actions are disabled.",
+  "studentLeaveNotEnabledTitle": "Leave requests not enabled",
+  "studentLeaveNotEnabledBody": "Leave requests are not enabled for your class. Please contact your school administrator."
 }

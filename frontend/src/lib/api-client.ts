@@ -2,6 +2,7 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequ
 import { notifications } from '@mantine/notifications';
 import { ApiResponse } from '@/types/api';
 import { supabase } from './supabase/client';
+import { clearLocalSupabaseSession } from '@/lib/auth';
 
 const STUDENT_TOKEN_STORAGE_KEY = 'studentToken';
 
@@ -152,7 +153,7 @@ class ApiClient {
 
               const hasSession = Boolean(session?.access_token);
               if (!hasSession) {
-                await supabase.auth.signOut();
+                await clearLocalSupabaseSession();
                 if (window.location.pathname !== '/login') {
                   window.location.href = '/login';
                 }
@@ -177,7 +178,7 @@ class ApiClient {
             const text = Array.isArray(raw) ? raw.join(', ') : typeof raw === 'string' ? raw : '';
             if (text.toLowerCase().includes('inactive')) {
               try {
-                await supabase.auth.signOut({ scope: 'local' });
+                await clearLocalSupabaseSession();
                 window.sessionStorage.setItem('ntg_auth_inactive_message', text);
                 const path = window.location.pathname;
                 const stayPut =

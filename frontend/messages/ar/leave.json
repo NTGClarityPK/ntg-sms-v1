@@ -74,5 +74,7 @@
     "tabLeaveQuota": "حد الإجازات"
     ,
     "viewOnly": "عرض فقط",
-    "viewOnlyMessage": "لديك صلاحية عرض فقط. تم تعطيل إجراءات الطلب والموافقة."
+  "viewOnlyMessage": "لديك صلاحية عرض فقط. تم تعطيل إجراءات الطلب والموافقة.",
+  "studentLeaveNotEnabledTitle": "طلبات الإجازة غير مفعّلة",
+  "studentLeaveNotEnabledBody": "طلبات الإجازة غير مفعّلة لصفك. يرجى التواصل مع مسؤول المدرسة."
   }

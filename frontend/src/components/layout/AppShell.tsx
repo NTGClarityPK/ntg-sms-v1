@@ -43,7 +43,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <MantineAppShell
-      header={{ height: 60 }}
+      header={{ height: 'calc(60px + env(safe-area-inset-top, 0px))' }}
       navbar={{
         width: navbarWidth,
         breakpoint: 'sm',
@@ -62,7 +62,7 @@ export function AppShell({ children }: AppShellProps) {
               aria-label="Toggle menu"
             />
           </Box>
-          <Box style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
+          <Box style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
             <Header />
           </Box>
         </Group>
@@ -82,7 +82,7 @@ export function AppShell({ children }: AppShellProps) {
           aria-hidden="true"
           style={{
             position: 'fixed',
-            top: '60px',
+            top: 'calc(60px + env(safe-area-inset-top, 0px))',
             width: '16px',
             height: '16px',
             zIndex: 101,

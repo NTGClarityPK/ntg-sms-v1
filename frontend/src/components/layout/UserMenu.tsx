@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Avatar, Menu, Text, Group } from '@mantine/core';
+import { Avatar, Menu, Text, Group, Box } from '@mantine/core';
 import {
   IconUser,
   IconBook,
@@ -170,11 +170,11 @@ export function UserMenu() {
   return (
     <Menu shadow="md" width={200}>
       <Menu.Target>
-        <Group id="user-menu-trigger" gap="xs" style={{ cursor: 'pointer' }}>
+        <Group id="user-menu-trigger" gap="xs" style={{ cursor: 'pointer' }} wrap="nowrap">
           <Avatar color="blue" radius="xl">
             {initials}
           </Avatar>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <Box visibleFrom="sm" style={{ flex: 1, minWidth: 0 }}>
             <Text size="sm" fw={500} truncate>
               {user?.fullName || user?.email}
             </Text>
@@ -183,7 +183,7 @@ export function UserMenu() {
                 {user.email}
               </Text>
             )}
-          </div>
+          </Box>
         </Group>
       </Menu.Target>
 

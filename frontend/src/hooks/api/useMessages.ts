@@ -255,7 +255,23 @@ export function useMarkConversationRead(conversationId: string | null) {
       await apiClient.put(`/api/v1/conversations/${conversationId}/read`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversation-messages'] });
+      if (conversationId) {
+        queryClient.setQueriesData(
+          {
+            predicate: (q) =>
+              Array.isArray(q.queryKey) &&
+              q.queryKey[0] === 'conversation-messages' &&
+              q.queryKey[1] === conversationId,
+          },
+          (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
+            if (!prev?.data?.length) return prev;
+            return {
+              ...prev,
+              data: prev.data.map((m) => ({ ...m, isRead: true })),
+            };
+          },
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });

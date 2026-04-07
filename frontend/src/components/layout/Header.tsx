@@ -12,6 +12,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useTenantMe } from '@/hooks/useTenant';
 import { useAuth } from '@/hooks/useAuth';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -34,6 +35,7 @@ const headerBadgeStyle = {
 
 export function Header() {
   const theme = useMantineTheme();
+  const isMobileNav = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const { isDark } = useTheme();
   const themeConfig = (theme.other ?? {}) as ThemeConfig | undefined;
   const onlineBadgeColor = themeConfig?.components?.statusOnline?.badgeColor ?? '#22c55e';
@@ -127,7 +129,7 @@ export function Header() {
             )}
           </Box>
           <div style={{ minWidth: 0 }}>
-            <Text fw={700} size="lg" style={{ lineHeight: 1 }} truncate>
+            <Text fw={700} size={isMobileNav ? 'sm' : 'lg'} style={{ lineHeight: 1 }} truncate>
               {tenantName || 'School'}
             </Text>
             <Text size="xs" c="dimmed" style={{ lineHeight: 1 }} visibleFrom="sm">
@@ -143,7 +145,7 @@ export function Header() {
       </Group>
 
       {/* Right: actions - hide non-essential on mobile so bar stays readable */}
-      <Group gap="md" align="center" style={{ flexShrink: 0 }} wrap="nowrap">
+      <Group gap={isMobileNav ? 'xs' : 'md'} align="center" style={{ flexShrink: 0 }} wrap="nowrap">
         {/* Super Admin Badge - desktop only */}
         {isSuperAdmin && (
           <Box visibleFrom="sm">
@@ -217,20 +219,34 @@ export function Header() {
                 id="header-child-switcher"
                 variant="light"
                 color={colors.primary}
-                size="lg"
+                size={isMobileNav ? 'md' : 'lg'}
                 leftSection={<IconSchool size={14} />}
                 style={{
                   ...headerBadgeStyle,
                   cursor: 'pointer',
+                  maxWidth: isMobileNav ? 120 : undefined,
                 }}
+                styles={
+                  isMobileNav
+                    ? {
+                        label: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                      }
+                    : undefined
+                }
               >
                 {hasStudentToken
-                  ? `Acting as ${
-                      children.find((c) => c.isCurrent)?.firstName ||
+                  ? isMobileNav
+                    ? children.find((c) => c.isCurrent)?.firstName ||
                       children[0]?.firstName ||
                       'Child'
-                    }`
-                  : 'Select child'}
+                    : `Acting as ${
+                        children.find((c) => c.isCurrent)?.firstName ||
+                        children[0]?.firstName ||
+                        'Child'
+                      }`
+                  : isMobileNav
+                    ? 'Child'
+                    : 'Select child'}
               </Badge>
             </Menu.Target>
             <Menu.Dropdown>

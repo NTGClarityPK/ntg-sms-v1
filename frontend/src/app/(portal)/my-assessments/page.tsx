@@ -21,9 +21,11 @@ import {
   Tooltip,
   Modal,
   Image,
+  useMantineTheme,
 } from '@mantine/core';
 import { IconDownload, IconEye, IconRefresh } from '@tabler/icons-react';
 import dayjs from 'dayjs';
+import { useMediaQuery } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMyAssessments, useUpdateMyAssessmentStatus } from '@/hooks/api/useMyAssessments';
@@ -32,6 +34,8 @@ import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { MyAssessmentAttachment } from '@/hooks/api/useMyAssessments';
 
 export default function MyAssessmentsPage() {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('assessment');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
@@ -136,12 +140,15 @@ export default function MyAssessmentsPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{t('myAssessmentTitle')}</Title>
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center" gap="sm">
+          <Title order={1} style={{ flex: 1, minWidth: 0 }} lineClamp={2}>
+            {t('myAssessmentTitle')}
+          </Title>
           <Tooltip label={tCommon('retry')}>
             <ActionIcon
               variant="light"
               size="lg"
+              style={{ flexShrink: 0 }}
               loading={isRefetching}
               onClick={() => queryClient.invalidateQueries({ queryKey: [activeQueryKey] })}
             >
@@ -173,15 +180,17 @@ export default function MyAssessmentsPage() {
                 {t('failedToLoadYourAssessments')}
               </Text>
             ) : data && data.length > 0 ? (
-              <ScrollArea>
-                <Table striped highlightOnHover>
+              <ScrollArea type="auto" scrollbars="x" w="100%">
+                <Table striped highlightOnHover style={{ minWidth: isMobile ? 640 : 560 }}>
                   <Table.Thead>
                     <Table.Tr>
                       <Table.Th>{t('titleColumn')}</Table.Th>
                       <Table.Th>{t('status')}</Table.Th>
                       <Table.Th>{t('dueDate')}</Table.Th>
                       <Table.Th>{t('attachments')}</Table.Th>
-                      <Table.Th style={{ textAlign: 'right' }}>{tCommon('actions')}</Table.Th>
+                      <Table.Th style={{ textAlign: isMobile ? 'left' : 'right', minWidth: isMobile ? 200 : undefined }}>
+                        {tCommon('actions')}
+                      </Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -236,23 +245,45 @@ export default function MyAssessmentsPage() {
                               </Text>
                             )}
                           </Table.Td>
-                          <Table.Td style={{ textAlign: 'right' }}>
-                            <Group justify="flex-end" gap="xs">
-                              <Button
-                                size="xs"
-                                variant="subtle"
-                                onClick={() => handleMarkRead(a.id, status?.status, isRead)}
-                              >
-                                {isRead ? t('markUnread') : t('markAsRead')}
-                              </Button>
-                              <Button
-                                size="xs"
-                                color="green"
-                                onClick={() => handleMarkSubmitted(a.id, status?.status)}
-                              >
-                                {status?.status === 'submitted' ? t('markNotSubmitted') : t('markSubmitted')}
-                              </Button>
-                            </Group>
+                          <Table.Td style={{ verticalAlign: 'top' }}>
+                            {isMobile ? (
+                              <Stack gap="xs" maw={220}>
+                                <Button
+                                  size="xs"
+                                  variant="light"
+                                  fullWidth
+                                  onClick={() => handleMarkRead(a.id, status?.status, isRead)}
+                                >
+                                  {isRead ? t('markUnread') : t('markAsRead')}
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  color="green"
+                                  variant="light"
+                                  fullWidth
+                                  onClick={() => handleMarkSubmitted(a.id, status?.status)}
+                                >
+                                  {status?.status === 'submitted' ? t('markNotSubmitted') : t('markSubmitted')}
+                                </Button>
+                              </Stack>
+                            ) : (
+                              <Group justify="flex-end" gap="xs" wrap="nowrap">
+                                <Button
+                                  size="xs"
+                                  variant="subtle"
+                                  onClick={() => handleMarkRead(a.id, status?.status, isRead)}
+                                >
+                                  {isRead ? t('markUnread') : t('markAsRead')}
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  color="green"
+                                  onClick={() => handleMarkSubmitted(a.id, status?.status)}
+                                >
+                                  {status?.status === 'submitted' ? t('markNotSubmitted') : t('markSubmitted')}
+                                </Button>
+                              </Group>
+                            )}
                           </Table.Td>
                         </Table.Tr>
                       );

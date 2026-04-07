@@ -1,3 +1,4 @@
+import type { Viewport } from 'next';
 import { Providers } from './providers';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
@@ -45,8 +46,9 @@ export const metadata = {
   },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   themeColor: '#4caf50',
+  viewportFit: 'cover',
 };
 
 export default async function RootLayout({

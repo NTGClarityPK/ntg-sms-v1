@@ -9,8 +9,10 @@ export default function BehavioralAssessPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{t('matrixTitle')}</Title>
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center">
+          <Title order={1} style={{ flex: 1, minWidth: 0 }} lineClamp={2}>
+            {t('matrixTitle')}
+          </Title>
         </Group>
       </div>
       <div

@@ -26,8 +26,10 @@ import {
   Table,
   ScrollArea,
   Chip,
+  useMantineTheme,
 } from '@mantine/core';
 import { IconPlus, IconRefresh, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye, IconChartBar } from '@tabler/icons-react';
+import { useMediaQuery } from '@mantine/hooks';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAssessments, useDeleteAssessment } from '@/hooks/api/useAssessments';
@@ -39,6 +41,8 @@ import dayjs from 'dayjs';
 import type { Assessment } from '@/types/assessment';
 
 export default function AssessmentsPage() {
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('assessment');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
@@ -99,9 +103,11 @@ export default function AssessmentsPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{t('title')}</Title>
-          <Group gap="sm">
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center" gap="sm">
+          <Title order={1} style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
+            {t('title')}
+          </Title>
+          <Group gap="sm" wrap="nowrap" style={{ flexShrink: 0 }}>
             <Tooltip label={tCommon('retry')}>
               <ActionIcon
                 variant="light"
@@ -112,7 +118,7 @@ export default function AssessmentsPage() {
                 <IconRefresh size={18} />
               </ActionIcon>
             </Tooltip>
-            {canEdit && (
+            {canEdit && !isMobile && (
               <Button id="assessments-btn-create" leftSection={<IconPlus size={16} />} onClick={() => router.push('/assessments/create')}>
                 {t('createAssessment')}
               </Button>
@@ -131,69 +137,142 @@ export default function AssessmentsPage() {
         }}
       >
         <Stack gap="md">
-          {/* Filters */}
-          <Paper p="md" withBorder>
-          <Stack gap="md">
-            <Group grow>
-              <TextInput
-                id="assessments-search"
-                placeholder={t('searchPlaceholder')}
-                leftSection={<IconSearch size={16} />}
-                value={search}
-                onChange={(e) => setSearch(e.currentTarget.value)}
-              />
-              <Select
-                id="assessments-filter-class-section"
-                placeholder={t('filterByClassSection')}
-                data={classSectionOptions}
-                value={classSectionId ?? null}
-                onChange={(v) => setClassSectionId(v ?? null)}
-                clearable
-              />
-              <Select
-                id="assessments-filter-status"
-                placeholder={t('filterByStatus')}
-                data={[
-                  { value: 'all', label: t('all') },
-                  { value: 'true', label: t('published') },
-                  { value: 'false', label: t('draft') },
-                ]}
-                value={isPublished}
-                onChange={setIsPublished}
-                clearable
-              />
-            </Group>
+          {canEdit && isMobile && (
+            <Button
+              id="assessments-btn-create-mobile"
+              leftSection={<IconPlus size={16} />}
+              onClick={() => router.push('/assessments/create')}
+              fullWidth
+              size="sm"
+            >
+              {t('createAssessment')}
+            </Button>
+          )}
 
-            {/* Assessment type chips */}
-            <Paper p="sm" withBorder id="assessments-filter-type-container">
-              <Group gap="xs" wrap="wrap" className="filter-chip-group">
-                <Chip
-                  id="assessments-filter-type-all"
-                  checked={assessmentTypeIdFilter === null}
-                  onChange={() => setAssessmentTypeIdFilter(null)}
-                  variant="filled"
-                >
-                  {t('all')}
-                </Chip>
-                <Chip.Group
-                  value={assessmentTypeIdFilter ?? ''}
-                  onChange={(value) => {
-                    const val = Array.isArray(value) ? value[0] : value;
-                    setAssessmentTypeIdFilter(val && val !== '' ? val : null);
-                  }}
-                >
-                  <Group gap="xs" wrap="wrap">
-                    {assessmentTypes.map((type) => (
-                      <Chip key={type.id} value={type.id} variant="filled">
-                        {type.name}
-                      </Chip>
-                    ))}
+          {/* Filters — single card on mobile; chips inline without nested bordered box */}
+          <Paper p="md" withBorder>
+            <Stack gap="md">
+              {isMobile ? (
+                <Stack gap="sm">
+                  <TextInput
+                    id="assessments-search"
+                    placeholder={t('searchPlaceholder')}
+                    leftSection={<IconSearch size={16} />}
+                    value={search}
+                    onChange={(e) => setSearch(e.currentTarget.value)}
+                  />
+                  <Select
+                    id="assessments-filter-class-section"
+                    placeholder={t('filterByClassSection')}
+                    data={classSectionOptions}
+                    value={classSectionId ?? null}
+                    onChange={(v) => setClassSectionId(v ?? null)}
+                    clearable
+                  />
+                  <Select
+                    id="assessments-filter-status"
+                    placeholder={t('filterByStatus')}
+                    data={[
+                      { value: 'all', label: t('all') },
+                      { value: 'true', label: t('published') },
+                      { value: 'false', label: t('draft') },
+                    ]}
+                    value={isPublished}
+                    onChange={setIsPublished}
+                    clearable
+                  />
+                </Stack>
+              ) : (
+                <Group grow>
+                  <TextInput
+                    id="assessments-search"
+                    placeholder={t('searchPlaceholder')}
+                    leftSection={<IconSearch size={16} />}
+                    value={search}
+                    onChange={(e) => setSearch(e.currentTarget.value)}
+                  />
+                  <Select
+                    id="assessments-filter-class-section"
+                    placeholder={t('filterByClassSection')}
+                    data={classSectionOptions}
+                    value={classSectionId ?? null}
+                    onChange={(v) => setClassSectionId(v ?? null)}
+                    clearable
+                  />
+                  <Select
+                    id="assessments-filter-status"
+                    placeholder={t('filterByStatus')}
+                    data={[
+                      { value: 'all', label: t('all') },
+                      { value: 'true', label: t('published') },
+                      { value: 'false', label: t('draft') },
+                    ]}
+                    value={isPublished}
+                    onChange={setIsPublished}
+                    clearable
+                  />
+                </Group>
+              )}
+
+              {isMobile ? (
+                <Box id="assessments-filter-type-container" pt="xs">
+                  <Group gap="xs" wrap="wrap" className="filter-chip-group">
+                    <Chip
+                      id="assessments-filter-type-all"
+                      checked={assessmentTypeIdFilter === null}
+                      onChange={() => setAssessmentTypeIdFilter(null)}
+                      variant="filled"
+                    >
+                      {t('all')}
+                    </Chip>
+                    <Chip.Group
+                      value={assessmentTypeIdFilter ?? ''}
+                      onChange={(value) => {
+                        const val = Array.isArray(value) ? value[0] : value;
+                        setAssessmentTypeIdFilter(val && val !== '' ? val : null);
+                      }}
+                    >
+                      <Group gap="xs" wrap="wrap">
+                        {assessmentTypes.map((type) => (
+                          <Chip key={type.id} value={type.id} variant="filled">
+                            {type.name}
+                          </Chip>
+                        ))}
+                      </Group>
+                    </Chip.Group>
                   </Group>
-                </Chip.Group>
-              </Group>
-            </Paper>
-          </Stack>
-        </Paper>
+                </Box>
+              ) : (
+                <Paper p="sm" withBorder id="assessments-filter-type-container">
+                  <Group gap="xs" wrap="wrap" className="filter-chip-group">
+                    <Chip
+                      id="assessments-filter-type-all"
+                      checked={assessmentTypeIdFilter === null}
+                      onChange={() => setAssessmentTypeIdFilter(null)}
+                      variant="filled"
+                    >
+                      {t('all')}
+                    </Chip>
+                    <Chip.Group
+                      value={assessmentTypeIdFilter ?? ''}
+                      onChange={(value) => {
+                        const val = Array.isArray(value) ? value[0] : value;
+                        setAssessmentTypeIdFilter(val && val !== '' ? val : null);
+                      }}
+                    >
+                      <Group gap="xs" wrap="wrap">
+                        {assessmentTypes.map((type) => (
+                          <Chip key={type.id} value={type.id} variant="filled">
+                            {type.name}
+                          </Chip>
+                        ))}
+                      </Group>
+                    </Chip.Group>
+                  </Group>
+                </Paper>
+              )}
+            </Stack>
+          </Paper>
 
         {/* Assessments Table */}
         <Paper p="md" withBorder>
@@ -209,8 +288,8 @@ export default function AssessmentsPage() {
             </Text>
           ) : data?.data && Array.isArray(data.data) && data.data.length > 0 ? (
             <Stack gap="md">
-              <ScrollArea>
-                <Table striped highlightOnHover>
+              <ScrollArea type="auto" scrollbars="x" w="100%">
+                <Table striped highlightOnHover style={{ minWidth: 720 }}>
                   <Table.Thead>
                     <Table.Tr>
                       <Table.Th>{t('titleColumn')}</Table.Th>
@@ -242,31 +321,33 @@ export default function AssessmentsPage() {
                         <Table.Td>
                           {assessment.dueDate ? dayjs(assessment.dueDate).format('MMM D, YYYY') : '—'}
                         </Table.Td>
-                        <Table.Td>
-                          <Group gap="xs" justify="flex-end">
+                        <Table.Td style={{ width: 1, whiteSpace: 'nowrap' }}>
+                          <Group gap={4} justify={isMobile ? 'flex-start' : 'flex-end'} wrap="nowrap">
                             <Tooltip label={t('viewStatistics')}>
                               <ActionIcon
                                 variant="subtle"
                                 color="blue"
+                                size={isMobile ? 'md' : 'lg'}
                                 onClick={() => router.push(`/assessments/${assessment.id}/statistics`)}
                               >
-                                <IconChartBar size={16} />
+                                <IconChartBar size={isMobile ? 16 : 18} />
                               </ActionIcon>
                             </Tooltip>
                             <Tooltip label={canEdit ? t('gradeEntry') : t('viewGrades')}>
                               <ActionIcon
                                 variant="subtle"
                                 color="green"
+                                size={isMobile ? 'md' : 'lg'}
                                 onClick={() => router.push(`/assessments/${assessment.id}/grades`)}
                               >
-                                <IconEye size={16} />
+                                <IconEye size={isMobile ? 16 : 18} />
                               </ActionIcon>
                             </Tooltip>
                             {canEdit && (
                               <Menu position="bottom-end" withinPortal>
                                 <Menu.Target>
-                                  <ActionIcon variant="subtle" color="gray">
-                                    <IconDotsVertical size={16} />
+                                  <ActionIcon variant="subtle" color="gray" size={isMobile ? 'md' : 'lg'}>
+                                    <IconDotsVertical size={isMobile ? 16 : 18} />
                                   </ActionIcon>
                                 </Menu.Target>
                                 <Menu.Dropdown>
@@ -296,9 +377,17 @@ export default function AssessmentsPage() {
 
               {/* Pagination */}
               {data.meta && data.meta.totalPages > 1 && (
-                <Group justify="center" mt="md">
-                  <Pagination total={data.meta.totalPages} value={page} onChange={setPage} />
-                </Group>
+                <ScrollArea type="auto" scrollbars="x" w="100%" mt="md">
+                  <Group justify="center" wrap="nowrap" gap={4} mx="auto" style={{ minWidth: 'min-content' }}>
+                    <Pagination
+                      total={data.meta.totalPages}
+                      value={page}
+                      onChange={setPage}
+                      size={isMobile ? 'sm' : 'md'}
+                      withEdges={!isMobile}
+                    />
+                  </Group>
+                </ScrollArea>
               )}
             </Stack>
           ) : (
