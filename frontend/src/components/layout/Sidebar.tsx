@@ -39,6 +39,7 @@ import {
   IconDatabase,
   IconKey,
   IconMedal,
+  IconArrowsShuffle,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -63,8 +64,7 @@ const allNavItems: NavItem[] = [
   { key: 'students', label: 'Student', href: '/students', icon: IconUsers },
   { key: 'users', label: 'User', href: '/users', icon: IconUsers },
   { key: 'classSections', label: 'Class', href: '/academic/class-sections', icon: IconSchool },
-  { key: 'teacherMapping', label: 'Teacher', href: '/academic/teacher-mapping', icon: IconBook },
-  { key: 'parentAssociations', label: 'Parent', href: '/parent-associations', icon: IconUsersGroup },
+  { key: 'mapping', label: 'Mapping', href: '/mapping', icon: IconArrowsShuffle },
   { key: 'myChildren', label: 'My Child', href: '/my-children', icon: IconUsersGroup },
   { key: 'parentPinManagement', label: 'PIN Management', href: '/parent/pin-management', icon: IconKey },
   { key: 'childrenTimetable', label: 'Child Timetable', href: '/children-timetable', icon: IconCalendarClock },
@@ -278,6 +278,10 @@ export function Sidebar({
     }
 
     const featureCode = getFeatureCodeForPath(item.href);
+    // Mapping is a combined page; show it if user can view either mapping feature.
+    if (item.href === '/mapping') {
+      return canView('teacher_mapping') || canView('parent_associations');
+    }
     // In student mode, items that have a showCondition control their own visibility
     // (e.g. /my-assessments checks isStudent). Skip the role-permission check for
     // those items so the parent's lack of my_assessments permission doesn't hide them.
@@ -387,8 +391,7 @@ export function Sidebar({
 
   const managementHrefsOrdered = [
     '/academic/class-sections',
-    '/academic/teacher-mapping',
-    '/parent-associations',
+    '/mapping',
     '/users',
     '/library',
     '/inventory',

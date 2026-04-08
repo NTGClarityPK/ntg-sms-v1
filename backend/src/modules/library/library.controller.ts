@@ -41,6 +41,8 @@ type UploadedFileType = {
   size: number;
 };
 
+const MAX_LIBRARY_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB
+
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/library')
 export class LibraryController {
@@ -52,7 +54,11 @@ export class LibraryController {
   ) {}
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_LIBRARY_UPLOAD_BYTES },
+    }),
+  )
   async uploadFile(
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
@@ -62,7 +68,7 @@ export class LibraryController {
           fileType: /(pdf|doc|docx|txt)$/i,
         })
         .addMaxSizeValidator({
-          maxSize: 100 * 1024 * 1024, // 100MB
+          maxSize: MAX_LIBRARY_UPLOAD_BYTES,
         })
         .build({
           errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,

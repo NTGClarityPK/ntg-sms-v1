@@ -27,6 +27,8 @@ export interface Event {
   participants?: EventParticipant[];
   studentNames?: string[]; // Names of students involved (for parents)
   consentStatuses?: EventConsentStatus[]; // Consent statuses for each student (for parents)
+  studentConsentStatus?: ConsentStatus; // For students: latest consent status for this event
+  studentConsentRespondedAt?: string; // For students: when consent was last responded
 }
 
 export interface EventParticipant {

@@ -369,30 +369,58 @@ export class StudentsService {
     const emailEntries = await Promise.all(emailPromises);
     const emailMap = new Map(emailEntries);
 
-    // Fetch subject template assignments for all students
+    // Fetch subject template assignments for all students (scoped to this branch + the student's academic year)
     const studentIds = (data as unknown as Array<{ id: string }>)
       .map((s) => s.id)
       .filter((id): id is string => !!id);
 
-    const { data: templateAssignments } = studentIds.length > 0
-      ? await supabase
-          .from('student_subject_template_assignments')
-          .select('student_id, subject_template_id, subject_templates:subject_template_id(name)')
-          .in('student_id', studentIds)
-      : { data: [] };
+    const academicYearIds = Array.from(
+      new Set(
+        (data as unknown as Array<{ academic_year_id: string | null }>)
+          .map((s) => s.academic_year_id)
+          .filter((y): y is string => !!y),
+      ),
+    );
 
-    // Create map: student_id -> { templateId, templateName }
-    const templateMap = new Map(
+    const { data: templateAssignments } =
+      studentIds.length > 0 && academicYearIds.length > 0
+        ? await supabase
+            .from('student_subject_template_assignments')
+            .select('student_id, academic_year_id, subject_template_id, subject_templates:subject_template_id(name)')
+            .in('student_id', studentIds)
+            .in('academic_year_id', academicYearIds)
+            .eq('branch_id', branchId)
+        : { data: [] };
+
+    // Build template availability map for the classes in this page
+    const classIdsOnPage = Array.from(
+      new Set(
+        (data as unknown as Array<{ class_id: string | null }>)
+          .map((s) => s.class_id)
+          .filter((c): c is string => !!c),
+      ),
+    );
+    const availableTemplateIdsByClassId = await this.getAvailableTemplateIdsByClassId(
+      classIdsOnPage,
+      branchId,
+    );
+
+    // Create map: student_id + academic_year_id -> { templateId, templateName }
+    const templateMap = new Map<
+      string,
+      { templateId: string; templateName?: string }
+    >(
       (templateAssignments || []).map((ta: {
         student_id: string;
+        academic_year_id: string;
         subject_template_id: string;
         subject_templates: { name: string } | { name: string }[] | null;
       }) => {
-        const templateData = Array.isArray(ta.subject_templates) 
-          ? ta.subject_templates[0] 
+        const templateData = Array.isArray(ta.subject_templates)
+          ? ta.subject_templates[0]
           : ta.subject_templates;
         return [
-          ta.student_id,
+          `${ta.student_id}::${ta.academic_year_id}`,
           {
             templateId: ta.subject_template_id,
             templateName: templateData?.name,
@@ -423,7 +451,16 @@ export class StudentsService {
     }>).map((row) => {
       const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
       const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
-      const templateInfo = templateMap.get(row.id);
+      const templateInfo =
+        row.academic_year_id ? templateMap.get(`${row.id}::${row.academic_year_id}`) : undefined;
+
+      // Only surface template if it is available for the student's current class/level.
+      const availableForClass = row.class_id
+        ? availableTemplateIdsByClassId.get(row.class_id) ?? new Set<string>()
+        : new Set<string>();
+      const templateIsValidForClass =
+        !!templateInfo?.templateId && availableForClass.has(templateInfo.templateId);
+      const safeTemplateInfo = templateIsValidForClass ? templateInfo : undefined;
 
       return new StudentDto({
         id: row.id,
@@ -445,8 +482,8 @@ export class StudentsService {
         email: row.user_id ? emailMap.get(row.user_id) : undefined,
         className: classData?.display_name ?? classData?.name,
         sectionName: sectionData?.name,
-        subjectTemplateId: templateInfo?.templateId,
-        subjectTemplateName: templateInfo?.templateName,
+        subjectTemplateId: safeTemplateInfo?.templateId,
+        subjectTemplateName: safeTemplateInfo?.templateName,
       });
     });
 
@@ -523,11 +560,31 @@ export class StudentsService {
       .from('student_subject_template_assignments')
       .select('subject_template_id, subject_templates:subject_template_id(name)')
       .eq('student_id', id)
+      .eq('academic_year_id', row.academic_year_id)
+      .eq('branch_id', branchId)
       .maybeSingle();
 
     const templateData = Array.isArray(templateAssignment?.subject_templates)
       ? templateAssignment?.subject_templates[0]
       : templateAssignment?.subject_templates;
+
+    const assignedTemplateId =
+      (templateAssignment as { subject_template_id?: string | null } | null)?.subject_template_id ??
+      null;
+
+    let safeTemplateId: string | undefined = undefined;
+    let safeTemplateName: string | undefined = undefined;
+    if (assignedTemplateId && row.class_id) {
+      const availableTemplateIdsByClassId = await this.getAvailableTemplateIdsByClassId(
+        [row.class_id],
+        branchId,
+      );
+      const available = availableTemplateIdsByClassId.get(row.class_id) ?? new Set<string>();
+      if (available.has(assignedTemplateId)) {
+        safeTemplateId = assignedTemplateId;
+        safeTemplateName = templateData?.name;
+      }
+    }
 
     return new StudentDto({
       id: row.id,
@@ -549,9 +606,71 @@ export class StudentsService {
       email: authUser.user?.email,
       className: classData?.display_name ?? classData?.name,
       sectionName: sectionData?.name,
-      subjectTemplateId: templateAssignment?.subject_template_id,
-      subjectTemplateName: templateData?.name,
+      subjectTemplateId: safeTemplateId,
+      subjectTemplateName: safeTemplateName,
     });
+  }
+
+  private async getAvailableTemplateIdsByClassId(
+    classIds: string[],
+    branchId: string,
+  ): Promise<Map<string, Set<string>>> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const uniqueClassIds = Array.from(new Set(classIds.filter((c) => !!c)));
+    const map = new Map<string, Set<string>>();
+    uniqueClassIds.forEach((id) => map.set(id, new Set<string>()));
+    if (uniqueClassIds.length === 0) return map;
+
+    const { data: classAssignments, error: caError } = await supabase
+      .from('class_subject_template_assignments')
+      .select('class_id, subject_template_id')
+      .in('class_id', uniqueClassIds)
+      .eq('branch_id', branchId);
+    throwIfDbError(caError);
+
+    for (const row of (classAssignments as Array<{ class_id: string; subject_template_id: string }>) ?? []) {
+      const set = map.get(row.class_id) ?? new Set<string>();
+      set.add(row.subject_template_id);
+      map.set(row.class_id, set);
+    }
+
+    // Resolve level templates (via level_classes -> level_subject_template_assignments)
+    const { data: levelClasses, error: lcError } = await supabase
+      .from('level_classes')
+      .select('class_id, level_id')
+      .in('class_id', uniqueClassIds);
+    throwIfDbError(lcError);
+
+    const levelIds = Array.from(
+      new Set(
+        ((levelClasses as Array<{ level_id: string }>) ?? []).map((r) => r.level_id).filter(Boolean),
+      ),
+    );
+
+    if (levelIds.length === 0) return map;
+
+    const { data: levelAssignments, error: laError } = await supabase
+      .from('level_subject_template_assignments')
+      .select('level_id, subject_template_id')
+      .in('level_id', levelIds)
+      .eq('branch_id', branchId);
+    throwIfDbError(laError);
+
+    const templateIdsByLevelId = new Map<string, string[]>();
+    for (const row of (levelAssignments as Array<{ level_id: string; subject_template_id: string }>) ?? []) {
+      const list = templateIdsByLevelId.get(row.level_id) ?? [];
+      list.push(row.subject_template_id);
+      templateIdsByLevelId.set(row.level_id, list);
+    }
+
+    for (const lc of (levelClasses as Array<{ class_id: string; level_id: string }>) ?? []) {
+      const set = map.get(lc.class_id) ?? new Set<string>();
+      (templateIdsByLevelId.get(lc.level_id) ?? []).forEach((tid) => set.add(tid));
+      map.set(lc.class_id, set);
+    }
+
+    return map;
   }
 
   async createStudent(input: CreateStudentDto, branchId: string, userEmail: string): Promise<StudentDto> {
@@ -1322,7 +1441,7 @@ export class StudentsService {
     // Get student's academic year for template assignment
     const { data: studentData } = await supabase
       .from('students')
-      .select('academic_year_id')
+      .select('academic_year_id, class_id')
       .eq('id', id)
       .single();
 
@@ -1388,7 +1507,13 @@ export class StudentsService {
     const academicYearIdForTemplate =
       input.academicYearId ?? studentData?.academic_year_id ?? null;
 
-    // Update subject template assignment if provided
+    // Auto-clear invalid subject template assignment when class changes to a class with no templates
+    // (or when current assignment isn't available for the new class/level).
+    const oldClassId = (studentData as { class_id?: string | null } | null)?.class_id ?? null;
+    const newClassId = input.classId !== undefined ? (input.classId ?? null) : oldClassId;
+    const classChanged = !!oldClassId && !!newClassId && oldClassId !== newClassId;
+
+    // Update subject template assignment if provided (explicit set/clear from UI)
     if (input.subjectTemplateId !== undefined) {
       if (!academicYearIdForTemplate) {
         throw new BadRequestException(
@@ -1423,6 +1548,78 @@ export class StudentsService {
           .eq('academic_year_id', academicYearIdForTemplate)
           .eq('branch_id', branchId);
         throwIfDbError(deleteError);
+      }
+    }
+
+    // If class changed and UI did NOT explicitly provide subjectTemplateId, enforce consistency:
+    // - if new class has no templates, clear any existing assignment
+    // - if new class has templates but existing assignment isn't available, clear it
+    if (classChanged && input.subjectTemplateId === undefined && academicYearIdForTemplate) {
+      // Fetch existing assignment for this student+year+branch
+      const { data: existingAssignment, error: existingError } = await supabase
+        .from('student_subject_template_assignments')
+        .select('subject_template_id')
+        .eq('student_id', id)
+        .eq('academic_year_id', academicYearIdForTemplate)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(existingError);
+
+      const existingTemplateId =
+        (existingAssignment as { subject_template_id?: string | null } | null)?.subject_template_id ??
+        null;
+
+      if (existingTemplateId) {
+        // Determine whether any templates exist for the new class (direct or via level)
+        const [{ data: classTemplates }, { data: levelClass }] = await Promise.all([
+          supabase
+            .from('class_subject_template_assignments')
+            .select('subject_template_id')
+            .eq('class_id', newClassId)
+            .eq('branch_id', branchId),
+          // keep consistent: no branch filter used elsewhere for level_classes
+          supabase.from('level_classes').select('level_id').eq('class_id', newClassId).maybeSingle(),
+        ]);
+
+        const classTemplateIds = new Set(
+          ((classTemplates as Array<{ subject_template_id: string }>) ?? []).map(
+            (r) => r.subject_template_id,
+          ),
+        );
+
+        let levelTemplateIds = new Set<string>();
+        const levelId = (levelClass as { level_id?: string } | null)?.level_id;
+        if (levelId) {
+          const { data: levelTemplates, error: ltError } = await supabase
+            .from('level_subject_template_assignments')
+            .select('subject_template_id')
+            .eq('level_id', levelId)
+            .eq('branch_id', branchId);
+          throwIfDbError(ltError);
+          levelTemplateIds = new Set(
+            ((levelTemplates as Array<{ subject_template_id: string }>) ?? []).map(
+              (r) => r.subject_template_id,
+            ),
+          );
+        }
+
+        const availableTemplateIds = new Set<string>([
+          ...Array.from(classTemplateIds),
+          ...Array.from(levelTemplateIds),
+        ]);
+
+        const newClassHasNoTemplates = availableTemplateIds.size === 0;
+        const existingTemplateInvalid = !availableTemplateIds.has(existingTemplateId);
+
+        if (newClassHasNoTemplates || existingTemplateInvalid) {
+          const { error: deleteError } = await supabase
+            .from('student_subject_template_assignments')
+            .delete()
+            .eq('student_id', id)
+            .eq('academic_year_id', academicYearIdForTemplate)
+            .eq('branch_id', branchId);
+          throwIfDbError(deleteError);
+        }
       }
     }
 

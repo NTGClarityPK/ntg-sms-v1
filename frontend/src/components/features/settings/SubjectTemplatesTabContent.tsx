@@ -5,6 +5,7 @@ import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { useAuth } from '@/hooks/useAuth';
 import {
   useSubjectTemplates,
@@ -112,19 +113,31 @@ export function SubjectTemplatesTabContent() {
   };
 
   const handleDelete = async (template: SubjectTemplate) => {
-    if (!confirm(tSettings('subjectTemplateDeleteConfirm', { name: template.name }))) return;
-
-    try {
-      await deleteTemplate.mutateAsync(template.id);
-      notifications.show({
-        title: tCommon('success'),
-        message: tSettings('subjectTemplateDeleted'),
-        color: notifyColors.success,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : tCommon('errors.generic');
-      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
-    }
+    modals.openConfirmModal({
+      title: tSettings('subjectTemplateDeleteButton'),
+      centered: true,
+      children: (
+        <Text size="sm">
+          {tSettings('subjectTemplateDeleteConfirm', { name: template.name })}
+        </Text>
+      ),
+      labels: { confirm: tCommon('delete'), cancel: tCommon('cancel') },
+      confirmProps: { color: 'red', id: `subject-template-delete-confirm-${template.id}` },
+      cancelProps: { id: `subject-template-delete-cancel-${template.id}` },
+      onConfirm: async () => {
+        try {
+          await deleteTemplate.mutateAsync(template.id);
+          notifications.show({
+            title: tCommon('success'),
+            message: tSettings('subjectTemplateDeleted'),
+            color: notifyColors.success,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : tCommon('errors.generic');
+          notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+        }
+      },
+    });
   };
 
   const handleClose = () => {

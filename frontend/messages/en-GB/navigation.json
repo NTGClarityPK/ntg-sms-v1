@@ -5,6 +5,7 @@
   "classSections": "Class",
   "teacherMapping": "Teacher",
   "parentAssociations": "Parent",
+  "mapping": "Mapping",
   "myChildren": "My Child",
   "parentPinManagement": "PIN Management",
   "childrenTimetable": "Child Timetable",

@@ -53,6 +53,7 @@
     "upload": "رفع",
     "pleaseSelectFile": "يرجى اختيار ملف لرفعه",
     "uploadError": "خطأ في الرفع",
+    "fileTooLarge100mb": "حجم الملف كبير جداً. الحد الأقصى المسموح به هو 100 ميجابايت.",
     "libraryCategories": "فئات المكتبة",
     "addCategory": "إضافة فئة",
     "addCategoryPlaceholder": "الكتب الدراسية",

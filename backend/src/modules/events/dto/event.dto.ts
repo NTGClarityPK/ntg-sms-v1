@@ -23,6 +23,8 @@ export class EventDto {
   participants?: EventParticipantDto[];
   studentNames?: string[]; // Names of students involved (for parents)
   consentStatuses?: EventConsentStatus[]; // Consent statuses for each student (for parents)
+  studentConsentStatus?: 'pending' | 'approved' | 'rejected'; // For students: latest consent status for this event
+  studentConsentRespondedAt?: string; // For students: when consent was last responded
 
   constructor(partial: Partial<EventDto>) {
     Object.assign(this, partial);

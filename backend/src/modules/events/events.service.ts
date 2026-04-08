@@ -1219,6 +1219,7 @@ export class EventsService {
     }
 
     let eventIds: string[] = [];
+    let currentStudentId: string | null = null;
 
     // If parent, get events for their children
     if (userRoles.includes('parent')) {
@@ -1364,6 +1365,7 @@ export class EventsService {
 
       if (student) {
         const studentData = student as { id: string; class_id: string | null; section_id: string | null };
+        currentStudentId = studentData.id;
 
         // Check for events assigned directly to the student
         const { data: directParticipants } = await supabase
@@ -1418,6 +1420,43 @@ export class EventsService {
     throwIfDbError(error);
 
     const events = (data || []).map((row) => mapEvent(row, 'ar'));
+
+    // For students, attach their latest consent status for each event (when events require consent).
+    if (userRoles.includes('student') && currentStudentId) {
+      const consentEventIds = events.filter((e) => e.requiresConsent).map((e) => e.id);
+      if (consentEventIds.length > 0) {
+        const { data: consentRows, error: consentError } = await supabase
+          .from('event_consents')
+          .select('event_id, status, responded_at')
+          .in('event_id', consentEventIds)
+          .eq('student_id', currentStudentId)
+          .order('responded_at', { ascending: false });
+        throwIfDbError(consentError);
+
+        const latestByEventId = new Map<
+          string,
+          { status: 'pending' | 'approved' | 'rejected'; respondedAt?: string }
+        >();
+        for (const r of (consentRows || []) as Array<{ event_id: string; status: string; responded_at: string | null }>) {
+          const eventId = r.event_id;
+          if (latestByEventId.has(eventId)) continue;
+          latestByEventId.set(eventId, {
+            status: (r.status as 'pending' | 'approved' | 'rejected') ?? 'pending',
+            respondedAt: r.responded_at ?? undefined,
+          });
+        }
+
+        for (const e of events) {
+          const latest = latestByEventId.get(e.id);
+          if (latest) {
+            e.studentConsentStatus = latest.status;
+            e.studentConsentRespondedAt = latest.respondedAt;
+          } else if (e.requiresConsent) {
+            e.studentConsentStatus = 'pending';
+          }
+        }
+      }
+    }
 
     // For parents, populate student names for each event
     if (userRoles.includes('parent')) {
@@ -1877,12 +1916,13 @@ export class EventsService {
     // Get student name
     const { data: student } = await supabase
       .from('students')
-      .select('user_id')
+      .select('user_id, class_id, section_id')
       .eq('id', studentId)
       .eq('branch_id', branchId)
       .maybeSingle();
 
     let studentName = 'Student';
+    const studentUserId = (student as { user_id?: string | null } | null)?.user_id ?? null;
     if (student?.user_id) {
       const { data: profile } = await supabase
         .from('profiles')
@@ -1903,14 +1943,43 @@ export class EventsService {
 
     const parentName = parentProfile?.full_name || 'Parent';
 
-    // Send notification to event creator
-    await this.notificationsService.createNotification({
-      userId: eventCreatorUserId,
-      type: 'event_consent_submitted',
-      title: `Event Consent ${status === 'approved' ? 'Approved' : 'Rejected'}: ${event.title}`,
-      body: `${parentName} has ${status === 'approved' ? 'approved' : 'rejected'} consent for ${studentName} to participate in "${event.title}".`,
-      data: { eventId, studentId, status },
-    });
+    const title = `Event Consent ${status === 'approved' ? 'Approved' : 'Rejected'}: ${event.title}`;
+    const body = `${parentName} has ${status === 'approved' ? 'approved' : 'rejected'} consent for ${studentName} to participate in "${event.title}".`;
+
+    const notifyUserIds = new Set<string>();
+    if (eventCreatorUserId) notifyUserIds.add(eventCreatorUserId);
+    if (studentUserId) notifyUserIds.add(studentUserId);
+
+    // Notify the student's class teacher (if available) so teachers see the consent without needing to open the event.
+    const classId = (student as { class_id?: string | null } | null)?.class_id ?? null;
+    const sectionId = (student as { section_id?: string | null } | null)?.section_id ?? null;
+    if (classId && sectionId && event.academicYearId) {
+      const { data: cs } = await supabase
+        .from('class_sections')
+        .select('class_teacher_id, staff:class_teacher_id(user_id)')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', event.academicYearId)
+        .eq('class_id', classId)
+        .eq('section_id', sectionId)
+        .maybeSingle();
+      const staffUserId = (cs as { staff?: { user_id?: string | null } | null } | null)?.staff?.user_id ?? null;
+      if (staffUserId) notifyUserIds.add(staffUserId);
+    }
+
+    // Avoid spamming the acting parent.
+    notifyUserIds.delete(parentUserId);
+
+    await Promise.all(
+      [...notifyUserIds].map((uid) =>
+        this.notificationsService.createNotification({
+          userId: uid,
+          type: 'event_consent_submitted',
+          title,
+          body,
+          data: { eventId, studentId, status },
+        }),
+      ),
+    ).catch(() => {});
   }
 }
 

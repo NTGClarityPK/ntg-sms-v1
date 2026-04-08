@@ -89,7 +89,10 @@ export function ClassTimetableContent({
 
   // Only enable timetable query once we know which template to use.
   const timetableEnabled =
-    !!classSectionId && !!branchId && !!selectedTemplateId;
+    !!classSectionId &&
+    !!branchId &&
+    !templatesLoading &&
+    (availableTemplates.length === 0 || !!selectedTemplateId);
 
   const {
     data: timetableData,
@@ -535,28 +538,7 @@ export function ClassTimetableContent({
 
         {classId && templatesLoading && <Skeleton height={36} />}
 
-        {!templatesLoading && classId && availableTemplates.length === 0 && (
-          <Alert color={colors.info} title={t('noSubjectTemplatesAssigned')}>
-            <Text size="sm">
-              {t('noSubjectTemplatesMessage')}
-              {classId && (
-                <>
-                  {' '}
-                  {t('toCreateTemplates')}{' '}
-                  <Text
-                    component="span"
-                    fw={500}
-                    style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                    onClick={() => router.push('/settings/subject-templates')}
-                  >
-                    {t('settingsSubjectTemplates')}
-                  </Text>
-                  .
-                </>
-              )}
-            </Text>
-          </Alert>
-        )}
+        {/* Subject templates are optional. If none exist, admin can still manage the generic timetable. */}
 
         {!showHeaderActions && classId && (
           <Group justify="space-between">

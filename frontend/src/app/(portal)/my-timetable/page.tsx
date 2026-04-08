@@ -298,8 +298,7 @@ export default function MyTimetablePage() {
     );
   }
 
-  // Error or no template assigned
-  if (timetableError || !subjectTemplate) {
+  if (timetableError) {
     return (
       <>
         <div className="page-title-bar">
@@ -316,9 +315,9 @@ export default function MyTimetablePage() {
             paddingBottom: 'var(--mantine-spacing-xl)',
           }}
         >
-          <Alert color={colors.warning} title={t('noSubjectTemplatesAssigned')}>
+          <Alert color={colors.warning} title={t('noTimetableAvailable')}>
             <Text size="sm">
-              {t('noSubjectTemplateMessage')}
+              {t('genericPleaseTryAgain')}
             </Text>
           </Alert>
         </div>
@@ -409,8 +408,11 @@ export default function MyTimetablePage() {
             }
           >
             <Text size="sm" fw={500}>
-              {t('showingTimetableFor')} <Text component="span" fw={600}>{[myStudentData.data.firstName, myStudentData.data.lastName].filter(Boolean).join(' ') || t('student')}</Text>{' '}
-              <Text component="span" fw={600}>{subjectTemplate?.name || t('unknownTemplate')}</Text>{' '}
+              {t('showingTimetableFor')}{' '}
+              <Text component="span" fw={600}>
+                {[myStudentData.data.firstName, myStudentData.data.lastName].filter(Boolean).join(' ') ||
+                  t('student')}
+              </Text>{' '}
               <Text component="span" fw={600}>
                 {timetable ? `${timetable.className} - ${timetable.sectionName}` : t('unknownClass')}
               </Text>

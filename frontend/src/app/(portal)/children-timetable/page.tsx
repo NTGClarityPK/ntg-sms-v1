@@ -71,7 +71,7 @@ export default function ChildrenTimetablePage() {
   );
   const subjectTemplate = studentTemplateData?.data || null;
 
-  const shouldLoadTimetable = !!selectedChildId && !!activeYearId && !!subjectTemplate;
+  const shouldLoadTimetable = !!selectedChildId && !!activeYearId;
   const { data: guardedTimetableData, isLoading: isLoadingGuardedTimetable } = useStudentTimetable(
     shouldLoadTimetable ? selectedChildId : null,
     activeYearId,
@@ -172,16 +172,6 @@ export default function ChildrenTimetablePage() {
 
               {isLoading ? (
                 <Skeleton height={420} />
-              ) : !subjectTemplate ? (
-                <Alert
-                  icon={<IconAlertCircle size={16} />}
-                  color={colors.warning}
-                  title={t('noSubjectTemplateAssigned')}
-                >
-                  <Text size="sm">
-                    {t('noSubjectTemplateMessage')}
-                  </Text>
-                </Alert>
               ) : !timetable ? (
                 <Alert
                   icon={<IconAlertCircle size={16} />}

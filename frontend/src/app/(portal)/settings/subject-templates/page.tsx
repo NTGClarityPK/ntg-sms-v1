@@ -5,6 +5,7 @@ import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { useAuth } from '@/hooks/useAuth';
 import {
   useSubjectTemplates,
@@ -38,13 +39,6 @@ export default function SubjectTemplatesPage() {
   const deleteTemplate = useDeleteSubjectTemplate();
   const assignClasses = useAssignClassesToTemplate();
   const assignLevels = useAssignLevelsToTemplate();
-
-  // Debug: Log the query data structure
-  if (typeof window !== 'undefined' && templatesQuery.data) {
-    console.log('Templates query data:', templatesQuery.data);
-    console.log('Templates query data.data:', templatesQuery.data?.data);
-    console.log('Templates query data.meta:', templatesQuery.data?.meta);
-  }
 
   const isLoading = templatesQuery.isLoading;
   const hasError = templatesQuery.error;
@@ -133,19 +127,31 @@ export default function SubjectTemplatesPage() {
   };
 
   const handleDelete = async (template: SubjectTemplate) => {
-    if (!confirm(`Are you sure you want to delete "${template.name}"?`)) return;
-
-    try {
-      await deleteTemplate.mutateAsync(template.id);
-      notifications.show({
-        title: 'Success',
-        message: 'Subject template deleted',
-        color: notifyColors.success,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notifications.show({ title: 'Error', message, color: notifyColors.error });
-    }
+    modals.openConfirmModal({
+      title: 'Delete subject template',
+      centered: true,
+      children: (
+        <Text size="sm">
+          Are you sure you want to delete "{template.name}"?
+        </Text>
+      ),
+      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      confirmProps: { color: 'red', id: `subject-template-delete-confirm-${template.id}` },
+      cancelProps: { id: `subject-template-delete-cancel-${template.id}` },
+      onConfirm: async () => {
+        try {
+          await deleteTemplate.mutateAsync(template.id);
+          notifications.show({
+            title: 'Success',
+            message: 'Subject template deleted',
+            color: notifyColors.success,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          notifications.show({ title: 'Error', message, color: notifyColors.error });
+        }
+      },
+    });
   };
 
   const handleClose = () => {

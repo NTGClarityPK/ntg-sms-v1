@@ -21,6 +21,8 @@ interface UploadModalProps {
   itemId?: string | null;
 }
 
+const MAX_LIBRARY_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB
+
 export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
   const t = useTranslations('library');
   const colors = useThemeColors();
@@ -82,6 +84,23 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
       setUploadProgress(0);
     }
   }, [isEdit, existingItem, opened]);
+
+  const handleFileChange = (file: File | null) => {
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+    if (file.size > MAX_LIBRARY_UPLOAD_BYTES) {
+      setSelectedFile(null);
+      notifications.show({
+        title: t('uploadError'),
+        message: t('fileTooLarge100mb'),
+        color: 'red',
+      });
+      return;
+    }
+    setSelectedFile(file);
+  };
 
   const handleSubmit = async (values: typeof form.values) => {
     if (isEdit) {
@@ -166,7 +185,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
           {!isEdit && (
             <>
               <StorageQuotaBar />
-              <FileButton onChange={setSelectedFile} accept=".pdf,.doc,.docx,.txt,application/pdf">
+              <FileButton onChange={handleFileChange} accept=".pdf,.doc,.docx,.txt,application/pdf">
                 {(props) => (
                   <Button id="library-upload-select-file" {...props} leftSection={<IconUpload size={16} />} variant="light" fullWidth>
                     {selectedFile ? t('selectedFile', { name: selectedFile.name }) : t('selectFile')}

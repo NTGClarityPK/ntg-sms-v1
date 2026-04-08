@@ -301,8 +301,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       .page-title-bar .mantine-Title-root {
         margin: 0 !important;
         text-align: left !important;
-        padding-left: var(--mantine-spacing-md) !important;
-        padding-top: var(--mantine-spacing-sm) !important;
+        line-height: 1.15 !important;
       }
       
       html[dir="rtl"] .page-title-bar .mantine-Title-root,

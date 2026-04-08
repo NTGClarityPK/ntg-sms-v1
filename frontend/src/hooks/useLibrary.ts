@@ -4,6 +4,7 @@ import { useAuth } from './useAuth';
 import { notifications } from '@mantine/notifications';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
+import axios from 'axios';
 
 export interface LibraryItem {
   id: string;
@@ -68,6 +69,23 @@ export interface UploadFileResponse {
   fileSizeBytes: number;
   mimeType: string;
   thumbnailUrl?: string;
+}
+
+/** Extract backend error message from Axios response. Nest returns { error: { code, message } }. */
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as unknown;
+    if (data && typeof data === 'object') {
+      const obj = data as {
+        error?: { message?: string | string[] };
+        message?: string | string[];
+      };
+      const msg = obj.error?.message ?? obj.message;
+      if (msg) return Array.isArray(msg) ? msg.join(', ') : msg;
+    }
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }
 
 export function useLibraryItems(params: QueryLibraryItemsInput = {}) {
@@ -172,10 +190,10 @@ export function useUploadLibraryFile() {
         queryClient.invalidateQueries({ queryKey: ['branches', 'byId', branchId] });
       }
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       notifications.show({
         title: 'Upload Error',
-        message: error.message || 'Failed to upload file',
+        message: getApiErrorMessage(error, 'Failed to upload file'),
         color: 'red',
       });
     },

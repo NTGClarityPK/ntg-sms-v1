@@ -86,7 +86,7 @@ export class TimetableService {
     classSectionId: string,
     branchId: string,
     academicYearId?: string,
-    subjectTemplateId?: string,
+    subjectTemplateId?: string | null,
   ): Promise<ClassTimetableDto> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -141,9 +141,15 @@ export class TimetableService {
       .eq('branch_id', branchId)
       .eq('academic_year_id', activeYearId);
 
-    // Filter by subject template if provided
-    if (subjectTemplateId) {
-      slotsQuery = slotsQuery.eq('subject_template_id', subjectTemplateId);
+    // Filter by subject template when explicitly specified.
+    // - string: return slots for that template
+    // - null: return generic (null-template) slots only
+    // - undefined: return all slots (no filtering)
+    if (subjectTemplateId !== undefined) {
+      slotsQuery =
+        subjectTemplateId === null
+          ? slotsQuery.is('subject_template_id', null)
+          : slotsQuery.eq('subject_template_id', subjectTemplateId);
     }
 
     const { data: slotsData, error: slotsError } = await slotsQuery
@@ -306,8 +312,15 @@ export class TimetableService {
       .order('day_of_week', { ascending: true })
       .order('start_time', { ascending: true });
 
-    if (subjectTemplateId) {
-      slotsQuery = slotsQuery.eq('subject_template_id', subjectTemplateId);
+    // Filter by subject template when explicitly specified.
+    // - string: return slots for that template
+    // - null: return generic (null-template) slots only
+    // - undefined: return all slots (no filtering)
+    if (subjectTemplateId !== undefined) {
+      slotsQuery =
+        subjectTemplateId === null
+          ? slotsQuery.is('subject_template_id', null)
+          : slotsQuery.eq('subject_template_id', subjectTemplateId);
     }
 
     const { data: slotsData, error: slotsError } = await slotsQuery;
@@ -1565,10 +1578,6 @@ export class TimetableService {
       .maybeSingle();
     throwIfDbError(templateError);
 
-    if (!templateAssignment) {
-      throw new BadRequestException('No subject template assigned to this student for this academic year');
-    }
-
     // Get class-section for this student
     const { data: classSection, error: csError } = await supabase
       .from('class_sections')
@@ -1583,8 +1592,62 @@ export class TimetableService {
       throw new NotFoundException('Class-section not found for this student');
     }
 
-    // Get timetable filtered by template
-    return this.getClassTimetable(classSection.id, branchId, activeYearId, templateAssignment.subject_template_id);
+    const assignedTemplateId = templateAssignment
+      ? (templateAssignment as { subject_template_id: string | null }).subject_template_id
+      : null;
+
+    // Templates are optional. If student has no assignment OR the assignment isn't available for their class/level,
+    // fall back to the generic (null-template) timetable.
+    let effectiveTemplateId: string | null = null;
+    if (assignedTemplateId) {
+      const isValid = await this.isTemplateAvailableForClass(
+        assignedTemplateId,
+        student.class_id,
+        branchId,
+      );
+      effectiveTemplateId = isValid ? assignedTemplateId : null;
+    }
+
+    return this.getClassTimetable(classSection.id, branchId, activeYearId, effectiveTemplateId);
+  }
+
+  private async isTemplateAvailableForClass(
+    subjectTemplateId: string,
+    classId: string,
+    branchId: string,
+  ): Promise<boolean> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const [classAssignment, levelClass] = await Promise.all([
+      supabase
+        .from('class_subject_template_assignments')
+        .select('subject_template_id')
+        .eq('class_id', classId)
+        .eq('branch_id', branchId)
+        .eq('subject_template_id', subjectTemplateId)
+        .maybeSingle(),
+      // Keep consistent with existing codebase usage: level_classes is queried without branch filter.
+      supabase.from('level_classes').select('level_id').eq('class_id', classId).maybeSingle(),
+    ]);
+
+    throwIfDbError(classAssignment.error);
+    throwIfDbError(levelClass.error);
+
+    if (classAssignment.data) return true;
+
+    const levelId = (levelClass.data as { level_id?: string } | null)?.level_id;
+    if (!levelId) return false;
+
+    const { data: levelAssignment, error: levelError } = await supabase
+      .from('level_subject_template_assignments')
+      .select('subject_template_id')
+      .eq('level_id', levelId)
+      .eq('branch_id', branchId)
+      .eq('subject_template_id', subjectTemplateId)
+      .maybeSingle();
+
+    throwIfDbError(levelError);
+    return !!levelAssignment;
   }
 
   async checkConflicts(

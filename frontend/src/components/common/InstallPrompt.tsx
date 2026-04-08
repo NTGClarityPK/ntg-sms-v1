@@ -1,12 +1,10 @@
 'use client';
 
-import { Button, Modal, Text, Group } from '@mantine/core';
+import { Button, Modal, Text, Group, Stack } from '@mantine/core';
 import { IconDownload } from '@tabler/icons-react';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useInstallApp } from '@/lib/install-app-context';
 
 export function InstallPrompt() {
-  const colors = useThemeColors();
   const {
     promptInstall,
     canInstallDirectly,
@@ -31,27 +29,31 @@ export function InstallPrompt() {
     <Modal
       opened={showPrompt}
       onClose={handleDismiss}
-      title="Install app"
+      title="Install NTG Alma App"
       centered
       styles={{
         title: { fontWeight: 600 },
       }}
     >
-      <Text size="sm" c="dimmed" mb="md">
-        Install the NTG Alma on your device for quick access and offline use.
-      </Text>
-      <Group justify="flex-end" gap="sm">
-        <Button variant="subtle" color="gray" onClick={handleDismiss}>
-          Not now
-        </Button>
-        <Button
-          leftSection={<IconDownload size={16} />}
-          onClick={handleInstall}
-          style={{ backgroundColor: colors.primary }}
-        >
-          Install
-        </Button>
-      </Group>
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          Your official school app for messages, notifications, and quick updates.
+          <br />
+          <Text component="span" fw={600}>
+            Mobile app is perfect for staying connected while desktop is best for a complete experience with all the
+            features.
+          </Text>
+        </Text>
+
+        <Group justify="flex-end" gap="sm">
+          <Button variant="subtle" onClick={handleDismiss}>
+            Skip
+          </Button>
+          <Button leftSection={<IconDownload size={16} />} onClick={handleInstall}>
+            Install
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
   );
 }

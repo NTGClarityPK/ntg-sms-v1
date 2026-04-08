@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
+type MulterLikeError = Error & { code?: string };
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -37,6 +39,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
           exception.name ||
           code;
       }
+    } else if (
+      exception instanceof Error &&
+      exception.name === 'MulterError' &&
+      (exception as MulterLikeError).code === 'LIMIT_FILE_SIZE'
+    ) {
+      status = HttpStatus.PAYLOAD_TOO_LARGE;
+      message = 'File size must not exceed 100MB';
+      code = 'LIMIT_FILE_SIZE';
     } else if (exception instanceof Error) {
       message = exception.message;
       code = exception.name;

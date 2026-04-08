@@ -36,6 +36,7 @@ export default function MyEventsPage() {
   const events = data?.data || [];
 
   const isParent = user?.roles?.some((r) => r.roleName === 'parent') ?? false;
+  const isStudent = user?.roles?.some((r) => r.roleName === 'student') ?? false;
 
   const getStatusBadge = (event: Event) => {
     const today = dayjs();
@@ -150,6 +151,24 @@ export default function MyEventsPage() {
     );
   };
 
+  const StudentConsentStatus = ({ event }: { event: Event }) => {
+    if (!isStudent || !event.requiresConsent) return null;
+    const status = event.studentConsentStatus ?? 'pending';
+    return (
+      <Group gap="xs" mt="xs">
+        <Text size="sm" fw={500} c="dimmed">
+          {t('consentStatus')}
+        </Text>
+        <Badge
+          variant="light"
+          color={status === 'approved' ? 'green' : status === 'rejected' ? 'red' : 'orange'}
+        >
+          {status === 'approved' ? t('approved') : status === 'rejected' ? t('rejected') : t('pending')}
+        </Badge>
+      </Group>
+    );
+  };
+
   return (
     <>
       <div className="page-title-bar">
@@ -229,6 +248,7 @@ export default function MyEventsPage() {
                                 </Button>
                               </Group>
                               <ConsentActions event={event} />
+                              <StudentConsentStatus event={event} />
                             </Stack>
                           </Card>
                         ))}
@@ -288,6 +308,7 @@ export default function MyEventsPage() {
                                 </Button>
                               </Group>
                               <ConsentActions event={event} />
+                              <StudentConsentStatus event={event} />
                             </Stack>
                           </Card>
                         ))}

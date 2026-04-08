@@ -113,6 +113,15 @@ export default function NotificationsPage() {
       router.push('/leaves');
     } else if (notification.type === 'grade' && notification.data) {
       router.push('/grades');
+    } else if (
+      (notification.type === 'event' ||
+        notification.type === 'event_created' ||
+        notification.type === 'event_updated' ||
+        notification.type === 'event_consent_submitted') &&
+      notification.data
+    ) {
+      const eventId = notification.data.eventId as string | undefined;
+      router.push(eventId ? `/events/${eventId}` : '/events');
     } else if (notification.type === 'message' && notification.data) {
       const conversationId = notification.data.conversationId as string | undefined;
       if (conversationId) router.push(`/messages?conversation=${conversationId}`);

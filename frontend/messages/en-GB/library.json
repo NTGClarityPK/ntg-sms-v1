@@ -54,6 +54,7 @@
   "upload": "Upload",
   "pleaseSelectFile": "Please select a file to upload",
   "uploadError": "Upload Error",
+  "fileTooLarge100mb": "File is too large. Maximum allowed size is 100MB.",
   "libraryCategories": "Library categories",
   "addCategory": "Add category",
   "addCategoryPlaceholder": "Textbooks",
