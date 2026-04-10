@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select } from '@mantine/core';
+import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
@@ -23,7 +23,7 @@ import { useRoles, useFeatures } from '@/hooks/useRoles';
 
 import { AcademicYearForm, type AcademicYearFormValues } from '@/components/features/settings/AcademicYearForm';
 import { AcademicYearCard } from '@/components/features/settings/AcademicYearCard';
-import { useAcademicYearsList, useActivateAcademicYear, useCreateAcademicYear, useLockAcademicYear } from '@/hooks/useAcademicYears';
+import { useAcademicYearsList, useActivateAcademicYear, useCreateAcademicYear, useLockAcademicYear, useRolloverAcademicYear } from '@/hooks/useAcademicYears';
 import { modals } from '@mantine/modals';
 import type { AcademicYear } from '@/types/settings';
 
@@ -554,6 +554,25 @@ function AcademicYearsTabContent() {
   const createMutation = useCreateAcademicYear();
   const activateMutation = useActivateAcademicYear();
   const lockMutation = useLockAcademicYear();
+  const rolloverMutation = useRolloverAcademicYear();
+  const [lockingYearId, setLockingYearId] = useState<string | null>(null);
+  const [activatingYearId, setActivatingYearId] = useState<string | null>(null);
+
+  const [rolloverOpened, rolloverHandlers] = useDisclosure(false);
+  const [rolloverSourceYear, setRolloverSourceYear] = useState<AcademicYear | null>(null);
+  const [targetYearId, setTargetYearId] = useState<string | null>(null);
+  const [carryForward, setCarryForward] = useState({
+    teacherAssignments: false,
+    timetableSlots: false,
+    leaveSettings: true,
+  });
+
+  const setCarry = (
+    key: 'teacherAssignments' | 'timetableSlots' | 'leaveSettings',
+    next: boolean,
+  ) => {
+    setCarryForward((p) => ({ ...p, [key]: next }));
+  };
 
   const handleCreate = async (values: AcademicYearFormValues) => {
     await createMutation.mutateAsync(values);
@@ -561,6 +580,7 @@ function AcademicYearsTabContent() {
 
   const handleActivate = async (id: string) => {
     try {
+      setActivatingYearId(id);
       await activateMutation.mutateAsync(id);
       notifications.show({
         title: tCommon('success'),
@@ -574,6 +594,8 @@ function AcademicYearsTabContent() {
         message,
         color: notifyColors.error,
       });
+    } finally {
+      setActivatingYearId(null);
     }
   };
 
@@ -592,6 +614,7 @@ function AcademicYearsTabContent() {
         confirmProps: { color: 'orange' },
         onConfirm: async () => {
           try {
+            setLockingYearId(year.id);
             await lockMutation.mutateAsync(year.id);
             notifications.show({
               title: tCommon('success'),
@@ -605,12 +628,15 @@ function AcademicYearsTabContent() {
               message,
               color: notifyColors.error,
             });
+          } finally {
+            setLockingYearId(null);
           }
         },
       });
     } else {
       // For non-active years, proceed directly
       try {
+        setLockingYearId(year.id);
         await lockMutation.mutateAsync(year.id);
         notifications.show({
           title: tCommon('success'),
@@ -624,7 +650,43 @@ function AcademicYearsTabContent() {
           message,
           color: notifyColors.error,
         });
+      } finally {
+        setLockingYearId(null);
       }
+    }
+  };
+
+  // Rollover copies from a *locked* source year into the currently-selected (active) target year.
+  // The "year" passed in is the target year card where the user clicked Rollover.
+  const openRollover = (year: AcademicYear) => {
+    setRolloverSourceYear(null);
+    setTargetYearId(null);
+    setCarryForward({
+      teacherAssignments: false,
+      timetableSlots: false,
+      leaveSettings: true,
+    });
+    setTargetYearId(year.id);
+    rolloverHandlers.open();
+  };
+
+  const handleRollover = async () => {
+    if (!rolloverSourceYear || !targetYearId) return;
+    try {
+      const res = await rolloverMutation.mutateAsync({
+        sourceAcademicYearId: rolloverSourceYear.id,
+        targetAcademicYearId: targetYearId,
+        carryForward,
+      });
+      notifications.show({
+        title: tCommon('success'),
+        message: `Rollover completed. Copied: class sections ${res.data?.classSectionsCopied ?? 0}, teacher assignments ${res.data?.teacherAssignmentsCopied ?? 0}, timetable slots ${res.data?.timetableSlotsCopied ?? 0}, leave settings ${res.data?.leaveSettingsCopied ?? 0}.`,
+        color: notifyColors.success,
+      });
+      rolloverHandlers.close();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     }
   };
 
@@ -664,8 +726,9 @@ function AcademicYearsTabContent() {
               year={year}
               onActivate={handleActivate}
               onLock={handleLock}
-              isActivating={activateMutation.isPending}
-              isLocking={lockMutation.isPending}
+              onRollover={openRollover}
+              isActivating={activatingYearId === year.id}
+              isLocking={lockingYearId === year.id}
             />
           ))}
         </Stack>
@@ -677,6 +740,67 @@ function AcademicYearsTabContent() {
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}
       />
+
+      <Modal
+        opened={rolloverOpened}
+        onClose={rolloverHandlers.close}
+        title="Rollover to new academic year"
+        size="lg"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Copy setup from a locked academic year into your current (active) academic year.
+            This will be blocked if Promotion is incomplete for the selected source year.
+          </Text>
+
+          <Select
+            label="Source academic year (locked)"
+            data={(listQuery.data?.data ?? [])
+              .filter((y) => y.isLocked && y.id !== targetYearId)
+              .map((y) => ({ value: y.id, label: y.name }))}
+            value={rolloverSourceYear?.id ?? null}
+            onChange={(v) => {
+              const year = (listQuery.data?.data ?? []).find((y) => y.id === v) ?? null;
+              setRolloverSourceYear(year);
+            }}
+            placeholder="Select locked source year"
+            searchable
+          />
+
+          <Paper withBorder p="md">
+            <Stack gap="xs">
+              <Checkbox
+                label="Copy teacher assignments"
+                checked={carryForward.teacherAssignments}
+                onChange={(e) => setCarry('teacherAssignments', Boolean(e?.currentTarget?.checked))}
+              />
+              <Checkbox
+                label="Copy timetable slots"
+                checked={carryForward.timetableSlots}
+                onChange={(e) => setCarry('timetableSlots', Boolean(e?.currentTarget?.checked))}
+              />
+              <Checkbox
+                label="Copy leave settings"
+                checked={carryForward.leaveSettings}
+                onChange={(e) => setCarry('leaveSettings', Boolean(e?.currentTarget?.checked))}
+              />
+            </Stack>
+          </Paper>
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={rolloverHandlers.close}>
+              {tCommon('cancel')}
+            </Button>
+            <Button
+              onClick={handleRollover}
+              loading={rolloverMutation.isPending}
+              disabled={!targetYearId || !rolloverSourceYear}
+            >
+              Run rollover
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

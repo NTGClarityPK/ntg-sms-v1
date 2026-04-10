@@ -378,6 +378,7 @@ export class EventsService {
     if (!activeYear) {
       throw new BadRequestException('No active academic year found');
     }
+    await this.academicYearsService.assertNotLockedForBranch(branchId, activeYear.id);
 
     // Validate class sections belong to branch
     if (input.classSectionIds && input.classSectionIds.length > 0) {
@@ -500,6 +501,10 @@ export class EventsService {
     if (!existing) {
       throw new NotFoundException('Event not found');
     }
+    await this.academicYearsService.assertNotLockedForBranch(
+      branchId,
+      (existing as EventRow).academic_year_id,
+    );
 
     // Validate dates if provided
     const startDate = input.startDate ? new Date(input.startDate) : new Date(existing.start_date);
@@ -625,6 +630,10 @@ export class EventsService {
     if (!oldRow) {
       throw new NotFoundException('Event not found');
     }
+    await this.academicYearsService.assertNotLockedForBranch(
+      branchId,
+      (oldRow as EventRow).academic_year_id,
+    );
 
     const { error } = await supabase
       .from('events')
@@ -1646,21 +1655,22 @@ export class EventsService {
         // Get class section details
         const { data: classSection } = await supabase
           .from('class_sections')
-          .select('class_id, section_id')
+          .select('class_id, section_id, academic_year_id')
           .eq('id', participant.class_section_id as string)
           .maybeSingle();
 
         if (classSection) {
-          // Get all students in the class section
-          const { data: students } = await supabase
-            .from('students')
-            .select('id')
+          // Get all active students in the class section for that academic year via enrolments.
+          const { data: enrolments } = await supabase
+            .from('student_enrolments')
+            .select('student_id')
+            .eq('branch_id', branchId)
+            .eq('academic_year_id', (classSection as { academic_year_id: string }).academic_year_id)
             .eq('class_id', classSection.class_id as string)
             .eq('section_id', classSection.section_id as string)
-            .eq('branch_id', branchId);
-
-          (students || []).forEach((s) => {
-            studentIds.add(s.id as string);
+            .eq('status', 'active');
+          (enrolments || []).forEach((e) => {
+            studentIds.add((e as { student_id: string }).student_id);
           });
         }
       }

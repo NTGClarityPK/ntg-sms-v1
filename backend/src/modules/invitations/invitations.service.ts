@@ -248,6 +248,38 @@ export class InvitationsService {
         html: template.html,
       });
 
+      // Persist latest invite destination for admin visibility (best-effort).
+      // Invitations table is the source of truth; this is a denormalised convenience field.
+      try {
+        const sentAt = new Date().toISOString();
+        await supabase
+          .from('profiles')
+          .update({
+            invitation_recipient_email: input.invitation.recipient_email,
+            invitation_sent_at: sentAt,
+            updated_at: sentAt,
+          })
+          .eq('id', input.invitation.user_id);
+
+        if (
+          input.invitation.invitation_type === 'student' ||
+          input.invitation.invitation_type === 'parent'
+        ) {
+          await supabase
+            .from('students')
+            .update({
+              invitation_recipient_email: input.invitation.recipient_email,
+              invitation_sent_at: sentAt,
+              updated_at: sentAt,
+            })
+            .eq('user_id', input.invitation.user_id);
+        }
+      } catch (e) {
+        this.logger.warn(
+          `Could not persist invitation metadata for user ${input.invitation.user_id}: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+
       this.auditLogService
         .logCreate(
           'invitations',

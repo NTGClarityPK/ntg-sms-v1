@@ -574,6 +574,8 @@ export class TimetableService {
     }
     const academicYearId = input.academicYearId ?? activeYear.id;
 
+    await this.academicYearsService.assertNotLockedForBranch(branchId, academicYearId);
+
     // Validate class-section belongs to branch
     const { data: classSection, error: csError } = await supabase
       .from('class_sections')
@@ -846,6 +848,8 @@ export class TimetableService {
       throw new NotFoundException('Timetable slot not found');
     }
 
+    await this.academicYearsService.assertNotLockedForBranch(branchId, slotToDelete.academic_year_id);
+
     const { error } = await supabase.from('timetable_slots').delete().eq('id', id);
     throwIfDbError(error);
 
@@ -893,6 +897,10 @@ export class TimetableService {
       throw new BadRequestException('No active academic year found');
     }
     const activeYearId = input.academicYearId ?? activeYear.id;
+
+    await this.academicYearsService.assertNotLockedForBranch(branchId, activeYearId);
+
+    await this.academicYearsService.assertNotLockedForBranch(branchId, activeYearId);
 
     // Fetch all slots from source day
     let sourceSlotsQuery = supabase
@@ -1020,6 +1028,8 @@ export class TimetableService {
       throw new BadRequestException('No active academic year found');
     }
     const activeYearId = input.academicYearId ?? activeYear.id;
+
+    await this.academicYearsService.assertNotLockedForBranch(branchId, activeYearId);
 
     // Fetch all slots from source class section
     let sourceSlotsQuery = supabase

@@ -521,20 +521,33 @@ export class BehavioralService {
       supabase.from('classes').select('id, display_name').eq('id', cs.class_id).single(),
       supabase.from('sections').select('id, name').eq('id', cs.section_id).single(),
       supabase
-        .from('students')
-        .select('id, user_id')
-        .eq('class_id', cs.class_id)
-        .eq('section_id', cs.section_id)
+        .from('student_enrolments')
+        .select('student_id')
         .eq('branch_id', branchId)
         .eq('academic_year_id', academicYearId)
-        .eq('is_active', true)
-        .order('id'),
+        .eq('class_id', cs.class_id)
+        .eq('section_id', cs.section_id)
+        .eq('status', 'active'),
     ]);
     const className = (classesRes.data as { display_name?: string } | null)?.display_name;
     const sectionName = (sectionsRes.data as { name?: string } | null)?.name;
 
     throwIfDbError(studentsRes.error);
-    const studentList = (studentsRes.data || []) as { id: string; user_id: string | null }[];
+    const enrolledStudentIds = (studentsRes.data || []) as Array<{ student_id: string }>;
+    const ids = enrolledStudentIds.map((r) => r.student_id);
+    const studentList =
+      ids.length > 0
+        ? (
+            (
+              await supabase
+                .from('students')
+                .select('id, user_id')
+                .in('id', ids)
+                .eq('branch_id', branchId)
+                .order('id')
+            ).data || []
+          )
+        : [];
     if (studentList.length === 0) {
       return {
         data: new BehavioralMatrixResponseDto({

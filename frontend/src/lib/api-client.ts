@@ -164,6 +164,20 @@ class ApiClient {
           }
         }
 
+        // Surface backend error messages (HttpExceptionFilter returns { error: { message } })
+        // so UI doesn't just show "Request failed with status code XYZ".
+        if (error.response?.data) {
+          const body = error.response.data as unknown as {
+            error?: { message?: string | string[] };
+            message?: string | string[];
+          };
+          const raw = body?.error?.message ?? body?.message;
+          const text = Array.isArray(raw) ? raw.join(', ') : typeof raw === 'string' ? raw : '';
+          if (text.trim().length > 0) {
+            error.message = text;
+          }
+        }
+
         // Student (or other) account blocked while session still exists locally — clear session and return to login.
         if (error.response?.status === 403 && typeof window !== 'undefined') {
           const reqUrl = error.config?.url ?? '';

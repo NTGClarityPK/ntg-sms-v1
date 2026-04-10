@@ -38,6 +38,8 @@ type StudentRow = {
   first_name: string | null;
   last_name: string | null;
   account_status?: string | null;
+  invitation_recipient_email?: string | null;
+  invitation_sent_at?: string | null;
 };
 
 function accountStatusFromRow(v: unknown): 'active' | 'pending_verification' | 'link_expired' {
@@ -357,6 +359,11 @@ export class StudentsService {
 
     throwIfDbError(error);
 
+    // Ensure placement shown is for the active academic year (enrolments),
+    // not the legacy students.class_id/section_id which can reflect an old year.
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    const activeYearId = activeYear?.id ?? null;
+
     const userIds = (data as unknown as Array<{ user_id: string | null }>)
       .map((s) => s.user_id)
       .filter((id): id is string => typeof id === 'string' && id.length > 0);
@@ -369,18 +376,60 @@ export class StudentsService {
     const emailEntries = await Promise.all(emailPromises);
     const emailMap = new Map(emailEntries);
 
-    // Fetch subject template assignments for all students (scoped to this branch + the student's academic year)
-    const studentIds = (data as unknown as Array<{ id: string }>)
+    const studentIdsOnPage = (data as unknown as Array<{ id: string }>)
       .map((s) => s.id)
       .filter((id): id is string => !!id);
 
-    const academicYearIds = Array.from(
-      new Set(
-        (data as unknown as Array<{ academic_year_id: string | null }>)
-          .map((s) => s.academic_year_id)
-          .filter((y): y is string => !!y),
-      ),
+    const enrolmentByStudentId = new Map<
+      string,
+      { classId: string | null; sectionId: string | null; status: string }
+    >();
+    if (activeYearId && studentIdsOnPage.length > 0) {
+      const { data: enrolments, error: enrolErr } = await supabase
+        .from('student_enrolments')
+        .select('student_id, class_id, section_id, status')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', activeYearId)
+        .in('student_id', studentIdsOnPage);
+      throwIfDbError(enrolErr);
+      for (const row of (enrolments || []) as Array<{
+        student_id: string;
+        class_id: string | null;
+        section_id: string | null;
+        status: string;
+      }>) {
+        enrolmentByStudentId.set(row.student_id, {
+          classId: row.class_id ?? null,
+          sectionId: row.section_id ?? null,
+          status: row.status,
+        });
+      }
+    }
+
+    const effectiveClassIds = Array.from(
+      new Set(Array.from(enrolmentByStudentId.values()).map((e) => e.classId).filter(Boolean)),
+    ) as string[];
+    const effectiveSectionIds = Array.from(
+      new Set(Array.from(enrolmentByStudentId.values()).map((e) => e.sectionId).filter(Boolean)),
+    ) as string[];
+
+    const [{ data: effectiveClasses }, { data: effectiveSections }] = await Promise.all([
+      effectiveClassIds.length > 0
+        ? supabase.from('classes').select('id, name, display_name').in('id', effectiveClassIds)
+        : Promise.resolve({ data: [] as any[] }),
+      effectiveSectionIds.length > 0
+        ? supabase.from('sections').select('id, name').in('id', effectiveSectionIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const classNameById = new Map(
+      ((effectiveClasses as any[]) ?? []).map((c) => [c.id as string, (c.display_name ?? c.name) as string]),
     );
+    const sectionNameById = new Map(((effectiveSections as any[]) ?? []).map((s) => [s.id as string, s.name as string]));
+
+    // Fetch subject template assignments for all students (scoped to this branch + the student's academic year)
+    const studentIds = studentIdsOnPage;
+    const academicYearIds = activeYearId ? [activeYearId] : [];
 
     const { data: templateAssignments } =
       studentIds.length > 0 && academicYearIds.length > 0
@@ -393,13 +442,7 @@ export class StudentsService {
         : { data: [] };
 
     // Build template availability map for the classes in this page
-    const classIdsOnPage = Array.from(
-      new Set(
-        (data as unknown as Array<{ class_id: string | null }>)
-          .map((s) => s.class_id)
-          .filter((c): c is string => !!c),
-      ),
-    );
+    const classIdsOnPage = effectiveClassIds;
     const availableTemplateIdsByClassId = await this.getAvailableTemplateIdsByClassId(
       classIdsOnPage,
       branchId,
@@ -446,17 +489,20 @@ export class StudentsService {
       updated_at: string;
       first_name: string | null;
       last_name: string | null;
+      invitation_recipient_email?: string | null;
+      invitation_sent_at?: string | null;
       classes: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
       sections: { name: string } | { name: string }[] | null;
     }>).map((row) => {
-      const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
-      const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
+      const enrol = enrolmentByStudentId.get(row.id);
+      const effectiveClassId = enrol?.classId ?? null;
+      const effectiveSectionId = enrol?.sectionId ?? null;
       const templateInfo =
-        row.academic_year_id ? templateMap.get(`${row.id}::${row.academic_year_id}`) : undefined;
+        activeYearId ? templateMap.get(`${row.id}::${activeYearId}`) : undefined;
 
       // Only surface template if it is available for the student's current class/level.
-      const availableForClass = row.class_id
-        ? availableTemplateIdsByClassId.get(row.class_id) ?? new Set<string>()
+      const availableForClass = effectiveClassId
+        ? availableTemplateIdsByClassId.get(effectiveClassId) ?? new Set<string>()
         : new Set<string>();
       const templateIsValidForClass =
         !!templateInfo?.templateId && availableForClass.has(templateInfo.templateId);
@@ -467,21 +513,23 @@ export class StudentsService {
         userId: row.user_id ?? undefined,
         branchId: row.branch_id,
         studentId: row.student_id,
-        classId: row.class_id ?? undefined,
-        sectionId: row.section_id ?? undefined,
+        classId: effectiveClassId ?? undefined,
+        sectionId: effectiveSectionId ?? undefined,
         bloodGroup: row.blood_group ?? undefined,
         medicalNotes: row.medical_notes ?? undefined,
         admissionDate: row.admission_date ?? undefined,
-        academicYearId: row.academic_year_id ?? undefined,
+        academicYearId: activeYearId ?? undefined,
         isActive: row.is_active,
         accountStatus: accountStatusFromRow(row.account_status),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        invitationRecipientEmail: row.invitation_recipient_email ?? undefined,
+        invitationSentAt: row.invitation_sent_at ?? undefined,
         firstName: row.first_name ?? undefined,
         lastName: row.last_name ?? undefined,
         email: row.user_id ? emailMap.get(row.user_id) : undefined,
-        className: classData?.display_name ?? classData?.name,
-        sectionName: sectionData?.name,
+        className: effectiveClassId ? classNameById.get(effectiveClassId) : undefined,
+        sectionName: effectiveSectionId ? sectionNameById.get(effectiveSectionId) : undefined,
         subjectTemplateId: safeTemplateInfo?.templateId,
         subjectTemplateName: safeTemplateInfo?.templateName,
       });
@@ -545,6 +593,8 @@ export class StudentsService {
       updated_at: string;
       first_name: string | null;
       last_name: string | null;
+      invitation_recipient_email?: string | null;
+      invitation_sent_at?: string | null;
       classes: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
       sections: { name: string } | { name: string }[] | null;
     };
@@ -601,6 +651,8 @@ export class StudentsService {
       accountStatus: accountStatusFromRow(row.account_status),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      invitationRecipientEmail: row.invitation_recipient_email ?? undefined,
+      invitationSentAt: row.invitation_sent_at ?? undefined,
       firstName: row.first_name ?? undefined,
       lastName: row.last_name ?? undefined,
       email: authUser.user?.email,
@@ -802,6 +854,27 @@ export class StudentsService {
           branchId,
         })
         .catch(() => {});
+
+      // Maintain year-scoped placement for attendance/results/etc.
+      // Without this, class-section rosters (which read student_enrolments) can appear empty.
+      if (academicYearId) {
+        const { error: enrolUpsertError } = await supabase
+          .from('student_enrolments')
+          .upsert(
+            {
+              student_id: studentRow.id,
+              branch_id: branchId,
+              academic_year_id: academicYearId,
+              class_id: input.classId ?? null,
+              section_id: input.sectionId ?? null,
+              status: 'active',
+              created_by: username,
+              updated_by: username,
+            },
+            { onConflict: 'student_id,branch_id,academic_year_id' },
+          );
+        throwIfDbError(enrolUpsertError);
+      }
 
       // Create subject template assignment if provided (requires an academic year).
       if (input.subjectTemplateId) {
@@ -1445,6 +1518,14 @@ export class StudentsService {
       .eq('id', id)
       .single();
 
+    const academicYearToLockCheck =
+      input.academicYearId !== undefined
+        ? (input.academicYearId ?? null)
+        : ((studentData as { academic_year_id?: string | null } | null)?.academic_year_id ?? null);
+    if (academicYearToLockCheck) {
+      await this.academicYearsService.assertNotLockedForBranch(branchId, academicYearToLockCheck);
+    }
+
     const updatePayload: {
       first_name?: string;
       last_name?: string;
@@ -1486,6 +1567,35 @@ export class StudentsService {
       .single();
 
     throwIfDbError(error);
+
+    // Keep student_enrolments in sync for the (possibly updated) academic year.
+    // This ensures class-section rosters and attendance reflect current placement.
+    const effectiveAcademicYearId =
+      input.academicYearId !== undefined
+        ? (input.academicYearId ?? null)
+        : ((studentData as { academic_year_id?: string | null } | null)?.academic_year_id ?? null);
+    if (effectiveAcademicYearId) {
+      const effectiveClassId =
+        input.classId !== undefined ? (input.classId ?? null) : ((studentData as { class_id?: string | null } | null)?.class_id ?? null);
+      const effectiveSectionId =
+        input.sectionId !== undefined ? (input.sectionId ?? null) : ((oldRow as { section_id?: string | null } | null)?.section_id ?? null);
+
+      const { error: enrolUpsertError } = await supabase
+        .from('student_enrolments')
+        .upsert(
+          {
+            student_id: id,
+            branch_id: branchId,
+            academic_year_id: effectiveAcademicYearId,
+            class_id: effectiveClassId,
+            section_id: effectiveSectionId,
+            status: (input.isActive ?? (oldRow as { is_active?: boolean } | null)?.is_active ?? true) ? 'active' : 'inactive',
+            updated_by: username,
+          },
+          { onConflict: 'student_id,branch_id,academic_year_id' },
+        );
+      throwIfDbError(enrolUpsertError);
+    }
 
     if (newRow) {
       const changedFields = Object.keys(filteredPayload).filter((k) => k !== 'updated_at');

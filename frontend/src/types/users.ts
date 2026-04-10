@@ -15,6 +15,10 @@ export interface User {
   }>;
   createdAt: string;
   updatedAt: string;
+  /** Where the latest setup invitation was sent (if any). */
+  invitationRecipientEmail?: string;
+  /** When the latest setup invitation was sent (if any). */
+  invitationSentAt?: string;
 }
 
 export interface CreateUserInput {

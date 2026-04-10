@@ -41,9 +41,19 @@ export default function ResultsPage() {
   const t = useTranslations('results');
   const { user } = useAuth();
   const userTyped = user as User | undefined;
+  const isClassTeacher =
+    userTyped?.roles?.some((r) => r.roleName === 'class_teacher') ?? false;
   const { data: myStaffData } = useMyStaff();
   const staffData = myStaffData?.data;
-  const classSectionsQuery = useClassSections({ limit: 200, minimal: true });
+  // For class teachers, the backend can return all class-sections they are responsible for:
+  // - class_sections.class_teacher_id = staffId
+  // - OR subject teacher assignments (teacher_assignments) for that staffId
+  // This keeps Results consistent with Attendance visibility.
+  const classSectionsQuery = useClassSections({
+    limit: 200,
+    minimal: true,
+    classTeacherId: isClassTeacher && staffData?.id ? staffData.id : undefined,
+  });
   const activeYearQuery = useActiveAcademicYear();
   const activeYear = activeYearQuery.data?.data ?? null;
   const academicYearId = activeYear?.id;
@@ -51,26 +61,15 @@ export default function ResultsPage() {
   const resultsQuery = useClassSectionResults(classSectionId ?? null, academicYearId, 'final');
   const results = resultsQuery.data ?? null;
 
-  const isClassTeacher =
-    userTyped?.roles?.some((r) => r.roleName === 'class_teacher') ?? false;
-
-  // Auto-select sole class-section for class teachers
+  // Auto-select sole class-section (common for class teachers)
   useEffect(() => {
     const list = (classSectionsQuery.data?.data as ClassSection[] | undefined) ?? [];
-    if (isClassTeacher && staffData?.id) {
-      // Filter to only sections where this staff member is class teacher
-      const ownSections = list.filter((cs) => cs.classTeacherId === staffData.id);
-      if (ownSections.length === 1 && !classSectionId) {
-        setClassSectionId(ownSections[0]!.id);
-      }
+    if (list.length === 1 && !classSectionId) {
+      setClassSectionId(list[0]!.id);
     }
-  }, [isClassTeacher, staffData?.id, classSectionId, classSectionsQuery.data]);
+  }, [classSectionId, classSectionsQuery.data]);
 
-  const classList = (classSectionsQuery.data?.data as ClassSection[] | undefined) ?? [];
-  const visibleClassSections =
-    isClassTeacher && staffData?.id
-      ? classList.filter((cs) => cs.classTeacherId === staffData.id)
-      : classList;
+  const visibleClassSections = (classSectionsQuery.data?.data as ClassSection[] | undefined) ?? [];
   const classOptions = visibleClassSections
     .sort((a, b) => {
       const classOrderA = a.classSortOrder ?? 999;

@@ -62,7 +62,9 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
     isActive: true,
     classTeacherId: staffId,
   });
-  const classSections = classSectionsData?.data ?? [];
+  // Dashboard should show only class-teacher classes (not subject-teacher classes).
+  // Backend may include subject-teacher sections when classTeacherId is provided (for attendance visibility).
+  const classSections = (classSectionsData?.data ?? []).filter((cs) => cs.classTeacherId === staffId);
   const assessmentsQuery = useAssessments({ limit: 1, page: 1 });
   const timetableQuery = useMyTimetable();
   const { data: unreadCount = 0 } = useUnreadCount();
@@ -85,11 +87,22 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
     ? formatRoleName(user.roles[0].roleName)
     : t('teacher');
 
-  const firstClass =
-    classSections.length > 0 ? classSections[0] : undefined;
-  const classDescriptor = firstClass
-    ? `${firstClass.className || firstClass.classDisplayName || ''} ${firstClass.sectionName || ''}`.trim()
-    : '';
+  const classDescriptor =
+    classSections.length > 0
+      ? classSections
+          .slice()
+          .sort((a, b) => {
+            const ca = a.classSortOrder ?? 999;
+            const cb = b.classSortOrder ?? 999;
+            if (ca !== cb) return ca - cb;
+            const sa = a.sectionSortOrder ?? 999;
+            const sb = b.sectionSortOrder ?? 999;
+            return sa - sb;
+          })
+          .map((cs) => `${cs.className || cs.classDisplayName || ''} ${cs.sectionName || ''}`.trim())
+          .filter(Boolean)
+          .join(', ')
+      : '';
 
   const chartData = [
     { name: t('assessment'), count: pendingGradingTotal },

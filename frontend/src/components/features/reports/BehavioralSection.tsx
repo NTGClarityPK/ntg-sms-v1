@@ -1,16 +1,23 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Table, Paper, Text, Skeleton } from '@mantine/core';
+import { Table, Paper, Text, Skeleton, Divider, Stack } from '@mantine/core';
 import type { BehavioralSection as BehavioralSectionType } from '@/types/reports';
 import { StarRating } from '@/components/features/behavioral/StarRating';
+import type { AssignmentStatistics } from '@/types/reports';
+import { AssignmentStatisticsSection } from './AssignmentStatisticsSection';
 
 interface BehavioralSectionProps {
   data: BehavioralSectionType | null | undefined;
   isLoading: boolean;
+  assignmentStatistics?: AssignmentStatistics;
 }
 
-export function BehavioralSectionReport({ data, isLoading }: BehavioralSectionProps) {
+export function BehavioralSectionReport({
+  data,
+  isLoading,
+  assignmentStatistics,
+}: BehavioralSectionProps) {
   const t = useTranslations('behavioral');
   if (isLoading) {
     return (
@@ -25,6 +32,12 @@ export function BehavioralSectionReport({ data, isLoading }: BehavioralSectionPr
       <Paper withBorder p="md">
         <Text fw={600} mb="xs">{t('behavioralLabel')}</Text>
         <Text c="dimmed" size="sm">{t('noBehavioralAssessments')}</Text>
+        {assignmentStatistics ? (
+          <>
+            <Divider my="md" />
+            <AssignmentStatisticsSection data={assignmentStatistics} />
+          </>
+        ) : null}
       </Paper>
     );
   }
@@ -35,38 +48,49 @@ export function BehavioralSectionReport({ data, isLoading }: BehavioralSectionPr
 
   return (
     <Paper withBorder p="md">
-      <Text fw={600} mb="md">{t('behavioralLabel')}</Text>
-      <Table withTableBorder withColumnBorders>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>{t('period')}</Table.Th>
-            {allAttributes.map((attr) => (
-              <Table.Th key={attr}>{attr}</Table.Th>
-            ))}
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {data.periods.map((p) => {
-            const attrMap = Object.fromEntries(
-              p.attributes.map((a) => [a.attributeName, a.average]),
-            );
-            return (
-              <Table.Tr key={p.period}>
-                <Table.Td>{p.period}</Table.Td>
+      <Stack gap="md">
+        <div>
+          <Text fw={600} mb="md">{t('behavioralLabel')}</Text>
+          <Table withTableBorder withColumnBorders>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('period')}</Table.Th>
                 {allAttributes.map((attr) => (
-                  <Table.Td key={attr}>
-                    {attrMap[attr] != null ? (
-                      <StarRating value={attrMap[attr]} readonly size={18} />
-                    ) : (
-                      '—'
-                    )}
-                  </Table.Td>
+                  <Table.Th key={attr}>{attr}</Table.Th>
                 ))}
               </Table.Tr>
-            );
-          })}
-        </Table.Tbody>
-      </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {data.periods.map((p) => {
+                const attrMap = Object.fromEntries(
+                  p.attributes.map((a) => [a.attributeName, a.average]),
+                );
+                return (
+                  <Table.Tr key={p.period}>
+                    <Table.Td>{p.period}</Table.Td>
+                    {allAttributes.map((attr) => (
+                      <Table.Td key={attr}>
+                        {attrMap[attr] != null ? (
+                          <StarRating value={attrMap[attr]} readonly size={18} />
+                        ) : (
+                          '—'
+                        )}
+                      </Table.Td>
+                    ))}
+                  </Table.Tr>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
+        </div>
+
+        {assignmentStatistics ? (
+          <>
+            <Divider />
+            <AssignmentStatisticsSection data={assignmentStatistics} />
+          </>
+        ) : null}
+      </Stack>
     </Paper>
   );
 }

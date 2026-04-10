@@ -153,9 +153,14 @@ export class ReportsService {
       if (!activeYear) return null;
       const today = new Date().toISOString().split('T')[0];
       const yearEnd = activeYear.endDate.split('T')[0];
+      const start = activeYear.startDate.split('T')[0];
+      const end = today <= yearEnd ? today : yearEnd;
+      // Guard against misconfigured future-dated academic years where start > end.
+      // In that case, treat the period as a single-day range at `end` (usually "today"),
+      // so reports still work with real data timestamps.
       return {
-        startDate: activeYear.startDate.split('T')[0],
-        endDate: today <= yearEnd ? today : yearEnd,
+        startDate: start <= end ? start : end,
+        endDate: end,
       };
     }
 
@@ -352,17 +357,42 @@ export class ReportsService {
     academicYearId: string,
   ): Promise<string | null> {
     const supabase = this.supabaseConfig.getClient();
-    const { data: student, error } = await supabase
-      .from('students')
+    // Preferred: year-scoped placement from student_enrolments
+    const { data: enrol, error: enrolErr } = await supabase
+      .from('student_enrolments')
       .select('class_id, section_id')
-      .eq('id', studentId)
+      .eq('student_id', studentId)
       .eq('branch_id', branchId)
       .eq('academic_year_id', academicYearId)
+      .eq('status', 'active')
       .maybeSingle();
-    throwIfDbError(error);
-    if (!student || !(student as { class_id: string }).class_id) return null;
+    throwIfDbError(enrolErr);
 
-    const s = student as { class_id: string; section_id: string };
+    // Fallback: legacy students table (older data / pre-migration screens)
+    const placement =
+      enrol && (enrol as { class_id: string | null; section_id: string | null }).class_id
+        ? (enrol as { class_id: string; section_id: string })
+        : (() => {
+            // NOTE: students table placement can be stale post-enrolments migration, hence fallback only.
+            return null;
+          })();
+
+    const legacyPlacement = async (): Promise<{ class_id: string; section_id: string } | null> => {
+      const { data: student, error } = await supabase
+        .from('students')
+        .select('class_id, section_id')
+        .eq('id', studentId)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', academicYearId)
+        .maybeSingle();
+      throwIfDbError(error);
+      if (!student || !(student as { class_id?: string | null }).class_id) return null;
+      return student as { class_id: string; section_id: string };
+    };
+
+    const s = placement ?? (await legacyPlacement());
+    if (!s?.class_id) return null;
+
     const { data: cs } = await supabase
       .from('class_sections')
       .select('id')
@@ -640,14 +670,15 @@ export class ReportsService {
     if (!cs) return result;
 
     const c = cs as { class_id: string; section_id: string };
-    const { data: students } = await supabase
-      .from('students')
-      .select('id')
+    const { data: enrolments } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
       .eq('class_id', c.class_id)
       .eq('section_id', c.section_id)
       .eq('branch_id', branchId)
-      .eq('academic_year_id', academicYearId);
-    const studentIds = (students || []).map((s: { id: string }) => s.id);
+      .eq('academic_year_id', academicYearId)
+      .eq('status', 'active');
+    const studentIds = (enrolments || []).map((s: { student_id: string }) => s.student_id);
     if (studentIds.length === 0) return result;
 
     const { data: assessList } = await supabase
@@ -726,14 +757,15 @@ export class ReportsService {
     if (!cs) return {};
 
     const c = cs as { class_id: string; section_id: string };
-    const { data: students } = await supabase
-      .from('students')
-      .select('id')
+    const { data: enrolments } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
       .eq('class_id', c.class_id)
       .eq('section_id', c.section_id)
       .eq('branch_id', branchId)
-      .eq('academic_year_id', academicYearId);
-    const studentIds = (students || []).map((s: { id: string }) => s.id);
+      .eq('academic_year_id', academicYearId)
+      .eq('status', 'active');
+    const studentIds = (enrolments || []).map((s: { student_id: string }) => s.student_id);
     if (studentIds.length === 0) return {};
 
     const { data: assessList } = await supabase
@@ -849,9 +881,12 @@ export class ReportsService {
 
     // Filter by date range if provided
     if (dateRange) {
+      // created_at is timestamptz; compare using full-day bounds to avoid excluding same-day rows.
+      const startTs = `${dateRange.startDate}T00:00:00.000Z`;
+      const endTs = `${dateRange.endDate}T23:59:59.999Z`;
       assessmentsQuery = assessmentsQuery
-        .gte('created_at', dateRange.startDate)
-        .lte('created_at', dateRange.endDate);
+        .gte('created_at', startTs)
+        .lte('created_at', endTs);
     }
 
     const { data: assessments } = await assessmentsQuery;
@@ -869,7 +904,7 @@ export class ReportsService {
       });
     }
 
-    // Get student's statuses for these assessments
+    // Get student's statuses for these assessments (if assignment engagement feature is used)
     const { data: statuses } = await supabase
       .from('student_assessment_statuses')
       .select('assessment_id, status, is_read')
@@ -883,6 +918,20 @@ export class ReportsService {
       ]),
     );
 
+    // Grades are the canonical "teacher has graded" signal in this system.
+    // When student_assessment_statuses isn't populated, fall back to student_grades to compute submission-like stats.
+    const { data: gradeRows } = await supabase
+      .from('student_grades')
+      .select('assessment_id')
+      .eq('branch_id', branchId)
+      .eq('student_id', studentId)
+      .in('assessment_id', assessmentIds);
+    const gradedAssessmentIds = new Set(
+      (gradeRows || [])
+        .map((g: { assessment_id: string | null }) => g.assessment_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    );
+
     let totalAssignments = assessmentIds.length;
     let viewedAssignments = 0;
     let submittedAssignments = 0;
@@ -894,7 +943,8 @@ export class ReportsService {
       if (status?.isRead) {
         viewedAssignments++;
       }
-      if (status?.status === 'submitted') {
+      const hasGrade = gradedAssessmentIds.has(assessmentId);
+      if (status?.status === 'submitted' || hasGrade) {
         submittedAssignments++;
       } else if (status?.status === 'in_progress') {
         inProgressAssignments++;
@@ -947,9 +997,12 @@ export class ReportsService {
 
     // Filter by date range if provided
     if (dateRange) {
+      // created_at is timestamptz; compare using full-day bounds to avoid excluding same-day rows.
+      const startTs = `${dateRange.startDate}T00:00:00.000Z`;
+      const endTs = `${dateRange.endDate}T23:59:59.999Z`;
       assessmentsQuery = assessmentsQuery
-        .gte('created_at', dateRange.startDate)
-        .lte('created_at', dateRange.endDate);
+        .gte('created_at', startTs)
+        .lte('created_at', endTs);
     }
 
     const { data: assessments } = await assessmentsQuery;
@@ -1778,18 +1831,17 @@ th{background:#eee;}
         supabase.from('classes').select('display_name').eq('id', c.class_id).single(),
         supabase.from('sections').select('name').eq('id', c.section_id).single(),
         supabase
-          .from('students')
-          .select('id, user_id')
+          .from('student_enrolments')
+          .select('student_id')
           .eq('class_id', c.class_id)
           .eq('section_id', c.section_id)
           .eq('branch_id', branchId)
           .eq('academic_year_id', yearId)
-          .eq('is_active', true),
+          .eq('status', 'active'),
       ]);
       const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
       const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
-      const students = (studentsRes.data || []) as { id: string; user_id: string | null }[];
-      const studentIds = students.map((s) => s.id);
+      const studentIds = ((studentsRes.data || []) as Array<{ student_id: string }>).map((s) => s.student_id);
       if (studentIds.length === 0) {
         byClass.push(
           new SubjectClassPerformanceDto({
@@ -1804,6 +1856,14 @@ th{background:#eee;}
         );
         continue;
       }
+
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, user_id')
+        .in('id', studentIds)
+        .eq('branch_id', branchId)
+        .eq('is_active', true);
+      const studentRows = (students || []) as { id: string; user_id: string | null }[];
 
       const { data: assessList } = await supabase
         .from('assessments')
@@ -1837,7 +1897,7 @@ th{background:#eee;}
         const avg = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
         averages.set(sid, Math.round(avg));
       });
-      const userIds = students.map((s) => s.user_id).filter(Boolean) as string[];
+      const userIds = studentRows.map((s) => s.user_id).filter(Boolean) as string[];
       const profileMap = new Map<string, string>();
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -1847,7 +1907,7 @@ th{background:#eee;}
         (profiles || []).forEach((p: { id: string; full_name: string }) => profileMap.set(p.id, p.full_name));
       }
       const studentIdToName = new Map(
-        students.map((s) => [s.id, s.user_id ? profileMap.get(s.user_id) ?? 'Unknown' : 'Unknown']),
+        studentRows.map((s) => [s.id, s.user_id ? profileMap.get(s.user_id) ?? 'Unknown' : 'Unknown']),
       );
       const sorted = [...averages.entries()].sort((a, b) => b[1] - a[1]);
       const top5 = sorted.slice(0, 5).map(([id, pct]) => ({
@@ -2177,14 +2237,24 @@ th{background:#eee;}
     const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
     const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
 
-    const { data: studentRows } = await supabase
-      .from('students')
-      .select('id, user_id')
+    const { data: enrolments } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
       .eq('class_id', c.class_id)
       .eq('section_id', c.section_id)
       .eq('branch_id', branchId)
       .eq('academic_year_id', yearId)
-      .eq('is_active', true);
+      .eq('status', 'active');
+    const studentIds = (enrolments || []).map((r: { student_id: string }) => r.student_id);
+    const { data: studentRows } =
+      studentIds.length > 0
+        ? await supabase
+            .from('students')
+            .select('id, user_id')
+            .in('id', studentIds)
+            .eq('branch_id', branchId)
+            .eq('is_active', true)
+        : { data: [] };
     const students = (studentRows || []) as { id: string; user_id: string | null }[];
     const userIds = students.map((s) => s.user_id).filter(Boolean) as string[];
 
@@ -2196,7 +2266,6 @@ th{background:#eee;}
       (profiles || []).map((p: { id: string; full_name: string }) => [p.id, p.full_name]),
     );
 
-    const studentIds = students.map((s) => s.id);
     const [summaryMap, gradesMap, assignmentStatsMap] = await Promise.all([
       this.attendanceService.getAttendanceSummariesByStudents(
         studentIds,
@@ -2440,15 +2509,26 @@ th{background:#eee;}
       .maybeSingle();
     const subjectName = (subjectRow as { name?: string } | null)?.name ?? 'Unknown';
 
-    const { data: students } = await supabase
-      .from('students')
-      .select('id, user_id')
+    const { data: enrolments } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
       .eq('class_id', c.class_id)
       .eq('section_id', c.section_id)
       .eq('branch_id', branchId)
-      .eq('academic_year_id', yearId);
-    const studentIds = (students || []).map((s: { id: string; user_id: string | null }) => s.id);
-    const userIds = (students || []).map((s) => s.user_id).filter(Boolean) as string[];
+      .eq('academic_year_id', yearId)
+      .eq('status', 'active');
+    const studentIds = (enrolments || []).map((r: { student_id: string }) => r.student_id);
+
+    const { data: students } =
+      studentIds.length > 0
+        ? await supabase
+            .from('students')
+            .select('id, user_id')
+            .in('id', studentIds)
+            .eq('branch_id', branchId)
+            .eq('is_active', true)
+        : { data: [] };
+    const userIds = (students || []).map((s: { user_id: string | null }) => s.user_id).filter(Boolean) as string[];
 
     const { data: profiles } = await supabase
       .from('profiles')
@@ -3149,14 +3229,25 @@ th{background:#eee;}
     const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
     const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
 
-    const { data: students } = await supabase
-      .from('students')
-      .select('id, user_id')
+    const { data: enrolments } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
       .eq('class_id', c.class_id)
       .eq('section_id', c.section_id)
       .eq('branch_id', branchId)
       .eq('academic_year_id', yearId)
-      .eq('is_active', true);
+      .eq('status', 'active');
+    const studentIds = (enrolments || []).map((r: { student_id: string }) => r.student_id);
+
+    const { data: students } =
+      studentIds.length > 0
+        ? await supabase
+            .from('students')
+            .select('id, user_id')
+            .in('id', studentIds)
+            .eq('branch_id', branchId)
+            .eq('is_active', true)
+        : { data: [] };
 
     const studentList = (students || []) as { id: string; user_id: string | null }[];
     const userIds = studentList.map((s) => s.user_id).filter(Boolean) as string[];

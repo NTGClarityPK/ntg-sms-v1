@@ -11,7 +11,6 @@ import { ScheduleStep } from './wizard-steps/ScheduleStep';
 import { AssessmentStep } from './wizard-steps/AssessmentStep';
 import { CommunicationStep } from './wizard-steps/CommunicationStep';
 import { BehaviorStep } from './wizard-steps/BehaviorStep';
-import { PermissionsStep } from './wizard-steps/PermissionsStep';
 import { SetupReviewForm } from './SetupReviewForm';
 import type { AcademicYearData, SetupWizardData } from './wizard-steps/types';
 import { useSaveSetupWizard } from '@/hooks/useSetupWizard';
@@ -30,7 +29,7 @@ interface SetupWizardProps {
   onComplete: () => void;
 }
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 
 export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
   const colors = useThemeColors();
@@ -75,7 +74,6 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
     },
     communication: null,
     behavior: null,
-    permissions: [],
   });
 
   useEffect(() => {
@@ -170,7 +168,6 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
       },
       communication: null,
       behavior: null,
-      permissions: [],
     });
     onClose();
   };
@@ -256,15 +253,6 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
         );
       case 6:
         return (
-          <PermissionsStep
-            data={wizardData.permissions}
-            onChange={(data) => handleStepDataChange(6, { permissions: data })}
-            onNext={handleNext}
-            onBack={handleBack}
-          />
-        );
-      case 7:
-        return (
           <SetupReviewForm
             data={wizardData}
             onBack={handleBack}
@@ -320,11 +308,6 @@ export function SetupWizard({ opened, onClose, onComplete }: SetupWizardProps) {
           <Stepper.Step label="Behavior" description="Assessment settings">
             <Text size="sm" c="dimmed" mt="md">
               Step 6 of {TOTAL_STEPS + 1}
-            </Text>
-          </Stepper.Step>
-          <Stepper.Step label="Permissions" description="Role permissions">
-            <Text size="sm" c="dimmed" mt="md">
-              Step 7 of {TOTAL_STEPS + 1}
             </Text>
           </Stepper.Step>
           <Stepper.Completed>

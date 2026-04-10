@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon, Button, Group, Stack, Text, TextInput, NumberInput } from '@mantine/core';
+import { ActionIcon, Alert, Button, Group, Stack, Text, TextInput, NumberInput } from '@mantine/core';
 import { useState } from 'react';
 import { IconTrash } from '@tabler/icons-react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -19,10 +19,12 @@ const DEFAULT_LEAVE_QUOTA = 7;
 export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentStepProps) {
   const colors = useThemeColors();
   const tSettings = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const [newAssessmentType, setNewAssessmentType] = useState({ name: '', sortOrder: 0 });
   const [newGradeTemplate, setNewGradeTemplate] = useState({ name: '' });
   const [newRange, setNewRange] = useState({ letter: '', minPercentage: 0, maxPercentage: 100, sortOrder: 0 });
   const [leaveQuota, setLeaveQuota] = useState(data.leaveQuota ?? DEFAULT_LEAVE_QUOTA);
+  const [rangeError, setRangeError] = useState<string | null>(null);
 
   /** Parent may still have `leaveQuota: null` while the input shows the default; Next must use the effective value. */
   const resolvedLeaveQuota = data.leaveQuota ?? leaveQuota;
@@ -84,6 +86,22 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
       const lastTemplate = data.gradeTemplates[data.gradeTemplates.length - 1];
       const templateId = lastTemplate.name;
       const newRangeData = { ...newRange, letter: newRange.letter.trim(), sortOrder: lastTemplate.ranges.length };
+
+      // Validate overlap immediately (inclusive bounds).
+      // Example: 80–90 and 90–100 overlaps at 90.
+      const candidateMin = Math.min(newRangeData.minPercentage, newRangeData.maxPercentage);
+      const candidateMax = Math.max(newRangeData.minPercentage, newRangeData.maxPercentage);
+      const overlaps = (lastTemplate.ranges ?? []).some((r) => {
+        const rMin = Math.min(r.minPercentage, r.maxPercentage);
+        const rMax = Math.max(r.minPercentage, r.maxPercentage);
+        return candidateMin <= rMax && candidateMax >= rMin;
+      });
+      if (overlaps) {
+        setRangeError(tSettings('gradeRangeOverlapError') || 'Grade ranges cannot overlap.');
+        return;
+      }
+      setRangeError(null);
+
       onChange({
         ...data,
         gradeRanges: [
@@ -235,27 +253,46 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
                           id="assessment-step-range-letter"
                           placeholder={tSettings('setupWizardAssessmentRangeLetterPlaceholder')}
                           value={newRange.letter}
-                          onChange={(e) => setNewRange({ ...newRange, letter: e.target.value })}
+                          onChange={(e) => {
+                            setRangeError(null);
+                            setNewRange({ ...newRange, letter: e.target.value });
+                          }}
                           style={{ width: 100 }}
                         />
                         <NumberInput
                           id="assessment-step-range-min"
                           placeholder={tSettings('setupWizardAssessmentRangeMinPlaceholder')}
                           value={newRange.minPercentage}
-                          onChange={(val) => setNewRange({ ...newRange, minPercentage: Number(val) || 0 })}
+                          onChange={(val) => {
+                            setRangeError(null);
+                            setNewRange({ ...newRange, minPercentage: Number(val) || 0 });
+                          }}
                           style={{ width: 100 }}
                         />
                         <NumberInput
                           id="assessment-step-range-max"
                           placeholder={tSettings('setupWizardAssessmentRangeMaxPlaceholder')}
                           value={newRange.maxPercentage}
-                          onChange={(val) => setNewRange({ ...newRange, maxPercentage: Number(val) || 100 })}
+                          onChange={(val) => {
+                            setRangeError(null);
+                            setNewRange({ ...newRange, maxPercentage: Number(val) || 100 });
+                          }}
                           style={{ width: 100 }}
                         />
                         <Button id="assessment-step-add-range" onClick={handleAddRange} size="sm">
                           Add Range
                         </Button>
                       </Group>
+                      {rangeError && (
+                        <Alert
+                          color={colors.error}
+                          variant="light"
+                          title={tCommon('error')}
+                          mt="xs"
+                        >
+                          {rangeError}
+                        </Alert>
+                      )}
                     </div>
                   )}
                 </div>

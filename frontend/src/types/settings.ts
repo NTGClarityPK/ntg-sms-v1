@@ -7,6 +7,22 @@ export interface AcademicYear {
   isLocked: boolean;
   createdAt: string;
   updatedAt: string;
+  rollover?: {
+    sourceAcademicYearId: string;
+    sourceAcademicYearName?: string;
+    completedAt: string;
+    carryForward: {
+      teacherAssignments?: boolean;
+      timetableSlots?: boolean;
+      leaveSettings?: boolean;
+    };
+    result: {
+      classSectionsCopied?: number;
+      teacherAssignmentsCopied?: number;
+      timetableSlotsCopied?: number;
+      leaveSettingsCopied?: number;
+    };
+  };
 }
 
 export interface Subject {

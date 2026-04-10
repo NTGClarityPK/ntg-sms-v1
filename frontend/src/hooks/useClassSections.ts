@@ -219,10 +219,10 @@ export function useClassSectionStudents(id: string | null) {
     queryKey: ['class-section-students', id],
     queryFn: async () => {
       if (!id) return null;
-      const response = await apiClient.get<{ data: ClassSectionStudent[] }>(
+      const response = await apiClient.get<ClassSectionStudent[]>(
         `/api/v1/class-sections/${id}/students`,
       );
-      return response.data;
+      return response;
     },
     enabled: !!id,
     staleTime: 2 * 60 * 1000, // 2 minutes - student list can change

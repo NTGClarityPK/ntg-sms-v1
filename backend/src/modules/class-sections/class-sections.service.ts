@@ -142,6 +142,7 @@ export class ClassSectionsService {
     if (!query.minimal) {
       studentCounts = await this.getStudentCountsForBranch(
         branchId,
+        activeYearId,
         rows.map((cs) => ({ id: cs.id, class_id: cs.class_id, section_id: cs.section_id })),
       );
       const teacherIds = rows
@@ -566,7 +567,7 @@ export class ClassSectionsService {
 
     const { data: classSection, error: csError } = await supabase
       .from('class_sections')
-      .select('class_id, section_id')
+      .select('class_id, section_id, academic_year_id')
       .eq('id', id)
       .eq('branch_id', branchId)
       .single();
@@ -575,16 +576,44 @@ export class ClassSectionsService {
       throw new NotFoundException('Class section not found');
     }
 
-    const cs = classSection as { class_id: string; section_id: string };
+    const cs = classSection as { class_id: string; section_id: string; academic_year_id: string };
+
+    // Use enrolments to ensure year-scoped roster
+    const { data: enrolments, error: enrolError } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', cs.academic_year_id)
+      .eq('class_id', cs.class_id)
+      .eq('section_id', cs.section_id)
+      .eq('status', 'active');
+
+    throwIfDbError(enrolError);
+
+    let studentIds = (enrolments || []).map((e) => (e as { student_id: string }).student_id);
+
+    // Backward compatibility: if enrolments were not backfilled/maintained for this tenant/year,
+    // fall back to legacy students placement (students.academic_year_id + class_id + section_id).
+    if (studentIds.length === 0) {
+      const { data: legacyStudents, error: legacyErr } = await supabase
+        .from('students')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', cs.academic_year_id)
+        .eq('class_id', cs.class_id)
+        .eq('section_id', cs.section_id)
+        .eq('is_active', true);
+      throwIfDbError(legacyErr);
+      studentIds = (legacyStudents || []).map((s) => (s as { id: string }).id);
+    }
+
+    if (studentIds.length === 0) return { data: [] };
 
     const { data: students, error: studentsError } = await supabase
       .from('students')
       .select('id, student_id, first_name, last_name')
-      .eq('branch_id', branchId)
-      .eq('class_id', cs.class_id)
-      .eq('section_id', cs.section_id)
-      .eq('is_active', true);
-
+      .in('id', studentIds)
+      .eq('branch_id', branchId);
     throwIfDbError(studentsError);
 
     const studentList = (students || []).map((s) => {
@@ -606,7 +635,7 @@ export class ClassSectionsService {
     // Get class-section details
     const { data: classSection, error: csError } = await supabase
       .from('class_sections')
-      .select('class_id, section_id, branch_id')
+      .select('class_id, section_id, branch_id, academic_year_id')
       .eq('id', id)
       .maybeSingle();
     throwIfDbError(csError);
@@ -614,16 +643,22 @@ export class ClassSectionsService {
       return 0;
     }
 
-    const cs = classSection as { class_id: string; section_id: string; branch_id: string };
+    const cs = classSection as {
+      class_id: string;
+      section_id: string;
+      branch_id: string;
+      academic_year_id: string;
+    };
 
-    // Count students
+    // Count students (year-scoped via enrolments)
     const { count, error } = await supabase
-      .from('students')
+      .from('student_enrolments')
       .select('*', { count: 'exact', head: true })
       .eq('branch_id', cs.branch_id)
+      .eq('academic_year_id', cs.academic_year_id)
       .eq('class_id', cs.class_id)
       .eq('section_id', cs.section_id)
-      .eq('is_active', true);
+      .eq('status', 'active');
 
     throwIfDbError(error);
     return count ?? 0;
@@ -635,6 +670,7 @@ export class ClassSectionsService {
    */
   private async getStudentCountsForBranch(
     branchId: string,
+    academicYearId: string,
     classSections: Array<{ id: string; class_id: string; section_id: string }>,
   ): Promise<Map<string, number>> {
     if (classSections.length === 0) {
@@ -644,10 +680,11 @@ export class ClassSectionsService {
     const supabase = this.supabaseConfig.getClient();
 
     const { data: students, error } = await supabase
-      .from('students')
+      .from('student_enrolments')
       .select('class_id, section_id')
       .eq('branch_id', branchId)
-      .eq('is_active', true);
+      .eq('academic_year_id', academicYearId)
+      .eq('status', 'active');
     throwIfDbError(error);
 
     const countByClassSection = new Map<string, number>();

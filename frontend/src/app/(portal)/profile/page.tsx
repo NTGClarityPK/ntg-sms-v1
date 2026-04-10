@@ -14,13 +14,21 @@ import {
   Button,
   Divider,
   Container,
+  List,
+  ThemeIcon,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconCheck, IconMail, IconUser } from '@tabler/icons-react';
+import { IconCheck, IconMail, IconUser, IconChalkboard, IconBook } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import ParentPinSection from '@/components/profile/ParentPinSection';
+import { useMyStaff } from '@/hooks/useStaff';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
+import { useClassSections } from '@/hooks/useClassSections';
+import { useAssignmentsByTeacher } from '@/hooks/useTeacherAssignments';
+import type { ClassSection } from '@/types/class-sections';
+import type { TeacherAssignment } from '@/types/teacher-assignments';
 
 export default function ProfilePage() {
   const tCommon = useTranslations('common');
@@ -29,6 +37,21 @@ export default function ProfilePage() {
 
   const profileQuery = useProfile();
   const updateProfile = useUpdateProfile();
+
+  const { data: myStaffData } = useMyStaff();
+  const staffId = myStaffData?.data?.id ?? null;
+  const activeYearQuery = useActiveAcademicYear();
+  const activeYearId = activeYearQuery.data?.data?.id ?? undefined;
+
+  const classSectionsQuery = useClassSections({
+    limit: 500,
+    minimal: true,
+    isActive: true,
+    classTeacherId: staffId ?? undefined,
+    enabled: !!staffId,
+  });
+
+  const teacherAssignmentsQuery = useAssignmentsByTeacher(staffId, activeYearId);
 
   const form = useForm<{ fullName: string; email: string }>({
     initialValues: {
@@ -164,6 +187,124 @@ export default function ProfilePage() {
                   </form>
                 </Stack>
               </Paper>
+
+              {/* Teaching summary (teachers only) */}
+              {staffId ? (
+                <Paper withBorder p="md">
+                  <Stack gap="md">
+                    <Group>
+                      <IconChalkboard size={24} />
+                      <Title order={3}>Teaching</Title>
+                    </Group>
+
+                    <Divider />
+
+                    {classSectionsQuery.isLoading || teacherAssignmentsQuery.isLoading ? (
+                      <Stack gap="xs">
+                        <Skeleton height={20} width="40%" />
+                        <Skeleton height={54} />
+                      </Stack>
+                    ) : (
+                      <>
+                        {(() => {
+                          const allSections =
+                            (classSectionsQuery.data?.data as ClassSection[] | undefined) ?? [];
+
+                          const classTeacherSections = allSections
+                            .filter((cs) => cs.classTeacherId === staffId)
+                            .slice()
+                            .sort((a, b) => {
+                              const ca = a.classSortOrder ?? 999;
+                              const cb = b.classSortOrder ?? 999;
+                              if (ca !== cb) return ca - cb;
+                              const sa = a.sectionSortOrder ?? 999;
+                              const sb = b.sectionSortOrder ?? 999;
+                              return sa - sb;
+                            });
+
+                          const assignments =
+                            (teacherAssignmentsQuery.data as TeacherAssignment[] | null) ?? [];
+
+                          const subjectTeacherLines = assignments
+                            .filter((a) => a.classSectionId)
+                            .map((a) => {
+                              const classLabel =
+                                a.classSectionName ||
+                                `${a.className ?? ''}${a.sectionName ? `-${a.sectionName}` : ''}`.trim();
+                              const subjectLabel = a.subjectName ?? 'Subject';
+                              const label = `${classLabel} (${subjectLabel})`.trim();
+                              return { key: a.id, label };
+                            })
+                            .filter((x) => x.label.length > 0)
+                            .sort((a, b) => a.label.localeCompare(b.label));
+
+                          const hasAny =
+                            classTeacherSections.length > 0 || subjectTeacherLines.length > 0;
+
+                          if (!hasAny) {
+                            return (
+                              <Text size="sm" c="dimmed">
+                                No teaching assignments found for the active academic year.
+                              </Text>
+                            );
+                          }
+
+                          return (
+                            <Stack gap="md">
+                              {classTeacherSections.length > 0 ? (
+                                <Stack gap={6}>
+                                  <Text fw={600} size="sm">
+                                    Class Teacher of
+                                  </Text>
+                                  <List
+                                    size="sm"
+                                    spacing={4}
+                                    icon={
+                                      <ThemeIcon size={18} radius="xl" variant="light" color="blue">
+                                        <IconChalkboard size={12} />
+                                      </ThemeIcon>
+                                    }
+                                  >
+                                    {classTeacherSections.map((cs) => (
+                                      <List.Item key={cs.id}>
+                                        {`${cs.className ?? cs.classDisplayName ?? ''}-${cs.sectionName ?? ''}`.replace(
+                                          /-$/,
+                                          '',
+                                        )}
+                                      </List.Item>
+                                    ))}
+                                  </List>
+                                </Stack>
+                              ) : null}
+
+                              {subjectTeacherLines.length > 0 ? (
+                                <Stack gap={6}>
+                                  <Text fw={600} size="sm">
+                                    Subject Teacher of
+                                  </Text>
+                                  <List
+                                    size="sm"
+                                    spacing={4}
+                                    icon={
+                                      <ThemeIcon size={18} radius="xl" variant="light" color="grape">
+                                        <IconBook size={12} />
+                                      </ThemeIcon>
+                                    }
+                                  >
+                                    {subjectTeacherLines.map((x) => (
+                                      <List.Item key={x.key}>{x.label}</List.Item>
+                                    ))}
+                                  </List>
+                                </Stack>
+                              ) : null}
+                            </Stack>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </Stack>
+                </Paper>
+              ) : null}
 
               {/* Temporarily hidden: PIN setup is only enabled for student PIN via parent flow */}
               {false && <ParentPinSection />}

@@ -129,6 +129,7 @@ export class AttendanceService {
     if (!activeYear) {
       return;
     }
+    await this.academicYearsService.assertNotLockedForBranch(branchId, activeYear.id);
 
     // Create unrequested leave request with status 'approved' (since it's already happened)
     const { error } = await supabase
@@ -434,20 +435,37 @@ export class AttendanceService {
       throw new NotFoundException('Class section not found');
     }
 
-    // Fetch all students in the class-section (using class_id and section_id)
-    const { data: studentsData, error: studentsError } = await supabase
-      .from('students')
-      .select('id, user_id, student_id')
+    // Fetch all active students in the class-section for the academic year via enrolments.
+    // Do NOT use legacy students.class_id/section_id: placements are year-scoped in student_enrolments.
+    const { data: enrolments, error: enrolErr } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYearId)
       .eq('class_id', classSectionDetails.class_id)
       .eq('section_id', classSectionDetails.section_id)
-      .eq('branch_id', branchId)
-      .eq('is_active', true);
+      .eq('status', 'active');
+    throwIfDbError(enrolErr);
 
-    const studentIdNumberMap = new Map(
-      (studentsData || []).map((s) => [s.id, s.student_id]),
-    );
+    const studentIds = (enrolments || [])
+      .map((e) => (e as { student_id: string }).student_id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
+    const { data: studentsData, error: studentsError } =
+      studentIds.length > 0
+        ? await supabase
+            .from('students')
+            .select('id, user_id, student_id')
+            .in('id', studentIds)
+            .eq('branch_id', branchId)
+            .eq('is_active', true)
+        : {
+            data: [] as Array<{ id: string; user_id: string | null; student_id: string | null }>,
+            error: null,
+          };
     throwIfDbError(studentsError);
+
+    const studentIdNumberMap = new Map((studentsData || []).map((s) => [s.id, s.student_id]));
 
     // Fetch related data (profiles, class, section) in parallel
     const studentUserIds = (studentsData || [])
@@ -733,6 +751,8 @@ export class AttendanceService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
+    await this.academicYearsService.assertNotLockedForBranch(branchId, academicYearId);
+
     // Verify class-section exists and belongs to branch
     const { data: classSectionData, error: classSectionError } = await supabase
       .from('class_sections')
@@ -946,6 +966,10 @@ export class AttendanceService {
     if (!existing) {
       throw new NotFoundException('Attendance record not found');
     }
+    await this.academicYearsService.assertNotLockedForBranch(
+      branchId,
+      (existing as AttendanceRow).academic_year_id,
+    );
 
     const updateData: Partial<AttendanceRow> = {
       updated_at: new Date().toISOString(),
@@ -1421,13 +1445,13 @@ export class AttendanceService {
       supabase.from('classes').select('display_name').eq('id', c.class_id).single(),
       supabase.from('sections').select('name').eq('id', c.section_id).single(),
       supabase
-        .from('students')
-        .select('id')
-        .eq('class_id', c.class_id)
-        .eq('section_id', c.section_id)
+        .from('student_enrolments')
+        .select('student_id')
         .eq('branch_id', branchId)
         .eq('academic_year_id', academicYearId)
-        .eq('is_active', true),
+        .eq('class_id', c.class_id)
+        .eq('section_id', c.section_id)
+        .eq('status', 'active'),
       supabase
         .from('attendance')
         .select('student_id, status')
@@ -1440,7 +1464,7 @@ export class AttendanceService {
 
     const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
     const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
-    const students = (studentRows.data || []) as { id: string }[];
+    const students = (studentRows.data || []).map((r: { student_id: string }) => ({ id: r.student_id })) as { id: string }[];
     const attRows = (attendanceRows.data || []) as { student_id: string; status: string }[];
 
     const byStudent = new Map<

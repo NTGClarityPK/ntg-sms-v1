@@ -6,6 +6,7 @@ import {
   Badge,
   Group,
   ActionIcon,
+  Tooltip,
   Pagination,
   Text,
   Modal,
@@ -14,6 +15,8 @@ import {
   Button,
   ScrollArea,
   useMantineTheme,
+  CopyButton,
+  Alert,
 } from '@mantine/core';
 import { IconEdit, IconTrash, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
@@ -50,6 +53,11 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
   const [resendOpened, resendModal] = useDisclosure(false);
   const [resendUser, setResendUser] = useState<User | null>(null);
   const [recipientEmail, setRecipientEmail] = useState('');
+  const [sentInfo, setSentInfo] = useState<{
+    recipientEmail: string;
+    sentAt?: string;
+    expiresAt?: string;
+  } | null>(null);
   const { data: rolesData } = useRoles();
   const deleteUser = useDeleteUser();
   const resend = useResendInvitationForUser();
@@ -61,9 +69,57 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
     open();
   };
 
+  const openInvitationSentModal = (input: { recipientEmail: string; expiresAt?: string }) => {
+    const recipient = input.recipientEmail?.trim();
+    if (!recipient) return;
+
+    modals.open({
+      title: t('invitationDetailsTitle'),
+      size: 'lg',
+      centered: true,
+      children: (
+        <Stack gap="sm">
+          <Table withTableBorder withColumnBorders>
+            <Table.Tbody>
+              <Table.Tr>
+                <Table.Th w={180}>{t('invitationRecipientEmail')}</Table.Th>
+                <Table.Td>
+                  <Group justify="space-between" wrap="nowrap">
+                    <Text size="sm">{recipient}</Text>
+                    <CopyButton value={recipient}>
+                      {({ copy }) => (
+                        <Button size="xs" variant="light" onClick={copy}>
+                          {tCommon('copy')}
+                        </Button>
+                      )}
+                    </CopyButton>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+              {input.expiresAt && (
+                <Table.Tr>
+                  <Table.Th>Expires at</Table.Th>
+                  <Table.Td>
+                    <Text size="sm">{new Date(input.expiresAt).toLocaleString()}</Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+        </Stack>
+      ),
+    });
+  };
+
   const handleResend = (user: User) => {
     setResendUser(user);
     setRecipientEmail('');
+    // Show the most recently used invite destination (if we have it) inside the resend modal.
+    setSentInfo(
+      user.invitationRecipientEmail
+        ? { recipientEmail: user.invitationRecipientEmail, sentAt: user.invitationSentAt }
+        : null,
+    );
     resendModal.open();
   };
 
@@ -155,20 +211,37 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                   <Group gap="xs">
                     {canEdit && (
                       <>
-                        <ActionIcon variant="light" onClick={() => handleEdit(user)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="light" color="red" onClick={() => handleDelete(user)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                        <ActionIcon
-                          variant="light"
-                          onClick={() => handleResend(user)}
-                          aria-label="Resend invitation"
-                          id={`users-resend-invite-${user.id}`}
-                        >
-                          <IconMailForward size={16} />
-                        </ActionIcon>
+                        <Tooltip label={tCommon('edit')} withArrow>
+                          <ActionIcon
+                            id={`users-edit-${user.id}`}
+                            variant="light"
+                            onClick={() => handleEdit(user)}
+                            aria-label={tCommon('edit')}
+                          >
+                            <IconEdit size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label={t('deactivateUser')} withArrow>
+                          <ActionIcon
+                            id={`users-deactivate-${user.id}`}
+                            variant="light"
+                            color="red"
+                            onClick={() => handleDelete(user)}
+                            aria-label={t('deactivateUser')}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label={t('resendInvitationTitle')} withArrow>
+                          <ActionIcon
+                            variant="light"
+                            onClick={() => handleResend(user)}
+                            aria-label={t('resendInvitationTitle')}
+                            id={`users-resend-invite-${user.id}`}
+                          >
+                            <IconMailForward size={16} />
+                          </ActionIcon>
+                        </Tooltip>
                       </>
                     )}
                   </Group>
@@ -209,10 +282,49 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
           resendModal.close();
           setResendUser(null);
           setRecipientEmail('');
+          setSentInfo(null);
         }}
         title={t('resendInvitationTitle')}
       >
         <Stack gap="md">
+          {sentInfo?.recipientEmail && (
+            <Alert
+              variant="light"
+              title={t('invitationDetailsTitle')}
+              styles={{
+                root: {
+                  borderColor: 'var(--theme-primary)',
+                  backgroundColor: 'var(--theme-surface-variant)',
+                },
+                title: { color: 'var(--theme-text)' },
+              }}
+            >
+              <Stack gap={6}>
+                <Group justify="space-between" wrap="nowrap">
+                  <Text size="sm">{sentInfo.recipientEmail}</Text>
+                  <CopyButton value={sentInfo.recipientEmail}>
+                    {({ copy }) => (
+                      <Button size="xs" variant="light" onClick={copy}>
+                        {tCommon('copy')}
+                      </Button>
+                    )}
+                  </CopyButton>
+                </Group>
+                {sentInfo.sentAt && (
+                  <Text size="sm" c="dimmed">
+                    {t('invitationSentAt', {
+                      date: new Date(sentInfo.sentAt).toLocaleString(),
+                    })}
+                  </Text>
+                )}
+                {sentInfo.expiresAt && (
+                  <Text size="sm" c="dimmed">
+                    Expires at: {new Date(sentInfo.expiresAt).toLocaleString()}
+                  </Text>
+                )}
+              </Stack>
+            </Alert>
+          )}
           <Text size="sm" c="dimmed">
             {t('resendInvitationIntro', {
               name: resendUser?.fullName || resendUser?.email || '—',
@@ -244,14 +356,16 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
               disabled={!resendUser}
               onClick={async () => {
                 if (!resendUser) return;
-                await resend.mutateAsync({
+                const result = await resend.mutateAsync({
                   userId: resendUser.id,
                   invitationType: 'student',
                   recipientEmail: recipientEmail.trim() || undefined,
                 });
-                resendModal.close();
-                setResendUser(null);
-                setRecipientEmail('');
+                const usedEmail =
+                  recipientEmail.trim() ||
+                  resendUser.invitationRecipientEmail ||
+                  resendUser.email;
+                setSentInfo({ recipientEmail: usedEmail, expiresAt: result.expiresAt });
               }}
             >
               {t('resend')}

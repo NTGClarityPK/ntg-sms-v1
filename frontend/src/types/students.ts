@@ -26,6 +26,10 @@ export interface Student {
   sectionName?: string;
   subjectTemplateId?: string;
   subjectTemplateName?: string;
+  /** Where the latest setup invitation was sent (if any). */
+  invitationRecipientEmail?: string;
+  /** When the latest setup invitation was sent (if any). */
+  invitationSentAt?: string;
 }
 
 /** Display name for a student (first + second name). */

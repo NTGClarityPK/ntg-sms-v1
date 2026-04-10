@@ -16,3 +16,16 @@
   - `backend/src/modules/students/dto/create-student-with-invitation.dto.ts`
   - `backend/src/modules/students/dto/reinvite-student.dto.ts`
 - **Lesson**: **Be extremely careful with escaping in regex literals vs string regexes.** If the symptom is “valid input fails for a specific character”, suspect an accidental character class restriction. Also ensure backend errors are specific (field-level) so debugging doesn’t stall on generic “Invalid email address”.
+
+### “Empty list only for some roles” was actually wrong branch selected (not permissions)
+- **Issue**: Subject teacher saw empty `Assessment Type` dropdown while class teacher/admin saw types. API call returned HTTP 200 with `{"data":[],"meta":{"total":0,...}}` for subject teacher.
+- **Root cause**: The subject teacher’s `profiles.current_branch_id` pointed to a different branch (“Secondary Branch”) that had **no `assessment_types` rows**. The teacher still had access to the main branch, but their current branch selection was wrong/stale, so BranchGuard + RLS correctly scoped the query to the empty branch.
+- **What slowed debugging**: We iterated on frontend hook timing/caching (`enabled`/queryKey/localStorage) assuming hydration issues, without first verifying which `branch_id` the backend resolved for that user.
+- **Fix pattern**:
+  - First confirm which branch the user is effectively on:
+    - Check `profiles.current_branch_id` for the affected user.
+    - Check `user_branches` membership for the intended branch.
+    - Compare `count(*)` of the relevant table (`assessment_types`) across those branches.
+  - Only then adjust frontend caching/hydration.
+  - If users frequently land on an unconfigured branch, add a safe server-side heuristic to auto-switch to a configured branch (or force a branch-selection UX).
+- **Lesson**: When an endpoint returns **200 + empty data** for one user but not another, **don’t assume permissions or frontend state first**. Immediately validate the effective `branch_id` and whether that branch has any rows for the resource.

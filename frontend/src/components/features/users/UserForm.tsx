@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group, Text, Alert } from '@mantine/core';
+import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group, Text, Alert, CopyButton } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
@@ -205,6 +205,50 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
     >
       <form id="user-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
+          {isEdit && user?.invitationRecipientEmail && (
+            <Alert
+              variant="light"
+              title={t('invitationDetailsTitle')}
+              styles={{
+                root: {
+                  borderColor: 'var(--theme-primary)',
+                  backgroundColor: 'var(--theme-surface-variant)',
+                },
+                title: { color: 'var(--theme-text)' },
+              }}
+            >
+              <Stack gap={6}>
+                <Group justify="space-between" align="flex-end" wrap="nowrap">
+                  <TextInput
+                    id="user-form-invitation-recipient-email"
+                    label={t('invitationRecipientEmail')}
+                    value={user.invitationRecipientEmail}
+                    readOnly
+                    style={{ flex: 1 }}
+                  />
+                  <CopyButton value={user.invitationRecipientEmail}>
+                    {({ copy }) => (
+                      <Button
+                        id="user-form-invitation-copy-email"
+                        size="xs"
+                        variant="light"
+                        onClick={copy}
+                      >
+                        {tCommon('copy')}
+                      </Button>
+                    )}
+                  </CopyButton>
+                </Group>
+                {user.invitationSentAt && (
+                  <Text size="sm" c="dimmed">
+                    {t('invitationSentAt', {
+                      date: new Date(user.invitationSentAt).toLocaleString(),
+                    })}
+                  </Text>
+                )}
+              </Stack>
+            </Alert>
+          )}
           {!isEdit && (
             <>
               <MultiSelect

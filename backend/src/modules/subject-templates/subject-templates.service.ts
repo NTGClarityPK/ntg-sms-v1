@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
+import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { CreateSubjectTemplateDto } from './dto/create-subject-template.dto';
 import { UpdateSubjectTemplateDto } from './dto/update-subject-template.dto';
 import { SubjectTemplateDto } from './dto/subject-template.dto';
@@ -74,6 +75,7 @@ export class SubjectTemplatesService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
+    private readonly academicYearsService: AcademicYearsService,
   ) {}
 
   async createSubjectTemplate(
@@ -271,26 +273,73 @@ export class SubjectTemplatesService {
     throwIfDbError(checkError);
     if (!oldRow) throw new NotFoundException('Subject template not found');
 
-    // Check if template is in use (students or timetable slots) using aggregation
-    const [studentsCount, slotsCount] = await Promise.all([
-      supabase
-        .from('student_subject_template_assignments')
-        .select('id', { count: 'exact', head: true })
-        .eq('subject_template_id', id),
-      supabase
-        .from('timetable_slots')
-        .select('id', { count: 'exact', head: true })
-        .eq('subject_template_id', id),
-    ]);
-
-    if (studentsCount.count && studentsCount.count > 0) {
-      throw new BadRequestException('Cannot delete template: students are assigned to this template');
+    // Block delete only when the template is still used in the *active* academic year (branch-scoped).
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (activeYear) {
+      const [studentsActive, slotsActive] = await Promise.all([
+        supabase
+          .from('student_subject_template_assignments')
+          .select('id', { count: 'exact', head: true })
+          .eq('subject_template_id', id)
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', activeYear.id),
+        supabase
+          .from('timetable_slots')
+          .select('id', { count: 'exact', head: true })
+          .eq('subject_template_id', id)
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', activeYear.id),
+      ]);
+      throwIfDbError(studentsActive.error);
+      throwIfDbError(slotsActive.error);
+      if (studentsActive.count && studentsActive.count > 0) {
+        throw new BadRequestException(
+          'Cannot delete this subject template while students are assigned to it in the active academic year. Remove those assignments first.',
+        );
+      }
+      if (slotsActive.count && slotsActive.count > 0) {
+        throw new BadRequestException(
+          "Cannot delete this subject template while the active academic year's timetable still references it. Clear or change those slots first.",
+        );
+      }
     }
-    if (slotsCount.count && slotsCount.count > 0) {
-      throw new BadRequestException('Cannot delete template: timetable slots reference this template');
-    }
 
-    // Delete template (cascade will handle related records)
+    // Remove dependent rows so the template row can be deleted (FK-safe). Historical student assignments
+    // and non-active timetable references are cleared here once the active-year guard above passes.
+    const { error: delStudentAssignErr } = await supabase
+      .from('student_subject_template_assignments')
+      .delete()
+      .eq('subject_template_id', id)
+      .eq('branch_id', branchId);
+    throwIfDbError(delStudentAssignErr);
+
+    const { error: delSubjectsErr } = await supabase
+      .from('subject_template_subjects')
+      .delete()
+      .eq('subject_template_id', id);
+    throwIfDbError(delSubjectsErr);
+
+    const { error: delClassAssignErr } = await supabase
+      .from('class_subject_template_assignments')
+      .delete()
+      .eq('subject_template_id', id)
+      .eq('branch_id', branchId);
+    throwIfDbError(delClassAssignErr);
+
+    const { error: delLevelAssignErr } = await supabase
+      .from('level_subject_template_assignments')
+      .delete()
+      .eq('subject_template_id', id)
+      .eq('branch_id', branchId);
+    throwIfDbError(delLevelAssignErr);
+
+    const { error: clearSlotsErr } = await supabase
+      .from('timetable_slots')
+      .update({ subject_template_id: null })
+      .eq('subject_template_id', id)
+      .eq('branch_id', branchId);
+    throwIfDbError(clearSlotsErr);
+
     const { error: deleteError } = await supabase.from('subject_templates').delete().eq('id', id);
     throwIfDbError(deleteError);
 

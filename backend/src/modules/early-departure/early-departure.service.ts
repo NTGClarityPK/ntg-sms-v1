@@ -453,10 +453,18 @@ export class EarlyDepartureService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      return { data: [], meta: { total: 0, page, limit, totalPages: 1 } };
+    }
+
     let dbQuery = supabase
       .from('early_departure_requests')
       .select('*', { count: 'exact' })
       .eq('branch_id', branchId);
+
+    // Always scope to the active academic year for operational views.
+    dbQuery = dbQuery.eq('academic_year_id', activeYear.id);
 
     if (query.studentId) {
       dbQuery = dbQuery.eq('student_id', query.studentId);
@@ -878,11 +886,17 @@ export class EarlyDepartureService {
 
     const isParent = !!parentCheck;
 
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      return [];
+    }
+
     // Build base query - get all requests for this branch
     let baseQuery = supabase
       .from('early_departure_requests')
       .select('student_id, status')
-      .eq('branch_id', branchId);
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', activeYear.id);
 
     // If parent, filter to only their students
     if (isParent) {

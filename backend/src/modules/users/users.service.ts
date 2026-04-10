@@ -29,6 +29,8 @@ type ProfileRow = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  invitation_recipient_email?: string | null;
+  invitation_sent_at?: string | null;
 };
 
 type UserRoleRow = {
@@ -366,6 +368,8 @@ export class UsersService {
         roles,
         createdAt: profile.created_at,
         updatedAt: profile.updated_at,
+        invitationRecipientEmail: profile.invitation_recipient_email ?? undefined,
+        invitationSentAt: profile.invitation_sent_at ?? undefined,
       });
     });
 
@@ -452,6 +456,8 @@ export class UsersService {
       roles,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      invitationRecipientEmail: row.invitation_recipient_email ?? undefined,
+      invitationSentAt: row.invitation_sent_at ?? undefined,
     });
   }
 

@@ -7,6 +7,7 @@ import {
   Badge,
   Group,
   ActionIcon,
+  Tooltip,
   Pagination,
   Text,
   Modal,
@@ -16,9 +17,12 @@ import {
   Button,
   ScrollArea,
   useMantineTheme,
+  CopyButton,
+  Alert,
 } from '@mantine/core';
 import { IconEdit, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
+import { modals } from '@mantine/modals';
 import type { Student } from '@/types/students';
 import { StudentForm } from './StudentForm';
 import { useResendInvitationForUser } from '@/hooks/useInvitationsAdmin';
@@ -43,6 +47,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('students');
+  const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [resendOpened, resendModal] = useDisclosure(false);
@@ -51,6 +56,11 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
   const [studentUsername, setStudentUsername] = useState('');
   const [invitationRecipientEmail, setInvitationRecipientEmail] = useState('');
   const [invitationType, setInvitationType] = useState<'student' | 'parent'>('student');
+  const [sentInfo, setSentInfo] = useState<{
+    recipientEmail: string;
+    sentAt?: string;
+    expiresAt?: string;
+  } | null>(null);
   const resend = useResendInvitationForUser();
   const reinvite = useReinviteStudentAfterExpiry();
 
@@ -62,12 +72,60 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
     open();
   };
 
+  const openInvitationSentModal = (input: { recipientEmail: string; expiresAt?: string }) => {
+    const recipient = input.recipientEmail?.trim();
+    if (!recipient) return;
+
+    modals.open({
+      title: t('invitationDetailsTitle'),
+      size: 'lg',
+      centered: true,
+      children: (
+        <Stack gap="sm">
+          <Table withTableBorder withColumnBorders>
+            <Table.Tbody>
+              <Table.Tr>
+                <Table.Th w={180}>{t('invitationRecipientEmail')}</Table.Th>
+                <Table.Td>
+                  <Group justify="space-between" wrap="nowrap">
+                    <Text size="sm">{recipient}</Text>
+                    <CopyButton value={recipient}>
+                      {({ copy }) => (
+                        <Button size="xs" variant="light" onClick={copy}>
+                          {tCommon('copy')}
+                        </Button>
+                      )}
+                    </CopyButton>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+              {input.expiresAt && (
+                <Table.Tr>
+                  <Table.Th>Expires at</Table.Th>
+                  <Table.Td>
+                    <Text size="sm">{new Date(input.expiresAt).toLocaleString()}</Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+        </Stack>
+      ),
+    });
+  };
+
   const handleResend = (student: Student) => {
     setResendStudent(student);
     setRecipientEmail('');
     setStudentUsername('');
     setInvitationRecipientEmail('');
     setInvitationType('student');
+    // Show the most recently used invite destination (if we have it) inside the resend modal.
+    setSentInfo(
+      student.invitationRecipientEmail
+        ? { recipientEmail: student.invitationRecipientEmail, sentAt: student.invitationSentAt }
+        : null,
+    );
     resendModal.open();
   };
 
@@ -168,12 +226,28 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                   <Table.Td>
                     {canEdit && (
                       <Group gap={6} wrap="nowrap">
-                        <ActionIcon variant="light" size={isMobile ? 'sm' : 'md'} onClick={() => handleEdit(student)} aria-label="Edit student">
-                          <IconEdit size={isMobile ? 14 : 16} />
-                        </ActionIcon>
-                        <ActionIcon variant="light" size={isMobile ? 'sm' : 'md'} onClick={() => handleResend(student)} aria-label="Resend invitation">
-                          <IconMailForward size={isMobile ? 14 : 16} />
-                        </ActionIcon>
+                        <Tooltip label={tCommon('edit')} withArrow>
+                          <ActionIcon
+                            id={`students-edit-${student.id}`}
+                            variant="light"
+                            size={isMobile ? 'sm' : 'md'}
+                            onClick={() => handleEdit(student)}
+                            aria-label={tCommon('edit')}
+                          >
+                            <IconEdit size={isMobile ? 14 : 16} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label={t('resendInvitationTitle')} withArrow>
+                          <ActionIcon
+                            id={`students-resend-invite-${student.id}`}
+                            variant="light"
+                            size={isMobile ? 'sm' : 'md'}
+                            onClick={() => handleResend(student)}
+                            aria-label={t('resendInvitationTitle')}
+                          >
+                            <IconMailForward size={isMobile ? 14 : 16} />
+                          </ActionIcon>
+                        </Tooltip>
                       </Group>
                     )}
                   </Table.Td>
@@ -212,10 +286,49 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
         onClose={() => {
           resendModal.close();
           setResendStudent(null);
+          setSentInfo(null);
         }}
         title={t('resendInvitationTitle')}
       >
         <Stack gap="md">
+          {sentInfo?.recipientEmail && (
+            <Alert
+              variant="light"
+              title={t('invitationDetailsTitle')}
+              styles={{
+                root: {
+                  borderColor: 'var(--theme-primary)',
+                  backgroundColor: 'var(--theme-surface-variant)',
+                },
+                title: { color: 'var(--theme-text)' },
+              }}
+            >
+              <Stack gap={6}>
+                <Group justify="space-between" wrap="nowrap">
+                  <Text size="sm">{sentInfo.recipientEmail}</Text>
+                  <CopyButton value={sentInfo.recipientEmail}>
+                    {({ copy }) => (
+                      <Button size="xs" variant="light" onClick={copy}>
+                        {tCommon('copy')}
+                      </Button>
+                    )}
+                  </CopyButton>
+                </Group>
+                {sentInfo.sentAt && (
+                  <Text size="sm" c="dimmed">
+                    {t('invitationSentAt', {
+                      date: new Date(sentInfo.sentAt).toLocaleString(),
+                    })}
+                  </Text>
+                )}
+                {sentInfo.expiresAt && (
+                  <Text size="sm" c="dimmed">
+                    Expires at: {new Date(sentInfo.expiresAt).toLocaleString()}
+                  </Text>
+                )}
+              </Stack>
+            </Alert>
+          )}
           <Text size="sm" c="dimmed">
             {needsReinviteFlow(resendStudent)
               ? t('reinviteAfterExpiryIntro')
@@ -290,7 +403,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
               onClick={async () => {
                 if (!resendStudent) return;
                 if (needsReinviteFlow(resendStudent)) {
-                  await reinvite.mutateAsync({
+                  const result = await reinvite.mutateAsync({
                     studentId: resendStudent.id,
                     input: {
                       username: studentUsername.trim(),
@@ -298,16 +411,24 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                       invitationType,
                     },
                   });
+                  setSentInfo({
+                    recipientEmail: result.studentInvitation.recipientEmail,
+                    expiresAt: result.studentInvitation.expiresAt,
+                  });
                 } else {
                   if (!resendStudent.userId) return;
-                  await resend.mutateAsync({
+                  const result = await resend.mutateAsync({
                     userId: resendStudent.userId,
                     invitationType,
                     recipientEmail: recipientEmail.trim() || undefined,
                   });
+                  const usedEmail =
+                    recipientEmail.trim() ||
+                    resendStudent.invitationRecipientEmail ||
+                    resendStudent.email ||
+                    '';
+                  setSentInfo({ recipientEmail: usedEmail, expiresAt: result.expiresAt });
                 }
-                resendModal.close();
-                setResendStudent(null);
               }}
             >
               {needsReinviteFlow(resendStudent) ? t('sendNewInvitation') : t('resend')}

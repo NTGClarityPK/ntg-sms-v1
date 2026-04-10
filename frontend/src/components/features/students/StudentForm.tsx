@@ -418,6 +418,50 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         })}
       >
         <Stack gap="md">
+          {isEdit && student?.invitationRecipientEmail && (
+            <Alert
+              variant="light"
+              title={t('invitationDetailsTitle')}
+              styles={{
+                root: {
+                  borderColor: 'var(--theme-primary)',
+                  backgroundColor: 'var(--theme-surface-variant)',
+                },
+                title: { color: 'var(--theme-text)' },
+              }}
+            >
+              <Stack gap={6}>
+                <Group justify="space-between" align="flex-end" wrap="nowrap">
+                  <TextInput
+                    id="student-form-invitation-recipient-email"
+                    label={t('invitationRecipientEmail')}
+                    value={student.invitationRecipientEmail}
+                    readOnly
+                    style={{ flex: 1 }}
+                  />
+                  <CopyButton value={student.invitationRecipientEmail}>
+                    {({ copy }) => (
+                      <Button
+                        id="student-form-invitation-copy-email"
+                        size="xs"
+                        variant="light"
+                        onClick={copy}
+                      >
+                        {tCommon('copy')}
+                      </Button>
+                    )}
+                  </CopyButton>
+                </Group>
+                {student.invitationSentAt && (
+                  <Text size="sm" c="dimmed">
+                    {t('invitationSentAt', {
+                      date: new Date(student.invitationSentAt).toLocaleString(),
+                    })}
+                  </Text>
+                )}
+              </Stack>
+            </Alert>
+          )}
           {!isEdit && (
             <>
               <Group grow align="flex-end">

@@ -22,7 +22,6 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
     assessment: true,
     communication: true,
     behavior: true,
-    permissions: true,
   });
 
   const toggleSection = (section: string) => {
@@ -313,21 +312,13 @@ export function SetupReviewForm({ data, onBack, onConfirm, isSaving }: SetupRevi
         </div>
 
         <div>
-          <Button
-            id="setup-review-toggle-permissions"
-            variant="subtle"
-            onClick={() => toggleSection('permissions')}
-            style={{ padding: 0, height: 'auto' }}
-          >
-            <Text fw={600} size="sm">
-              {expandedSections.permissions ? '▼' : '▶'} Permissions
-            </Text>
-          </Button>
-          <Collapse in={expandedSections.permissions}>
-            <Text size="sm" pl="md" mt="xs">
-              {data.permissions.length} permission rules configured
-            </Text>
-          </Collapse>
+          <Text fw={600} size="sm">
+            Permissions
+          </Text>
+          <Text size="sm" c="dimmed" pl="md" mt="xs">
+            School Admin will be granted edit access to all features by default. You can refine role permissions later
+            from Settings → Permissions.
+          </Text>
         </div>
       </Stack>
 

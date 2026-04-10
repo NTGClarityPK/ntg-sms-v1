@@ -25,8 +25,7 @@ import {
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useAssessmentGrades, useBulkCreateGrades } from '@/hooks/api/useGrades';
-import { useClassSection } from '@/hooks/useClassSections';
-import { useStudents } from '@/hooks/useStudents';
+import { useClassSection, useClassSectionStudents } from '@/hooks/useClassSections';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { Assessment, CreateStudentGradeInput } from '@/types/assessment';
 
@@ -44,22 +43,19 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
   const colors = useThemeColors();
   const { data: existingGrades, isLoading: gradesLoading } = useAssessmentGrades(assessment.id);
   const { data: classSection, isLoading: classSectionLoading } = useClassSection(assessment.classSectionId);
-  const { data: studentsData, isLoading: studentsLoading } = useStudents({
-    classId: classSection?.classId,
-    sectionId: classSection?.sectionId,
-    isActive: true,
-    limit: 100, // Backend max limit is 100
-  });
+  const { data: classSectionStudentsData, isLoading: studentsLoading } = useClassSectionStudents(
+    assessment.classSectionId,
+  );
   const bulkCreateGrades = useBulkCreateGrades();
   const [grades, setGrades] = useState<GradeRow[]>([]);
 
   // Load students and pre-fill with existing grades
   useEffect(() => {
-    if (!studentsData?.data || studentsLoading || classSectionLoading) {
+    if (!classSectionStudentsData?.data || studentsLoading || classSectionLoading) {
       return;
     }
 
-    const students = studentsData?.data || []; // useStudents returns full response { data: [], meta: {...} }
+    const students = classSectionStudentsData?.data || [];
     const grades = existingGrades || []; // useAssessmentGrades returns response.data (already unwrapped)
     const gradesMap = new Map(grades.map((g) => [g.studentId, g]));
 
@@ -77,7 +73,7 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
     });
 
     setGrades(gradeRows);
-  }, [assessment.id, existingGrades, studentsData, studentsLoading, classSectionLoading]);
+  }, [assessment.id, existingGrades, classSectionStudentsData, studentsLoading, classSectionLoading]);
 
   const updateGrade = (index: number, field: keyof GradeRow, value: any) => {
     setGrades((prev) => {
@@ -114,7 +110,7 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
     );
   }
 
-  if (!studentsData?.data || studentsData.data.length === 0) {
+  if (!classSectionStudentsData?.data || classSectionStudentsData.data.length === 0) {
     return (
       <Alert icon={<IconAlertCircle size={16} />} title={t('noStudents')} color="yellow">
         {t('noActiveStudentsInSection')}

@@ -103,12 +103,6 @@ export interface BehaviorData {
   attributes: string[];
 }
 
-export interface PermissionData {
-  roleId: string;
-  featureId: string;
-  permission: 'none' | 'view' | 'edit';
-}
-
 export interface SetupWizardData {
   academicYear: AcademicYearData | null;
   academic: AcademicData;
@@ -116,6 +110,5 @@ export interface SetupWizardData {
   assessment: AssessmentData;
   communication: CommunicationData | null;
   behavior: BehaviorData | null;
-  permissions: PermissionData[];
 }
 

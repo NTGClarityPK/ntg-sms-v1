@@ -160,12 +160,15 @@ export class AssessmentsService {
       yearId = activeYear.id;
     }
 
-    const isAdmin = currentUserRoles?.includes('school_admin') ?? false;
+    const roles = (currentUserRoles || []).map((r) => String(r).toLowerCase());
+    const isAdmin = roles.includes('school_admin');
+    const isClassTeacher = roles.includes('class_teacher');
+    const isSubjectTeacher = roles.includes('subject_teacher');
     let roleScopeClassSectionId: string | null = null;
     let roleScopePairs: Array<{ classSectionId: string; subjectId: string }> = [];
 
     if (currentUserId && !isAdmin) {
-      if (currentUserRoles?.includes('student')) {
+      if (roles.includes('student')) {
         const { data: student, error: studentError } = await supabase
           .from('students')
           .select('id, class_id, section_id, academic_year_id')
@@ -197,7 +200,8 @@ export class AssessmentsService {
           };
         }
         roleScopeClassSectionId = (classSection as { id: string }).id;
-      } else {
+      } else if (isSubjectTeacher && !isClassTeacher) {
+        // Subject teachers should only see assessments for subjects/class-sections they are assigned to.
         const staff = await this.staffService.getStaffByUserId(
           currentUserId,
           branchId,
@@ -391,6 +395,8 @@ export class AssessmentsService {
       throw new BadRequestException('Either classSectionId or classId must be provided');
     }
 
+    await this.academicYearsService.assertNotLockedForBranch(branchId, academicYearId);
+
     // If creator is a teacher (has staff record), restrict to their assigned class-sections and subjects only
     const staff = await this.staffService.getStaffByUserId(createdByUserId, branchId);
     if (staff) {
@@ -507,6 +513,10 @@ export class AssessmentsService {
     if (!existing) {
       throw new NotFoundException('Assessment not found');
     }
+    await this.academicYearsService.assertNotLockedForBranch(
+      branchId,
+      (existing as AssessmentRow).academic_year_id,
+    );
 
     const payload: Record<string, unknown> = {};
     if (input.title !== undefined) payload.title = input.title;
@@ -572,6 +582,10 @@ export class AssessmentsService {
     if (!oldRow) {
       throw new NotFoundException('Assessment not found');
     }
+    await this.academicYearsService.assertNotLockedForBranch(
+      branchId,
+      (oldRow as AssessmentRow).academic_year_id,
+    );
 
     const { count, error: gradesError } = await supabase
       .from('student_grades')
@@ -672,15 +686,15 @@ export class AssessmentsService {
       branchId,
     );
 
-    // Get total students in the class section (students table uses class_id and section_id, not class_section_id)
+    // Get total students in the class section (year-scoped placement via enrolments)
     const { count: totalStudents, error: studentsError } = await supabase
-      .from('students')
-      .select('id', { count: 'exact', head: true })
+      .from('student_enrolments')
+      .select('student_id', { count: 'exact', head: true })
       .eq('class_id', classSection.classId)
       .eq('section_id', classSection.sectionId)
       .eq('branch_id', branchId)
       .eq('academic_year_id', assessment.academic_year_id)
-      .eq('is_active', true);
+      .eq('status', 'active');
     throwIfDbError(studentsError);
 
     // Get grades statistics
@@ -762,22 +776,32 @@ export class AssessmentsService {
       branchId,
     );
 
-    // Get all active students in this class/section/year
-    const { data: students, error: studentsError } = await supabase
-      .from('students')
-      .select('id, user_id, student_id, branch_id, academic_year_id')
+    // Get all active students in this class/section/year (via enrolments -> students)
+    const { data: enrolments, error: enrolErr } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
       .eq('class_id', classSection.classId)
       .eq('section_id', classSection.sectionId)
       .eq('branch_id', branchId)
       .eq('academic_year_id', assessment.academic_year_id)
-      .eq('is_active', true);
-    throwIfDbError(studentsError);
+      .eq('status', 'active');
+    throwIfDbError(enrolErr);
 
-    if (!students || students.length === 0) {
+    const studentIds = (enrolments || [])
+      .map((e: { student_id: string }) => e.student_id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    if (studentIds.length === 0) {
       return [];
     }
 
-    const studentIds = students.map((s: any) => s.id as string);
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('id, user_id, student_id, branch_id')
+      .in('id', studentIds)
+      .eq('branch_id', branchId)
+      .eq('is_active', true);
+    throwIfDbError(studentsError);
+    if (!students || students.length === 0) return [];
 
     // Fetch statuses for these students for this assessment
     const { data: statuses, error: statusesError } = await supabase

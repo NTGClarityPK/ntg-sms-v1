@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Title,
   Text,
@@ -21,6 +22,7 @@ import { ClassTimetableContent } from '@/components/features/timetable/ClassTime
 
 export default function TimetablePage() {
   const t = useTranslations('timetable');
+  const searchParams = useSearchParams();
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
   const colors = useThemeColors();
   const {
@@ -49,6 +51,18 @@ export default function TimetablePage() {
   );
 
   const classSections = classSectionsData?.data || [];
+
+  // Allow deep-linking to a pre-selected class section (e.g. from conflict window)
+  useEffect(() => {
+    const classSectionIdFromQuery = searchParams.get('classSectionId');
+    if (!classSectionIdFromQuery) return;
+
+    // Only set if it exists in the loaded options; avoids selecting stale IDs.
+    const exists = classSections.some((cs) => cs.id === classSectionIdFromQuery);
+    if (exists) {
+      setSelectedClassSectionId(classSectionIdFromQuery);
+    }
+  }, [searchParams, classSections]);
 
   const classSectionOptions = classSections
     .sort((a, b) => {

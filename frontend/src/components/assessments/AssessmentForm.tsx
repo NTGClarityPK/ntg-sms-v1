@@ -295,10 +295,10 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
   // Transform API data into select options
   const assessmentTypes = useMemo(
     () =>
-      assessmentTypesData?.data?.map((type) => ({
+      (Array.isArray(assessmentTypesData?.data) ? assessmentTypesData.data : []).map((type) => ({
         value: type.id,
         label: type.name,
-      })) || [],
+      })),
     [assessmentTypesData],
   );
 

@@ -38,6 +38,8 @@
   "usernameInvalid": "اسم المستخدم يجب أن يكون أحرفاً/أرقاماً فقط",
   "domain": "النطاق",
   "invitationRecipientEmail": "بريد الدعوة",
+  "invitationDetailsTitle": "تفاصيل الدعوة",
+  "invitationSentAt": "تم إرسال الدعوة في: {date}",
   "invitationTemplateLabel": "القالب",
   "invitationTemplateStudent": "الطالب يضبط كلمة المرور",
   "invitationTemplateParent": "ولي الأمر يضبط كلمة المرور",

@@ -119,7 +119,7 @@ export default function ConflictManagementPage() {
   }, [conflicts]);
 
   const handleViewClassTimetable = (classSectionId: string) => {
-    router.push(`/timetable/class/${classSectionId}`);
+    router.push(`/timetable?classSectionId=${encodeURIComponent(classSectionId)}`);
   };
 
   const handleViewStaffSchedule = (staffId: string) => {
@@ -324,22 +324,39 @@ export default function ConflictManagementPage() {
                           <Text size="xs" fw={500} c="dimmed">
                             {t('conflictingSlots')}
                           </Text>
-                          {conflict.conflictingSlots.map((slot, slotIndex) => (
-                            <Group key={slotIndex} justify="space-between" wrap="nowrap">
-                              <Text size="sm">
-                                {slot.className} {slot.sectionName} - {slot.startTime} to{' '}
-                                {slot.endTime}
-                              </Text>
+                          {/* Show unique "View timetable" options per class section */}
+                          <Group gap="xs" wrap="wrap">
+                            {Array.from(
+                              new Map(
+                                conflict.conflictingSlots.map((s) => [
+                                  s.classSectionId,
+                                  {
+                                    classSectionId: s.classSectionId,
+                                    label: `${s.className ?? t('unknown')} ${s.sectionName ?? ''}`.trim(),
+                                  },
+                                ]),
+                              ).values(),
+                            ).map((cs) => (
                               <Button
+                                key={cs.classSectionId}
                                 size="xs"
-                                variant="subtle"
+                                variant="light"
                                 leftSection={<IconExternalLink size={14} />}
-                                onClick={() => handleViewClassTimetable(slot.classSectionId)}
+                                onClick={() => handleViewClassTimetable(cs.classSectionId)}
                               >
-                                {t('viewTimetable')}
+                                {cs.label} {t('viewTimetable')}
                               </Button>
-                            </Group>
-                          ))}
+                            ))}
+                          </Group>
+
+                          {/* Still list individual conflicting slots (times) for context */}
+                          <Stack gap={4} mt={6}>
+                            {conflict.conflictingSlots.map((slot, slotIndex) => (
+                              <Text key={`${slot.id}-${slotIndex}`} size="sm" c="dimmed">
+                                {slot.className} {slot.sectionName} - {slot.startTime} to {slot.endTime}
+                              </Text>
+                            ))}
+                          </Stack>
                         </Stack>
                       </>
                     )}

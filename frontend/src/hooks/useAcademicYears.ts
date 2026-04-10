@@ -82,6 +82,36 @@ export function useLockAcademicYear() {
   });
 }
 
+export function useRolloverAcademicYear() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      sourceAcademicYearId: string;
+      targetAcademicYearId: string;
+      carryForward?: {
+        classSections?: boolean;
+        teacherAssignments?: boolean;
+        timetableSlots?: boolean;
+        leaveSettings?: boolean;
+      };
+    }) => {
+      const res = await apiClient.post<{
+        classSectionsCopied: number;
+        teacherAssignmentsCopied: number;
+        timetableSlotsCopied: number;
+        leaveSettingsCopied: number;
+      }>(`/api/v1/academic-years/${payload.sourceAcademicYearId}/rollover`, {
+        targetAcademicYearId: payload.targetAcademicYearId,
+        carryForward: payload.carryForward,
+      });
+      return res;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: academicYearsKeys.all });
+    },
+  });
+}
+
 export function useUnlockAcademicYear() {
   const qc = useQueryClient();
   return useMutation({

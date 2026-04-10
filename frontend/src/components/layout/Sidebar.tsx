@@ -40,6 +40,7 @@ import {
   IconKey,
   IconMedal,
   IconArrowsShuffle,
+  IconArrowUpRight,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -166,6 +167,7 @@ const allNavItems: NavItem[] = [
       return true;
     },
   },
+  { key: 'promotionPlacement', label: 'Promotion & Placement', href: '/promotion-placement', icon: IconArrowUpRight },
   { key: 'reports', label: 'Report', href: '/reports', icon: IconChartBar },
   { key: 'results', label: 'Results', href: '/results', icon: IconMedal },
   {
@@ -391,6 +393,7 @@ export function Sidebar({
 
   const managementHrefsOrdered = [
     '/academic/class-sections',
+    '/promotion-placement',
     '/mapping',
     '/users',
     '/library',

@@ -64,6 +64,8 @@ export function StudentRow({
     { value: 'late', label: 'L', color: notifyColors.warning },
   ];
 
+  const selectedBorderColour = 'var(--mantine-color-yellow-4)';
+
   return (
     <Table.Tr>
       <Table.Td>
@@ -89,17 +91,39 @@ export function StudentRow({
       <Table.Td>
         <Group gap={4}>
           {statusButtons.map((btn) => (
+            (() => {
+              const isSelected = attendance.status === btn.value;
+              return (
             <Button
               key={btn.value}
               size="xs"
-              variant={attendance.status === btn.value ? 'filled' : 'light'}
-              color={btn.color}
+              variant="outline"
               onClick={() => handleStatusChange(btn.value)}
-              style={{ minWidth: '32px', padding: '0 8px' }}
               title={btn.value.charAt(0).toUpperCase() + btn.value.slice(1)}
+              aria-pressed={isSelected}
+              styles={{
+                root: {
+                  minWidth: '32px',
+                  padding: '0 8px',
+                  borderColor: isSelected ? selectedBorderColour : btn.color,
+                  borderWidth: isSelected ? '3px' : '1px',
+                  boxShadow: isSelected ? `0 0 0 2px ${selectedBorderColour}` : undefined,
+                  ...(isSelected
+                    ? {
+                        backgroundColor: btn.color,
+                        color: 'var(--mantine-color-white)',
+                      }
+                    : {
+                        backgroundColor: 'transparent',
+                        color: btn.color,
+                      }),
+                },
+              }}
             >
               {btn.label}
             </Button>
+              );
+            })()
           ))}
         </Group>
       </Table.Td>

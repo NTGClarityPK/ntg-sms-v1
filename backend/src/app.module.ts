@@ -50,6 +50,8 @@ import { BulkImportModule } from './modules/bulk-import/bulk-import.module';
 import { StudentSelfModule } from './modules/student-self/student-self.module';
 import { SettingsImportModule } from './modules/settings-import/settings-import.module';
 import { InvitationsModule } from './modules/invitations/invitations.module';
+import { PromotionPlacementModule } from './modules/promotion-placement/promotion-placement.module';
+import { SetupWizardModule } from './modules/setup-wizard/setup-wizard.module';
 
 @Module({
   imports: [
@@ -102,6 +104,8 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
     SettingsImportModule,
     StudentSelfModule,
     InvitationsModule,
+    PromotionPlacementModule,
+    SetupWizardModule,
   ],
   controllers: [AppController],
   providers: [

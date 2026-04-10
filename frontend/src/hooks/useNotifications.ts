@@ -93,10 +93,10 @@ export function useMarkAsRead() {
       return response;
     },
     onSuccess: () => {
-      // Invalidate all notification queries
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      // Also explicitly invalidate unread count query
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count', userId] });
+      }
     },
     onError: (error: unknown) => {
       const errorMessage =
@@ -121,10 +121,11 @@ export function useMarkAllAsRead() {
       await apiClient.put(`/api/v1/notifications/read-all`, {});
     },
     onSuccess: () => {
-      // Invalidate all notification queries
+      if (userId) {
+        queryClient.setQueryData<number>(['notifications', 'unread-count', userId], 0);
+        queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count', userId] });
+      }
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      // Also explicitly invalidate unread count query
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
       notifications.show({
         title: 'Success',
         message: 'All notifications marked as read',

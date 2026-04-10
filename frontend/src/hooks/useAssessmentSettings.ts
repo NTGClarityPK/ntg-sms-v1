@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 import type { AssessmentType, ClassGradeAssignment, GradeTemplate } from '@/types/settings';
+import { useAuth } from '@/hooks/useAuth';
 
 const assessmentKeys = {
   types: ['assessment', 'types'] as const,
@@ -12,8 +13,15 @@ const assessmentKeys = {
 
 export function useAssessmentTypes() {
   const locale = useLocale();
+  const { user } = useAuth();
+  const branchId =
+    user?.currentBranch?.id ??
+    (typeof window !== 'undefined' ? window.localStorage.getItem('currentBranchId') : null);
+  // BranchGuard can resolve branch from profile when header is missing.
+  // Subject-teachers often have `user.currentBranch` unset on first render.
+  const branchKey = branchId ?? 'auto';
   return useQuery({
-    queryKey: [...assessmentKeys.types, locale],
+    queryKey: [...assessmentKeys.types, locale, branchKey],
     queryFn: async () =>
       apiClient.get<AssessmentType[]>('/api/v1/assessment-types', {
         params: { page: 1, limit: 100, language: locale },

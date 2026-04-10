@@ -87,6 +87,8 @@ export class GradesService {
       throw new NotFoundException('Assessment not found.');
     }
 
+    await this.academicYearsService.assertNotLockedForBranch(branchId, assessment.academicYearId);
+
     // Validate marks don't exceed total marks
     if (dto.marksObtained > assessment.totalMarks) {
       throw new BadRequestException(
@@ -190,6 +192,8 @@ export class GradesService {
       throw new NotFoundException('Assessment not found.');
     }
 
+    await this.academicYearsService.assertNotLockedForBranch(branchId, assessment.academicYearId);
+
     const successfulGrades: StudentGradeDto[] = [];
     const errors: Array<{ studentId: string; error: string }> = [];
 
@@ -208,14 +212,30 @@ export class GradesService {
       throw new NotFoundException('Class section not found.');
     }
 
-    // Get all students for the class section (students table uses class_id and section_id, not class_section_id)
-    const { data: students, error: studentsError } = await supabase
-      .from('students')
-      .select('id, class_id, section_id, branch_id, academic_year_id')
+    // Get all students for the class section (year-scoped placement via enrolments)
+    const { data: enrolments, error: enrolErr } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
       .eq('branch_id', branchId)
       .eq('academic_year_id', assessment.academicYearId)
       .eq('class_id', classSection.class_id)
-      .eq('section_id', classSection.section_id);
+      .eq('section_id', classSection.section_id)
+      .eq('status', 'active');
+    throwIfDbError(enrolErr);
+
+    const studentIdsInSection = (enrolments || [])
+      .map((e: { student_id: string }) => e.student_id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+    const { data: students, error: studentsError } =
+      studentIdsInSection.length > 0
+        ? await supabase
+            .from('students')
+            .select('id, branch_id')
+            .in('id', studentIdsInSection)
+            .eq('branch_id', branchId)
+            .eq('is_active', true)
+        : { data: [], error: null };
     
     if (studentsError) {
       throw new BadRequestException(`Failed to get students: ${studentsError.message}`);

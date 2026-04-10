@@ -581,15 +581,27 @@ export class MessagesService {
         .single();
       if (!cs) throw new NotFoundException('Class section not found');
       const csRow = cs as { class_id: string; section_id: string; academic_year_id: string };
-      const { data: studentRows } = await supabase
-        .from('students')
-        .select('user_id')
+      const { data: enrolments } = await supabase
+        .from('student_enrolments')
+        .select('student_id')
         .eq('branch_id', branchId)
+        .eq('academic_year_id', csRow.academic_year_id)
         .eq('class_id', csRow.class_id)
         .eq('section_id', csRow.section_id)
-        .eq('academic_year_id', csRow.academic_year_id)
-        .eq('is_active', true);
-      const studentUserIds = (studentRows || []).map((s: { user_id: string }) => s.user_id);
+        .eq('status', 'active');
+      const studentIds = (enrolments || []).map((e: { student_id: string }) => e.student_id);
+      const { data: studentRows } =
+        studentIds.length > 0
+          ? await supabase
+              .from('students')
+              .select('user_id')
+              .in('id', studentIds)
+              .eq('branch_id', branchId)
+              .eq('is_active', true)
+          : { data: [] };
+      const studentUserIds = (studentRows || [])
+        .map((s: { user_id: string | null }) => s.user_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
       const allParticipantIds = [userId, ...studentUserIds];
       const { data: newConv, error: insError } = await supabase
         .from('conversations')

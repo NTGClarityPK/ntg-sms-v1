@@ -38,6 +38,8 @@
   "usernameInvalid": "Username must be alphanumeric only",
   "domain": "Domain",
   "invitationRecipientEmail": "Invitation email",
+  "invitationDetailsTitle": "Invitation details",
+  "invitationSentAt": "Invitation sent at: {date}",
   "invitationTemplateLabel": "Template",
   "invitationTemplateStudent": "Student sets own password",
   "invitationTemplateParent": "Parent sets child’s password",

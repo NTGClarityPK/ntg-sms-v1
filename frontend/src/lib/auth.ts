@@ -2,15 +2,49 @@ import { supabase } from './supabase/client';
 
 const LOCALE_COOKIE = 'NEXT_LOCALE';
 const LOCALE_COOKIE_MAX_AGE = 31536000; // 1 year
+const SUPPORTED_LOCALES = new Set(['en', 'en-US', 'en-GB', 'ar']);
 
 function setLocaleCookie(locale: string): void {
   if (typeof document === 'undefined') return;
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
 }
 
+function getCookieValue(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const parts = document.cookie.split(';').map((p) => p.trim());
+  const found = parts.find((p) => p.startsWith(`${name}=`));
+  if (!found) return null;
+  return found.substring(name.length + 1) || null;
+}
+
+function normaliseLocale(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const value = raw.trim();
+  if (!value) return null;
+  if (SUPPORTED_LOCALES.has(value)) return value;
+  // Backward compatibility: some older places may store `en` or other variants.
+  if (value.toLowerCase() === 'en') return 'en';
+  if (value.toLowerCase() === 'ar') return 'ar';
+  return null;
+}
+
 export function syncLocaleCookieFromStorage(): void {
   if (typeof window === 'undefined') return;
-  const storedLocale = window.localStorage.getItem('locale');
+  // Prefer the cookie (server source-of-truth). Only fall back to localStorage when cookie is missing.
+  const cookieLocale = normaliseLocale(getCookieValue(LOCALE_COOKIE));
+  const storedLocale = normaliseLocale(window.localStorage.getItem('locale'));
+
+  if (cookieLocale) {
+    if (storedLocale !== cookieLocale) {
+      try {
+        window.localStorage.setItem('locale', cookieLocale);
+      } catch {
+        // Non-blocking
+      }
+    }
+    return;
+  }
+
   if (storedLocale) {
     setLocaleCookie(storedLocale);
   }
@@ -53,8 +87,8 @@ export async function signOut() {
   }
 
   if (typeof window !== 'undefined') {
-    // Keep the user's last-selected language on the login screen.
-    // (Server renders from NEXT_LOCALE cookie; localStorage alone isn't enough.)
+    // Keep the currently active language on the login screen.
+    // Do NOT overwrite NEXT_LOCALE from potentially-stale localStorage during logout.
     syncLocaleCookieFromStorage();
     clearAuthClientState();
     window.location.href = '/login';

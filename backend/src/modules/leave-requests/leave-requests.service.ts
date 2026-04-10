@@ -235,6 +235,7 @@ export class LeaveRequestsService {
     if (!activeYear) {
       throw new BadRequestException('No active academic year found');
     }
+    await this.academicYearsService.assertNotLockedForBranch(branchId, activeYear.id);
 
     if (input.endDate < input.startDate) {
       throw new BadRequestException('End date cannot be before start date');
@@ -435,6 +436,11 @@ export class LeaveRequestsService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) {
+      return { data: [], meta: { total: 0, page, limit, totalPages: 1 } };
+    }
+
     let dbQuery = supabase
       .from('leave_requests')
       .select(
@@ -442,6 +448,9 @@ export class LeaveRequestsService {
         { count: 'exact' },
       )
       .eq('branch_id', branchId);
+
+    // Always scope to the active academic year for operational views.
+    dbQuery = dbQuery.eq('academic_year_id', activeYear.id);
 
     if (isStudent && !isParent) {
       // Students can only see leave requests related to themselves (their student record).
@@ -661,6 +670,7 @@ export class LeaveRequestsService {
     }
 
     const existingRow = existing as LeaveRequestRow;
+    await this.academicYearsService.assertNotLockedForBranch(branchId, existingRow.academic_year_id);
 
     if (existingRow.status !== 'pending') {
       throw new BadRequestException(
@@ -768,6 +778,7 @@ export class LeaveRequestsService {
     }
 
     const existingRow = existing as LeaveRequestRow;
+    await this.academicYearsService.assertNotLockedForBranch(branchId, existingRow.academic_year_id);
 
     if (existingRow.requested_by !== userId) {
       throw new ForbiddenException('You can only cancel your own requests');

@@ -186,7 +186,7 @@ export class ResultsService {
 
     const { data: cs, error: csErr } = await supabase
       .from('class_sections')
-      .select('id, class_id')
+      .select('id, class_id, section_id')
       .eq('id', classSectionId)
       .eq('branch_id', branchId)
       .eq('academic_year_id', yearId)
@@ -194,17 +194,31 @@ export class ResultsService {
     throwIfDbError(csErr);
     if (!cs) throw new NotFoundException('Class section not found');
     const classId = (cs as { class_id: string }).class_id;
+    const sectionId = (cs as { section_id: string }).section_id;
 
+    // Validate roster membership via enrolments (year-scoped placement).
+    const { data: enrol, error: enrolErr } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
+      .eq('student_id', studentId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', yearId)
+      .eq('class_id', classId)
+      .eq('section_id', sectionId)
+      .eq('status', 'active')
+      .maybeSingle();
+    throwIfDbError(enrolErr);
+    if (!enrol) throw new NotFoundException('Student not found in this class section');
+
+    // Fetch student display fields (do not filter by legacy year/class fields).
     const { data: student, error: stErr } = await supabase
       .from('students')
       .select('id, user_id, student_id')
       .eq('id', studentId)
       .eq('branch_id', branchId)
-      .eq('academic_year_id', yearId)
-      .eq('class_id', classId)
       .maybeSingle();
     throwIfDbError(stErr);
-    if (!student) throw new NotFoundException('Student not found in this class section');
+    if (!student) throw new NotFoundException('Student not found');
     const studentRow = student as { id: string; user_id: string | null; student_id: string | null };
 
     const assessmentMap = await this.getAssessmentsInScope(
@@ -546,17 +560,27 @@ export class ResultsService {
       supabase.from('classes').select('display_name').eq('id', c.class_id).single(),
       supabase.from('sections').select('name').eq('id', c.section_id).single(),
       supabase
-        .from('students')
-        .select('id, user_id, student_id')
-        .eq('class_id', c.class_id)
-        .eq('section_id', c.section_id)
+        .from('student_enrolments')
+        .select('student_id')
         .eq('branch_id', branchId)
         .eq('academic_year_id', yearId)
-        .eq('is_active', true),
+        .eq('class_id', c.class_id)
+        .eq('section_id', c.section_id)
+        .eq('status', 'active'),
     ]);
     const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
     const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
-    const students = (studentRows.data || []) as {
+    const ids = ((studentRows.data || []) as Array<{ student_id: string }>).map((r) => r.student_id);
+    const { data: studentsData, error: stErr } =
+      ids.length > 0
+        ? await supabase
+            .from('students')
+            .select('id, user_id, student_id')
+            .in('id', ids)
+            .eq('branch_id', branchId)
+        : { data: [], error: null };
+    throwIfDbError(stErr);
+    const students = (studentsData || []) as {
       id: string;
       user_id: string | null;
       student_id: string | null;

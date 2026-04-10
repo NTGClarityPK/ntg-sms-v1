@@ -193,8 +193,13 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         transition: left 0.3s ease !important;
         border-top-left-radius: 12px !important;
         overflow: hidden !important;
-        padding-left: max(var(--mantine-spacing-md), env(safe-area-inset-left, 0px)) !important;
-        padding-right: max(var(--mantine-spacing-md), env(safe-area-inset-right, 0px)) !important;
+        /* Pages already add inner padding (many screens use paddingLeft/Right md),
+           and AppShell main also has padding="md". To keep title text aligned with
+           content below, mirror the effective double padding here. */
+        padding-left: max(calc(var(--mantine-spacing-md) * 2), env(safe-area-inset-left, 0px)) !important;
+        padding-right: max(calc(var(--mantine-spacing-md) * 2), env(safe-area-inset-right, 0px)) !important;
+        /* Slightly lower title text within the bar */
+        padding-top: 14px !important;
       }
 
       /* Force visible inner rounded join with sidebar/header edge */
@@ -249,8 +254,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         width: calc(100% - 270px) !important;
         border-top-left-radius: 0 !important;
         border-top-right-radius: 12px !important;
-        padding-left: max(var(--mantine-spacing-md), env(safe-area-inset-left, 0px)) !important;
-        padding-right: max(var(--mantine-spacing-md), env(safe-area-inset-right, 0px)) !important;
+        padding-left: max(calc(var(--mantine-spacing-md) * 2), env(safe-area-inset-left, 0px)) !important;
+        padding-right: max(calc(var(--mantine-spacing-md) * 2), env(safe-area-inset-right, 0px)) !important;
         transition: right 0.3s ease, width 0.3s ease !important;
       }
 
@@ -330,7 +335,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* Note: Horizontal padding comes from AppShell padding="md" prop (like RMS) */
       .mantine-AppShell-main {
         /* Header + Title bar + safe-area + spacing */
-        padding-top: calc(120px + env(safe-area-inset-top, 0px) + var(--mantine-spacing-md)) !important;
+        padding-top: calc(120px + env(safe-area-inset-top, 0px) - 6px) !important;
       }
       
       /* Reduce margin-top for content div after title bar */

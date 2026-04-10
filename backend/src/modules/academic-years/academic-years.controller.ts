@@ -7,11 +7,16 @@ import { AcademicYearsService } from './academic-years.service';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
 import { AcademicYearDto } from './dto/academic-year.dto';
+import { PromotionPlacementService } from '../promotion-placement/promotion-placement.service';
+import { RolloverAcademicYearDto } from './dto/rollover-academic-year.dto';
 
 @Controller('api/v1/academic-years')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class AcademicYearsController {
-  constructor(private readonly academicYearsService: AcademicYearsService) {}
+  constructor(
+    private readonly academicYearsService: AcademicYearsService,
+    private readonly promotionPlacementService: PromotionPlacementService,
+  ) {}
 
   @Get()
   async list(
@@ -21,7 +26,7 @@ export class AcademicYearsController {
     data: AcademicYearDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
-    return this.academicYearsService.list(query, branch.tenantId);
+    return this.academicYearsService.list(query, branch.tenantId, branch.branchId);
   }
 
   @Get('active')
@@ -46,7 +51,19 @@ export class AcademicYearsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AcademicYearDto }> {
+    const previousActive = await this.academicYearsService.getActive(branch.tenantId);
     const updated = await this.academicYearsService.activate(id, branch.tenantId, user.email);
+
+    // If switching from one year to another, apply Promotion decisions into enrolments for the newly active year.
+    // This ensures student placement screens and class rosters reflect the active year.
+    if (previousActive?.id && previousActive.id !== id) {
+      await this.academicYearsService.applyPromotionDecisionsToEnrolments({
+        branchId: branch.branchId,
+        sourceAcademicYearId: previousActive.id,
+        targetAcademicYearId: id,
+        userEmail: user.email,
+      });
+    }
     return { data: updated };
   }
 
@@ -56,8 +73,53 @@ export class AcademicYearsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AcademicYearDto }> {
-    const updated = await this.academicYearsService.lock(id, branch.tenantId, user.email);
+    // Block year close if Promotion & Placement is incomplete for active students.
+    // (Applies especially to locking the active year.)
+    const readiness = await this.promotionPlacementService.getReadiness(branch.branchId, id);
+    if (readiness.decisionsMissing > 0) {
+      throw new ForbiddenException(
+        `Cannot lock academic year: ${readiness.decisionsMissing} student(s) are missing Promotion & Placement decisions.`,
+      );
+    }
+    const updated = await this.academicYearsService.lock(id, branch.tenantId, branch.branchId, user.email);
     return { data: updated };
+  }
+
+  @Get(':id/readiness')
+  async readiness(
+    @Param('id') id: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ) {
+    const data = await this.promotionPlacementService.getReadiness(branch.branchId, id);
+    return { data };
+  }
+
+  @Post(':id/rollover')
+  async rollover(
+    @Param('id') sourceAcademicYearId: string,
+    @Body() body: RolloverAcademicYearDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    const readiness = await this.promotionPlacementService.getReadiness(
+      branch.branchId,
+      sourceAcademicYearId,
+    );
+    if (readiness.decisionsMissing > 0) {
+      throw new ForbiddenException(
+        `Cannot rollover academic year: ${readiness.decisionsMissing} student(s) are missing Promotion & Placement decisions.`,
+      );
+    }
+    const data = await this.academicYearsService.rolloverAcademicYear({
+      branchId: branch.branchId,
+      tenantId: branch.tenantId,
+      sourceAcademicYearId,
+      targetAcademicYearId: body.targetAcademicYearId,
+      carryForward: body.carryForward,
+      userEmail: user.email,
+      userId: user.id,
+    });
+    return { data };
   }
 
   // Admin-only endpoint for unlocking academic years

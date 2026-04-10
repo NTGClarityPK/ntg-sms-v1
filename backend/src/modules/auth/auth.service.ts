@@ -295,6 +295,45 @@ export class AuthService {
       }
     }
 
+    // Heuristic auto-correction:
+    // Some users (e.g. subject teachers) can end up with `current_branch_id` pointing to a branch
+    // that hasn't been configured (no assessment types), causing many "empty list" screens.
+    // If the selected branch has no assessment types but another accessible branch does, switch.
+    if (currentBranchId && branches.length > 1) {
+      const { data: hasTypes } = await supabase
+        .from('assessment_types')
+        .select('id')
+        .eq('branch_id', currentBranchId)
+        .limit(1);
+
+      if (!hasTypes || hasTypes.length === 0) {
+        let fallbackBranchId: string | null = null;
+        for (const b of branches) {
+          const { data: otherTypes } = await supabase
+            .from('assessment_types')
+            .select('id')
+            .eq('branch_id', b.id)
+            .limit(1);
+          if (otherTypes && otherTypes.length > 0) {
+            fallbackBranchId = b.id;
+            break;
+          }
+        }
+
+        if (fallbackBranchId && fallbackBranchId !== currentBranchId) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ current_branch_id: fallbackBranchId })
+            .eq('id', userId);
+          if (!updateError) {
+            currentBranchId = fallbackBranchId;
+          } else {
+            currentBranchId = fallbackBranchId;
+          }
+        }
+      }
+    }
+
     const currentBranch = currentBranchId
       ? branches.find((b) => b.id === currentBranchId) ?? null
       : null;

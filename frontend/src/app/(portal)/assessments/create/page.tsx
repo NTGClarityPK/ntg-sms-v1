@@ -117,20 +117,19 @@ export default function CreateAssessmentPage() {
         } else {
           setCompressionProgress(null);
         }
+        // QA expectation: after successful create, redirect back to assessment list.
+        // We still attempt to read the id so we can surface a clearer error if the API response is unexpected.
         const assessment =
           (response as unknown as { data?: Assessment })?.data ??
           (response as unknown as Assessment);
-        const assessmentId = assessment?.id;
-        if (!assessmentId) {
+        if (!assessment?.id) {
           notifications.show({
             title: t('error'),
             message: t('errorCreatedNoId'),
             color: 'red',
           });
-          router.push('/assessments');
-          return;
         }
-        router.push(`/assessments/${assessmentId}/edit`);
+        router.push('/assessments');
       },
       onError: (error: Error & { response?: { data?: { message?: string } } }) => {
         clearProgressInterval();
