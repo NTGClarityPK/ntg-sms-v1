@@ -7,7 +7,7 @@ export default function OfflineDocumentsRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/admin/storage?tab=offline-documents');
+    router.replace('/admin/storage');
   }, [router]);
 
   return null;

@@ -1,6 +1,7 @@
 import { IsOptional, IsEnum, IsString, IsDateString } from 'class-validator';
 
 export enum ReportPeriodType {
+  ALL = 'all',
   WEEK = 'week',
   MONTH = 'month',
   YEAR = 'year',

@@ -1,13 +1,11 @@
 'use client';
 
 import { SimpleGrid, Pagination, Group, Text, Badge, Card, Image, Stack, ActionIcon, Modal } from '@mantine/core';
-import { IconDownload, IconEye, IconEdit, IconTrash, IconFolderOff } from '@tabler/icons-react';
+import { IconDownload, IconEye, IconEdit, IconTrash } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useTranslations } from 'next-intl';
 import { useDownloadLibraryItem, useDeleteLibraryItem, useIncrementLibraryViewCount } from '@/hooks/useLibrary';
-import { saveDocumentForOffline } from '@/lib/offline/documents';
 import { modals } from '@mantine/modals';
-import { notifications } from '@mantine/notifications';
 import { UploadModal } from './UploadModal';
 import { useState } from 'react';
 
@@ -58,30 +56,6 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
   const handleDownload = async (id: string) => {
     const url = await downloadMutation.mutateAsync(id);
     window.open(url, '_blank');
-  };
-
-  const handleSaveForOffline = async (id: string) => {
-    const libraryItem = items.find((i) => i.id === id);
-    if (!libraryItem) return;
-    try {
-      const url = await downloadMutation.mutateAsync(id);
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch file');
-      const blob = await res.blob();
-      await saveDocumentForOffline(
-        libraryItem.title,
-        'library_item',
-        url,
-        blob
-      );
-      notifications.show({ title: t('savedForOffline'), message: t('openFromOffline'), color: 'green' });
-    } catch (e) {
-      notifications.show({
-        title: t('failedToSave'),
-        message: e instanceof Error ? e.message : 'Unknown error',
-        color: 'red',
-      });
-    }
   };
 
   const handleEdit = (id: string) => {
@@ -154,9 +128,6 @@ export function LibraryGrid({ items, meta, onPageChange, canEdit = false }: Libr
                   </ActionIcon>
                   <ActionIcon variant="light" size="sm" onClick={() => handleDownload(item.id)} title={t('download')}>
                     <IconDownload size={16} />
-                  </ActionIcon>
-                  <ActionIcon variant="light" size="sm" onClick={() => handleSaveForOffline(item.id)} title={t('saveForOffline')}>
-                    <IconFolderOff size={16} />
                   </ActionIcon>
                   {canEdit && (
                     <>

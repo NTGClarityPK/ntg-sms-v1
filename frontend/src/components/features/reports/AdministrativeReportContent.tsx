@@ -157,7 +157,11 @@ export function AdministrativeReportContent({
       const type = format === 'pdf' ? 'report_pdf' : 'report_excel';
       const title = `Attendance report (${format.toUpperCase()}) ${startDate}–${endDate}`;
       await saveDocumentForOffline(title, type, `/api/v1/reports/attendance/export?${params}`, blob);
-      notifications.show({ title: 'Saved for offline', message: 'You can open it from Offline documents.', color: 'green' });
+      notifications.show({
+        title: 'Saved for offline',
+        message: 'Stored on this device.',
+        color: 'green',
+      });
     } catch (e) {
       notifications.show({
         title: 'Failed to save',
@@ -179,7 +183,11 @@ export function AdministrativeReportContent({
       const type = format === 'pdf' ? 'report_pdf' : 'report_excel';
       const title = `Academic report (${format.toUpperCase()})`;
       await saveDocumentForOffline(title, type, `/api/v1/reports/academic/export?${params}`, blob);
-      notifications.show({ title: 'Saved for offline', message: 'You can open it from Offline documents.', color: 'green' });
+      notifications.show({
+        title: 'Saved for offline',
+        message: 'Stored on this device.',
+        color: 'green',
+      });
     } catch (e) {
       notifications.show({
         title: 'Failed to save',

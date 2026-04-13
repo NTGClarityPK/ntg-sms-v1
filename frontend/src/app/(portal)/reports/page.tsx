@@ -37,6 +37,9 @@ import { AdministrativeReportContent } from '@/components/features/reports/Admin
 
 function getPeriodDates(period: string): { periodType: ReportPeriodType; startDate: string | null; endDate: string | null } {
   const now = new Date();
+  if (period === 'all') {
+    return { periodType: ReportPeriodType.ALL, startDate: null, endDate: null };
+  }
   if (period === 'year') {
     return { periodType: ReportPeriodType.YEAR, startDate: null, endDate: null };
   }
@@ -221,6 +224,9 @@ export default function ReportsPage() {
                     }}
                   >
                     <Group gap="xs">
+                      <Chip value="all" variant="filled">
+                        {t('chipAll')}
+                      </Chip>
                       <Chip value="year" variant="filled">
                         {t('chipYearToDate')}
                       </Chip>

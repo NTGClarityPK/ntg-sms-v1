@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
-import type { ClassEntity, Level, Section, Subject } from '@/types/settings';
+import type { AcademicEntityDeletionStatus, ClassEntity, Level, Section, Subject } from '@/types/settings';
 
 const coreKeys = {
   subjects: ['subjects'] as const,
@@ -58,6 +58,52 @@ export function useUpdateSubject() {
     }) => apiClient.patch<Subject>(`/api/v1/subjects/${id}`, payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: coreKeys.subjects });
+    },
+  });
+}
+
+export async function fetchSubjectDeletionStatus(id: string): Promise<AcademicEntityDeletionStatus> {
+  const res = await apiClient.get<AcademicEntityDeletionStatus>(`/api/v1/subjects/${id}/deletion-check`);
+  return res.data;
+}
+
+export function useDeleteSubject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => apiClient.delete<{ deleted: boolean }>(`/api/v1/subjects/${id}`),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: coreKeys.subjects });
+    },
+  });
+}
+
+export async function fetchClassDeletionStatus(id: string): Promise<AcademicEntityDeletionStatus> {
+  const res = await apiClient.get<AcademicEntityDeletionStatus>(`/api/v1/classes/${id}/deletion-check`);
+  return res.data;
+}
+
+export function useDeleteClass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => apiClient.delete<{ deleted: boolean }>(`/api/v1/classes/${id}`),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: coreKeys.classes });
+      await qc.invalidateQueries({ queryKey: coreKeys.levels });
+    },
+  });
+}
+
+export async function fetchSectionDeletionStatus(id: string): Promise<AcademicEntityDeletionStatus> {
+  const res = await apiClient.get<AcademicEntityDeletionStatus>(`/api/v1/sections/${id}/deletion-check`);
+  return res.data;
+}
+
+export function useDeleteSection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => apiClient.delete<{ deleted: boolean }>(`/api/v1/sections/${id}`),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: coreKeys.sections });
     },
   });
 }

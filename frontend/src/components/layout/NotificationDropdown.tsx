@@ -46,7 +46,14 @@ export function NotificationDropdown({
   });
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
-  const { requestSubscribe, needsPermission, isLoading: pushLoading } = usePushSubscribe();
+  const {
+    requestSubscribe,
+    isSupported: pushSupported,
+    permission: pushPermission,
+    isSubscribed: pushSubscribed,
+    isSubscribing: pushSubscribing,
+    isLoading: pushLoading,
+  } = usePushSubscribe();
 
   // Show the latest few notifications (read + unread). The red bubble on the bell
   // still reflects the unread count via useUnreadCount.
@@ -163,19 +170,27 @@ export function NotificationDropdown({
 
       <Divider mb="sm" />
 
-      {needsPermission && (
-        <Button
-          variant="light"
-          fullWidth
-          size="sm"
-          leftSection={<IconBellRinging size={16} />}
-          onClick={() => requestSubscribe()}
-          loading={pushLoading}
-          mb="sm"
-        >
-          {t('enablePushNotifications')}
-        </Button>
-      )}
+      {(() => {
+        const disabled =
+          !pushSupported ||
+          pushSubscribing ||
+          (pushPermission === 'granted' && pushSubscribed);
+
+        return (
+          <Button
+            variant="light"
+            fullWidth
+            size="sm"
+            leftSection={<IconBellRinging size={16} />}
+            onClick={() => requestSubscribe()}
+            disabled={disabled}
+            loading={!disabled && pushLoading}
+            mb="sm"
+          >
+            {t('enablePushNotifications')}
+          </Button>
+        );
+      })()}
 
       {isLoading ? (
         <Stack gap="md" py="xl">

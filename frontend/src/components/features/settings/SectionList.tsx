@@ -1,14 +1,16 @@
 'use client';
 
-import { Alert, ActionIcon, Button, Group, Skeleton, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, ActionIcon, Button, Group, List, Skeleton, Modal, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconRefresh, IconPencil } from '@tabler/icons-react';
-import { useCreateSection, useSections, useUpdateSection } from '@/hooks/useCoreLookups';
+import { IconPlus, IconRefresh, IconPencil, IconTrash } from '@tabler/icons-react';
+import { modals } from '@mantine/modals';
+import { fetchSectionDeletionStatus, useCreateSection, useDeleteSection, useSections, useUpdateSection } from '@/hooks/useCoreLookups';
+import { useIsSchoolAdminForCurrentBranch } from '@/hooks/useSchoolAdminBranch';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { useState } from 'react';
-import type { Section } from '@/types/settings';
+import type { AcademicEntityDeletionStatus, Section } from '@/types/settings';
 import { useTranslations } from 'next-intl';
 
 export function SectionList() {
@@ -16,11 +18,77 @@ export function SectionList() {
   const notifyColors = useNotificationColors();
   const tSettings = useTranslations('settings');
   const tCommon = useTranslations('common');
+  const tBlockers = useTranslations('settings.academicDeleteBlockers');
   const [opened, { open, close }] = useDisclosure(false);
   const [editSection, setEditSection] = useState<Section | null>(null);
+  const isSchoolAdminBranch = useIsSchoolAdminForCurrentBranch();
   const listQuery = useSections();
   const createMutation = useCreateSection();
   const updateMutation = useUpdateSection();
+  const deleteMutation = useDeleteSection();
+  const [blockerModal, setBlockerModal] = useState<{ opened: boolean; status: AcademicEntityDeletionStatus | null }>({
+    opened: false,
+    status: null,
+  });
+  const [deletionCheckLoadingId, setDeletionCheckLoadingId] = useState<string | null>(null);
+
+  const knownBlockerTypes = new Set([
+    'subject_template_subjects',
+    'teacher_assignments',
+    'assessments',
+    'timetable_slots',
+    'library_items',
+    'class_sections',
+    'level_classes',
+    'class_subject_template_assignments',
+    'class_grade_assignments',
+    'class_timing_assignments',
+    'students',
+    'student_enrolments',
+    'student_promotion_decisions',
+  ]);
+
+  const blockerLabel = (type: string, count: number): string => {
+    if (knownBlockerTypes.has(type)) {
+      return tBlockers(type as 'assessments', { count });
+    }
+    return tSettings('academicDeleteBlockedUnknown', { type, count });
+  };
+
+  const openDeleteSection = async (s: Section) => {
+    setDeletionCheckLoadingId(s.id);
+    try {
+      const status = await fetchSectionDeletionStatus(s.id);
+      if (status.canDelete) {
+        modals.openConfirmModal({
+          title: tSettings('academicDeleteConfirmAction'),
+          children: <Text size="sm">{tSettings('academicDeleteConfirmSection', { name: s.name })}</Text>,
+          labels: { confirm: tSettings('academicDeleteConfirmAction'), cancel: tCommon('cancel') },
+          confirmProps: { color: 'red' },
+          onConfirm: async () => {
+            try {
+              await deleteMutation.mutateAsync(s.id);
+              notifications.show({
+                title: tCommon('success'),
+                message: tSettings('sectionDeleted'),
+                color: notifyColors.success,
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : tCommon('errors.generic');
+              notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+            }
+          },
+        });
+      } else {
+        setBlockerModal({ opened: true, status });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+    } finally {
+      setDeletionCheckLoadingId(null);
+    }
+  };
 
   const form = useForm<{ name: string }>({
     initialValues: { name: '' },
@@ -107,7 +175,7 @@ export function SectionList() {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>{tCommon('name')}</Table.Th>
-                <Table.Th style={{ width: 80 }}>{tCommon('actions')}</Table.Th>
+                <Table.Th style={{ width: isSchoolAdminBranch ? 120 : 80 }}>{tCommon('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -115,9 +183,25 @@ export function SectionList() {
                 <Table.Tr key={s.id}>
                   <Table.Td>{s.name}</Table.Td>
                   <Table.Td>
-                    <ActionIcon variant="subtle" size="sm" onClick={() => openEdit(s)} aria-label="Edit section">
-                      <IconPencil size={16} />
-                    </ActionIcon>
+                    <Group gap="xs" wrap="nowrap">
+                      <ActionIcon variant="subtle" size="sm" onClick={() => openEdit(s)} aria-label="Edit section" id={`section-list-edit-${s.id}`}>
+                        <IconPencil size={16} />
+                      </ActionIcon>
+                      {isSchoolAdminBranch && (
+                        <ActionIcon
+                          variant="subtle"
+                          size="sm"
+                          color="red"
+                          onClick={() => void openDeleteSection(s)}
+                          aria-label={tSettings('academicDeleteAria')}
+                          id={`section-list-delete-${s.id}`}
+                          loading={deletionCheckLoadingId === s.id}
+                          disabled={deletionCheckLoadingId !== null && deletionCheckLoadingId !== s.id}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      )}
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -125,6 +209,29 @@ export function SectionList() {
           </Table>
         )}
       </Paper>
+
+      <Modal
+        opened={blockerModal.opened}
+        onClose={() => setBlockerModal({ opened: false, status: null })}
+        title={tSettings('academicDeleteBlockedTitle')}
+        size="md"
+      >
+        <Stack gap="sm">
+          <Text size="sm">{tSettings('academicDeleteBlockedIntro')}</Text>
+          {blockerModal.status?.blockers?.length ? (
+            <List size="sm" spacing="xs">
+              {blockerModal.status.blockers.map((b) => (
+                <List.Item key={b.type}>{blockerLabel(b.type, b.count)}</List.Item>
+              ))}
+            </List>
+          ) : null}
+          <Group justify="flex-end" mt="md">
+            <Button variant="light" onClick={() => setBlockerModal({ opened: false, status: null })}>
+              {tCommon('close')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={opened}

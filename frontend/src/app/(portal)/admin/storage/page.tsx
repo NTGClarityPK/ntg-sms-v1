@@ -8,7 +8,6 @@ import {
   IconChartPie,
   IconFile,
   IconAlertTriangle,
-  IconFolderOff,
   IconCloud,
 } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
@@ -17,11 +16,10 @@ import { StorageOverview } from '@/components/features/storage/StorageOverview';
 import { CategoryBreakdown } from '@/components/features/storage/CategoryBreakdown';
 import { LargestFiles } from '@/components/features/storage/LargestFiles';
 import { StorageAlerts } from '@/components/features/storage/StorageAlerts';
-import { OfflineDocumentsTab } from '@/components/features/offline/OfflineDocumentsTab';
 import { StorageManager } from '@/components/features/offline/StorageManager';
 
-const VALID_TABS = ['overview', 'breakdown', 'files', 'alerts', 'offline-documents', 'cache'] as const;
-const SUPER_ADMIN_ONLY_TABS = ['offline-documents', 'cache'] as const;
+const VALID_TABS = ['overview', 'breakdown', 'files', 'alerts', 'cache'] as const;
+const SUPER_ADMIN_ONLY_TABS = ['cache'] as const;
 
 export default function StoragePage() {
   const t = useTranslations('storage');
@@ -47,7 +45,7 @@ export default function StoragePage() {
     }
   }, [tabFromUrl]);
 
-  // If non–super-admin lands on offline-documents or cache, switch to overview
+  // If non–super-admin lands on cache, switch to overview
   useEffect(() => {
     if (!isSuperAdmin && activeTab && SUPER_ADMIN_ONLY_TABS.includes(activeTab as (typeof SUPER_ADMIN_ONLY_TABS)[number])) {
       setActiveTab('overview');
@@ -96,14 +94,9 @@ export default function StoragePage() {
               {t('tabAlerts')}
             </Tabs.Tab>
             {isSuperAdmin && (
-              <>
-                <Tabs.Tab value="offline-documents" leftSection={<IconFolderOff size={16} />}>
-                  {t('tabOfflineDocuments')}
-                </Tabs.Tab>
-                <Tabs.Tab value="cache" leftSection={<IconCloud size={16} />}>
-                  {t('tabCache')}
-                </Tabs.Tab>
-              </>
+              <Tabs.Tab value="cache" leftSection={<IconCloud size={16} />}>
+                {t('tabCache')}
+              </Tabs.Tab>
             )}
           </Tabs.List>
 
@@ -138,14 +131,9 @@ export default function StoragePage() {
           </Tabs.Panel>
 
           {isSuperAdmin && (
-            <>
-              <Tabs.Panel value="offline-documents" pt="md" px="md" pb="md">
-                <OfflineDocumentsTab />
-              </Tabs.Panel>
-              <Tabs.Panel value="cache" pt="md" px="md" pb="md">
-                <StorageManager />
-              </Tabs.Panel>
-            </>
+            <Tabs.Panel value="cache" pt="md" px="md" pb="md">
+              <StorageManager />
+            </Tabs.Panel>
           )}
         </Tabs>
       </div>

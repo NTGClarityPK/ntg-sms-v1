@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
@@ -15,6 +15,8 @@ import { UpdateClassDto } from './dto/update-class.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { UpdateLevelDto } from './dto/update-level.dto';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
+import { assertSchoolAdminForBranch } from '../../common/utils/branch-roles.util';
+import { DeletionBlockerDto, DeletionStatusDto, EntityDeletedDto } from './dto/deletion-status.dto';
 
 type Meta = { total: number; page: number; limit: number; totalPages: number };
 
@@ -579,6 +581,340 @@ export class CoreLookupsService {
       )
       .catch(() => {});
     return mapSection(newRow);
+  }
+
+  private async collectSubjectDeletionBlockers(subjectId: string, branchId: string): Promise<DeletionBlockerDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: templates, error: templatesError } = await supabase
+      .from('subject_templates')
+      .select('id')
+      .eq('branch_id', branchId);
+    throwIfDbError(templatesError);
+    const templateIds = (templates ?? []).map((t: { id: string }) => t.id);
+
+    const [stsRes, taRes, assRes, ttRes, libRes] = await Promise.all([
+      templateIds.length === 0
+        ? Promise.resolve({ count: 0 as number, error: null as PostgrestError | null })
+        : supabase
+            .from('subject_template_subjects')
+            .select('subject_template_id', { count: 'exact', head: true })
+            .eq('subject_id', subjectId)
+            .in('subject_template_id', templateIds),
+      supabase
+        .from('teacher_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('subject_id', subjectId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('assessments')
+        .select('id', { count: 'exact', head: true })
+        .eq('subject_id', subjectId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('timetable_slots')
+        .select('id', { count: 'exact', head: true })
+        .eq('subject_id', subjectId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('library_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('subject_id', subjectId)
+        .eq('branch_id', branchId),
+    ]);
+
+    throwIfDbError(stsRes.error);
+    throwIfDbError(taRes.error);
+    throwIfDbError(assRes.error);
+    throwIfDbError(ttRes.error);
+    throwIfDbError(libRes.error);
+
+    const blockers: DeletionBlockerDto[] = [];
+    const pushIf = (type: string, count: number | null | undefined) => {
+      const n = count ?? 0;
+      if (n > 0) blockers.push(new DeletionBlockerDto({ type, count: n }));
+    };
+
+    pushIf('subject_template_subjects', stsRes.count);
+    pushIf('teacher_assignments', taRes.count);
+    pushIf('assessments', assRes.count);
+    pushIf('timetable_slots', ttRes.count);
+    pushIf('library_items', libRes.count);
+    return blockers;
+  }
+
+  private async collectClassDeletionBlockers(classId: string, branchId: string): Promise<DeletionBlockerDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+
+    // level_classes has no branch_id; constrain via levels.branch_id
+    const { data: lcRows, error: lcErr } = await supabase
+      .from('level_classes')
+      .select('level_id')
+      .eq('class_id', classId);
+    throwIfDbError(lcErr);
+
+    const levelIds = Array.from(new Set((lcRows ?? []).map((r: { level_id: string }) => r.level_id)));
+    let levelClassesInBranch = 0;
+    if (levelIds.length > 0) {
+      const { data: levelRows, error: levErr } = await supabase
+        .from('levels')
+        .select('id')
+        .in('id', levelIds)
+        .eq('branch_id', branchId);
+      throwIfDbError(levErr);
+      const allowed = new Set((levelRows ?? []).map((r: { id: string }) => r.id));
+      levelClassesInBranch = (lcRows ?? []).filter((r: { level_id: string }) => allowed.has(r.level_id)).length;
+    }
+
+    const [csRes, cstaRes, cgaRes, ctaRes, stuRes, seRes, spdRes, libRes] = await Promise.all([
+      supabase
+        .from('class_sections')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_id', classId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('class_subject_template_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_id', classId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('class_grade_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_id', classId),
+      supabase
+        .from('class_timing_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_id', classId),
+      supabase
+        .from('students')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_id', classId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('student_enrolments')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_id', classId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('student_promotion_decisions')
+        .select('id', { count: 'exact', head: true })
+        .eq('target_class_id', classId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('library_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_id', classId)
+        .eq('branch_id', branchId),
+    ]);
+
+    throwIfDbError(csRes.error);
+    throwIfDbError(cstaRes.error);
+    throwIfDbError(cgaRes.error);
+    throwIfDbError(ctaRes.error);
+    throwIfDbError(stuRes.error);
+    throwIfDbError(seRes.error);
+    throwIfDbError(spdRes.error);
+    throwIfDbError(libRes.error);
+
+    const blockers: DeletionBlockerDto[] = [];
+    const pushIf = (type: string, count: number | null | undefined) => {
+      const n = count ?? 0;
+      if (n > 0) blockers.push(new DeletionBlockerDto({ type, count: n }));
+    };
+    pushIf('class_sections', csRes.count);
+    if (levelClassesInBranch > 0) blockers.push(new DeletionBlockerDto({ type: 'level_classes', count: levelClassesInBranch }));
+    pushIf('class_subject_template_assignments', cstaRes.count);
+    pushIf('class_grade_assignments', cgaRes.count);
+    pushIf('class_timing_assignments', ctaRes.count);
+    pushIf('students', stuRes.count);
+    pushIf('student_enrolments', seRes.count);
+    pushIf('student_promotion_decisions', spdRes.count);
+    pushIf('library_items', libRes.count);
+    return blockers;
+  }
+
+  private async collectSectionDeletionBlockers(sectionId: string, branchId: string): Promise<DeletionBlockerDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+    const [csRes, stuRes, seRes, spdRes] = await Promise.all([
+      supabase
+        .from('class_sections')
+        .select('id', { count: 'exact', head: true })
+        .eq('section_id', sectionId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('students')
+        .select('id', { count: 'exact', head: true })
+        .eq('section_id', sectionId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('student_enrolments')
+        .select('id', { count: 'exact', head: true })
+        .eq('section_id', sectionId)
+        .eq('branch_id', branchId),
+      supabase
+        .from('student_promotion_decisions')
+        .select('id', { count: 'exact', head: true })
+        .eq('target_section_id', sectionId)
+        .eq('branch_id', branchId),
+    ]);
+
+    throwIfDbError(csRes.error);
+    throwIfDbError(stuRes.error);
+    throwIfDbError(seRes.error);
+    throwIfDbError(spdRes.error);
+
+    const blockers: DeletionBlockerDto[] = [];
+    const pushIf = (type: string, count: number | null | undefined) => {
+      const n = count ?? 0;
+      if (n > 0) blockers.push(new DeletionBlockerDto({ type, count: n }));
+    };
+    pushIf('class_sections', csRes.count);
+    pushIf('students', stuRes.count);
+    pushIf('student_enrolments', seRes.count);
+    pushIf('student_promotion_decisions', spdRes.count);
+    return blockers;
+  }
+
+  async getSubjectDeletionStatus(id: string, branchId: string, userId: string): Promise<{ data: DeletionStatusDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    await assertSchoolAdminForBranch(supabase, userId, branchId);
+
+    const { data: row, error } = await supabase
+      .from('subjects')
+      .select('id')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!row) throw new NotFoundException('Subject not found');
+
+    const blockers = await this.collectSubjectDeletionBlockers(id, branchId);
+    return { data: new DeletionStatusDto({ canDelete: blockers.length === 0, blockers }) };
+  }
+
+  async getClassDeletionStatus(id: string, branchId: string, userId: string): Promise<{ data: DeletionStatusDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    await assertSchoolAdminForBranch(supabase, userId, branchId);
+
+    const { data: row, error } = await supabase
+      .from('classes')
+      .select('id')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!row) throw new NotFoundException('Class not found');
+
+    const blockers = await this.collectClassDeletionBlockers(id, branchId);
+    return { data: new DeletionStatusDto({ canDelete: blockers.length === 0, blockers }) };
+  }
+
+  async getSectionDeletionStatus(id: string, branchId: string, userId: string): Promise<{ data: DeletionStatusDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    await assertSchoolAdminForBranch(supabase, userId, branchId);
+
+    const { data: row, error } = await supabase
+      .from('sections')
+      .select('id')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!row) throw new NotFoundException('Section not found');
+
+    const blockers = await this.collectSectionDeletionBlockers(id, branchId);
+    return { data: new DeletionStatusDto({ canDelete: blockers.length === 0, blockers }) };
+  }
+
+  async deleteSubject(
+    id: string,
+    branchId: string,
+    userId: string,
+    userEmail: string,
+  ): Promise<{ data: EntityDeletedDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    await assertSchoolAdminForBranch(supabase, userId, branchId);
+
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('subjects')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('Subject not found');
+
+    const blockers = await this.collectSubjectDeletionBlockers(id, branchId);
+    if (blockers.length > 0) {
+      throw new ConflictException(`Cannot delete subject: ${blockers.map((b) => `${b.type} (${b.count})`).join(', ')}`);
+    }
+
+    const { error: delError } = await supabase.from('subjects').delete().eq('id', id).eq('branch_id', branchId);
+    throwIfDbError(delError);
+    this.auditLogService
+      .logDelete('subjects', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
+      .catch(() => {});
+
+    return { data: new EntityDeletedDto({ deleted: true }) };
+  }
+
+  async deleteClass(id: string, branchId: string, userId: string, userEmail: string): Promise<{ data: EntityDeletedDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    await assertSchoolAdminForBranch(supabase, userId, branchId);
+
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('classes')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('Class not found');
+
+    const blockers = await this.collectClassDeletionBlockers(id, branchId);
+    if (blockers.length > 0) {
+      throw new ConflictException(`Cannot delete class: ${blockers.map((b) => `${b.type} (${b.count})`).join(', ')}`);
+    }
+
+    const { error: delError } = await supabase.from('classes').delete().eq('id', id).eq('branch_id', branchId);
+    throwIfDbError(delError);
+    this.auditLogService
+      .logDelete('classes', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
+      .catch(() => {});
+
+    return { data: new EntityDeletedDto({ deleted: true }) };
+  }
+
+  async deleteSection(
+    id: string,
+    branchId: string,
+    userId: string,
+    userEmail: string,
+  ): Promise<{ data: EntityDeletedDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    await assertSchoolAdminForBranch(supabase, userId, branchId);
+
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('sections')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('Section not found');
+
+    const blockers = await this.collectSectionDeletionBlockers(id, branchId);
+    if (blockers.length > 0) {
+      throw new ConflictException(`Cannot delete section: ${blockers.map((b) => `${b.type} (${b.count})`).join(', ')}`);
+    }
+
+    const { error: delError } = await supabase.from('sections').delete().eq('id', id).eq('branch_id', branchId);
+    throwIfDbError(delError);
+    this.auditLogService
+      .logDelete('sections', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
+      .catch(() => {});
+
+    return { data: new EntityDeletedDto({ deleted: true }) };
   }
 
   async listLevels(query: QueryLevelsDto, branchId: string): Promise<{ data: LevelDto[]; meta: Meta }> {

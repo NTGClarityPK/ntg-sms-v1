@@ -25,6 +25,16 @@ export interface AcademicYear {
   };
 }
 
+export interface AcademicEntityDeletionBlocker {
+  type: string;
+  count: number;
+}
+
+export interface AcademicEntityDeletionStatus {
+  canDelete: boolean;
+  blockers: AcademicEntityDeletionBlocker[];
+}
+
 export interface Subject {
   id: string;
   name: string;

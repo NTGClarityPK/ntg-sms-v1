@@ -29,7 +29,7 @@ export function ReportPeriodSelector({
   const t = useTranslations('reports');
 
   const handlePeriodTypeChange = (newType: string | null) => {
-    if (!newType || newType === 'year') {
+    if (!newType || newType === 'year' || newType === 'all') {
       onChange(newType as ReportPeriodType | null, null, null);
       return;
     }
@@ -112,6 +112,7 @@ export function ReportPeriodSelector({
         value={value || 'year'}
         onChange={handlePeriodTypeChange}
         data={[
+          { value: 'all', label: t('chipAll') },
           { value: 'week', label: t('chipThisWeek') },
           { value: 'month', label: t('chipThisMonth') },
           { value: 'year', label: t('chipYearToDate') },

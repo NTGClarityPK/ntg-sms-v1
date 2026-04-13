@@ -63,12 +63,7 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
     const userResponse = await apiClient.get<{
       preferredLocale?: string;
       roles?: Array<{ roleName?: string }>;
-      branches?: Array<{
-        id: string;
-        tenantId?: string | null;
-        name: string;
-        code?: string | null;
-      }>;
+      branches?: BranchForSelection[];
     }>('/api/v1/auth/me');
 
     const userData = userResponse.data ?? {};
@@ -96,44 +91,7 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       setLoading?.(false);
       return;
     }
-  } catch (userError: unknown) {
-    const err = userError as {
-      response?: { status?: number; data?: { error?: { message?: string }; message?: string } };
-      message?: string;
-    };
-    const status = err.response?.status;
-    const message =
-      err.response?.data?.error?.message ||
-      err.response?.data?.message ||
-      err.message ||
-      '';
-    const msg = typeof message === 'string' ? message.toLowerCase() : '';
-
-    if (status === 403) {
-      try {
-        await clearLocalSupabaseSession();
-      } catch {
-        // Session clear best-effort; still show backend message
-      }
-      setError(formatApiErrorBodyMessage(err.response?.data, err.message || 'Access denied.'));
-      setLoading?.(false);
-      return;
-    }
-
-    if (status === 404 || msg.includes('user not found')) {
-      router.push('/signup?google=not_found');
-      setLoading?.(false);
-      return;
-    }
-
-    console.error('Failed to check user role:', userError);
-  }
-
-  try {
-    const response = await apiClient.get<{
-      branches?: BranchForSelection[];
-    }>('/api/v1/auth/me');
-    const userBranches = (response.data?.branches || []) as BranchForSelection[];
+    const userBranches = (userData.branches || []) as BranchForSelection[];
 
     if (userBranches.length === 0) {
       setError('No branches assigned to your account. Please contact your administrator.');
@@ -149,6 +107,7 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
 
     onMultiBranch(Array.from(new Map(userBranches.map((b) => [b.id, b])).values()));
     setLoading?.(false);
+    return;
   } catch (branchError: unknown) {
     const err = branchError as {
       response?: { status?: number; data?: { error?: { message?: string }; message?: string } };
@@ -164,8 +123,22 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       setLoading?.(false);
       return;
     }
-    console.error('Failed to fetch branches:', branchError);
-    setError('Failed to fetch branches. Please try again.');
+    const status = err.response?.status;
+    const message =
+      err.response?.data?.error?.message ||
+      err.response?.data?.message ||
+      err.message ||
+      '';
+    const msg = typeof message === 'string' ? message.toLowerCase() : '';
+
+    if (status === 404 || msg.includes('user not found')) {
+      router.push('/signup?google=not_found');
+      setLoading?.(false);
+      return;
+    }
+
+    console.error('Failed to fetch user session context:', branchError);
+    setError('Failed to complete login. Please try again.');
     setLoading?.(false);
   }
 }

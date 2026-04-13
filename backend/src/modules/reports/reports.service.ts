@@ -147,6 +147,34 @@ export class ReportsService {
     branchId: string,
     academicYearId: string,
   ): Promise<{ startDate: string; endDate: string } | null> {
+    if (periodType === ReportPeriodType.ALL) {
+      // "All" = earliest available academic year start (tenant) → today.
+      // Uses academic years as the best proxy for when reporting data began.
+      const supabase = this.supabaseConfig.getClient();
+      const { data: branchRow, error: branchErr } = await supabase
+        .from('branches')
+        .select('tenant_id')
+        .eq('id', branchId)
+        .maybeSingle();
+      if (branchErr) return null;
+      const tenantId = (branchRow as { tenant_id?: string | null } | null)?.tenant_id ?? null;
+      const { data: earliest, error } = await supabase
+        .from('academic_years')
+        .select('start_date')
+        .eq('tenant_id', tenantId)
+        .order('start_date', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) return null;
+      const earliestStart =
+        (earliest as { start_date?: string } | null)?.start_date?.split('T')[0] ?? null;
+      const today = new Date().toISOString().split('T')[0];
+      if (!earliestStart) {
+        // Fallback to default behaviour if no academic years exist.
+        return this.getDateRangeForPeriod(ReportPeriodType.YEAR, undefined, undefined, branchId, academicYearId);
+      }
+      return { startDate: earliestStart, endDate: today };
+    }
     if (!periodType || periodType === ReportPeriodType.YEAR) {
       // Default to academic year - get academic year dates
       const activeYear = await this.academicYearsService.getActiveForBranch(branchId);

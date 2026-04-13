@@ -548,6 +548,13 @@ export class MessagesService {
         }
         for (const [cid, set] of byConv) {
           if (set.has(userId) && set.has(dto.recipientUserId!)) {
+            // Conversation may have been previously hidden (per-user). Ensure the creator sees it immediately.
+            const { error: unhideSelfError } = await supabase
+              .from('conversation_hidden')
+              .delete()
+              .eq('conversation_id', cid)
+              .eq('user_id', userId);
+            throwIfDbError(unhideSelfError);
             return this.getConversation(cid, userId, branchId);
           }
         }
@@ -697,6 +704,14 @@ export class MessagesService {
         .in('user_id', recipientIds);
       throwIfDbError(unhideError);
     }
+
+    // Also unhide for the sender (e.g. if they previously hid/deleted the thread).
+    const { error: unhideSenderError } = await supabase
+      .from('conversation_hidden')
+      .delete()
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+    throwIfDbError(unhideSenderError);
 
     const { data: profile } = await supabase
       .from('profiles')

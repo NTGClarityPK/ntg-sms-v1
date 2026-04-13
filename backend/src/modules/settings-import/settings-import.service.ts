@@ -260,35 +260,6 @@ export class SettingsImportService {
       data: {
         workbookName: 'settings-onboarding-template.xlsx',
         sheets: [
-          {
-            name: SHEET_NAMES.schoolInfo,
-            columns: [
-              'school_name',
-              'domain',
-              'email',
-              'phone',
-              'timezone',
-              'fiscal_year_start',
-              'vat_number',
-              'branch_name',
-              'branch_address',
-              'branch_phone',
-              'branch_email',
-            ],
-            sample: {
-              school_name: 'Your School Name',
-              domain: 'school.example.edu',
-              email: 'admin@school.example.edu',
-              phone: '+1234567890',
-              timezone: 'Asia/Baghdad',
-              fiscal_year_start: '2026-09-01',
-              vat_number: '',
-              branch_name: 'Main Branch',
-              branch_address: 'City, Country',
-              branch_phone: '+1234567891',
-              branch_email: 'main@school.example.edu',
-            },
-          },
           { name: SHEET_NAMES.academicYears, columns: ['name', 'start_date', 'end_date', 'set_active'], sample: { name: '2026-2027', start_date: '2026-09-01', end_date: '2027-06-30', set_active: 'true' } },
           { name: SHEET_NAMES.subjects, columns: ['name_en', 'name_ar', 'code'], sample: { name_en: 'Mathematics', name_ar: 'رياضيات', code: 'MATH' } },
           { name: SHEET_NAMES.classes, columns: ['name', 'display_name', 'sort_order'], sample: { name: 'Grade 1', display_name: 'Grade 1', sort_order: '1' } },
@@ -671,13 +642,9 @@ export class SettingsImportService {
     if (rows.length === 0) return {};
     const row = rows[0];
     const schoolName = asString(row.school_name);
-    if (!schoolName) {
-      errors.push({
-        sheet: SHEET_NAMES.schoolInfo,
-        rowNumber: 2,
-        message: 'school_name is required',
-      });
-    } else if (isPlaceholderSchoolName(schoolName)) {
+    // School / tenant details are captured during signup. This sheet is optional and only used
+    // to override fields intentionally during bulk setup.
+    if (schoolName && isPlaceholderSchoolName(schoolName)) {
       errors.push({
         sheet: SHEET_NAMES.schoolInfo,
         rowNumber: 2,
@@ -686,7 +653,7 @@ export class SettingsImportService {
       });
     }
     return {
-      schoolName,
+      schoolName: schoolName || undefined,
       domain: asString(row.domain) || undefined,
       email: asString(row.email) || undefined,
       phone: asString(row.phone) || undefined,

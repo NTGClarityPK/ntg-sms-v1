@@ -7,6 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "i18n:export": "node scripts/i18n-json-to-xlsx.cjs",
+    "i18n:import": "node scripts/i18n-xlsx-to-json.cjs",
+    "i18n:align": "node scripts/i18n-align-locales.cjs",
+    "i18n:clean-ar": "node scripts/i18n-clean-ar-placeholders.cjs",
+    "i18n:prune-missing": "node scripts/i18n-prune-missing-rows.cjs",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -45,6 +50,7 @@
     "@types/react-dom": "^18.2.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "14.2.0",
+    "exceljs": "^4.4.0",
     "patch-package": "^8.0.1",
     "typescript": "^5.0.0"
   }

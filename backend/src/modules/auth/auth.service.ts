@@ -247,6 +247,7 @@ export class AuthService {
     }
 
     const isStudentUser = roles.some((r) => (r.roleName || '').toLowerCase() === 'student');
+    const isSchoolAdminUser = roles.some((r) => (r.roleName || '').toLowerCase() === 'school_admin');
     if (isStudentUser) {
       const { data: studentRows, error: studentRowsError } = await supabase
         .from('students')
@@ -271,7 +272,16 @@ export class AuthService {
     // Auto-set current branch for users who have exactly one branch (e.g. non–school-admin roles
     // that skip the branch selection modal). Ensures BranchGuard and frontend have a branch without
     // requiring a separate select-branch call.
-    if (!currentBranchId && branches.length > 0) {
+    if (!currentBranchId && branches.length === 1) {
+      const defaultBranchId = branches[0].id;
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ current_branch_id: defaultBranchId })
+        .eq('id', userId);
+      if (!updateError) {
+        currentBranchId = defaultBranchId;
+      }
+    } else if (!currentBranchId && branches.length > 0 && !isSchoolAdminUser) {
       const defaultBranchId = branches[0].id;
       const { error: updateError } = await supabase
         .from('profiles')
@@ -299,7 +309,7 @@ export class AuthService {
     // Some users (e.g. subject teachers) can end up with `current_branch_id` pointing to a branch
     // that hasn't been configured (no assessment types), causing many "empty list" screens.
     // If the selected branch has no assessment types but another accessible branch does, switch.
-    if (currentBranchId && branches.length > 1) {
+    if (!isSchoolAdminUser && currentBranchId && branches.length > 1) {
       const { data: hasTypes } = await supabase
         .from('assessment_types')
         .select('id')

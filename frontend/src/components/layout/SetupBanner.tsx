@@ -22,6 +22,13 @@ export function SetupBanner() {
     | { isInitialized?: boolean; tabbedScreenReady?: boolean }
     | undefined;
   const isSetupReady = status?.tabbedScreenReady ?? status?.isInitialized ?? true;
+
+  const forceShowForDevTesting =
+    process.env.NODE_ENV === 'development' &&
+    typeof window !== 'undefined' &&
+    (new URLSearchParams(window.location.search).get('forceSetupBanner') === '1' ||
+      window.localStorage.getItem('forceSetupBanner') === '1');
+
   const hideKey = useMemo(() => {
     const userId = user?.id ?? 'anonymous';
     const branchId = user?.currentBranch?.id ?? 'no-branch';
@@ -35,14 +42,23 @@ export function SetupBanner() {
     setIsDismissed(hidden);
   }, [hideKey]);
 
-  if (!user || !canManageSetup(user.roles)) return null;
-  if (statusQuery.isLoading || isSetupReady || isDismissed) return null;
+  if (!forceShowForDevTesting) {
+    if (!user || !canManageSetup(user.roles)) return null;
+    if (statusQuery.isLoading || isSetupReady || isDismissed) return null;
+  }
 
   return (
     <Alert
-      icon={<IconRocket size={20} />}
+      icon={<IconRocket size={16} />}
+      mt="xs"
       mb="md"
-      title="Complete your setup"
+      px="md"
+      py="xs"
+      title={
+        <Text size="sm" fw={600}>
+          Complete your setup
+        </Text>
+      }
       variant="light"
       style={{
         marginLeft: 'var(--mantine-spacing-md)',
@@ -59,7 +75,7 @@ export function SetupBanner() {
         setIsDismissed(true);
       }}
     >
-      <Text size="sm" component="span">
+      <Text size="xs" component="span">
         Add academic details, schedule, and more in Settings to get the most out of your school.
         {' '}
         <Link href="/settings" style={{ fontWeight: 600, color: primaryColor }}>

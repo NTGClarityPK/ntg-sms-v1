@@ -1,14 +1,16 @@
 'use client';
 
-import { Alert, ActionIcon, Button, Group, Skeleton, Modal, NumberInput, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, ActionIcon, Button, Group, List, Skeleton, Modal, NumberInput, Paper, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconRefresh, IconPencil } from '@tabler/icons-react';
-import { useClasses, useCreateClass, useUpdateClass } from '@/hooks/useCoreLookups';
+import { IconPlus, IconRefresh, IconPencil, IconTrash } from '@tabler/icons-react';
+import { modals } from '@mantine/modals';
+import { fetchClassDeletionStatus, useClasses, useCreateClass, useDeleteClass, useUpdateClass } from '@/hooks/useCoreLookups';
+import { useIsSchoolAdminForCurrentBranch } from '@/hooks/useSchoolAdminBranch';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { useState } from 'react';
-import type { ClassEntity } from '@/types/settings';
+import type { AcademicEntityDeletionStatus, ClassEntity } from '@/types/settings';
 import { useTranslations } from 'next-intl';
 
 export function ClassList() {
@@ -16,11 +18,77 @@ export function ClassList() {
   const notifyColors = useNotificationColors();
   const tSettings = useTranslations('settings');
   const tCommon = useTranslations('common');
+  const tBlockers = useTranslations('settings.academicDeleteBlockers');
   const [opened, { open, close }] = useDisclosure(false);
   const [editClass, setEditClass] = useState<ClassEntity | null>(null);
+  const isSchoolAdminBranch = useIsSchoolAdminForCurrentBranch();
   const listQuery = useClasses();
   const createMutation = useCreateClass();
   const updateMutation = useUpdateClass();
+  const deleteMutation = useDeleteClass();
+  const [blockerModal, setBlockerModal] = useState<{ opened: boolean; status: AcademicEntityDeletionStatus | null }>({
+    opened: false,
+    status: null,
+  });
+  const [deletionCheckLoadingId, setDeletionCheckLoadingId] = useState<string | null>(null);
+
+  const knownBlockerTypes = new Set([
+    'subject_template_subjects',
+    'teacher_assignments',
+    'assessments',
+    'timetable_slots',
+    'library_items',
+    'class_sections',
+    'level_classes',
+    'class_subject_template_assignments',
+    'class_grade_assignments',
+    'class_timing_assignments',
+    'students',
+    'student_enrolments',
+    'student_promotion_decisions',
+  ]);
+
+  const blockerLabel = (type: string, count: number): string => {
+    if (knownBlockerTypes.has(type)) {
+      return tBlockers(type as 'assessments', { count });
+    }
+    return tSettings('academicDeleteBlockedUnknown', { type, count });
+  };
+
+  const openDeleteClass = async (c: ClassEntity) => {
+    setDeletionCheckLoadingId(c.id);
+    try {
+      const status = await fetchClassDeletionStatus(c.id);
+      if (status.canDelete) {
+        modals.openConfirmModal({
+          title: tSettings('academicDeleteConfirmAction'),
+          children: <Text size="sm">{tSettings('academicDeleteConfirmClass', { name: c.displayName || c.name })}</Text>,
+          labels: { confirm: tSettings('academicDeleteConfirmAction'), cancel: tCommon('cancel') },
+          confirmProps: { color: 'red' },
+          onConfirm: async () => {
+            try {
+              await deleteMutation.mutateAsync(c.id);
+              notifications.show({
+                title: tCommon('success'),
+                message: tSettings('classDeleted'),
+                color: notifyColors.success,
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : tCommon('errors.generic');
+              notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+            }
+          },
+        });
+      } else {
+        setBlockerModal({ opened: true, status });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+    } finally {
+      setDeletionCheckLoadingId(null);
+    }
+  };
 
   const form = useForm<{ name: string; displayName: string; sortOrder: number }>({
     initialValues: { name: '', displayName: '', sortOrder: 0 },
@@ -113,7 +181,7 @@ export function ClassList() {
                 <Table.Th>{tCommon('name')}</Table.Th>
                 <Table.Th>{tSettings('classColDisplayName')}</Table.Th>
                 <Table.Th>{tSettings('classColSort')}</Table.Th>
-                <Table.Th style={{ width: 80 }}>{tCommon('actions')}</Table.Th>
+                <Table.Th style={{ width: isSchoolAdminBranch ? 120 : 80 }}>{tCommon('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -123,9 +191,25 @@ export function ClassList() {
                   <Table.Td>{c.displayName}</Table.Td>
                   <Table.Td>{c.sortOrder}</Table.Td>
                   <Table.Td>
-                    <ActionIcon variant="subtle" size="sm" onClick={() => openEdit(c)} aria-label="Edit class">
-                      <IconPencil size={16} />
-                    </ActionIcon>
+                    <Group gap="xs" wrap="nowrap">
+                      <ActionIcon variant="subtle" size="sm" onClick={() => openEdit(c)} aria-label="Edit class" id={`class-list-edit-${c.id}`}>
+                        <IconPencil size={16} />
+                      </ActionIcon>
+                      {isSchoolAdminBranch && (
+                        <ActionIcon
+                          variant="subtle"
+                          size="sm"
+                          color="red"
+                          onClick={() => void openDeleteClass(c)}
+                          aria-label={tSettings('academicDeleteAria')}
+                          id={`class-list-delete-${c.id}`}
+                          loading={deletionCheckLoadingId === c.id}
+                          disabled={deletionCheckLoadingId !== null && deletionCheckLoadingId !== c.id}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      )}
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -133,6 +217,29 @@ export function ClassList() {
           </Table>
         )}
       </Paper>
+
+      <Modal
+        opened={blockerModal.opened}
+        onClose={() => setBlockerModal({ opened: false, status: null })}
+        title={tSettings('academicDeleteBlockedTitle')}
+        size="md"
+      >
+        <Stack gap="sm">
+          <Text size="sm">{tSettings('academicDeleteBlockedIntro')}</Text>
+          {blockerModal.status?.blockers?.length ? (
+            <List size="sm" spacing="xs">
+              {blockerModal.status.blockers.map((b) => (
+                <List.Item key={b.type}>{blockerLabel(b.type, b.count)}</List.Item>
+              ))}
+            </List>
+          ) : null}
+          <Group justify="flex-end" mt="md">
+            <Button variant="light" onClick={() => setBlockerModal({ opened: false, status: null })}>
+              {tCommon('close')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={opened}
