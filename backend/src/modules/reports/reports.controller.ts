@@ -34,12 +34,15 @@ export class ReportsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: { id: string; roles?: string[] },
     @Query('academicYearId') academicYearId?: string,
+    @Query('include') include?: string,
+    @Query('exclude') exclude?: string,
   ): Promise<void> {
     await this.reportsService.ensureUserCanAccessStudent(id, user.id, user.roles);
     const buffer = await this.reportsService.exportStudentReportPdf(
       id,
       branch.branchId,
       academicYearId,
+      { include, exclude },
     );
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
@@ -56,12 +59,15 @@ export class ReportsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: { id: string; roles?: string[] },
     @Query('academicYearId') academicYearId?: string,
+    @Query('include') include?: string,
+    @Query('exclude') exclude?: string,
   ): Promise<void> {
     await this.reportsService.ensureUserCanAccessStudent(id, user.id, user.roles);
     const buffer = await this.reportsService.exportStudentReportExcel(
       id,
       branch.branchId,
       academicYearId,
+      { include, exclude },
     );
     res.setHeader(
       'Content-Type',
@@ -232,6 +238,8 @@ export class ReportsController {
     @Query('endDate') endDate: string,
     @Query('academicYearId') academicYearId?: string,
     @Query('classSectionId') classSectionId?: string,
+    @Query('include') include?: string,
+    @Query('exclude') exclude?: string,
   ): Promise<void> {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate and endDate are required');
@@ -246,6 +254,7 @@ export class ReportsController {
           classSectionId,
           user.id,
           user.roles,
+          { include, exclude },
         )
       : await this.reportsService.exportAttendanceReportExcel(
           branch.branchId,
@@ -304,6 +313,8 @@ export class ReportsController {
     @Query('academicYearId') academicYearId?: string,
     @Query('classSectionId') classSectionId?: string,
     @Query('subjectId') subjectId?: string,
+    @Query('include') include?: string,
+    @Query('exclude') exclude?: string,
   ): Promise<void> {
     const isPdf = (format || 'pdf').toLowerCase() === 'pdf';
     const buffer = isPdf
@@ -314,6 +325,7 @@ export class ReportsController {
           subjectId,
           user.id,
           user.roles,
+          { include, exclude },
         )
       : await this.reportsService.exportAcademicReportExcel(
           branch.branchId,

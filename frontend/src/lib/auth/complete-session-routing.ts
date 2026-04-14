@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api-client';
 import type { Tenant } from '@/types/tenant';
 import { clearLocalSupabaseSession } from '@/lib/auth';
+import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
 
 function formatApiErrorBodyMessage(
   data: { error?: { message?: string | string[] }; message?: string | string[] } | undefined,
@@ -62,15 +63,24 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
   try {
     const userResponse = await apiClient.get<{
       preferredLocale?: string;
+      preferred_locale?: string;
       roles?: Array<{ roleName?: string }>;
       branches?: BranchForSelection[];
     }>('/api/v1/auth/me');
 
     const userData = userResponse.data ?? {};
 
-    const locale = userData.preferredLocale ?? 'en';
-    document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000; SameSite=Lax`;
-    localStorage.setItem('locale', locale);
+    const rawPreferred =
+      userData.preferredLocale ??
+      (userData as { preferred_locale?: string }).preferred_locale ??
+      'en-US';
+    const locale = normalizeUiLocale(rawPreferred);
+    setUiLocaleCookieOnDocument(locale);
+    try {
+      localStorage.setItem('locale', locale);
+    } catch {
+      // Non-blocking
+    }
 
     const roles = userData.roles ?? [];
     const normalisedRoleNames = roles

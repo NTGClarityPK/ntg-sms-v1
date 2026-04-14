@@ -19,6 +19,7 @@ import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { NextStepRoot } from '@/components/onboarding/NextStepRoot';
+import { LocaleRepairRefresh } from '@/components/common/LocaleRepairRefresh';
 
 /** In development, unregister any existing service workers so the production sw.js (and workbox) are not used. */
 function DevServiceWorkerCleanup() {
@@ -69,6 +70,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeWrapper>
         <InstallAppProvider>
+          <LocaleRepairRefresh />
           <DevServiceWorkerCleanup />
           <Notifications />
           <InstallPrompt />

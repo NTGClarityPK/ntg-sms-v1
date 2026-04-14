@@ -48,13 +48,18 @@ function throwIfDbError(error: PostgrestError | null): void {
 @Injectable()
 export class InvitationsService {
   private readonly logger = new Logger(InvitationsService.name);
+  private readonly invitationsPerMinuteLimit: number;
 
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
     private readonly mailjetService: MailjetService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    const configured = Number(this.configService.get<string>('INVITATIONS_RATE_LIMIT_PER_MINUTE'));
+    // Default to 20 invitations/min so bulk import can do ~10 students/min when creating parent accounts too.
+    this.invitationsPerMinuteLimit = Number.isFinite(configured) && configured > 0 ? configured : 20;
+  }
 
   private getFrontendUrl(): string {
     const url = this.configService.get<string>('FRONTEND_URL')?.trim();
@@ -125,9 +130,9 @@ export class InvitationsService {
 
     throwIfDbError(error);
     const sentRecently = count ?? 0;
-    if (sentRecently >= 10) {
+    if (sentRecently >= this.invitationsPerMinuteLimit) {
       throw new HttpException(
-        'Rate limit exceeded: maximum 10 invitations per minute',
+        `Rate limit exceeded: maximum ${this.invitationsPerMinuteLimit} invitations per minute`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

@@ -54,13 +54,57 @@ export function AttendanceHistoryContent() {
   });
   const classSections = classSectionsData?.data || [];
 
-  const [page] = useState(1);
-  const { data: attendanceData, isLoading } = useAttendance({
-    classSectionIds: selectedClassSectionIds.length > 0 ? selectedClassSectionIds : undefined,
-    statuses: selectedStatuses.length > 0 ? (selectedStatuses as ('present' | 'absent' | 'late' | 'excused')[]) : undefined,
-    page,
+  // Calendar needs enough rows to cover multiple days (rows scale with student count).
+  // Backend caps `limit` at 500, so fetch a few pages when in calendar view.
+  const calendarLimit = 500;
+  const calendarPages = 3; // 3×500 = 1500 rows (~11+ days @ 129 students/day)
+
+  const commonParams = {
+    classSectionIds:
+      selectedClassSectionIds.length > 0 ? selectedClassSectionIds : undefined,
+    statuses:
+      selectedStatuses.length > 0
+        ? (selectedStatuses as ('present' | 'absent' | 'late' | 'excused')[])
+        : undefined,
+  };
+
+  const { data: tableData, isLoading: isTableLoading } = useAttendance({
+    ...commonParams,
+    page: 1,
     limit: 100,
   });
+
+  const { data: calData1, isLoading: isCalLoading1 } = useAttendance({
+    ...commonParams,
+    page: 1,
+    limit: calendarLimit,
+  });
+  const { data: calData2, isLoading: isCalLoading2 } = useAttendance({
+    ...commonParams,
+    page: viewMode === 'calendar' ? 2 : 999999, // keep hook stable, avoid loading extra pages in table mode
+    limit: calendarLimit,
+  });
+  const { data: calData3, isLoading: isCalLoading3 } = useAttendance({
+    ...commonParams,
+    page: viewMode === 'calendar' ? 3 : 999999,
+    limit: calendarLimit,
+  });
+
+  const isLoading =
+    viewMode === 'calendar'
+      ? isCalLoading1 || isCalLoading2 || isCalLoading3
+      : isTableLoading;
+
+  const attendanceData =
+    viewMode === 'calendar'
+      ? {
+          data: [
+            ...(calData1?.data ?? []),
+            ...(calData2?.data ?? []),
+            ...(calData3?.data ?? []),
+          ],
+        }
+      : tableData;
 
   let attendance = attendanceData?.data || [];
   if (startDate) {

@@ -26,6 +26,23 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
     [roles],
   );
 
+  // Align with Assign Access tab: hide deprecated / redundant feature codes
+  // (same display label for different codes, e.g. `events_management` + `events` → "Events",
+  // `user_management` + `staff` → "Users" — nav uses `user_management` for /users).
+  const managementFeatures = useMemo(() => {
+    return features.filter(
+      (f) =>
+        ![
+          'events',
+          'my_events',
+          'timetable',
+          'my_timetable',
+          'my_schedule',
+          'staff',
+        ].includes(f.code),
+    );
+  }, [features]);
+
   const roleOptions = matrixRoles.map((r) => ({
     value: r.id,
     label: tCommon(`roleName.${r.name}` as any),
@@ -114,7 +131,7 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
       }
     };
 
-    let rows = features.map((feature) => ({
+    let rows = managementFeatures.map((feature) => ({
       featureId: feature.id,
       featureName: getFeatureLabel(feature),
       permission: rolePermissionMap.get(feature.id) || 'none',
@@ -130,7 +147,7 @@ export function RoleAccessSummary({ roles, features, permissions }: RoleAccessSu
     }
 
     return rows.sort((a, b) => a.featureName.localeCompare(b.featureName));
-  }, [features, rolePermissionMap, search, accessFilter]);
+  }, [managementFeatures, rolePermissionMap, search, accessFilter]);
 
   const counts = useMemo(() => {
     return filteredRows.reduce(

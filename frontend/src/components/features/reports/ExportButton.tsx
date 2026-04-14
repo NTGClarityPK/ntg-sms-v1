@@ -1,10 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Group, Menu, Text } from '@mantine/core';
 import { IconFileExport, IconFileTypePdf, IconFileSpreadsheet } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
+import {
+  StudentReportExportOptionsModal,
+  type StudentReportExportSection,
+} from './StudentReportExportOptionsModal';
 
 export type ExportVariant = 'student' | 'class';
 
@@ -42,6 +46,8 @@ export function ExportButton({
 }: ExportButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [pendingFormat, setPendingFormat] = useState<'pdf' | 'excel' | null>(null);
   const t = useTranslations('reports');
 
   const buildUrl = (path: string): string => {
@@ -52,7 +58,7 @@ export function ExportButton({
     return query ? `${base}?${query}` : base;
   };
 
-  const handleExport = async (format: 'pdf' | 'excel') => {
+  const handleExport = async (format: 'pdf' | 'excel', sections?: StudentReportExportSection[]) => {
     setError(null);
     setLoading(true);
 
@@ -62,7 +68,14 @@ export function ExportButton({
           format === 'pdf'
             ? `/api/v1/reports/student/${studentId}/export/pdf`
             : `/api/v1/reports/student/${studentId}/export/excel`;
-        const blob = await apiClient.getBlob(buildUrl(path));
+        const baseUrl = buildUrl(path);
+        const url = (() => {
+          if (!sections?.length) return baseUrl;
+          const u = new URL(baseUrl, window.location.origin);
+          u.searchParams.set('include', sections.join(','));
+          return `${u.pathname}${u.search}`;
+        })();
+        const blob = await apiClient.getBlob(url);
         const ext = format === 'pdf' ? 'pdf' : 'xlsx';
         triggerDownload(blob, `student-report-${studentId}.${ext}`);
       } else if (variant === 'class' && classSectionId && format === 'excel') {
@@ -75,6 +88,20 @@ export function ExportButton({
     } finally {
       setLoading(false);
     }
+  };
+
+  const studentDefaultSections: StudentReportExportSection[] = useMemo(
+    () => ['academic', 'attendance', 'behavioral', 'assignmentStatistics', 'assignmentEngagement'],
+    [],
+  );
+
+  const requestExport = (format: 'pdf' | 'excel') => {
+    if (variant === 'student') {
+      setPendingFormat(format);
+      setOptionsOpen(true);
+      return;
+    }
+    void handleExport(format);
   };
 
   const studentOptions = [
@@ -92,6 +119,24 @@ export function ExportButton({
 
   return (
     <Group gap="sm" align="center">
+      {variant === 'student' && (
+        <StudentReportExportOptionsModal
+          opened={optionsOpen}
+          onClose={() => {
+            if (loading) return;
+            setOptionsOpen(false);
+            setPendingFormat(null);
+          }}
+          confirmLoading={loading}
+          onConfirm={async (sections) => {
+            const fmt = pendingFormat ?? 'pdf';
+            setOptionsOpen(false);
+            setPendingFormat(null);
+            const finalSections = sections.length ? sections : studentDefaultSections;
+            await handleExport(fmt, finalSections);
+          }}
+        />
+      )}
       <Menu shadow="md" width={180} disabled={!canExport || loading}>
         <Menu.Target>
           <Button
@@ -108,7 +153,7 @@ export function ExportButton({
             <Menu.Item
               key={format}
               leftSection={<Icon size={14} />}
-              onClick={() => handleExport(format)}
+              onClick={() => requestExport(format)}
               disabled={loading}
             >
               {label}

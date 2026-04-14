@@ -9,19 +9,13 @@ import { useMantineTheme } from '@mantine/core';
 import { apiClient } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { supabase } from '@/lib/supabase/client';
-const LOCALE_COOKIE = 'NEXT_LOCALE';
-const COOKIE_MAX_AGE = 31536000; // 1 year
+import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
 
 const LANGUAGES = [
   { code: 'en-US', nativeName: 'English (US)', name: 'English (US)' },
   { code: 'en-GB', nativeName: 'English (UK)', name: 'English (UK)' },
   { code: 'ar', nativeName: 'العربية', name: 'Arabic' },
 ];
-
-function setLocaleCookie(locale: string) {
-  if (typeof document === 'undefined') return;
-  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
-}
 
 export function LanguageSwitcher() {
   const router = useRouter();
@@ -35,9 +29,10 @@ export function LanguageSwitcher() {
     LANGUAGES.find((l) => l.code === normalizedLocale) ?? LANGUAGES[0];
 
   const handleChange = async (value: string) => {
-    setLocaleCookie(value);
+    const next = normalizeUiLocale(value);
+    setUiLocaleCookieOnDocument(next);
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('locale', value);
+      localStorage.setItem('locale', next);
     }
     try {
       // Avoid noisy 401s during logout/expired sessions: only persist to backend when authenticated.

@@ -10,6 +10,8 @@ export interface User {
   email: string;
   fullName: string;
   avatarUrl?: string;
+  /** Server profile preference; drives NEXT_LOCALE reconciliation after /auth/me. */
+  preferredLocale?: string;
   onboardingSeenToursModal?: boolean;
   roles?: Array<{
     roleId: string;

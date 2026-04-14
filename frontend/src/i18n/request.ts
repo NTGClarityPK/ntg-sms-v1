@@ -1,9 +1,11 @@
 import { getRequestConfig } from 'next-intl/server';
 import { cookies } from 'next/headers';
+import { resolveLocaleFromServerCookieValues, UI_LOCALE_COOKIE } from '@/lib/ui-locale';
 
 export default getRequestConfig(async () => {
   const cookieStore = await cookies();
-  const locale = cookieStore.get('NEXT_LOCALE')?.value ?? 'en';
+  const localeValues = cookieStore.getAll(UI_LOCALE_COOKIE).map((c) => c.value);
+  const locale = resolveLocaleFromServerCookieValues(localeValues);
 
   const loadLocaleMessages = async (requestedLocale: string) => {
     try {

@@ -359,8 +359,12 @@ export class StudentsService {
 
     throwIfDbError(error);
 
-    // Ensure placement shown is for the active academic year (enrolments),
-    // not the legacy students.class_id/section_id which can reflect an old year.
+    // Placement (class/section) is year-scoped via student_enrolments.
+    // IMPORTANT: Do NOT force the active academic year for all students.
+    // Bulk imports (or historical records) can legitimately belong to a different year, and
+    // the UI must not show N/A simply because the tenant's active year changed.
+    // We resolve placement per-student using their academic_year_id, falling back to the
+    // active year only when a student has no academic year set.
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     const activeYearId = activeYear?.id ?? null;
 
@@ -380,25 +384,39 @@ export class StudentsService {
       .map((s) => s.id)
       .filter((id): id is string => !!id);
 
-    const enrolmentByStudentId = new Map<
+    const academicYearIdByStudentId = new Map<string, string | null>();
+    for (const row of (data as unknown as Array<{ id: string; academic_year_id: string | null }>)) {
+      academicYearIdByStudentId.set(row.id, row.academic_year_id ?? null);
+    }
+
+    const yearIdsForPlacement = Array.from(
+      new Set(
+        Array.from(academicYearIdByStudentId.values())
+          .map((y) => y ?? activeYearId)
+          .filter((y): y is string => typeof y === 'string' && y.length > 0),
+      ),
+    );
+
+    const enrolmentByStudentYearKey = new Map<
       string,
       { classId: string | null; sectionId: string | null; status: string }
     >();
-    if (activeYearId && studentIdsOnPage.length > 0) {
+    if (yearIdsForPlacement.length > 0 && studentIdsOnPage.length > 0) {
       const { data: enrolments, error: enrolErr } = await supabase
         .from('student_enrolments')
-        .select('student_id, class_id, section_id, status')
+        .select('student_id, academic_year_id, class_id, section_id, status')
         .eq('branch_id', branchId)
-        .eq('academic_year_id', activeYearId)
+        .in('academic_year_id', yearIdsForPlacement)
         .in('student_id', studentIdsOnPage);
       throwIfDbError(enrolErr);
       for (const row of (enrolments || []) as Array<{
         student_id: string;
+        academic_year_id: string;
         class_id: string | null;
         section_id: string | null;
         status: string;
       }>) {
-        enrolmentByStudentId.set(row.student_id, {
+        enrolmentByStudentYearKey.set(`${row.student_id}::${row.academic_year_id}`, {
           classId: row.class_id ?? null,
           sectionId: row.section_id ?? null,
           status: row.status,
@@ -407,10 +425,12 @@ export class StudentsService {
     }
 
     const effectiveClassIds = Array.from(
-      new Set(Array.from(enrolmentByStudentId.values()).map((e) => e.classId).filter(Boolean)),
+      new Set(Array.from(enrolmentByStudentYearKey.values()).map((e) => e.classId).filter(Boolean)),
     ) as string[];
     const effectiveSectionIds = Array.from(
-      new Set(Array.from(enrolmentByStudentId.values()).map((e) => e.sectionId).filter(Boolean)),
+      new Set(
+        Array.from(enrolmentByStudentYearKey.values()).map((e) => e.sectionId).filter(Boolean),
+      ),
     ) as string[];
 
     const [{ data: effectiveClasses }, { data: effectiveSections }] = await Promise.all([
@@ -427,9 +447,9 @@ export class StudentsService {
     );
     const sectionNameById = new Map(((effectiveSections as any[]) ?? []).map((s) => [s.id as string, s.name as string]));
 
-    // Fetch subject template assignments for all students (scoped to this branch + the student's academic year)
+    // Fetch subject template assignments for all students (scoped to this branch + the student's placement year)
     const studentIds = studentIdsOnPage;
-    const academicYearIds = activeYearId ? [activeYearId] : [];
+    const academicYearIds = yearIdsForPlacement;
 
     const { data: templateAssignments } =
       studentIds.length > 0 && academicYearIds.length > 0
@@ -494,11 +514,13 @@ export class StudentsService {
       classes: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
       sections: { name: string } | { name: string }[] | null;
     }>).map((row) => {
-      const enrol = enrolmentByStudentId.get(row.id);
+      const placementYearId = row.academic_year_id ?? activeYearId ?? null;
+      const enrol =
+        placementYearId ? enrolmentByStudentYearKey.get(`${row.id}::${placementYearId}`) : undefined;
       const effectiveClassId = enrol?.classId ?? null;
       const effectiveSectionId = enrol?.sectionId ?? null;
       const templateInfo =
-        activeYearId ? templateMap.get(`${row.id}::${activeYearId}`) : undefined;
+        placementYearId ? templateMap.get(`${row.id}::${placementYearId}`) : undefined;
 
       // Only surface template if it is available for the student's current class/level.
       const availableForClass = effectiveClassId
@@ -518,7 +540,7 @@ export class StudentsService {
         bloodGroup: row.blood_group ?? undefined,
         medicalNotes: row.medical_notes ?? undefined,
         admissionDate: row.admission_date ?? undefined,
-        academicYearId: activeYearId ?? undefined,
+        academicYearId: placementYearId ?? undefined,
         isActive: row.is_active,
         accountStatus: accountStatusFromRow(row.account_status),
         createdAt: row.created_at,

@@ -8,6 +8,7 @@ import { AssessmentService } from '../assessment/assessment.service';
 import { SystemSettingsService } from '../system-settings/system-settings.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { BranchesService } from '../branches/branches.service';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 type WorkbookRow = Record<string, unknown>;
 
@@ -80,6 +81,11 @@ const DISALLOWED_SCHOOL_NAME_PLACEHOLDERS = new Set(
 function isPlaceholderSchoolName(value: string | undefined): boolean {
   const n = value?.trim().toLowerCase();
   return Boolean(n && DISALLOWED_SCHOOL_NAME_PLACEHOLDERS.has(n));
+}
+
+function throwIfDbError(error: PostgrestError | null): void {
+  if (!error) return;
+  throw new BadRequestException(error.message);
 }
 
 const SHEET_NAMES = {
@@ -591,6 +597,10 @@ export class SettingsImportService {
       await this.systemSettingsService.upsert('inventory_categories', prepared.categories.inventory);
     }
 
+    // Seed default permissions so Settings → Permissions matrix is populated after bulk setup,
+    // matching wizard behaviour (School Admin gets edit for all features; others start at none).
+    await this.seedDefaultPermissionsIfMissing(prepared.branchId);
+
     // Mark setup as completed for this branch so Settings opens full tabbed view
     // even when optional domains (e.g. schedule/permissions) are intentionally deferred.
     await this.systemSettingsService.upsert(
@@ -605,6 +615,45 @@ export class SettingsImportService {
         created,
       },
     };
+  }
+
+  private async seedDefaultPermissionsIfMissing(branchId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: existing, error: existingError } = await supabase
+      .from('role_permissions')
+      .select('id')
+      .eq('branch_id', branchId)
+      .limit(1);
+    throwIfDbError(existingError);
+    if ((existing?.length ?? 0) > 0) return;
+
+    const [rolesRes, featuresRes] = await Promise.all([
+      supabase.from('roles').select('id, name'),
+      supabase.from('features').select('id'),
+    ]);
+    throwIfDbError(rolesRes.error);
+    throwIfDbError(featuresRes.error);
+
+    const roles = (rolesRes.data ?? []) as Array<{ id: string; name: string }>;
+    const features = (featuresRes.data ?? []) as Array<{ id: string }>;
+
+    if (roles.length === 0 || features.length === 0) return;
+
+    const rows = roles.flatMap((role) =>
+      features.map((feature) => ({
+        role_id: role.id,
+        feature_id: feature.id,
+        branch_id: branchId,
+        permission: role.name?.toLowerCase() === 'school_admin' ? 'edit' : 'none',
+        updated_at: new Date().toISOString(),
+      })),
+    );
+
+    const { error: upsertError } = await supabase.from('role_permissions').upsert(rows, {
+      onConflict: 'role_id,feature_id,branch_id',
+    });
+    throwIfDbError(upsertError);
   }
 
   private ensureValidUpload(file: Express.Multer.File | undefined): void {

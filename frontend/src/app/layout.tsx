@@ -4,9 +4,8 @@ import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import { Audiowide, Rajdhani, Saira, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
+import { getLocale, getMessages } from 'next-intl/server';
 import { DirectionProvider } from '@mantine/core';
-import { cookies } from 'next/headers';
 
 const primaryFont = Saira({
   subsets: ['latin'],
@@ -56,8 +55,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const locale = cookieStore.get('NEXT_LOCALE')?.value ?? 'en';
+  const locale = await getLocale();
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
   const messages = await getMessages();
 

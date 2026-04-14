@@ -7,6 +7,7 @@ import { IconAlertCircle, IconCheck, IconBrandGoogle, IconLayoutDashboard } from
 import { supabase } from '@/lib/supabase/client';
 import { apiClient } from '@/lib/api-client';
 import { clearLocalSupabaseSession } from '@/lib/auth';
+import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 
@@ -19,6 +20,7 @@ interface Branch {
 
 interface UserResponseDto {
   preferredLocale?: string;
+  preferred_locale?: string;
   roles?: Array<{ roleName?: string }>;
   branches?: Branch[];
   currentBranch?: Branch | null;
@@ -148,9 +150,15 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        const locale = userData.preferredLocale ?? 'en';
-        document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000; SameSite=Lax`;
-        localStorage.setItem('locale', locale);
+        const rawPreferred =
+          userData.preferredLocale ?? userData.preferred_locale ?? 'en-US';
+        const locale = normalizeUiLocale(rawPreferred);
+        setUiLocaleCookieOnDocument(locale);
+        try {
+          localStorage.setItem('locale', locale);
+        } catch {
+          // Non-blocking
+        }
 
         if (roleNames.includes('super_admin')) {
           setStepMsg(2, 'Taking you to admin portal...');

@@ -1,43 +1,30 @@
 import { supabase } from './supabase/client';
-
-const LOCALE_COOKIE = 'NEXT_LOCALE';
-const LOCALE_COOKIE_MAX_AGE = 31536000; // 1 year
-const SUPPORTED_LOCALES = new Set(['en', 'en-US', 'en-GB', 'ar']);
-
-function setLocaleCookie(locale: string): void {
-  if (typeof document === 'undefined') return;
-  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
-}
-
-function getCookieValue(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const parts = document.cookie.split(';').map((p) => p.trim());
-  const found = parts.find((p) => p.startsWith(`${name}=`));
-  if (!found) return null;
-  return found.substring(name.length + 1) || null;
-}
-
-function normaliseLocale(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const value = raw.trim();
-  if (!value) return null;
-  if (SUPPORTED_LOCALES.has(value)) return value;
-  // Backward compatibility: some older places may store `en` or other variants.
-  if (value.toLowerCase() === 'en') return 'en';
-  if (value.toLowerCase() === 'ar') return 'ar';
-  return null;
-}
+import {
+  getUiLocaleCookieFromDocument,
+  normalizeUiLocale,
+  setUiLocaleCookieOnDocument,
+} from './ui-locale';
 
 export function syncLocaleCookieFromStorage(): void {
   if (typeof window === 'undefined') return;
-  // Prefer the cookie (server source-of-truth). Only fall back to localStorage when cookie is missing.
-  const cookieLocale = normaliseLocale(getCookieValue(LOCALE_COOKIE));
-  const storedLocale = normaliseLocale(window.localStorage.getItem('locale'));
 
-  if (cookieLocale) {
-    if (storedLocale !== cookieLocale) {
+  const cookieRaw = getUiLocaleCookieFromDocument();
+  if (cookieRaw != null && cookieRaw.trim() !== '') {
+    const normalized = normalizeUiLocale(cookieRaw);
+    if (normalized !== cookieRaw.trim()) {
+      setUiLocaleCookieOnDocument(normalized);
+    }
+  }
+
+  const cookieNorm =
+    cookieRaw != null && cookieRaw.trim() !== '' ? normalizeUiLocale(cookieRaw) : null;
+  const storedRaw = window.localStorage.getItem('locale');
+  const storedLocale = storedRaw != null ? normalizeUiLocale(storedRaw) : null;
+
+  if (cookieNorm) {
+    if (storedLocale !== cookieNorm) {
       try {
-        window.localStorage.setItem('locale', cookieLocale);
+        window.localStorage.setItem('locale', cookieNorm);
       } catch {
         // Non-blocking
       }
@@ -46,7 +33,7 @@ export function syncLocaleCookieFromStorage(): void {
   }
 
   if (storedLocale) {
-    setLocaleCookie(storedLocale);
+    setUiLocaleCookieOnDocument(storedLocale);
   }
 }
 
@@ -137,4 +124,3 @@ export async function updatePassword(newPassword: string) {
 
   return data;
 }
-

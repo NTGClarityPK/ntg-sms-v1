@@ -55,6 +55,8 @@ export function usePermissions() {
       case 'my_timetable':
       case 'my_schedule':
         return ['timetable_personal', 'my_timetable', 'my_schedule', 'timetable'];
+      case 'user_management':
+        return ['user_management', 'staff'];
       default:
         return [featureCode];
     }

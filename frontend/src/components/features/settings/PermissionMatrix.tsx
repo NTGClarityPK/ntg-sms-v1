@@ -1,12 +1,12 @@
 'use client';
 
-import { Table, Select, Button, Stack, Group, Text, MultiSelect, Paper, Alert } from '@mantine/core';
+import { Table, Select, Button, Stack, Group, Text, MultiSelect, Paper, Alert, Box } from '@mantine/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { notifications } from '@mantine/notifications';
 import type { Role, Feature, PermissionMatrix, Permission, UpdatePermissionsPayload } from '@/types/permissions';
 import { useAuth } from '@/hooks/useAuth';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import type { User } from '@/types/auth';
 import { useClasses } from '@/hooks/useCoreLookups';
@@ -14,7 +14,6 @@ import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSetti
 
 const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
 const SUPER_ADMIN_ROLE_NAME = 'super_admin';
-const DEFAULT_VISIBLE_TAB_COUNT = 5;
 
 interface PermissionMatrixProps {
   roles: Role[];
@@ -46,6 +45,7 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
         'timetable',
         'my_timetable',
         'my_schedule',
+        'staff',
       ].includes(f.code),
   );
 
@@ -53,7 +53,6 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   const [hasChanges, setHasChanges] = useState(false);
   const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
-  const hasSetInitialDefault = useRef(false);
 
   const visibleFeatures =
     selectedFeatureIds.length === 0
@@ -192,13 +191,6 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   }, [remoteLeaveClassIds, localLeaveClassIds]);
 
   useEffect(() => {
-    if (managementFeatures.length > 0 && !hasSetInitialDefault.current) {
-      hasSetInitialDefault.current = true;
-      setSelectedFeatureIds(managementFeatures.slice(0, DEFAULT_VISIBLE_TAB_COUNT).map((f) => f.id));
-    }
-  }, [managementFeatures]);
-
-  useEffect(() => {
     const newMap = new Map<string, Permission>();
     permissions.forEach((p) => {
       const key = `${p.roleId}-${p.featureId}`;
@@ -330,11 +322,39 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
                   // Students should not be granted management "Assessment" permissions (they use "My Assessments").
                   const isDisabledForStudent = isStudentRole && feature.code === 'assessment';
 
+                  const permissionColor: 'green' | 'blue' | 'gray' =
+                    currentPermission === 'edit'
+                      ? 'green'
+                      : currentPermission === 'view'
+                        ? 'blue'
+                        : 'gray';
+
+                  const PermissionDot = ({ color }: { color: 'green' | 'blue' | 'gray' }) => (
+                    <Box
+                      w={10}
+                      h={10}
+                      style={{
+                        borderRadius: 999,
+                        background: `var(--mantine-color-${color}-6)`,
+                        flex: '0 0 10px',
+                      }}
+                    />
+                  );
+
                   return (
                     <Table.Td key={feature.id}>
                       <Select
                         value={currentPermission}
                         disabled={isDisabledForStudent}
+                        leftSection={
+                          <PermissionDot color={isDisabledForStudent ? 'gray' : permissionColor} />
+                        }
+                        renderOption={({ option }) => (
+                          <Group gap="xs" wrap="nowrap">
+                            <PermissionDot color={(option.value as Permission) === 'edit' ? 'green' : (option.value as Permission) === 'view' ? 'blue' : 'gray'} />
+                            <Text size="sm">{option.label}</Text>
+                          </Group>
+                        )}
                         onChange={(value) => {
                           if (isDisabledForStudent) return;
                           handlePermissionChange(role.id, feature.id, value as Permission);

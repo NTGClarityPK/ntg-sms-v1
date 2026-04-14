@@ -2,11 +2,50 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import {
+  getUiLocaleCookieFromDocument,
+  isSupportedUiLocale,
+  LOCALE_REPAIR_REFRESH_FLAG,
+  normalizeUiLocale,
+  setUiLocaleCookieOnDocument,
+} from '@/lib/ui-locale';
 import { User } from '@/types/auth';
+
+function isEnglishFamily(l: string): boolean {
+  return l === 'en' || l === 'en-US' || l === 'en-GB';
+}
 
 async function fetchCurrentUser(): Promise<User> {
   const response = await apiClient.get<User>('/api/v1/auth/me');
-  return response.data;
+  const user = response.data;
+
+  if (typeof window !== 'undefined') {
+    const rawPreferred =
+      user.preferredLocale ?? (user as { preferred_locale?: string }).preferred_locale;
+    const preferredNorm = normalizeUiLocale(rawPreferred ?? 'en-US');
+
+    const cookieRaw = getUiLocaleCookieFromDocument();
+    const cookieNorm =
+      cookieRaw != null && cookieRaw.trim() !== '' ? normalizeUiLocale(cookieRaw) : null;
+
+    const cookieMissingOrInvalid =
+      cookieRaw == null || cookieRaw.trim() === '' || !isSupportedUiLocale(cookieRaw);
+
+    const shouldSyncFromApi =
+      cookieMissingOrInvalid || (isEnglishFamily(preferredNorm) && cookieNorm === 'ar');
+
+    if (shouldSyncFromApi) {
+      setUiLocaleCookieOnDocument(preferredNorm);
+      try {
+        window.localStorage.setItem('locale', preferredNorm);
+        window.sessionStorage.setItem(LOCALE_REPAIR_REFRESH_FLAG, '1');
+      } catch {
+        // Non-blocking
+      }
+    }
+  }
+
+  return user;
 }
 
 export function useAuth() {

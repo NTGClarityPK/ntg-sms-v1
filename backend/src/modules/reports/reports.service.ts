@@ -60,6 +60,36 @@ function getPuppeteerExecutablePath(): string | undefined {
   );
 }
 
+type ExportFilterQuery = { include?: string; exclude?: string };
+
+function parseCsvSet(value?: string): Set<string> | null {
+  if (!value) return null;
+  const parts = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length ? new Set(parts) : null;
+}
+
+function buildInclusionChecker(
+  allowedKeys: readonly string[],
+  filter?: ExportFilterQuery,
+): (key: string) => boolean {
+  const allowed = new Set(allowedKeys);
+  const includeRaw = parseCsvSet(filter?.include);
+  const excludeRaw = parseCsvSet(filter?.exclude);
+
+  const include = includeRaw ? new Set([...includeRaw].filter((k) => allowed.has(k))) : null;
+  const exclude = excludeRaw ? new Set([...excludeRaw].filter((k) => allowed.has(k))) : null;
+
+  return (key: string) => {
+    if (!allowed.has(key)) return false;
+    if (include && !include.has(key)) return false;
+    if (exclude && exclude.has(key)) return false;
+    return true;
+  };
+}
+
 type GradeRangeRow = {
   letter: string;
   min_percentage: number;
@@ -447,15 +477,19 @@ export class ReportsService {
     const student = await this.studentsService.getStudentById(studentId, branchId);
 
     // Get date range for period filtering
-    const dateRange = periodParams?.periodType
-      ? await this.getDateRangeForPeriod(
-          periodParams.periodType,
-          periodParams.startDate,
-          periodParams.endDate,
-          branchId,
-          yearId,
-        )
-      : null;
+    // IMPORTANT: treat "year" as the academic-year scope itself, not an extra created_at filter.
+    // This keeps on-screen report consistent with PDF export (which does not pass period params),
+    // and avoids accidental empty stats when academic years are configured in the future.
+    const dateRange =
+      periodParams?.periodType && periodParams.periodType !== ReportPeriodType.YEAR
+        ? await this.getDateRangeForPeriod(
+            periodParams.periodType,
+            periodParams.startDate,
+            periodParams.endDate,
+            branchId,
+            yearId,
+          )
+        : null;
 
     const [grades, attendanceSummary, behavioralRes] = await Promise.all([
       this.gradesService.getGradesByStudent(studentId, branchId).catch(() => [] as StudentGradeDto[]),
@@ -1593,6 +1627,7 @@ export class ReportsService {
     classSectionId: string | undefined,
     userId: string,
     userRoles: string[] | undefined,
+    filter?: ExportFilterQuery,
   ): Promise<Buffer> {
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) throw new BadRequestException('No active academic year found');
@@ -1610,7 +1645,7 @@ export class ReportsService {
         userId,
         userRoles,
       );
-      return this.renderAttendanceReportPdf(report, branchId);
+      return this.renderAttendanceReportPdf(report, branchId, filter);
     }
 
     const { data: summary } = await this.getAttendanceSummaryBranch(
@@ -1620,13 +1655,18 @@ export class ReportsService {
       userId,
       userRoles,
     );
-    return this.renderAttendanceSummaryPdf(summary, branchId);
+    return this.renderAttendanceSummaryPdf(summary, branchId, filter);
   }
 
   private async renderAttendanceReportPdf(
     report: AttendanceReportByClassDto,
     branchId: string,
+    filter?: ExportFilterQuery,
   ): Promise<Buffer> {
+    const shouldInclude = buildInclusionChecker(
+      ['present', 'absent', 'late', 'excused', 'total', 'percentage'] as const,
+      filter,
+    );
     let htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1638,10 +1678,26 @@ th{background:#eee;}
 <h2>Attendance Report - ${this.escapeHtml(report.className)} ${this.escapeHtml(report.sectionName)}</h2>
 <p>Period: ${report.startDate} to ${report.endDate}</p>
 <table>
-<tr><th>Student</th><th>Present</th><th>Absent</th><th>Late</th><th>Excused</th><th>Total</th><th>%</th></tr>
+<tr>
+  <th>Student</th>
+  ${shouldInclude('present') ? '<th>Present</th>' : ''}
+  ${shouldInclude('absent') ? '<th>Absent</th>' : ''}
+  ${shouldInclude('late') ? '<th>Late</th>' : ''}
+  ${shouldInclude('excused') ? '<th>Excused</th>' : ''}
+  ${shouldInclude('total') ? '<th>Total</th>' : ''}
+  ${shouldInclude('percentage') ? '<th>%</th>' : ''}
+</tr>
 `;
     report.students.forEach((s) => {
-      htmlContent += `<tr><td>${this.escapeHtml(s.studentName)}</td><td>${s.presentDays}</td><td>${s.absentDays}</td><td>${s.lateDays}</td><td>${s.excusedDays}</td><td>${s.totalDays}</td><td>${s.percentage}%</td></tr>
+      htmlContent += `<tr>
+<td>${this.escapeHtml(s.studentName)}</td>
+${shouldInclude('present') ? `<td>${s.presentDays}</td>` : ''}
+${shouldInclude('absent') ? `<td>${s.absentDays}</td>` : ''}
+${shouldInclude('late') ? `<td>${s.lateDays}</td>` : ''}
+${shouldInclude('excused') ? `<td>${s.excusedDays}</td>` : ''}
+${shouldInclude('total') ? `<td>${s.totalDays}</td>` : ''}
+${shouldInclude('percentage') ? `<td>${s.percentage}%</td>` : ''}
+</tr>
 `;
     });
     htmlContent += `</table><p>Class average: ${report.classSummary.averageAttendance}% | Students: ${report.classSummary.studentCount}</p></body></html>`;
@@ -1671,7 +1727,12 @@ th{background:#eee;}
   private async renderAttendanceSummaryPdf(
     summary: AttendanceSummaryBranchDto,
     branchId: string,
+    filter?: ExportFilterQuery,
   ): Promise<Buffer> {
+    const shouldInclude = buildInclusionChecker(
+      ['avg', 'students', 'present', 'absent', 'late', 'excused'] as const,
+      filter,
+    );
     let htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1683,10 +1744,28 @@ th{background:#eee;}
 <h2>Branch Attendance Summary</h2>
 <p>Period: ${summary.startDate} to ${summary.endDate}</p>
 <table>
-<tr><th>Class</th><th>Section</th><th>Avg %</th><th>Students</th><th>Present</th><th>Absent</th><th>Late</th><th>Excused</th></tr>
+<tr>
+  <th>Class</th>
+  <th>Section</th>
+  ${shouldInclude('avg') ? '<th>Avg %</th>' : ''}
+  ${shouldInclude('students') ? '<th>Students</th>' : ''}
+  ${shouldInclude('present') ? '<th>Present</th>' : ''}
+  ${shouldInclude('absent') ? '<th>Absent</th>' : ''}
+  ${shouldInclude('late') ? '<th>Late</th>' : ''}
+  ${shouldInclude('excused') ? '<th>Excused</th>' : ''}
+</tr>
 `;
     summary.byClass.forEach((c) => {
-      htmlContent += `<tr><td>${this.escapeHtml(c.className)}</td><td>${this.escapeHtml(c.sectionName)}</td><td>${c.averageAttendance}%</td><td>${c.studentCount}</td><td>${c.totalPresent}</td><td>${c.totalAbsent}</td><td>${c.totalLate}</td><td>${c.totalExcused}</td></tr>
+      htmlContent += `<tr>
+<td>${this.escapeHtml(c.className)}</td>
+<td>${this.escapeHtml(c.sectionName)}</td>
+${shouldInclude('avg') ? `<td>${c.averageAttendance}%</td>` : ''}
+${shouldInclude('students') ? `<td>${c.studentCount}</td>` : ''}
+${shouldInclude('present') ? `<td>${c.totalPresent}</td>` : ''}
+${shouldInclude('absent') ? `<td>${c.totalAbsent}</td>` : ''}
+${shouldInclude('late') ? `<td>${c.totalLate}</td>` : ''}
+${shouldInclude('excused') ? `<td>${c.totalExcused}</td>` : ''}
+</tr>
 `;
     });
     htmlContent += `</table><p>Overall average: ${summary.overall.averageAttendance}% | Total students: ${summary.overall.totalStudents}</p></body></html>`;
@@ -2069,6 +2148,7 @@ th{background:#eee;}
     subjectId: string | undefined,
     userId: string,
     userRoles: string[] | undefined,
+    filter?: ExportFilterQuery,
   ): Promise<Buffer> {
     if (classSectionId) {
       const { data: report } = await this.getAcademicReportByClass(
@@ -2078,6 +2158,7 @@ th{background:#eee;}
         userId,
         userRoles,
       );
+      const shouldInclude = buildInclusionChecker(['attendance', 'average'] as const, filter);
       let htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -2088,10 +2169,18 @@ th{background:#eee;}
 <body>
 <h2>Academic Report - ${this.escapeHtml(report.className)} ${this.escapeHtml(report.sectionName)}</h2>
 <table>
-<tr><th>Student</th><th>Attendance %</th><th>Average %</th></tr>
+<tr>
+  <th>Student</th>
+  ${shouldInclude('attendance') ? '<th>Attendance %</th>' : ''}
+  ${shouldInclude('average') ? '<th>Average %</th>' : ''}
+</tr>
 `;
       report.students.forEach((s) => {
-        htmlContent += `<tr><td>${this.escapeHtml(s.studentName)}</td><td>${s.attendancePercentage}%</td><td>${s.averagePercentage ?? '-'}%</td></tr>
+        htmlContent += `<tr>
+<td>${this.escapeHtml(s.studentName)}</td>
+${shouldInclude('attendance') ? `<td>${s.attendancePercentage}%</td>` : ''}
+${shouldInclude('average') ? `<td>${s.averagePercentage ?? '-'}%</td>` : ''}
+</tr>
 `;
       });
       htmlContent += `</table></body></html>`;
@@ -2125,6 +2214,7 @@ th{background:#eee;}
         userId,
         userRoles,
       );
+      const shouldInclude = buildInclusionChecker(['average', 'students'] as const, filter);
       let htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -2135,10 +2225,20 @@ th{background:#eee;}
 <body>
 <h2>Subject Report - ${this.escapeHtml(report.subjectName)}</h2>
 <table>
-<tr><th>Class</th><th>Section</th><th>Avg %</th><th>Students</th></tr>
+<tr>
+  <th>Class</th>
+  <th>Section</th>
+  ${shouldInclude('average') ? '<th>Avg %</th>' : ''}
+  ${shouldInclude('students') ? '<th>Students</th>' : ''}
+</tr>
 `;
       report.byClass.forEach((c) => {
-        htmlContent += `<tr><td>${this.escapeHtml(c.className)}</td><td>${this.escapeHtml(c.sectionName)}</td><td>${c.averagePercentage}%</td><td>${c.studentCount}</td></tr>
+        htmlContent += `<tr>
+<td>${this.escapeHtml(c.className)}</td>
+<td>${this.escapeHtml(c.sectionName)}</td>
+${shouldInclude('average') ? `<td>${c.averagePercentage}%</td>` : ''}
+${shouldInclude('students') ? `<td>${c.studentCount}</td>` : ''}
+</tr>
 `;
       });
       htmlContent += `</table></body></html>`;
@@ -2648,8 +2748,13 @@ th{background:#eee;}
     studentId: string,
     branchId: string,
     academicYearId?: string,
+    filter?: ExportFilterQuery,
   ): Promise<Buffer> {
     const { data: report } = await this.getStudentReport(studentId, branchId, academicYearId);
+    const shouldInclude = buildInclusionChecker(
+      ['academic', 'attendance', 'behavioral', 'assignmentStatistics', 'assignmentEngagement'] as const,
+      filter,
+    );
 
     // Helper function to render star rating
     const renderStars = (value: number): string => {
@@ -2889,7 +2994,7 @@ th{background:#eee;}
 `;
 
     // Academic Section
-    if (report.academic?.entries?.length) {
+    if (shouldInclude('academic') && report.academic?.entries?.length) {
       htmlContent += `
   <div class="section">
     <div class="section-title">Academic</div>
@@ -2925,7 +3030,7 @@ th{background:#eee;}
     }
 
     // Attendance Section
-    if (report.attendance) {
+    if (shouldInclude('attendance') && report.attendance) {
       htmlContent += `
   <div class="section">
     <div class="section-title">Attendance</div>
@@ -2943,7 +3048,7 @@ th{background:#eee;}
     }
 
     // Behavioral Section
-    if (report.behavioral?.periods?.length) {
+    if (shouldInclude('behavioral') && report.behavioral?.periods?.length) {
       const allAttributes = Array.from(
         new Set(report.behavioral.periods.flatMap((p) => p.attributes.map((a) => a.attributeName))),
       ).sort();
@@ -2986,7 +3091,7 @@ th{background:#eee;}
     }
 
     // Assignment Statistics Section
-    if (report.assignmentStatistics) {
+    if (shouldInclude('assignmentStatistics') && report.assignmentStatistics) {
       const stats = report.assignmentStatistics;
       htmlContent += `
   <div class="section">
@@ -3052,7 +3157,7 @@ th{background:#eee;}
     }
 
     // Assignment Engagement Section
-    if (report.assignmentEngagement && report.assignmentEngagement.length > 0) {
+    if (shouldInclude('assignmentEngagement') && report.assignmentEngagement && report.assignmentEngagement.length > 0) {
       htmlContent += `
   <div class="section">
     <div class="section-title">Assignment Engagement</div>
@@ -3144,13 +3249,18 @@ th{background:#eee;}
     studentId: string,
     branchId: string,
     academicYearId?: string,
+    filter?: ExportFilterQuery,
   ): Promise<Buffer> {
     const { data: report } = await this.getStudentReport(studentId, branchId, academicYearId);
+    const shouldInclude = buildInclusionChecker(
+      ['academic', 'attendance', 'behavioral'] as const,
+      filter,
+    );
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'NTG SMS';
 
-    if (report.academic?.entries?.length) {
+    if (shouldInclude('academic') && report.academic?.entries?.length) {
       const ws = workbook.addWorksheet('Academic', { headerFooter: { firstHeader: report.studentName } });
       ws.columns = [
         { header: 'Subject', key: 'subject', width: 20 },
@@ -3169,7 +3279,7 @@ th{background:#eee;}
         });
       });
     }
-    if (report.attendance) {
+    if (shouldInclude('attendance') && report.attendance) {
       const ws = workbook.addWorksheet('Attendance');
       ws.addRow(['Metric', 'Value']);
       ws.addRow(['Present', report.attendance.presentDays]);
@@ -3179,7 +3289,7 @@ th{background:#eee;}
       ws.addRow(['Total days', report.attendance.totalDays]);
       ws.addRow(['Percentage', `${report.attendance.percentage}%`]);
     }
-    if (report.behavioral?.periods?.length) {
+    if (shouldInclude('behavioral') && report.behavioral?.periods?.length) {
       const ws = workbook.addWorksheet('Behavioral');
       const attrs = Array.from(
         new Set(report.behavioral.periods.flatMap((p) => p.attributes.map((a) => a.attributeName))),
