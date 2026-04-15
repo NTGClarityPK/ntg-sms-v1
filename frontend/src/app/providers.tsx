@@ -10,7 +10,6 @@ import { ModalsProvider } from '@mantine/modals';
 import { queryClient } from '@/lib/query-client';
 import { createDynamicTheme } from '@/lib/utils/createDynamicTheme';
 import { DynamicThemeProvider } from '@/components/providers/DynamicThemeProvider';
-import { InstallPrompt } from '@/components/common/InstallPrompt';
 import { PushSubscribe } from '@/components/common/PushSubscribe';
 import { InstallAppProvider } from '@/lib/install-app-context';
 import { SafariInstallModal } from '@/components/common/SafariInstallModal';
@@ -73,7 +72,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <LocaleRepairRefresh />
           <DevServiceWorkerCleanup />
           <Notifications />
-          <InstallPrompt />
           <SafariInstallModal />
           <PushSubscribe />
           <NextStepRoot>{children}</NextStepRoot>

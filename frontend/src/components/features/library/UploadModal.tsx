@@ -21,7 +21,7 @@ interface UploadModalProps {
   itemId?: string | null;
 }
 
-const MAX_LIBRARY_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB
+const MAX_LIBRARY_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB
 
 export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
   const t = useTranslations('library');
@@ -94,7 +94,7 @@ export function UploadModal({ opened, onClose, itemId }: UploadModalProps) {
       setSelectedFile(null);
       notifications.show({
         title: t('uploadError'),
-        message: t('fileTooLarge100mb'),
+        message: t('fileTooLarge20mb'),
         color: 'red',
       });
       return;

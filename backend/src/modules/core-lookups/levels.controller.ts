@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -8,6 +8,7 @@ import { QueryLevelsDto } from './dto/query-levels.dto';
 import { CreateLevelDto } from './dto/create-level.dto';
 import { UpdateLevelDto } from './dto/update-level.dto';
 import { LevelDto } from './dto/level.dto';
+import { DeletionStatusDto, EntityDeletedDto } from './dto/deletion-status.dto';
 
 @Controller('api/v1/levels')
 @UseGuards(JwtAuthGuard, BranchGuard)
@@ -44,6 +45,24 @@ export class LevelsController {
   ): Promise<{ data: LevelDto }> {
     const updated = await this.coreLookupsService.updateLevel(id, body, branch.branchId, user.email);
     return { data: updated };
+  }
+
+  @Get(':id/deletion-check')
+  async deletionCheck(
+    @Param('id') id: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: DeletionStatusDto }> {
+    return this.coreLookupsService.getLevelDeletionStatus(id, branch.branchId, user.id, user.email);
+  }
+
+  @Delete(':id')
+  async delete(
+    @Param('id') id: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: EntityDeletedDto }> {
+    return this.coreLookupsService.deleteLevel(id, branch.branchId, user.id, user.email);
   }
 }
 

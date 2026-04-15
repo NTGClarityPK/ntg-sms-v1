@@ -98,6 +98,11 @@ export async function fetchSectionDeletionStatus(id: string): Promise<AcademicEn
   return res.data;
 }
 
+export async function fetchLevelDeletionStatus(id: string): Promise<AcademicEntityDeletionStatus> {
+  const res = await apiClient.get<AcademicEntityDeletionStatus>(`/api/v1/levels/${id}/deletion-check`);
+  return res.data;
+}
+
 export function useDeleteSection() {
   const qc = useQueryClient();
   return useMutation({
@@ -199,6 +204,17 @@ export function useUpdateLevel() {
       apiClient.patch<Level>(`/api/v1/levels/${id}`, payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: coreKeys.levels });
+    },
+  });
+}
+
+export function useDeleteLevel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => apiClient.delete<{ deleted: boolean }>(`/api/v1/levels/${id}`),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: coreKeys.levels });
+      await qc.invalidateQueries({ queryKey: coreKeys.classes });
     },
   });
 }

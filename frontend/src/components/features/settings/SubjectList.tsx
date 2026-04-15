@@ -34,6 +34,7 @@ export function SubjectList() {
     status: null,
   });
   const [deletionCheckLoadingId, setDeletionCheckLoadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const knownBlockerTypes = new Set([
     'subject_template_subjects',
@@ -69,6 +70,7 @@ export function SubjectList() {
           labels: { confirm: tSettings('academicDeleteConfirmAction'), cancel: tCommon('cancel') },
           confirmProps: { color: 'red' },
           onConfirm: async () => {
+            setDeletingId(s.id);
             try {
               await deleteMutation.mutateAsync(s.id);
               notifications.show({
@@ -76,9 +78,12 @@ export function SubjectList() {
                 message: tSettings('subjectDeleted'),
                 color: notifyColors.success,
               });
+              await listQuery.refetch();
             } catch (error) {
               const message = error instanceof Error ? error.message : tCommon('errors.generic');
               notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+            } finally {
+              setDeletingId(null);
             }
           },
         });
@@ -217,8 +222,11 @@ export function SubjectList() {
                           onClick={() => void openDeleteSubject(s)}
                           aria-label={tSettings('academicDeleteAria')}
                           id={`subject-list-delete-${s.id}`}
-                          loading={deletionCheckLoadingId === s.id}
-                          disabled={deletionCheckLoadingId !== null && deletionCheckLoadingId !== s.id}
+                          loading={deletionCheckLoadingId === s.id || deletingId === s.id}
+                          disabled={
+                            (deletionCheckLoadingId !== null && deletionCheckLoadingId !== s.id) ||
+                            (deletingId !== null && deletingId !== s.id)
+                          }
                         >
                           <IconTrash size={16} />
                         </ActionIcon>

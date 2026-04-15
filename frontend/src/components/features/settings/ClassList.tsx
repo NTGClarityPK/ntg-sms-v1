@@ -31,6 +31,7 @@ export function ClassList() {
     status: null,
   });
   const [deletionCheckLoadingId, setDeletionCheckLoadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const knownBlockerTypes = new Set([
     'subject_template_subjects',
@@ -66,6 +67,7 @@ export function ClassList() {
           labels: { confirm: tSettings('academicDeleteConfirmAction'), cancel: tCommon('cancel') },
           confirmProps: { color: 'red' },
           onConfirm: async () => {
+            setDeletingId(c.id);
             try {
               await deleteMutation.mutateAsync(c.id);
               notifications.show({
@@ -73,9 +75,12 @@ export function ClassList() {
                 message: tSettings('classDeleted'),
                 color: notifyColors.success,
               });
+              await listQuery.refetch();
             } catch (error) {
               const message = error instanceof Error ? error.message : tCommon('errors.generic');
               notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+            } finally {
+              setDeletingId(null);
             }
           },
         });
@@ -203,8 +208,11 @@ export function ClassList() {
                           onClick={() => void openDeleteClass(c)}
                           aria-label={tSettings('academicDeleteAria')}
                           id={`class-list-delete-${c.id}`}
-                          loading={deletionCheckLoadingId === c.id}
-                          disabled={deletionCheckLoadingId !== null && deletionCheckLoadingId !== c.id}
+                          loading={deletionCheckLoadingId === c.id || deletingId === c.id}
+                          disabled={
+                            (deletionCheckLoadingId !== null && deletionCheckLoadingId !== c.id) ||
+                            (deletingId !== null && deletingId !== c.id)
+                          }
                         >
                           <IconTrash size={16} />
                         </ActionIcon>

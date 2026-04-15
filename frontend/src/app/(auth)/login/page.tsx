@@ -56,6 +56,8 @@ export default function LoginPage() {
   const [isInactiveFlashError, setIsInactiveFlashError] = useState(false);
   const [forgotPasswordOpened, setForgotPasswordOpened] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetDeliveredToEmail, setResetDeliveredToEmail] = useState<string | null>(null);
+  const [resetNeedsConfirm, setResetNeedsConfirm] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [showBranchSelection, setShowBranchSelection] = useState(false);
@@ -299,8 +301,48 @@ export default function LoginPage() {
 
     try {
       const email = values.email.normalize('NFKC').trim().toLowerCase();
-      await apiClient.post<{ ok: true }>('/api/v1/public/request-password-reset', { email });
+      const res = await apiClient.post<{
+        ok: true;
+        deliveredToEmail?: string;
+        usedAssociatedEmail?: boolean;
+        requiresConfirmation?: boolean;
+      }>('/api/v1/public/request-password-reset', { email });
       forgotPasswordForm.setFieldValue('email', email);
+      const deliveredTo = res.data?.deliveredToEmail ?? null;
+      const needsConfirm = res.data?.requiresConfirmation === true;
+      setResetDeliveredToEmail(deliveredTo);
+      setResetNeedsConfirm(needsConfirm);
+      if (!needsConfirm) {
+        setResetEmailSent(true);
+      }
+    } catch (err: unknown) {
+      const ax = err as {
+        response?: { data?: { error?: { message?: string } } };
+        message?: string;
+      };
+      setResetError(
+        ax.response?.data?.error?.message ||
+          (typeof ax.message === 'string' ? ax.message : '') ||
+          'Failed to send reset email. Please try again.',
+      );
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleConfirmSendResetToProvided = async () => {
+    setResetLoading(true);
+    setResetError(null);
+    try {
+      const email = forgotPasswordForm.values.email.normalize('NFKC').trim().toLowerCase();
+      const res = await apiClient.post<{
+        ok: true;
+        deliveredToEmail?: string;
+        usedAssociatedEmail?: boolean;
+        requiresConfirmation?: boolean;
+      }>('/api/v1/public/request-password-reset', { email, confirmSendToProvided: true });
+      setResetDeliveredToEmail(res.data?.deliveredToEmail ?? email);
+      setResetNeedsConfirm(false);
       setResetEmailSent(true);
     } catch (err: unknown) {
       const ax = err as {
@@ -320,6 +362,8 @@ export default function LoginPage() {
   const handleCloseForgotPassword = () => {
     setForgotPasswordOpened(false);
     setResetEmailSent(false);
+    setResetDeliveredToEmail(null);
+    setResetNeedsConfirm(false);
     setResetError(null);
     forgotPasswordForm.reset();
   };
@@ -519,7 +563,7 @@ export default function LoginPage() {
               radius="md"
             >
               <Text size="sm">
-                {t('resetEmailSent', { email: forgotPasswordForm.values.email })}
+                {t('resetEmailSent', { email: resetDeliveredToEmail || forgotPasswordForm.values.email })}
               </Text>
             </Alert>
             <Button
@@ -567,6 +611,19 @@ export default function LoginPage() {
                 {...forgotPasswordForm.getInputProps('email')}
               />
 
+              {resetNeedsConfirm && (
+                <Alert
+                  icon={<IconAlertCircle size={16} />}
+                  variant="light"
+                  radius="md"
+                  color="yellow"
+                >
+                  <Text size="sm">
+                    {t('resetNoAssociatedEmailConfirm')}
+                  </Text>
+                </Alert>
+              )}
+
               <Group justify="flex-end" mt="md">
                 <Button
                   id="login-reset-cancel"
@@ -587,6 +644,16 @@ export default function LoginPage() {
                 >
                   {t('sendResetLink')}
                 </Button>
+                {resetNeedsConfirm && (
+                  <Button
+                    id="login-reset-confirm-send"
+                    variant="outline"
+                    loading={resetLoading}
+                    onClick={() => void handleConfirmSendResetToProvided()}
+                  >
+                    {t('confirmSend')}
+                  </Button>
+                )}
               </Group>
             </Stack>
           </form>

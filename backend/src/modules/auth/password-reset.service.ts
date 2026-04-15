@@ -23,8 +23,19 @@ export class PasswordResetService {
    * Uses Admin generateLink + Mailjet instead of POST /auth/v1/recover so school
    * domains are not rejected by GoTrue extended email / MX validation when sending via Supabase SMTP.
    */
-  async requestPasswordReset(rawEmail: string): Promise<void> {
-    const email = this.normalizeEmail(rawEmail);
+  async requestPasswordReset(input: {
+    rawEmail: string;
+    confirmSendToProvided?: boolean;
+  }): Promise<{
+    ok: true;
+    /** The email address the reset link was (or would be) delivered to. */
+    deliveredToEmail?: string;
+    /** True when deliveredToEmail differs from the login email provided. */
+    usedAssociatedEmail?: boolean;
+    /** When true, we did not send yet and require confirmation to send to provided email. */
+    requiresConfirmation?: boolean;
+  }> {
+    const email = this.normalizeEmail(input.rawEmail);
     const frontendBase =
       this.configService.get<string>('FRONTEND_URL')?.replace(/\/$/, '') ?? 'http://localhost:3000';
     const redirectTo = `${frontendBase}/reset-password`;
@@ -46,7 +57,7 @@ export class PasswordResetService {
         msg.includes('no user found') ||
         msg.includes('not registered')
       ) {
-        return;
+        return { ok: true };
       }
       throw new BadRequestException(error.message);
     }
@@ -81,6 +92,17 @@ export class PasswordResetService {
       }
     }
 
+    const usedAssociatedEmail = deliveryEmail !== email;
+    if (!usedAssociatedEmail && userId && input.confirmSendToProvided !== true) {
+      // We found a user but no associated invitation recipient email; ask user to confirm sending to provided email.
+      return {
+        ok: true,
+        deliveredToEmail: email,
+        usedAssociatedEmail: false,
+        requiresConfirmation: true,
+      };
+    }
+
     const template = passwordResetEmailTemplate({
       loginEmail: email,
       resetLink: safeLink,
@@ -99,5 +121,12 @@ export class PasswordResetService {
       const message = e instanceof Error ? e.message : 'Unknown email error';
       throw new BadRequestException(`Failed to send password reset email: ${message}`);
     }
+
+    return {
+      ok: true,
+      deliveredToEmail: deliveryEmail,
+      usedAssociatedEmail,
+      requiresConfirmation: false,
+    };
   }
 }

@@ -41,7 +41,8 @@ type UploadedFileType = {
   size: number;
 };
 
-const MAX_LIBRARY_UPLOAD_BYTES = 100 * 1024 * 1024; // 100MB
+// Enforce a hard limit to prevent timeouts on large uploads.
+const MAX_LIBRARY_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB
 
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/library')

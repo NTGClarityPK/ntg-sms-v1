@@ -69,8 +69,11 @@ export class AuthPublicController {
   async requestPasswordReset(
     @Body() body: RequestPasswordResetDto,
   ): Promise<{ data: { ok: true } }> {
-    await this.passwordResetService.requestPasswordReset(body.email);
-    return { data: { ok: true } };
+    const res = await this.passwordResetService.requestPasswordReset({
+      rawEmail: body.email,
+      confirmSendToProvided: body.confirmSendToProvided,
+    });
+    return { data: res };
   }
 }
 

@@ -775,6 +775,26 @@ export class CoreLookupsService {
     return blockers;
   }
 
+  private async collectLevelDeletionBlockers(levelId: string, branchId: string): Promise<DeletionBlockerDto[]> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const blockers: DeletionBlockerDto[] = [];
+
+    // Level → subject template assignments
+    const { count: levelTemplateAssignmentsCount, error: lstaError } = await supabase
+      .from('level_subject_template_assignments')
+      .select('id', { count: 'exact', head: true })
+      .eq('branch_id', branchId)
+      .eq('level_id', levelId);
+    throwIfDbError(lstaError);
+    if ((levelTemplateAssignmentsCount ?? 0) > 0) {
+      blockers.push(new DeletionBlockerDto({ type: 'level_subject_template_assignments', count: levelTemplateAssignmentsCount ?? 0 }));
+    }
+
+    // Note: level_classes links are not treated as blockers; deleting a level will unassign classes.
+    return blockers;
+  }
+
   async getSubjectDeletionStatus(id: string, branchId: string, userId: string): Promise<{ data: DeletionStatusDto }> {
     const supabase = this.supabaseConfig.getClient();
     await assertSchoolAdminForBranch(supabase, userId, branchId);
@@ -912,6 +932,77 @@ export class CoreLookupsService {
     throwIfDbError(delError);
     this.auditLogService
       .logDelete('sections', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
+      .catch(() => {});
+
+    return { data: new EntityDeletedDto({ deleted: true }) };
+  }
+
+  async getLevelDeletionStatus(
+    id: string,
+    branchId: string,
+    userId: string,
+    userEmail: string,
+  ): Promise<{ data: DeletionStatusDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    await assertSchoolAdminForBranch(supabase, userId, branchId);
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('levels')
+      .select('id')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!existing) throw new NotFoundException('Level not found');
+
+    const blockers = await this.collectLevelDeletionBlockers(id, branchId);
+    return {
+      data: new DeletionStatusDto({
+        canDelete: blockers.length === 0,
+        blockers,
+      }),
+    };
+  }
+
+  async deleteLevel(
+    id: string,
+    branchId: string,
+    userId: string,
+    userEmail: string,
+  ): Promise<{ data: EntityDeletedDto }> {
+    const supabase = this.supabaseConfig.getClient();
+    await assertSchoolAdminForBranch(supabase, userId, branchId);
+
+    const { data: oldRow, error: fetchError } = await supabase
+      .from('levels')
+      .select('*')
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(fetchError);
+    if (!oldRow) throw new NotFoundException('Level not found');
+
+    const blockers = await this.collectLevelDeletionBlockers(id, branchId);
+    if (blockers.length > 0) {
+      throw new ConflictException(`Cannot delete level: ${blockers.map((b) => `${b.type} (${b.count})`).join(', ')}`);
+    }
+
+    // Remove class links first (safe even if none)
+    const { error: delLinksError } = await supabase
+      .from('level_classes')
+      .delete()
+      .eq('level_id', id);
+    throwIfDbError(delLinksError);
+
+    const { error: delError } = await supabase
+      .from('levels')
+      .delete()
+      .eq('id', id)
+      .eq('branch_id', branchId);
+    throwIfDbError(delError);
+
+    this.auditLogService
+      .logDelete('levels', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
       .catch(() => {});
 
     return { data: new EntityDeletedDto({ deleted: true }) };
