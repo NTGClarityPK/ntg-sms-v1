@@ -29,6 +29,37 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
   /** Parent may still have `leaveQuota: null` while the input shows the default; Next must use the effective value. */
   const resolvedLeaveQuota = data.leaveQuota ?? leaveQuota;
 
+  const getActiveTemplateForRanges = () => {
+    if (data.gradeTemplates.length === 0) return null;
+    return data.gradeTemplates[data.gradeTemplates.length - 1];
+  };
+
+  const computeRangeError = (candidate: { letter: string; minPercentage: number; maxPercentage: number }): string | null => {
+    const template = getActiveTemplateForRanges();
+    if (!template) return null;
+    const letter = candidate.letter.trim();
+    if (!letter) return null;
+
+    const min = Math.min(candidate.minPercentage, candidate.maxPercentage);
+    const max = Math.max(candidate.minPercentage, candidate.maxPercentage);
+
+    // Inclusive overlap: 80–90 overlaps with 90–100 at 90.
+    const overlaps = (template.ranges ?? []).some((r) => {
+      const rMin = Math.min(r.minPercentage, r.maxPercentage);
+      const rMax = Math.max(r.minPercentage, r.maxPercentage);
+      return min <= rMax && max >= rMin;
+    });
+    if (overlaps) {
+      // next-intl can show raw keys when missing; guard with a fallback.
+      const translated = tSettings('gradeRangeOverlapError') as unknown as string;
+      if (translated && typeof translated === 'string' && !translated.includes('gradeRangeOverlapError')) {
+        return translated;
+      }
+      return 'Grade ranges cannot overlap. Please adjust the range.';
+    }
+    return null;
+  };
+
   const handleAddAssessmentType = () => {
     if (newAssessmentType.name.trim()) {
       onChange({
@@ -87,17 +118,9 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
       const templateId = lastTemplate.name;
       const newRangeData = { ...newRange, letter: newRange.letter.trim(), sortOrder: lastTemplate.ranges.length };
 
-      // Validate overlap immediately (inclusive bounds).
-      // Example: 80–90 and 90–100 overlaps at 90.
-      const candidateMin = Math.min(newRangeData.minPercentage, newRangeData.maxPercentage);
-      const candidateMax = Math.max(newRangeData.minPercentage, newRangeData.maxPercentage);
-      const overlaps = (lastTemplate.ranges ?? []).some((r) => {
-        const rMin = Math.min(r.minPercentage, r.maxPercentage);
-        const rMax = Math.max(r.minPercentage, r.maxPercentage);
-        return candidateMin <= rMax && candidateMax >= rMin;
-      });
-      if (overlaps) {
-        setRangeError(tSettings('gradeRangeOverlapError') || 'Grade ranges cannot overlap.');
+      const err = computeRangeError(newRangeData);
+      if (err) {
+        setRangeError(err);
         return;
       }
       setRangeError(null);
@@ -254,8 +277,9 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
                           placeholder={tSettings('setupWizardAssessmentRangeLetterPlaceholder')}
                           value={newRange.letter}
                           onChange={(e) => {
-                            setRangeError(null);
-                            setNewRange({ ...newRange, letter: e.target.value });
+                            const next = { ...newRange, letter: e.target.value };
+                            setNewRange(next);
+                            setRangeError(computeRangeError(next));
                           }}
                           style={{ width: 100 }}
                         />
@@ -264,8 +288,9 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
                           placeholder={tSettings('setupWizardAssessmentRangeMinPlaceholder')}
                           value={newRange.minPercentage}
                           onChange={(val) => {
-                            setRangeError(null);
-                            setNewRange({ ...newRange, minPercentage: Number(val) || 0 });
+                            const next = { ...newRange, minPercentage: Number(val) || 0 };
+                            setNewRange(next);
+                            setRangeError(computeRangeError(next));
                           }}
                           style={{ width: 100 }}
                         />
@@ -274,12 +299,18 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
                           placeholder={tSettings('setupWizardAssessmentRangeMaxPlaceholder')}
                           value={newRange.maxPercentage}
                           onChange={(val) => {
-                            setRangeError(null);
-                            setNewRange({ ...newRange, maxPercentage: Number(val) || 100 });
+                            const next = { ...newRange, maxPercentage: Number(val) || 100 };
+                            setNewRange(next);
+                            setRangeError(computeRangeError(next));
                           }}
                           style={{ width: 100 }}
                         />
-                        <Button id="assessment-step-add-range" onClick={handleAddRange} size="sm">
+                        <Button
+                          id="assessment-step-add-range"
+                          onClick={handleAddRange}
+                          size="sm"
+                          disabled={!newRange.letter.trim() || !!rangeError}
+                        >
                           Add Range
                         </Button>
                       </Group>

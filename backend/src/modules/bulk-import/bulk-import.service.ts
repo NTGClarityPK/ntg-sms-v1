@@ -16,6 +16,17 @@ interface ParsedRow {
   isValid: boolean;
 }
 
+type PlacementRefs = {
+  classById: Map<string, { id: string; name: string; displayName: string | null }>;
+  classIdByNameLower: Map<string, string>;
+  sectionById: Map<string, { id: string; name: string }>;
+  sectionIdByNameLower: Map<string, string>;
+  templateById: Map<string, { id: string; name: string }>;
+  templateIdByNameLower: Map<string, string>;
+  classHasAnyTemplates: Set<string>;
+  classTemplateLinks: Set<string>; // `${classId}::${templateId}`
+};
+
 export interface ImportPreview {
   totalRows: number;
   validRows: number;
@@ -193,6 +204,19 @@ function isUuid(s: string): boolean {
   return UUID_REGEX.test((s || '').trim());
 }
 
+function normalizeSpreadsheetString(value: string): string {
+  return String(value ?? '')
+    // Strip common invisible characters (often introduced by Excel copy/paste)
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+    // Normalise NBSP to regular spaces
+    .replace(/\u00A0/g, ' ');
+}
+
+function normalizeLookupValue(value: string): string {
+  return normalizeSpreadsheetString(value)
+    .trim();
+}
+
 @Injectable()
 export class BulkImportService {
   private readonly classIdCache = new Map<string, string | null>();
@@ -207,6 +231,171 @@ export class BulkImportService {
 
   private getClient(): SupabaseClient {
     return this.supabaseConfig.getClient();
+  }
+
+  private async loadPlacementRefs(
+    supabase: SupabaseClient,
+    branchId: string,
+  ): Promise<PlacementRefs> {
+    const [classesRes, sectionsRes, templatesRes, assignmentsRes] = await Promise.all([
+      supabase
+        .from('classes')
+        .select('id, name, display_name')
+        .eq('branch_id', branchId),
+      supabase.from('sections').select('id, name').eq('branch_id', branchId),
+      supabase
+        .from('subject_templates')
+        .select('id, name')
+        .eq('branch_id', branchId),
+      supabase
+        .from('class_subject_template_assignments')
+        .select('class_id, subject_template_id')
+        .eq('branch_id', branchId),
+    ]);
+
+    const classes = (classesRes.data ?? []) as Array<{
+      id: string;
+      name: string;
+      display_name?: string | null;
+    }>;
+    const sections = (sectionsRes.data ?? []) as Array<{ id: string; name: string }>;
+    const templates = (templatesRes.data ?? []) as Array<{ id: string; name: string }>;
+    const assignments = (assignmentsRes.data ?? []) as Array<{
+      class_id: string;
+      subject_template_id: string;
+    }>;
+
+    const classById = new Map<string, { id: string; name: string; displayName: string | null }>();
+    const classIdByNameLower = new Map<string, string>();
+    for (const c of classes) {
+      const displayName = c.display_name ?? null;
+      classById.set(c.id, { id: c.id, name: c.name, displayName });
+      classIdByNameLower.set(c.name.toLowerCase(), c.id);
+      if (displayName) classIdByNameLower.set(displayName.toLowerCase(), c.id);
+    }
+
+    const sectionById = new Map<string, { id: string; name: string }>();
+    const sectionIdByNameLower = new Map<string, string>();
+    for (const s of sections) {
+      sectionById.set(s.id, { id: s.id, name: s.name });
+      sectionIdByNameLower.set(s.name.toLowerCase(), s.id);
+    }
+
+    const templateById = new Map<string, { id: string; name: string }>();
+    const templateIdByNameLower = new Map<string, string>();
+    for (const t of templates) {
+      templateById.set(t.id, { id: t.id, name: t.name });
+      templateIdByNameLower.set(t.name.toLowerCase(), t.id);
+    }
+
+    const classHasAnyTemplates = new Set<string>();
+    const classTemplateLinks = new Set<string>();
+    for (const a of assignments) {
+      classHasAnyTemplates.add(a.class_id);
+      classTemplateLinks.add(`${a.class_id}::${a.subject_template_id}`);
+    }
+
+    return {
+      classById,
+      classIdByNameLower,
+      sectionById,
+      sectionIdByNameLower,
+      templateById,
+      templateIdByNameLower,
+      classHasAnyTemplates,
+      classTemplateLinks,
+    };
+  }
+
+  private resolvePlacementForRowFromRefs(
+    row: BulkStudentRowDto,
+    refs: PlacementRefs,
+  ): {
+    classId: string | null;
+    sectionId: string | null;
+    subjectTemplateId: string | null;
+    warnings: string[];
+  } {
+    const warnings: string[] = [];
+
+    const classRaw = normalizeLookupValue(row.class_name_or_id ?? '');
+    const sectionRaw = normalizeLookupValue(row.section_name_or_id ?? '');
+    const templateRaw = normalizeLookupValue(row.subject_template_name_or_id ?? '');
+
+    const hasClass = classRaw.length > 0;
+    const hasSection = sectionRaw.length > 0;
+    const hasTemplate = templateRaw.length > 0;
+
+    let resolvedClassId: string | null = null;
+    let resolvedSectionId: string | null = null;
+    let resolvedTemplateId: string | null = null;
+
+    if (hasClass) {
+      if (isUuid(classRaw)) {
+        resolvedClassId = refs.classById.has(classRaw) ? classRaw : null;
+      } else {
+        resolvedClassId = refs.classIdByNameLower.get(classRaw.toLowerCase()) ?? null;
+      }
+      if (!resolvedClassId) warnings.push(`Class '${row.class_name_or_id}' not found.`);
+    }
+
+    if (hasSection) {
+      if (isUuid(sectionRaw)) {
+        resolvedSectionId = refs.sectionById.has(sectionRaw) ? sectionRaw : null;
+      } else {
+        resolvedSectionId = refs.sectionIdByNameLower.get(sectionRaw.toLowerCase()) ?? null;
+      }
+      if (!resolvedSectionId) warnings.push(`Section '${row.section_name_or_id}' not found.`);
+    }
+
+    if (hasTemplate) {
+      if (isUuid(templateRaw)) {
+        resolvedTemplateId = refs.templateById.has(templateRaw) ? templateRaw : null;
+      } else {
+        resolvedTemplateId = refs.templateIdByNameLower.get(templateRaw.toLowerCase()) ?? null;
+      }
+      if (!resolvedTemplateId) {
+        warnings.push(`Subject template '${row.subject_template_name_or_id}' not found.`);
+      }
+    }
+
+    if (resolvedClassId) {
+      const requiresTemplate = refs.classHasAnyTemplates.has(resolvedClassId);
+      if (requiresTemplate && !hasTemplate) {
+        warnings.push(`Subject template is required for class '${row.class_name_or_id}'.`);
+      }
+    }
+
+    if (resolvedTemplateId && resolvedClassId) {
+      const linked = refs.classTemplateLinks.has(`${resolvedClassId}::${resolvedTemplateId}`);
+      if (!linked) {
+        warnings.push(
+          `Subject template '${row.subject_template_name_or_id}' is not linked to class '${row.class_name_or_id}'.`,
+        );
+        resolvedClassId = null;
+        resolvedSectionId = null;
+        resolvedTemplateId = null;
+      }
+    } else if (resolvedTemplateId) {
+      warnings.push(`Subject template requires a valid class.`);
+      resolvedTemplateId = null;
+    }
+
+    if ((hasClass && !resolvedClassId) || (hasSection && !resolvedSectionId)) {
+      return {
+        classId: null,
+        sectionId: null,
+        subjectTemplateId: null,
+        warnings,
+      };
+    }
+
+    return {
+      classId: resolvedClassId,
+      sectionId: resolvedSectionId,
+      subjectTemplateId: resolvedTemplateId,
+      warnings,
+    };
   }
 
   /** Case-insensitive header lookup (trim + strip BOM). */
@@ -273,7 +462,7 @@ export class BulkImportService {
     value: string,
     branchId: string,
   ): Promise<string | null> {
-    const v = (value || '').trim();
+    const v = normalizeLookupValue(value);
     if (!v) return null;
     const cacheKey = `${branchId}::${v.toLowerCase()}`;
     if (this.classIdCache.has(cacheKey)) return this.classIdCache.get(cacheKey) ?? null;
@@ -318,7 +507,7 @@ export class BulkImportService {
     value: string,
     branchId: string,
   ): Promise<string | null> {
-    const v = (value || '').trim();
+    const v = normalizeLookupValue(value);
     if (!v) return null;
     const cacheKey = `${branchId}::${v.toLowerCase()}`;
     if (this.sectionIdCache.has(cacheKey)) return this.sectionIdCache.get(cacheKey) ?? null;
@@ -351,7 +540,7 @@ export class BulkImportService {
     value: string,
     branchId: string,
   ): Promise<string | null> {
-    const v = (value || '').trim();
+    const v = normalizeLookupValue(value);
     if (!v) return null;
     const cacheKey = `${branchId}::${v.toLowerCase()}`;
     if (this.templateIdCache.has(cacheKey)) return this.templateIdCache.get(cacheKey) ?? null;
@@ -399,6 +588,21 @@ export class BulkImportService {
     const linked = !!data;
     this.classTemplateLinkCache.set(cacheKey, linked);
     return linked;
+  }
+
+  /** Check if a class has any subject template assignments for branch. */
+  private async classHasAnySubjectTemplates(
+    supabase: SupabaseClient,
+    classId: string,
+    branchId: string,
+  ): Promise<boolean> {
+    const { data } = await supabase
+      .from('class_subject_template_assignments')
+      .select('id')
+      .eq('class_id', classId)
+      .eq('branch_id', branchId)
+      .limit(1);
+    return (data ?? []).length > 0;
   }
 
   private async resolvePlacementForRow(
@@ -458,6 +662,21 @@ export class BulkImportService {
         );
       }
     }
+
+    // If class has any templates configured, template becomes mandatory.
+    if (resolvedClassId) {
+      const requiresTemplate = await this.classHasAnySubjectTemplates(
+        supabase,
+        resolvedClassId,
+        branchId,
+      );
+      if (requiresTemplate && !hasTemplate) {
+        warnings.push(
+          `Subject template is required for class '${row.class_name_or_id}'.`,
+        );
+      }
+    }
+
     if (resolvedTemplateId && resolvedClassId) {
       const linked = await this.isClassLinkedToSubjectTemplate(
         supabase,
@@ -493,10 +712,112 @@ export class BulkImportService {
     return { classId, sectionId, subjectTemplateId, warnings };
   }
 
+  async getSubjectTemplateHelp(
+    branchId: string,
+  ): Promise<{
+    data: {
+      templates: Array<{
+        id: string;
+        name: string;
+        classes: Array<{ id: string; name: string; displayName?: string | null }>;
+      }>;
+    };
+    meta: { branchId: string; branchName?: string | null; tenantName?: string | null };
+  }> {
+    const supabase = this.getClient();
+    const { data: branchRow } = await supabase
+      .from('branches')
+      .select('id, name, tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    const branch = branchRow as { id: string; name?: string | null; tenant_id?: string | null } | null;
+    const tenantId = branch?.tenant_id ?? null;
+    const { data: tenantRow } = tenantId
+      ? await supabase
+          .from('tenants')
+          .select('id, name')
+          .eq('id', tenantId)
+          .maybeSingle()
+      : { data: null };
+    const tenant = tenantRow as { id: string; name?: string | null } | null;
+
+    const { data: templates, error: templatesError } = await supabase
+      .from('subject_templates')
+      .select('id, name')
+      .eq('branch_id', branchId)
+      .order('name', { ascending: true });
+    if (templatesError) throw new BadRequestException(templatesError.message);
+
+    const templateIds = (templates ?? []).map((t) => (t as { id: string }).id);
+    if (templateIds.length === 0) {
+      return {
+        data: { templates: [] },
+        meta: {
+          branchId,
+          branchName: branch?.name ?? null,
+          tenantName: tenant?.name ?? null,
+        },
+      };
+    }
+
+    const { data: links, error: linksError } = await supabase
+      .from('class_subject_template_assignments')
+      .select('subject_template_id, class_id')
+      .eq('branch_id', branchId)
+      .in('subject_template_id', templateIds);
+    if (linksError) throw new BadRequestException(linksError.message);
+
+    const classIds = Array.from(
+      new Set((links ?? []).map((l) => (l as { class_id: string }).class_id)),
+    );
+
+    const { data: classes, error: classesError } = await supabase
+      .from('classes')
+      .select('id, name, display_name')
+      .eq('branch_id', branchId)
+      .in('id', classIds);
+    if (classesError) throw new BadRequestException(classesError.message);
+
+    const classById = new Map(
+      (classes ?? []).map((c) => {
+        const row = c as { id: string; name: string; display_name?: string | null };
+        return [row.id, { id: row.id, name: row.name, displayName: row.display_name ?? null }] as const;
+      }),
+    );
+
+    const classesByTemplate = new Map<string, Array<{ id: string; name: string; displayName?: string | null }>>();
+    for (const l of links ?? []) {
+      const row = l as { subject_template_id: string; class_id: string };
+      const cls = classById.get(row.class_id);
+      if (!cls) continue;
+      const list = classesByTemplate.get(row.subject_template_id) ?? [];
+      list.push(cls);
+      classesByTemplate.set(row.subject_template_id, list);
+    }
+
+    return {
+      meta: {
+        branchId,
+        branchName: branch?.name ?? null,
+        tenantName: tenant?.name ?? null,
+      },
+      data: {
+        templates: (templates ?? []).map((t) => {
+          const row = t as { id: string; name: string };
+          const linkedClasses = classesByTemplate.get(row.id) ?? [];
+          linkedClasses.sort((a, b) => (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name));
+          return { id: row.id, name: row.name, classes: linkedClasses };
+        }),
+      },
+    };
+  }
+
   async parseStudentsFile(
     file: Express.Multer.File,
-    _branchId: string,
+    branchId: string,
   ): Promise<{ data: ImportPreview }> {
+    const supabase = this.getClient();
+    const refs = await this.loadPlacementRefs(supabase, branchId);
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
@@ -537,6 +858,60 @@ export class BulkImportService {
       );
       const extraErrors = this.appendExtraRowValidation(dto);
       const allErrors = [...fieldErrors, ...extraErrors];
+
+      // Validate subject template existence/linking at preview time so users don't find out at commit.
+      // Only run placement/template checks if row passed basic shape validation (avoids noisy follow-on errors).
+      if (allErrors.length === 0) {
+        try {
+          const hasTemplate = !!dto.subject_template_name_or_id?.trim();
+          const hasClass = !!dto.class_name_or_id?.trim();
+          const hasSection = !!dto.section_name_or_id?.trim();
+          const hasAnyPlacement =
+            hasClass ||
+            hasSection ||
+            hasTemplate;
+
+          if (hasAnyPlacement) {
+            const placement = this.resolvePlacementForRowFromRefs(dto, refs);
+
+            if (hasClass && !placement.classId) {
+              const classIssues = (placement.warnings ?? []).filter((w) => {
+                const s = String(w).toLowerCase();
+                return s.startsWith('class ') && s.includes('not found');
+              });
+              if (classIssues.length > 0) {
+                allErrors.push(...classIssues);
+              }
+            }
+
+            if (hasSection && !placement.sectionId) {
+              const sectionIssues = (placement.warnings ?? []).filter((w) => {
+                const s = String(w).toLowerCase();
+                return s.startsWith('section ') && s.includes('not found');
+              });
+              if (sectionIssues.length > 0) {
+                allErrors.push(...sectionIssues);
+              }
+            }
+
+            if (hasTemplate) {
+              // If user provided a template but it can't be resolved or applied, mark row invalid.
+              const templateIssues = (placement.warnings ?? []).filter((w) =>
+                String(w).toLowerCase().includes('subject template'),
+              );
+              if (templateIssues.length > 0) {
+                allErrors.push(...templateIssues);
+              } else if (!placement.subjectTemplateId) {
+                // Safety: no warning but still no template id (shouldn't happen).
+                allErrors.push(`Subject template '${dto.subject_template_name_or_id}' not found.`);
+              }
+            }
+          }
+        } catch {
+          // Non-blocking: preview should still work even if lookup fails unexpectedly.
+        }
+      }
+
       parsedRows.push({
         rowNumber,
         data: dto,
@@ -557,6 +932,95 @@ export class BulkImportService {
     };
   }
 
+  async validateStudentsRows(
+    rows: BulkStudentRowDto[],
+    branchId: string,
+  ): Promise<{ data: ImportPreview }> {
+    const supabase = this.getClient();
+    const refs = await this.loadPlacementRefs(supabase, branchId);
+    const parsedRows: ParsedRow[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const incoming = rows[i]!;
+      const rowNumber = incoming.row_number ?? i + 2;
+
+      // Rebuild DTO to ensure transforms run consistently (and to avoid trusting client shape).
+      const dto = plainToInstance(BulkStudentRowDto, {
+        ...incoming,
+        create_parent_account: incoming.create_parent_account ?? false,
+        invitation_type: incoming.invitation_type ?? 'student',
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.flatMap((err) =>
+        err.constraints ? Object.values(err.constraints) : [],
+      );
+      const extraErrors = this.appendExtraRowValidation(dto);
+      const allErrors = [...fieldErrors, ...extraErrors];
+
+      if (allErrors.length === 0) {
+        const placement = this.resolvePlacementForRowFromRefs(dto, refs);
+
+        const hasClass = !!dto.class_name_or_id?.trim();
+        const hasSection = !!dto.section_name_or_id?.trim();
+        const hasTemplate = !!dto.subject_template_name_or_id?.trim();
+
+        if (hasClass && !placement.classId) {
+          const classIssues = (placement.warnings ?? []).filter((w) => {
+            const s = String(w).toLowerCase();
+            return s.startsWith('class ') && s.includes('not found');
+          });
+          if (classIssues.length > 0) allErrors.push(...classIssues);
+        }
+
+        if (hasSection && !placement.sectionId) {
+          const sectionIssues = (placement.warnings ?? []).filter((w) => {
+            const s = String(w).toLowerCase();
+            return s.startsWith('section ') && s.includes('not found');
+          });
+          if (sectionIssues.length > 0) allErrors.push(...sectionIssues);
+        }
+
+        if (hasTemplate) {
+          const templateIssues = (placement.warnings ?? []).filter((w) =>
+            String(w).toLowerCase().includes('subject template'),
+          );
+          if (templateIssues.length > 0) {
+            allErrors.push(...templateIssues);
+          } else if (!placement.subjectTemplateId) {
+            allErrors.push(
+              `Subject template '${dto.subject_template_name_or_id}' not found.`,
+            );
+          }
+        } else {
+          const requiredTemplateIssues = (placement.warnings ?? []).filter((w) =>
+            String(w).toLowerCase().includes('subject template is required'),
+          );
+          if (requiredTemplateIssues.length > 0) {
+            allErrors.push(...requiredTemplateIssues);
+          }
+        }
+      }
+
+      parsedRows.push({
+        rowNumber,
+        data: dto,
+        errors: allErrors,
+        isValid: allErrors.length === 0,
+      });
+    }
+
+    const validRows = parsedRows.filter((r) => r.isValid).length;
+    return {
+      data: {
+        totalRows: parsedRows.length,
+        validRows,
+        invalidRows: parsedRows.length - validRows,
+        rows: parsedRows,
+      },
+    };
+  }
+
   private mapColumnNames(row: Record<string, unknown>): Record<string, unknown> {
     const lookup = this.buildHeaderLookup(row);
     const mapped: Record<string, unknown> = {};
@@ -566,6 +1030,9 @@ export class BulkImportService {
         if (val !== undefined && val !== '') {
           if (targetField === 'phone' && typeof val === 'number') {
             val = String(val);
+          }
+          if (typeof val === 'string') {
+            val = normalizeSpreadsheetString(val);
           }
           if (targetField === 'date_of_birth') {
             val = this.normalizeDate(val) ?? undefined;
@@ -663,6 +1130,7 @@ export class BulkImportService {
     adminUser: CurrentUserPayload,
   ): Promise<{ data: ImportResult }> {
     const supabase = this.getClient();
+    const refs = await this.loadPlacementRefs(supabase, branchId);
     const results: ImportResult = {
       totalProcessed: rows.length,
       successCount: 0,
@@ -703,11 +1171,51 @@ export class BulkImportService {
         }
 
         try {
-          const placement = await this.resolvePlacementForRow(
-            supabase,
-            row,
-            branchId,
-          );
+          const placement = this.resolvePlacementForRowFromRefs(row, refs);
+
+          const hasClass = !!row.class_name_or_id?.trim();
+          const hasSection = !!row.section_name_or_id?.trim();
+          const hasTemplate = !!row.subject_template_name_or_id?.trim();
+          const blockingIssues: string[] = [];
+
+          if (hasClass && !placement.classId) {
+            const classWarn = (placement.warnings ?? []).find((w) => {
+              const s = String(w).toLowerCase();
+              return s.startsWith('class ') && s.includes('not found');
+            });
+            if (classWarn) blockingIssues.push(classWarn);
+          }
+
+          if (hasSection && !placement.sectionId) {
+            const sectionWarn = (placement.warnings ?? []).find((w) => {
+              const s = String(w).toLowerCase();
+              return s.startsWith('section ') && s.includes('not found');
+            });
+            if (sectionWarn) blockingIssues.push(sectionWarn);
+          }
+
+          if (hasTemplate) {
+            const templateIssues = (placement.warnings ?? []).filter((w) =>
+              String(w).toLowerCase().includes('subject template'),
+            );
+            if (templateIssues.length > 0) {
+              blockingIssues.push(...templateIssues);
+            } else if (!placement.subjectTemplateId) {
+              blockingIssues.push(
+                `Subject template '${row.subject_template_name_or_id}' not found.`,
+              );
+            }
+          } else {
+            const requiredTemplateIssues = (placement.warnings ?? []).filter((w) =>
+              String(w).toLowerCase().includes('subject template is required'),
+            );
+            if (requiredTemplateIssues.length > 0) {
+              blockingIssues.push(...requiredTemplateIssues);
+            }
+          }
+          if (blockingIssues.length > 0) {
+            throw new BadRequestException(blockingIssues.join(' '));
+          }
 
           const created = await this.studentsService.createStudentWithInvitation(
             {

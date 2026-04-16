@@ -33,6 +33,9 @@ function pushUrlForType(type: string, data?: Record<string, unknown> | null): st
   if (data?.conversationId && typeof data.conversationId === 'string') {
     return `/messages?conversation=${encodeURIComponent(data.conversationId)}`;
   }
+  if (type === 'assessment_read' && data?.assessmentId && typeof data.assessmentId === 'string') {
+    return `/assessments/${encodeURIComponent(data.assessmentId)}/statistics`;
+  }
   switch (type) {
     case 'leave':
     case 'leave_request_raised':

@@ -109,10 +109,43 @@ class ApiClient {
 
     // Response interceptor - handle errors
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        // Keep branch ID in sync with what backend actually used (BranchGuard can fall back).
+        try {
+          if (typeof window !== 'undefined') {
+            const effective =
+              (response.headers?.['x-effective-branch-id'] as string | undefined) ?? undefined;
+            if (effective && effective.trim() !== '') {
+              const current = window.localStorage.getItem('currentBranchId');
+              if (!current || current !== effective) {
+                window.localStorage.setItem('currentBranchId', effective);
+              }
+            }
+          }
+        } catch {
+          // Non-blocking
+        }
+        return response;
+      },
       async (error: AxiosError<ApiResponse<unknown>> & { isOfflineError?: boolean }) => {
         if (error.isOfflineError) {
           return Promise.reject(error);
+        }
+
+        // Sync branch ID from error responses too (helps recover from stale localStorage).
+        try {
+          if (typeof window !== 'undefined') {
+            const effective =
+              (error.response?.headers?.['x-effective-branch-id'] as string | undefined) ?? undefined;
+            if (effective && effective.trim() !== '') {
+              const current = window.localStorage.getItem('currentBranchId');
+              if (!current || current !== effective) {
+                window.localStorage.setItem('currentBranchId', effective);
+              }
+            }
+          }
+        } catch {
+          // Non-blocking
         }
 
         // Network/timeout errors - show connection message

@@ -94,6 +94,9 @@ export function NotificationDropdown({
     } else if (notification.type === 'message' && notification.data) {
       const conversationId = notification.data.conversationId as string | undefined;
       if (conversationId) router.push(`/messages?conversation=${conversationId}`);
+    } else if (notification.type === 'assessment_read' && notification.data) {
+      const assessmentId = notification.data.assessmentId as string | undefined;
+      router.push(assessmentId ? `/assessments/${assessmentId}/statistics` : '/assessments');
     }
 
     onClose();

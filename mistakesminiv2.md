@@ -29,3 +29,12 @@
   - Only then adjust frontend caching/hydration.
   - If users frequently land on an unconfigured branch, add a safe server-side heuristic to auto-switch to a configured branch (or force a branch-selection UX).
 - **Lesson**: When an endpoint returns **200 + empty data** for one user but not another, **don’t assume permissions or frontend state first**. Immediately validate the effective `branch_id` and whether that branch has any rows for the resource.
+
+### Help modal showed “No subject templates found” despite templates existing (API response shape mismatch)
+- **Issue**: Bulk import “subject template help” modal always showed **No subject templates found**, even though the tenant/branch had subject templates in the database.
+- **Root cause**: Backend endpoint returned `{ data: Template[] , meta }`, but frontend treated it as the standard wrapper and effectively expected `{ data: { templates: Template[] }, meta }`. This mismatch made the UI read the wrong property and interpret the response as “empty”.
+- **What slowed debugging**: We focused on branch context/stale `currentBranchId` hypotheses before verifying the **actual JSON response shape** returned by the endpoint, which would have immediately revealed the contract mismatch.
+- **Fix pattern**:
+  - First inspect the Network response payload and confirm it matches the frontend type expectations.
+  - Ensure backend endpoints always follow the standard `{ data: T, meta? }` contract; if `T` needs multiple fields, make it an object (e.g. `{ templates: [...] }`) rather than returning a bare array.
+- **Lesson**: When a UI shows an “empty state” but DB checks prove data exists, **validate the API contract shape first** (actual response body vs expected type), before deeper state/branch debugging.

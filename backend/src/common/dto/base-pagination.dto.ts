@@ -11,12 +11,23 @@ export class BasePaginationDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Transform(({ value }) => {
+    // Accept both numbers and strings; clamp to avoid massive ranges.
+    const n = typeof value === 'string' ? Number.parseInt(value, 10) : (value as number);
+    if (!Number.isFinite(n)) return 1;
+    return Math.min(Math.max(n, 1), 10000);
+  })
   page: number = 1;
 
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(500)
+  @Transform(({ value }) => {
+    const n = typeof value === 'string' ? Number.parseInt(value, 10) : (value as number);
+    if (!Number.isFinite(n)) return 20;
+    return Math.min(Math.max(n, 1), 500);
+  })
   limit: number = 20;
 
   @IsOptional()

@@ -1342,6 +1342,7 @@
     "loadStatusErrorTitle": "فشل تحميل حالة الإعدادات",
     "loadStatusErrorMessage": "يرجى المحاولة مرة أخرى. إذا استمرت المشكلة، فتأكد من أن لديك صلاحية الوصول إلى الفرع المحدد.",
     "genericPleaseTryAgain": "يرجى المحاولة مرة أخرى.",
+    "gradeRangeOverlapError": "لا يمكن أن تتداخل نطاقات الدرجات. يرجى تعديل النطاق.",
     "retry": "إعادة المحاولة",
     "tabPermissions": "الصلاحيات",
     "tabBusinessInformation": "معلومات المؤسسة",

@@ -184,7 +184,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       if (!exists) {
         base.unshift({
           value: currentKey,
-          label: `${t('class')} / ${t('section')} (${tCommon('inactive')})`,
+          label: `${t('class')} / ${t('section')} (${t('inactive')})`,
           disabled: true,
         });
       }

@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   normalizeUiLocale,
+  resolveLocaleFromCookieHeader,
   resolveLocaleFromServerCookieValues,
   UI_LOCALE_COOKIE,
   UI_LOCALE_COOKIE_MAX_AGE,
@@ -18,7 +19,9 @@ export async function middleware(request: NextRequest) {
   try {
     const all = request.cookies.getAll(UI_LOCALE_COOKIE).map((c) => c.value);
     if (all.length > 0) {
-      const resolved = resolveLocaleFromServerCookieValues(all);
+      const resolved =
+        resolveLocaleFromCookieHeader(request.headers.get('cookie')) ??
+        resolveLocaleFromServerCookieValues(all);
       const hasDuplicates = all.length > 1;
       const anyInvalid = all.some((v) => normalizeUiLocale(v) !== v.trim());
       if (hasDuplicates || anyInvalid) {

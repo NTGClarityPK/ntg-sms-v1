@@ -81,6 +81,18 @@ export class BulkImportController {
     );
   }
 
+  @Post('students/validate')
+  @ApiOperation({ summary: 'Validate edited students rows before import' })
+  async validateStudents(
+    @Body() body: { rows: BulkStudentRowDto[] },
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    if (!body.rows || body.rows.length === 0) {
+      throw new BadRequestException('No rows to validate');
+    }
+    return this.bulkImportService.validateStudentsRows(body.rows, branch.branchId);
+  }
+
   @Post('students/template')
   @ApiOperation({ summary: 'Get students import template metadata' })
   downloadTemplate() {
@@ -165,5 +177,13 @@ export class BulkImportController {
         ],
       },
     };
+  }
+
+  @Post('students/subject-template-help')
+  @ApiOperation({ summary: 'Get subject templates and linked classes (help)' })
+  async subjectTemplateHelp(
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    return this.bulkImportService.getSubjectTemplateHelp(branch.branchId);
   }
 }

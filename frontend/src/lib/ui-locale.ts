@@ -26,6 +26,29 @@ export function isSupportedUiLocale(value: string): boolean {
   return SUPPORTED.has(value.trim());
 }
 
+function decodeCookieValue(raw: string): string {
+  // Cookie values may be URL-encoded; decode safely.
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * Resolve NEXT_LOCALE from the raw Cookie header deterministically.
+ * When multiple cookies with the same name exist, take the last occurrence in the header string.
+ */
+export function resolveLocaleFromCookieHeader(cookieHeader: string | null | undefined): string {
+  if (!cookieHeader) return 'en';
+  const parts = cookieHeader.split(';').map((p) => p.trim());
+  const matches = parts.filter((p) => p.startsWith(`${UI_LOCALE_COOKIE}=`));
+  if (matches.length === 0) return 'en';
+  const last = matches[matches.length - 1];
+  const raw = last.substring(UI_LOCALE_COOKIE.length + 1);
+  return normalizeUiLocale(decodeCookieValue(raw));
+}
+
 /** Resolve locale from one or more cookie values (handles duplicate NEXT_LOCALE cookies). */
 export function resolveLocaleFromServerCookieValues(values: Iterable<string>): string {
   const list = [...values]

@@ -26,6 +26,7 @@ import {
   useReplicateDay,
   useReplicateAcrossSections,
   useReplicateFromSection,
+  useConflicts,
 } from '@/hooks/useTimetable';
 import { useQueries } from '@tanstack/react-query';
 import { useTemplatesForClass } from '@/hooks/useSubjectTemplates';
@@ -222,6 +223,18 @@ export function ClassTimetableContent({
     }
   }, [sourceSectionId, sourceTemplates, sourceTemplateId]);
   const timetable = timetableData?.data;
+
+  const { data: conflictsResponse } = useConflicts({
+    classSectionId: classSectionId ?? undefined,
+    academicYearId: activeYear?.data?.id,
+  });
+
+  const conflictsForGrid = useMemo(() => {
+    const all = conflictsResponse?.data ?? [];
+    const slotIds = new Set((timetable?.slots ?? []).map((s) => s.id));
+    if (slotIds.size === 0) return [];
+    return all.filter((c) => c.slotIds.some((id) => slotIds.has(id)));
+  }, [conflictsResponse?.data, timetable?.slots]);
 
   const handleSlotClick = (
     slot: TimetableSlot | null,
@@ -612,6 +625,7 @@ export function ClassTimetableContent({
                   slots={timetable.slots}
                   onSlotClick={handleSlotClick}
                   templateInfo={templateInfoData || null}
+                  conflicts={conflictsForGrid}
                   isLoading={false}
                 />
 

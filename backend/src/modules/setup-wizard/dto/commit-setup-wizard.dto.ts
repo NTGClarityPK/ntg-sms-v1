@@ -310,6 +310,7 @@ export class CommitSetupWizardDto {
   @Type(() => BehaviorPayloadDto)
   behavior!: BehaviorPayloadDto | null;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => PermissionPayloadDto)

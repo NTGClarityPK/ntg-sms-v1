@@ -7,6 +7,8 @@ export interface ConflictingSlot {
   sectionName?: string;
   startTime: string;
   endTime: string;
+  /** Subject name for class slots, or assembly / break / free for other slot types */
+  slotLabel?: string;
 }
 
 export class ConflictDto {

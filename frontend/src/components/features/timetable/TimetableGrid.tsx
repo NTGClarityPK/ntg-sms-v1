@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Paper, Badge, Text, Group } from '@mantine/core';
+import { Paper, Text, Group } from '@mantine/core';
 import type { TimetableSlot, Conflict, TimingTemplateInfo } from '@/types/timetable';
 import { TimetableSlotComponent } from './TimetableSlot';
 
@@ -38,6 +38,73 @@ const minutesToTimeString = (minutes: number): string => {
   const mm = String(m).padStart(2, '0');
   return `${hh}:${mm}`;
 };
+
+const templateKey = (slot: TimetableSlot): string => slot.subjectTemplateId ?? 'null';
+
+const timesOverlap = (start1: string, end1: string, start2: string, end2: string): boolean => {
+  const s1 = parseTimeToMinutes(start1);
+  const e1 = parseTimeToMinutes(end1);
+  const s2 = parseTimeToMinutes(start2);
+  const e2 = parseTimeToMinutes(end2);
+  return s1 < e2 && s2 < e1;
+};
+
+/** Split the day lane into columns when multiple slots overlap in time (same template group). */
+function buildOverlapColumnLayout(slots: TimetableSlot[]): Map<string, { index: number; count: number }> {
+  const result = new Map<string, { index: number; count: number }>();
+  const byDayTemplate = new Map<string, TimetableSlot[]>();
+  for (const s of slots) {
+    const k = `${s.dayOfWeek}-${templateKey(s)}`;
+    const arr = byDayTemplate.get(k) ?? [];
+    arr.push(s);
+    byDayTemplate.set(k, arr);
+  }
+  for (const group of byDayTemplate.values()) {
+    if (group.length === 0) continue;
+    if (group.length === 1) {
+      result.set(group[0].id, { index: 0, count: 1 });
+      continue;
+    }
+    let slotGroups: TimetableSlot[][] = group.map((s) => [s]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      outer: for (let i = 0; i < slotGroups.length; i++) {
+        for (let j = i + 1; j < slotGroups.length; j++) {
+          const g1 = slotGroups[i];
+          const g2 = slotGroups[j];
+          let hasOverlap = false;
+          for (const s1 of g1) {
+            for (const s2 of g2) {
+              if (timesOverlap(s1.startTime, s1.endTime, s2.startTime, s2.endTime)) {
+                hasOverlap = true;
+                break;
+              }
+            }
+            if (hasOverlap) break;
+          }
+          if (hasOverlap) {
+            slotGroups[i] = [...g1, ...g2];
+            slotGroups.splice(j, 1);
+            changed = true;
+            break outer;
+          }
+        }
+      }
+    }
+    for (const cluster of slotGroups) {
+      if (cluster.length < 2) {
+        for (const s of cluster) result.set(s.id, { index: 0, count: 1 });
+      } else {
+        const sorted = [...cluster].sort(
+          (a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime),
+        );
+        sorted.forEach((s, idx) => result.set(s.id, { index: idx, count: sorted.length }));
+      }
+    }
+  }
+  return result;
+}
 
 export function TimetableGrid({
   slots,
@@ -114,6 +181,8 @@ export function TimetableGrid({
     });
     return ids;
   }, [conflicts]);
+
+  const overlapColumnLayout = useMemo(() => buildOverlapColumnLayout(slots), [slots]);
 
   const minutesToOffset = (minutes: number): number => {
     if (totalMinutes <= 0) return 0;
@@ -219,8 +288,10 @@ export function TimetableGrid({
                     ? ((endMinutes - schoolStartMinutes) / periodMinutes) * ROW_HEIGHT
                     : minutesToOffset(endMinutes);
                   const height = Math.max(bottom - top, 24);
-                  const hasConflict = conflictSlotIds.has(slot.id);
-                  
+                  const overlapInfo = overlapColumnLayout.get(slot.id) ?? { index: 0, count: 1 };
+                  const hasOverlapLayout = overlapInfo.count > 1;
+                  const hasConflict = conflictSlotIds.has(slot.id) || hasOverlapLayout;
+
                   // Calculate duration to determine if compact layout needed
                   const durationMinutes = endMinutes - startMinutes;
                   const isCompact = durationMinutes < 15 || height < 50;
@@ -231,8 +302,17 @@ export function TimetableGrid({
                       style={{
                         position: 'absolute',
                         top,
-                        insetInlineStart: 4,
-                        insetInlineEnd: 4,
+                        ...(hasOverlapLayout
+                          ? {
+                              left: `calc(4px + (100% - 8px) * ${overlapInfo.index} / ${overlapInfo.count})`,
+                              width: `calc((100% - 8px) / ${overlapInfo.count})`,
+                              zIndex: overlapInfo.index + 2,
+                            }
+                          : {
+                              insetInlineStart: 4,
+                              insetInlineEnd: 4,
+                              zIndex: 1,
+                            }),
                         height,
                       }}
                       onClick={(e) => {

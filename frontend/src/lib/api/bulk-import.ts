@@ -56,6 +56,15 @@ export interface TemplateColumnsResponse {
   columns: Array<{ key: string; label: string; example: string }>;
 }
 
+export interface SubjectTemplateHelpResponse {
+  templates: Array<{
+    id: string;
+    name: string;
+    classes: Array<{ id: string; name: string; displayName?: string | null }>;
+  }>;
+  meta?: { branchId?: string; branchName?: string | null; tenantName?: string | null };
+}
+
 export const bulkImportApi = {
   async previewStudents(file: File): Promise<BulkImportPreview> {
     const formData = new FormData();
@@ -64,6 +73,14 @@ export const bulkImportApi = {
       '/api/v1/bulk-import/students/preview',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return (res as ApiResponse<BulkImportPreview>).data ?? (res as unknown as BulkImportPreview);
+  },
+
+  async validateStudents(rows: BulkStudentRowDto[]): Promise<BulkImportPreview> {
+    const res = await apiClient.post<BulkImportPreview>(
+      '/api/v1/bulk-import/students/validate',
+      { rows },
     );
     return (res as ApiResponse<BulkImportPreview>).data ?? (res as unknown as BulkImportPreview);
   },
@@ -86,5 +103,14 @@ export const bulkImportApi = {
     const data = (res as ApiResponse<TemplateColumnsResponse>).data;
     if (data) return data;
     return res as unknown as TemplateColumnsResponse;
+  },
+
+  async getSubjectTemplateHelp(): Promise<SubjectTemplateHelpResponse> {
+    const res = await apiClient.post<SubjectTemplateHelpResponse>(
+      '/api/v1/bulk-import/students/subject-template-help',
+    );
+    const data = (res as ApiResponse<SubjectTemplateHelpResponse>).data;
+    if (data) return data;
+    return res as unknown as SubjectTemplateHelpResponse;
   },
 };

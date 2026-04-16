@@ -72,6 +72,24 @@ function timesOverlap(start1: string, end1: string, start2: string, end2: string
   return s1 < e2 && s2 < e1;
 }
 
+function formatClockRange(start: string, end: string): string {
+  const trim = (t: string) => t.split(':').slice(0, 2).join(':');
+  return `${trim(start)}–${trim(end)}`;
+}
+
+function buildSlotLabel(slot: TimetableSlotWithRelations): string {
+  const st = slot.slot_type;
+  if (st === 'assembly') return 'Assembly';
+  if (st === 'break') return 'Break';
+  if (st === 'free') return 'Free period';
+  const subj = slot.subjects;
+  if (!subj) return 'Class';
+  const s = Array.isArray(subj) ? subj[0] : subj;
+  const name =
+    s && typeof s === 'object' && 'name' in s ? String((s as { name: string }).name).trim() : '';
+  return name || 'Class';
+}
+
 @Injectable()
 export class TimetableService {
   constructor(
@@ -1819,6 +1837,7 @@ export class TimetableService {
                 sectionName: csInfo.sectionName,
                 startTime: slot.start_time,
                 endTime: slot.end_time,
+                slotLabel: buildSlotLabel(slot),
               },
             ],
           }),
@@ -1891,6 +1910,7 @@ export class TimetableService {
               sectionName: csInfo.sectionName,
               startTime: slot.start_time,
               endTime: slot.end_time,
+              slotLabel: buildSlotLabel(slot),
             };
           });
 
@@ -1903,11 +1923,17 @@ export class TimetableService {
               ? classSectionNames[0]
               : `${classSectionNames.length} different class-sections`;
           const teacherText = staffName ? `Teacher ${staffName}` : 'A teacher';
+          const overlapDetail = conflictingSlots
+            .map(
+              (cs) =>
+                `${cs.className} ${cs.sectionName}: ${cs.slotLabel ?? 'Slot'} (${formatClockRange(cs.startTime, cs.endTime)})`,
+            )
+            .join('; ');
 
           conflicts.push(
             new ConflictDto({
               type: 'teacher_double_booking',
-              message: `${teacherText} is assigned to ${group.length} overlapping slot${group.length > 1 ? 's' : ''} on ${DAY_NAMES[group[0].day_of_week] || `day ${group[0].day_of_week}`} across ${classSectionText}`,
+              message: `${teacherText} is assigned to ${group.length} overlapping slot${group.length > 1 ? 's' : ''} on ${DAY_NAMES[group[0].day_of_week] || `day ${group[0].day_of_week}`} across ${classSectionText}. ${overlapDetail}`,
               staffId,
               dayOfWeek: group[0].day_of_week,
               slotIds,
@@ -1985,16 +2011,24 @@ export class TimetableService {
             sectionName: csInfo.sectionName,
             startTime: slot.start_time,
             endTime: slot.end_time,
+            slotLabel: buildSlotLabel(slot),
           }));
 
           const templateText = templateInfo.name
             ? ` (Subject Template: ${templateInfo.name})`
             : '';
+          const dayLabel = DAY_NAMES[group[0].day_of_week] || `day ${group[0].day_of_week}`;
+          const overlapDetail = conflictingSlots
+            .map(
+              (cs) =>
+                `${cs.slotLabel ?? 'Slot'} (${formatClockRange(cs.startTime, cs.endTime)})`,
+            )
+            .join('; ');
 
           conflicts.push(
             new ConflictDto({
               type: 'class_section_slot_overlap',
-              message: `Class-section ${csInfo.className} ${csInfo.sectionName} has ${group.length} overlapping slot${group.length > 1 ? 's' : ''} on day ${group[0].day_of_week}${templateText}`,
+              message: `Class-section ${csInfo.className} ${csInfo.sectionName} has ${group.length} overlapping slots on ${dayLabel}${templateText}: ${overlapDetail}.`,
               dayOfWeek: group[0].day_of_week,
               slotIds,
               conflictingSlots,

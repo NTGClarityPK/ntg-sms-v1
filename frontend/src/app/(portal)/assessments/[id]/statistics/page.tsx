@@ -122,9 +122,6 @@ export default function AssessmentStatisticsPage() {
             <Title order={1}>
               {t('statisticsTitle')}: {assessment.title}
             </Title>
-            <Text size="sm" c="dimmed">
-              {t('statisticsSubtitle')}
-            </Text>
           </Stack>
           <Button variant="subtle" onClick={() => router.back()}>
             {tCommon('back')}
@@ -134,14 +131,17 @@ export default function AssessmentStatisticsPage() {
 
       <div
         style={{
-          marginTop: '100px',
           paddingLeft: 'var(--mantine-spacing-md)',
           paddingRight: 'var(--mantine-spacing-md)',
-          paddingTop: 'var(--mantine-spacing-sm)',
+          // Global styles force margin-top=0 after .page-title-bar, so use padding-top for extra clearance.
+          paddingTop: 'calc(var(--mantine-spacing-sm) + 24px)',
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
         <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            {t('statisticsSubtitle')}
+          </Text>
           {/* Stat Cards */}
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
             {statCards.map((stat) => (

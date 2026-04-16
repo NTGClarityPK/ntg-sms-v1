@@ -298,6 +298,7 @@ export class ClassSectionsService {
         branch_id: branchId,
         academic_year_id: activeYearId,
         capacity: input.capacity ?? 30,
+        is_active: true,
         created_by: username,
         updated_by: username,
       })
@@ -364,6 +365,7 @@ export class ClassSectionsService {
       branch_id: string;
       academic_year_id: string;
       capacity: number;
+      is_active: boolean;
       created_by: string;
       updated_by: string;
     }> = [];
@@ -390,6 +392,7 @@ export class ClassSectionsService {
         branch_id: branchId,
         academic_year_id: activeYearId,
         capacity: cs.capacity ?? 30,
+        is_active: true,
         created_by: username,
         updated_by: username,
       });

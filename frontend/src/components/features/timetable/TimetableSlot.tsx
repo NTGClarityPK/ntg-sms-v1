@@ -77,7 +77,7 @@ export function TimetableSlotComponent({
         style={{
           cursor: onClick ? 'pointer' : 'default',
           height: '100%',
-          border: showConflict ? '2px solid var(--mantine-color-red-6)' : undefined,
+          border: showConflict ? '3px solid var(--mantine-color-red-7)' : undefined,
           backgroundColor: showConflict 
             ? 'var(--mantine-color-red-0)' 
             : cardBackgroundColor,
@@ -150,7 +150,7 @@ export function TimetableSlotComponent({
       style={{
         cursor: onClick ? 'pointer' : 'default',
         height: '100%',
-        border: showConflict ? '2px solid var(--mantine-color-red-6)' : undefined,
+        border: showConflict ? '3px solid var(--mantine-color-red-7)' : undefined,
         backgroundColor: showConflict
           ? 'var(--mantine-color-red-0)'
           : cardBackgroundColor,

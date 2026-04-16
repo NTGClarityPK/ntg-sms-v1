@@ -19,6 +19,7 @@ import {
   Tooltip,
   ActionIcon,
   Anchor,
+  List,
 } from '@mantine/core';
 import { IconAlertTriangle, IconExternalLink, IconRefresh } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,9 +29,11 @@ import { useClassSections } from '@/hooks/useClassSections';
 import { useStaff } from '@/hooks/useStaff';
 import { useActiveAcademicYear, useAcademicYearsList } from '@/hooks/useAcademicYears';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import type { Conflict } from '@/types/timetable';
-
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function formatHm(time: string): string {
+  return time.split(':').slice(0, 2).join(':');
+}
 
 function getConflictTypeColor(type: string): string {
   switch (type) {
@@ -296,26 +299,30 @@ export default function ConflictManagementPage() {
           ) : (
             <Stack gap="md">
               {conflicts.map((conflict, index) => (
-                <Card key={index} withBorder padding="md" radius="md">
+                <Card
+                  key={`${conflict.type}-${conflict.dayOfWeek}-${conflict.slotIds.join(',')}-${index}`}
+                  withBorder
+                  padding="md"
+                  radius="md"
+                >
                   <Stack gap="sm">
-                    <Group justify="space-between">
-                      <Group gap="xs">
-                        <Badge color={getConflictTypeColor(conflict.type)} variant="light">
-                          {t(`conflictType_${conflict.type}` as 'conflictType_teacher_double_booking' | 'conflictType_invalid_school_day' | 'conflictType_class_section_slot_overlap' | 'conflictType_timing_mismatch', { defaultValue: conflict.type })}
-                        </Badge>
-                        <Text size="sm" c="dimmed">
-                          {t('day')}: {DAY_NAMES[conflict.dayOfWeek] || t('dayNumber', { number: conflict.dayOfWeek })}
-                        </Text>
-                        {conflict.subjectTemplateName && (
-                          <Badge color="blue" variant="light" size="sm">
-                            {conflict.subjectTemplateName}
-                          </Badge>
-                        )}
-                      </Group>
-                      <Text size="sm" fw={500}>
-                        {conflict.message}
+                    <Group gap="xs" wrap="wrap">
+                      <Badge color={getConflictTypeColor(conflict.type)} variant="light">
+                        {t(`conflictType_${conflict.type}` as 'conflictType_teacher_double_booking' | 'conflictType_invalid_school_day' | 'conflictType_class_section_slot_overlap' | 'conflictType_timing_mismatch', { defaultValue: conflict.type })}
+                      </Badge>
+                      <Text size="sm" c="dimmed">
+                        {t('day')}: {DAY_NAMES[conflict.dayOfWeek] || t('dayNumber', { number: conflict.dayOfWeek })}
                       </Text>
+                      {conflict.subjectTemplateName && (
+                        <Badge color="blue" variant="light" size="sm">
+                          {conflict.subjectTemplateName}
+                        </Badge>
+                      )}
                     </Group>
+
+                    <Text size="sm" fw={500}>
+                      {conflict.message}
+                    </Text>
 
                     {conflict.conflictingSlots.length > 0 && (
                       <>
@@ -324,7 +331,6 @@ export default function ConflictManagementPage() {
                           <Text size="xs" fw={500} c="dimmed">
                             {t('conflictingSlots')}
                           </Text>
-                          {/* Show unique "View timetable" options per class section */}
                           <Group gap="xs" wrap="wrap">
                             {Array.from(
                               new Map(
@@ -349,14 +355,23 @@ export default function ConflictManagementPage() {
                             ))}
                           </Group>
 
-                          {/* Still list individual conflicting slots (times) for context */}
-                          <Stack gap={4} mt={6}>
+                          <List size="sm" spacing="xs" withPadding listStyleType="disc">
                             {conflict.conflictingSlots.map((slot, slotIndex) => (
-                              <Text key={`${slot.id}-${slotIndex}`} size="sm" c="dimmed">
-                                {slot.className} {slot.sectionName} - {slot.startTime} to {slot.endTime}
-                              </Text>
+                              <List.Item key={`${slot.id}-${slotIndex}`}>
+                                <Stack gap={2}>
+                                  <Text size="sm" fw={600}>
+                                    {slot.slotLabel ?? t('unknown')}
+                                  </Text>
+                                  <Text size="xs" c="dimmed">
+                                    {[slot.className, slot.sectionName].filter(Boolean).join(' ')}
+                                  </Text>
+                                  <Text size="xs" c="dimmed">
+                                    {formatHm(slot.startTime)} – {formatHm(slot.endTime)}
+                                  </Text>
+                                </Stack>
+                              </List.Item>
                             ))}
-                          </Stack>
+                          </List>
                         </Stack>
                       </>
                     )}

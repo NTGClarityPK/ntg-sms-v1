@@ -176,58 +176,96 @@ export class AttendanceService {
       activeYearId = activeYear.id;
     }
 
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    // Defensive pagination: avoid huge ranges that PostgREST can reject.
+    // We'll clamp page after we know the real totalPages (head count query).
+    const requestedPageRaw = query.page ?? 1;
+    const requestedLimitRaw = query.limit ?? 20;
+    const requestedPage = Math.min(Number(requestedPageRaw) || 1, 10000);
+    const limit = Math.min(Number(requestedLimitRaw) || 20, 500);
+
+    const applyFilters = <T extends { eq: any; in: any }>(q: T): T => {
+      let next: any = q
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', activeYearId);
+
+      if (query.date) {
+        next = next.eq('date', query.date);
+      }
+
+      // Support both single and multiple filters
+      if (query.classSectionIds && query.classSectionIds.length > 0) {
+        next = next.in('class_section_id', query.classSectionIds);
+      } else if (query.classSectionId) {
+        next = next.eq('class_section_id', query.classSectionId);
+      }
+
+      if (query.studentId) {
+        next = next.eq('student_id', query.studentId);
+      }
+
+      if (query.statuses && query.statuses.length > 0) {
+        next = next.in('status', query.statuses);
+      } else if (query.status) {
+        next = next.eq('status', query.status);
+      }
+
+      return next as T;
+    };
+
+    // Count first, then clamp page to real bounds to avoid huge offsets.
+    const countQuery = applyFilters(
+      supabase
+        .from('attendance')
+        .select('id', { count: 'exact', head: true }),
+    );
+    const { count: totalCount, error: countError } = await countQuery;
+    throwIfDbError(countError);
+
+    const total = totalCount ?? 0;
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+    const page = Math.min(requestedPage, totalPages);
+
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let dbQuery = supabase
-      .from('attendance')
-      .select(
-        'id, student_id, class_section_id, date, status, entry_time, exit_time, notes, marked_by, branch_id, academic_year_id, created_at, updated_at',
-        { count: 'exact' },
-      )
-      .eq('branch_id', branchId)
-      .eq('academic_year_id', activeYearId);
-
-    if (query.date) {
-      dbQuery = dbQuery.eq('date', query.date);
-    }
-
-    // Support both single and multiple filters
-    if (query.classSectionIds && query.classSectionIds.length > 0) {
-      dbQuery = dbQuery.in('class_section_id', query.classSectionIds);
-    } else if (query.classSectionId) {
-      dbQuery = dbQuery.eq('class_section_id', query.classSectionId);
-    }
-
-    if (query.studentId) {
-      dbQuery = dbQuery.eq('student_id', query.studentId);
-    }
-
-    if (query.statuses && query.statuses.length > 0) {
-      dbQuery = dbQuery.in('status', query.statuses);
-    } else if (query.status) {
-      dbQuery = dbQuery.eq('status', query.status);
+    // If requested page is beyond bounds, return empty without hitting range().
+    if (requestedPage > totalPages) {
+      return {
+        data: [],
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+        },
+      };
     }
 
     // Apply sorting
     const sortBy = query.sortBy || 'date';
     const sortOrder = query.sortOrder || 'desc';
     const ascending = sortOrder === 'asc';
-    dbQuery = dbQuery.order(sortBy, { ascending });
 
-    const { data, error, count } = await dbQuery.range(from, to);
+    const pageQuery = applyFilters(
+      supabase
+        .from('attendance')
+        .select(
+          'id, student_id, class_section_id, date, status, entry_time, exit_time, notes, marked_by, branch_id, academic_year_id, created_at, updated_at',
+        )
+        .order(sortBy, { ascending }),
+    );
+
+    const { data, error } = await pageQuery.range(from, to);
     throwIfDbError(error);
 
     if (!data || data.length === 0) {
       return {
         data: [],
         meta: {
-          total: count || 0,
+          total,
           page,
           limit,
-          totalPages: Math.ceil((count || 0) / limit),
+          totalPages,
         },
       };
     }
@@ -383,10 +421,10 @@ export class AttendanceService {
     return {
       data: attendanceList,
       meta: {
-        total: count || 0,
+        total,
         page,
         limit,
-        totalPages: Math.ceil((count || 0) / limit),
+        totalPages,
       },
     };
   }

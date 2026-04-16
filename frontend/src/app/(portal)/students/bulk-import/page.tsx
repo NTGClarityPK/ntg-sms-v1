@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   alpha,
@@ -18,12 +18,18 @@ import {
   Skeleton,
   TextInput,
   Divider,
+  Loader,
+  Modal,
+  ScrollArea,
+  ActionIcon,
+  Tooltip,
+  List,
   useComputedColorScheme,
   useMantineTheme,
 } from '@mantine/core';
-import { IconUpload, IconCheck, IconX, IconAlertCircle, IconDownload } from '@tabler/icons-react';
-import { useBulkImportPreview, useBulkImport, useBulkImportTemplate } from '@/hooks/useBulkImport';
-import { useAcademicYearsList } from '@/hooks/useAcademicYears';
+import { IconUpload, IconCheck, IconX, IconAlertCircle, IconDownload, IconQuestionMark } from '@tabler/icons-react';
+import { useBulkImportPreview, useBulkImport, useBulkImportTemplate, useBulkImportValidate, useSubjectTemplateHelp } from '@/hooks/useBulkImport';
+import { useAcademicYearsList, useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { notifications } from '@mantine/notifications';
 import * as XLSX from 'xlsx';
 import type { BulkImportPreview, BulkImportResult, BulkStudentRowDto } from '@/hooks/useBulkImport';
@@ -37,12 +43,44 @@ export default function BulkImportStudentsPage() {
   const [preview, setPreview] = useState<BulkImportPreview | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [lastImportResult, setLastImportResult] = useState<BulkImportResult | null>(null);
+  const [isValidated, setIsValidated] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const previewMutation = useBulkImportPreview();
   const importMutation = useBulkImport();
+  const validateMutation = useBulkImportValidate();
   const { data: templateData } = useBulkImportTemplate();
   const { data: academicYearsResponse } = useAcademicYearsList({ page: 1, limit: 50 });
+  const { data: activeAcademicYearResponse } = useActiveAcademicYear();
   const academicYears = academicYearsResponse?.data ?? [];
+  const activeAcademicYear = activeAcademicYearResponse?.data ?? null;
+  const subjectTemplateHelpQuery = useSubjectTemplateHelp({ enabled: helpOpen });
+
+  useEffect(() => {
+    if (!helpOpen) return;
+    // Ensure help modal never shows stale template→class mappings.
+    void subjectTemplateHelpQuery.refetch();
+  }, [helpOpen]);
+
+  const hasSubjectTemplateValidationIssues =
+    showValidation &&
+    (preview?.rows ?? []).some((r) =>
+      (r.errors ?? []).some((e) => String(e).toLowerCase().includes('subject template')),
+    );
+
+  const helpTemplates = useMemo(() => {
+    const tpls = subjectTemplateHelpQuery.data?.templates ?? [];
+    // Avoid extra work in render; keep ordering stable.
+    return tpls;
+  }, [subjectTemplateHelpQuery.data]);
+
+  useEffect(() => {
+    if (!preview) return;
+    if (selectedYear) return;
+    if (!activeAcademicYear?.id) return;
+    setSelectedYear(activeAcademicYear.id);
+  }, [preview, selectedYear, activeAcademicYear?.id]);
 
   const handleFileUpload = async (uploadedFile: File | null) => {
     if (!uploadedFile) {
@@ -50,30 +88,25 @@ export default function BulkImportStudentsPage() {
       setPreview(null);
       setSelectedYear(null);
       setLastImportResult(null);
+      setIsValidated(false);
+      setShowValidation(false);
       return;
     }
     setFile(uploadedFile);
     setPreview(null);
     setSelectedYear(null);
     setLastImportResult(null);
+    setIsValidated(false);
+    setShowValidation(false);
     try {
       const result = await previewMutation.mutateAsync(uploadedFile);
       setPreview(result);
-      if (result.invalidRows > 0) {
-        notifications.show({
-          title: t('bulkValidationIssues'),
-          message: t('bulkValidationIssuesMessage', { invalid: result.invalidRows, total: result.totalRows }),
-          color: 'yellow',
-          icon: <IconAlertCircle size={16} />,
-        });
-      } else {
-        notifications.show({
-          title: t('bulkReadyToImport'),
-          message: t('bulkReadyToImportMessage', { count: result.validRows }),
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
-      }
+      notifications.show({
+        title: 'File uploaded',
+        message: 'Edit any cells if needed, then press Validate.',
+        color: 'blue',
+        icon: <IconAlertCircle size={16} />,
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('bulkFailedToParseFile');
       notifications.show({
@@ -237,6 +270,55 @@ export default function BulkImportStudentsPage() {
     });
   };
 
+  const recomputePreviewCounts = (rows: BulkImportPreview['rows']) => {
+    const validRows = rows.filter((r) => r.isValid).length;
+    return {
+      validRows,
+      invalidRows: rows.length - validRows,
+    };
+  };
+
+  const clearPlacementErrorsOnEdit = (
+    errors: string[],
+    field: keyof BulkStudentRowDto,
+    nextValue: string,
+  ): string[] => {
+    // These errors are produced by backend placement lookups. When user edits the cell,
+    // clear the corresponding message immediately so the row UI reflects the new state.
+    // Import still re-validates on the backend, so incorrect values will be caught there.
+    const lower = errors.map((e) => String(e).toLowerCase());
+    return errors.filter((e, idx) => {
+      const s = lower[idx] ?? '';
+
+      const isClassNotFound = s.startsWith('class ') && s.includes('not found');
+      const isSectionNotFound = s.startsWith('section ') && s.includes('not found');
+      const isTemplateAny = s.includes('subject template');
+      const isTemplateLinking =
+        s.includes('subject template') &&
+        (s.includes('not linked') || s.includes('requires a valid class'));
+
+      if (field === 'class_name_or_id') {
+        // Changing class can fix class-not-found or template-linking errors.
+        // But if user entered another value, we don't know it's valid until Validate is pressed.
+        // Only clear if the cell is blanked (class is optional).
+        if (nextValue.trim() === '') return !(isClassNotFound || isTemplateLinking);
+        return true;
+      }
+      if (field === 'section_name_or_id') {
+        // Only clear if blanked (section is optional).
+        if (nextValue.trim() === '') return !isSectionNotFound;
+        return true;
+      }
+      if (field === 'subject_template_name_or_id') {
+        // Changing template can fix template-not-found or template-linking errors.
+        // Only clear if blanked (template is optional). Otherwise keep the error until Validate re-checks.
+        if (nextValue.trim() === '') return !(isTemplateAny || isTemplateLinking);
+        return true;
+      }
+      return true;
+    });
+  };
+
   const updatePreviewRow = useCallback(
     (rowIndex: number, field: keyof BulkStudentRowDto, value: string | undefined) => {
       setPreview((prev) => {
@@ -245,25 +327,85 @@ export default function BulkImportStudentsPage() {
           field === 'invitation_type'
             ? { invitation_type: (value === 'parent' ? 'parent' : 'student') }
             : { [field]: value ?? '' } as Partial<BulkStudentRowDto>;
+        const nextRows = prev.rows.map((r, i) => {
+          if (i !== rowIndex) return r;
+          const nextData = { ...r.data, ...patch };
+          const nextValue =
+            typeof value === 'string' ? value : value == null ? '' : String(value);
+          const nextErrors =
+            field === 'class_name_or_id' ||
+            field === 'section_name_or_id' ||
+            field === 'subject_template_name_or_id'
+              ? clearPlacementErrorsOnEdit(r.errors, field, nextValue)
+              : r.errors;
+          return {
+            ...r,
+            data: nextData,
+            errors: nextErrors,
+            isValid: nextErrors.length === 0,
+          };
+        });
+
+        const counts = recomputePreviewCounts(nextRows);
+
         return {
           ...prev,
-          rows: prev.rows.map((r, i) =>
-            i === rowIndex ? { ...r, data: { ...r.data, ...patch } } : r
-          ),
+          ...counts,
+          rows: nextRows,
         };
       });
+      setIsValidated(false);
+      setShowValidation(false);
     },
     []
   );
 
   const editableValidCount =
-    preview?.rows.filter(
-      (r) =>
-        r.data.first_name?.trim() &&
-        r.data.last_name?.trim() &&
-        r.data.username?.trim() &&
-        r.data.gender?.trim()
-    ).length ?? 0;
+    preview?.rows.filter((r) => r.isValid).length ?? 0;
+
+  const handleValidate = () => {
+    void (async () => {
+      if (!preview) return;
+      setShowValidation(true);
+      setIsValidated(false);
+      try {
+        const payloadRows = preview.rows.map((r) => ({
+          ...r.data,
+          row_number: r.rowNumber,
+        }));
+        const result = await validateMutation.mutateAsync(payloadRows);
+        setPreview(result);
+
+        if (result.invalidRows === 0) {
+          setIsValidated(true);
+          notifications.show({
+            title: 'Validated',
+            message: `All ${result.totalRows} rows are valid. You can import now.`,
+            color: 'green',
+            icon: <IconCheck size={16} />,
+          });
+          return;
+        }
+
+        const firstInvalid = result.rows.find((r) => !r.isValid);
+        const firstMsg = firstInvalid?.errors?.[0] ?? 'Row has errors';
+        notifications.show({
+          title: 'Validation failed',
+          message: `Fix ${result.invalidRows} row(s). First issue: Row ${firstInvalid?.rowNumber ?? ''} — ${firstMsg}`,
+          color: 'red',
+          icon: <IconX size={16} />,
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to validate rows';
+        notifications.show({
+          title: 'Validation failed',
+          message,
+          color: 'red',
+          icon: <IconX size={16} />,
+        });
+      }
+    })();
+  };
 
   return (
     <>
@@ -377,23 +519,42 @@ export default function BulkImportStudentsPage() {
                   <div>
                     <Title order={4}>Preview — edit any cell before importing</Title>
                     <Text size="sm" c="dimmed">
-                      {editableValidCount} valid / {preview.totalRows} total rows (required: Username, First
-                      name, Last name, Gender)
+                      {showValidation
+                        ? `${editableValidCount} valid / ${preview.totalRows} total rows (required: Username, First name, Last name, Gender)`
+                        : `Not validated yet — press Validate to check ${preview.totalRows} row(s).`}
                     </Text>
                   </div>
-                  <Button
-                    id="bulk-import-submit"
-                    onClick={handleImport}
-                    disabled={
-                      editableValidCount === 0 ||
-                      !selectedYear ||
-                      importMutation.isPending
-                    }
-                    loading={importMutation.isPending}
-                    leftSection={<IconCheck size={16} />}
-                  >
-                    Import {editableValidCount} Students
-                  </Button>
+                  <Group gap="sm">
+                    <Button
+                      id="bulk-import-validate"
+                      variant="light"
+                      onClick={handleValidate}
+                      disabled={
+                        !preview ||
+                        previewMutation.isPending ||
+                        importMutation.isPending ||
+                        validateMutation.isPending
+                      }
+                      loading={validateMutation.isPending}
+                      leftSection={<IconCheck size={16} />}
+                    >
+                      Validate
+                    </Button>
+                    <Button
+                      id="bulk-import-submit"
+                      onClick={handleImport}
+                      disabled={
+                        editableValidCount === 0 ||
+                        !selectedYear ||
+                        importMutation.isPending ||
+                        !isValidated
+                      }
+                      loading={importMutation.isPending}
+                      leftSection={<IconUpload size={16} />}
+                    >
+                      Import {editableValidCount} Students
+                    </Button>
+                  </Group>
                 </Group>
 
                 <div style={{ overflowX: 'auto' }}>
@@ -412,7 +573,26 @@ export default function BulkImportStudentsPage() {
                         <Table.Th>Class</Table.Th>
                         <Table.Th>Section</Table.Th>
                         <Table.Th>Subject Template</Table.Th>
-                        <Table.Th>Errors</Table.Th>
+                        <Table.Th>
+                          <Group gap={6} wrap="nowrap">
+                            <Text size="sm" fw={600}>
+                              Errors
+                            </Text>
+                            {hasSubjectTemplateValidationIssues && (
+                              <Tooltip label="Show subject templates linked to classes">
+                                <ActionIcon
+                                  id="bulk-import-subject-template-help"
+                                  variant="light"
+                                  radius="xl"
+                                  size="sm"
+                                  onClick={() => setHelpOpen(true)}
+                                >
+                                  <IconQuestionMark size={14} />
+                                </ActionIcon>
+                              </Tooltip>
+                            )}
+                          </Group>
+                        </Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -422,8 +602,12 @@ export default function BulkImportStudentsPage() {
                           row.data.last_name?.trim() &&
                           row.data.username?.trim() &&
                           row.data.gender?.trim();
+                        const isValidating = validateMutation.isPending;
+                        const isRowValid = showValidation ? (hasRequired && row.isValid) : false;
                         const errorRowBg =
-                          !hasRequired &&
+                          showValidation &&
+                          !isValidating &&
+                          !isRowValid &&
                           (computedColorScheme === 'dark'
                             ? alpha(theme.colors.red[8], 0.25)
                             : theme.colors.red[0]);
@@ -435,12 +619,25 @@ export default function BulkImportStudentsPage() {
                           >
                             <Table.Td>{row.rowNumber}</Table.Td>
                             <Table.Td>
-                              <Badge
-                                color={hasRequired ? 'green' : 'red'}
-                                size="sm"
-                              >
-                                {hasRequired ? 'Valid' : 'Error'}
-                              </Badge>
+                              {showValidation && isValidating ? (
+                                <Group gap={6} wrap="nowrap">
+                                  <Loader size="xs" />
+                                  <Text size="xs">Validating…</Text>
+                                </Group>
+                              ) : (
+                                <Badge
+                                  color={
+                                    !showValidation
+                                      ? 'gray'
+                                      : isRowValid
+                                        ? 'green'
+                                        : 'red'
+                                  }
+                                  size="sm"
+                                >
+                                  {!showValidation ? 'Not validated' : isRowValid ? 'Valid' : 'Error'}
+                                </Badge>
+                              )}
                             </Table.Td>
                             <Table.Td>
                               <TextInput
@@ -568,7 +765,7 @@ export default function BulkImportStudentsPage() {
                               />
                             </Table.Td>
                             <Table.Td>
-                              {row.errors.length > 0 && (
+                              {showValidation && !isValidating && row.errors.length > 0 && (
                                 <Text
                                   size="xs"
                                   c={computedColorScheme === 'dark' ? 'red.3' : 'red.8'}
@@ -589,6 +786,93 @@ export default function BulkImportStudentsPage() {
           )}
         </Stack>
       </div>
+
+      <Modal
+        opened={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        title="Subject template help"
+        centered
+        size="lg"
+      >
+        <Stack gap="sm">
+          <Alert icon={<IconAlertCircle size={16} />} color="blue" title="How validation works">
+            If a class has subject templates configured in Settings, then <strong>Subject Template is mandatory</strong>{' '}
+            for students in that class. Choose one of the templates linked to that class.
+          </Alert>
+
+          <Text fw={600}>Available subject templates and linked classes</Text>
+          {(subjectTemplateHelpQuery.data?.meta?.branchId ||
+            subjectTemplateHelpQuery.isLoading ||
+            subjectTemplateHelpQuery.error) && (
+            <Text size="xs" c="dimmed">
+              Branch context:{' '}
+              {subjectTemplateHelpQuery.data?.meta?.tenantName
+                ? `${subjectTemplateHelpQuery.data?.meta?.tenantName} / `
+                : ''}
+              {subjectTemplateHelpQuery.data?.meta?.branchName
+                ? `${subjectTemplateHelpQuery.data?.meta?.branchName} `
+                : ''}
+              {subjectTemplateHelpQuery.data?.meta?.branchId
+                ? `(${subjectTemplateHelpQuery.data?.meta?.branchId})`
+                : ''}
+            </Text>
+          )}
+
+          {subjectTemplateHelpQuery.isLoading ? (
+            <Group gap="sm">
+              <Loader size="sm" />
+              <Text size="sm">Loading templates…</Text>
+            </Group>
+          ) : subjectTemplateHelpQuery.error ? (
+            <Alert color="red" title="Failed to load" icon={<IconX size={16} />}>
+              {(subjectTemplateHelpQuery.error as Error).message}
+            </Alert>
+          ) : (helpTemplates.length ?? 0) === 0 ? (
+            <Alert color="yellow" title="No subject templates found" icon={<IconAlertCircle size={16} />}>
+              This branch has no subject templates configured yet.
+            </Alert>
+          ) : (
+            <Paper withBorder p="sm">
+              <ScrollArea.Autosize mah={420} type="auto">
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Subject template</Table.Th>
+                      <Table.Th>Linked classes</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {helpTemplates.map((tpl) => (
+                      <Table.Tr key={tpl.id}>
+                        <Table.Td>
+                          <Text fw={600} size="sm">
+                            {tpl.name}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          {tpl.classes.length === 0 ? (
+                            <Text size="sm" c="dimmed">
+                              Not linked
+                            </Text>
+                          ) : (
+                            <List size="sm" withPadding listStyleType="disc" spacing={2}>
+                              {tpl.classes.map((c) => (
+                                <List.Item key={c.id}>
+                                  {c.displayName ?? c.name}
+                                </List.Item>
+                              ))}
+                            </List>
+                          )}
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea.Autosize>
+            </Paper>
+          )}
+        </Stack>
+      </Modal>
     </>
   );
 }

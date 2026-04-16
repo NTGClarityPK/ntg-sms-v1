@@ -798,6 +798,7 @@ export class StudentsService {
         date_of_birth: input.dateOfBirth ?? null,
         gender: input.gender ?? null,
         is_active: input.isActive ?? true,
+        current_branch_id: branchId,
         created_by: username,
         updated_by: username,
       });
@@ -989,6 +990,7 @@ export class StudentsService {
         date_of_birth: input.dateOfBirth ?? null,
         gender: input.gender ?? null,
         is_active: input.isActive ?? true,
+        current_branch_id: branchId,
         created_by: username,
         updated_by: username,
       });
@@ -1049,6 +1051,27 @@ export class StudentsService {
       if (!student) throw new BadRequestException('Failed to create student record');
 
       const studentRow = student as StudentRow;
+
+      // Maintain year-scoped placement for attendance/results/etc.
+      // Without this, the Students list (which reads student_enrolments) can show N/A for class/section.
+      if (academicYearId) {
+        const { error: enrolUpsertError } = await supabase
+          .from('student_enrolments')
+          .upsert(
+            {
+              student_id: studentRow.id,
+              branch_id: branchId,
+              academic_year_id: academicYearId,
+              class_id: input.classId ?? null,
+              section_id: input.sectionId ?? null,
+              status: 'active',
+              created_by: username,
+              updated_by: username,
+            },
+            { onConflict: 'student_id,branch_id,academic_year_id' },
+          );
+        throwIfDbError(enrolUpsertError);
+      }
 
       // Optional: template assignment
       if (input.subjectTemplateId) {
@@ -1390,6 +1413,7 @@ export class StudentsService {
         date_of_birth: null,
         gender: null,
         is_active: false,
+        current_branch_id: branchId,
         created_by: username,
         updated_by: username,
       });

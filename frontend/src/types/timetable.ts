@@ -51,6 +51,8 @@ export interface ConflictingSlot {
   sectionName?: string;
   startTime: string;
   endTime: string;
+  /** Subject name or assembly / break label from the API */
+  slotLabel?: string;
 }
 
 export interface Conflict {

@@ -687,9 +687,9 @@ export class AssessmentsService {
     );
 
     // Get total students in the class section (year-scoped placement via enrolments)
-    const { count: totalStudents, error: studentsError } = await supabase
+    const { data: enrolments, count: totalStudents, error: studentsError } = await supabase
       .from('student_enrolments')
-      .select('student_id', { count: 'exact', head: true })
+      .select('student_id', { count: 'exact' })
       .eq('class_id', classSection.classId)
       .eq('section_id', classSection.sectionId)
       .eq('branch_id', branchId)
@@ -697,22 +697,58 @@ export class AssessmentsService {
       .eq('status', 'active');
     throwIfDbError(studentsError);
 
-    // Get grades statistics
+    const enrolledStudentIds = (enrolments ?? [])
+      .map((e) => (e as any).student_id as string | undefined)
+      .filter((id): id is string => !!id);
+
+    // If there are no enrolled students for this class/section/year, return safe zeros.
+    // This can happen for old assessments where the class has no active enrolments in that academic year.
+    if (enrolledStudentIds.length === 0) {
+      return new AssessmentStatisticsDto({
+        assessmentId: assessment.id,
+        assessmentTitle: assessment.title,
+        totalStudents: totalStudents ?? 0,
+        gradedCount: 0,
+        ungradedCount: 0,
+        absentCount: 0,
+        excusedCount: 0,
+        averageMarks: undefined,
+        highestMarks: undefined,
+        lowestMarks: undefined,
+        submissionRate: 0,
+        completionRate: 0,
+      });
+    }
+
+    // Get grades only for the relevant enrolled students (prevents mixing old-year / withdrawn data)
     const { data: grades, error: gradesError } = await supabase
       .from('student_grades')
-      .select('marks_obtained, submission_status')
+      .select('student_id, marks_obtained, submission_status')
       .eq('assessment_id', assessmentId)
-      .eq('branch_id', branchId);
+      .eq('branch_id', branchId)
+      .in('student_id', enrolledStudentIds);
     throwIfDbError(gradesError);
 
-    const gradedCount = (grades ?? []).length;
+    // De-duplicate by student_id so one student can't inflate counts
+    const latestByStudent = new Map<string, { marks_obtained: string | number; submission_status: string }>();
+    for (const g of (grades ?? []) as any[]) {
+      const sid = g.student_id as string | undefined;
+      if (!sid) continue;
+      latestByStudent.set(sid, {
+        marks_obtained: (g.marks_obtained as string | number) ?? 0,
+        submission_status: String(g.submission_status ?? ''),
+      });
+    }
+    const gradesUnique = Array.from(latestByStudent.values());
+
+    const gradedCount = gradesUnique.length;
     // submission_status: 'not_submitted', 'submitted', 'late', 'excused'
-    const absentCount = (grades ?? []).filter((g) => g.submission_status === 'not_submitted').length;
-    const excusedCount = (grades ?? []).filter((g) => g.submission_status === 'excused').length;
-    const ungradedCount = (totalStudents ?? 0) - gradedCount;
+    const absentCount = gradesUnique.filter((g) => g.submission_status === 'not_submitted').length;
+    const excusedCount = gradesUnique.filter((g) => g.submission_status === 'excused').length;
+    const ungradedCount = Math.max((totalStudents ?? 0) - gradedCount, 0);
 
     // Calculate statistics for non-absent and non-excused students
-    const validGrades = (grades ?? []).filter(
+    const validGrades = gradesUnique.filter(
       (g) => g.submission_status !== 'not_submitted' && g.submission_status !== 'excused',
     );
     const averageMarks =

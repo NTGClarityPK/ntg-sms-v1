@@ -20,8 +20,15 @@ export class SetupWizardService {
     if (!input.tenantId) throw new BadRequestException('Tenant not found for current branch');
 
     const supabase = this.supabaseConfig.getClient();
+    // Step 7 (permissions UI) was removed; default roles/permissions are handled in the RPC.
+    // Keep payload backward-compatible for older clients by always sending an array.
+    const payload = {
+      ...input.payload,
+      permissions: Array.isArray((input.payload as any).permissions) ? (input.payload as any).permissions : [],
+    } as CommitSetupWizardDto;
+
     const { data, error } = await supabase.rpc('commit_setup_wizard', {
-      p_payload: input.payload,
+      p_payload: payload,
       p_branch_id: input.branchId,
       p_tenant_id: input.tenantId,
       p_user_email: input.userEmail,

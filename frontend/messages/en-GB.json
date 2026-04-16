@@ -1342,6 +1342,7 @@
     "loadStatusErrorTitle": "Failed to load settings status",
     "loadStatusErrorMessage": "Please try again. If the issue persists, ensure you have access to the selected branch.",
     "genericPleaseTryAgain": "Please try again.",
+    "gradeRangeOverlapError": "Grade ranges cannot overlap. Please adjust the range.",
     "retry": "Retry",
     "tabPermissions": "Permissions",
     "tabBusinessInformation": "Business Info",
