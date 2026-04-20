@@ -380,6 +380,26 @@ export class StudentsService {
     const emailEntries = await Promise.all(emailPromises);
     const emailMap = new Map(emailEntries);
 
+    // Fetch profile fields needed for edit/display (DOB, gender, phone, address).
+    // Do not rely on PostgREST relationship cache; fetch explicitly by profile id.
+    const { data: profileRows, error: profilesError } =
+      userIds.length > 0
+        ? await supabase
+            .from('profiles')
+            .select('id, phone, address, date_of_birth, gender')
+            .in('id', userIds)
+        : { data: [], error: null };
+    throwIfDbError(profilesError);
+    const profileByUserId = new Map(
+      ((profileRows as Array<{
+        id: string;
+        phone: string | null;
+        address: string | null;
+        date_of_birth: string | null;
+        gender: string | null;
+      }>) ?? []).map((p) => [p.id, p] as const),
+    );
+
     const studentIdsOnPage = (data as unknown as Array<{ id: string }>)
       .map((s) => s.id)
       .filter((id): id is string => !!id);
@@ -522,6 +542,10 @@ export class StudentsService {
       const templateInfo =
         placementYearId ? templateMap.get(`${row.id}::${placementYearId}`) : undefined;
 
+      const profile = row.user_id ? profileByUserId.get(row.user_id) : undefined;
+      const gender =
+        profile?.gender === 'male' || profile?.gender === 'female' ? (profile.gender as 'male' | 'female') : undefined;
+
       // Only surface template if it is available for the student's current class/level.
       const availableForClass = effectiveClassId
         ? availableTemplateIdsByClassId.get(effectiveClassId) ?? new Set<string>()
@@ -550,6 +574,10 @@ export class StudentsService {
         firstName: row.first_name ?? undefined,
         lastName: row.last_name ?? undefined,
         email: row.user_id ? emailMap.get(row.user_id) : undefined,
+        phone: profile?.phone ?? undefined,
+        address: profile?.address ?? undefined,
+        dateOfBirth: profile?.date_of_birth ?? undefined,
+        gender,
         className: effectiveClassId ? classNameById.get(effectiveClassId) : undefined,
         sectionName: effectiveSectionId ? sectionNameById.get(effectiveSectionId) : undefined,
         subjectTemplateId: safeTemplateInfo?.templateId,
@@ -624,6 +652,22 @@ export class StudentsService {
     const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
     const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
 
+    const profile =
+      row.user_id
+        ? (
+            await supabase
+              .from('profiles')
+              .select('phone, address, date_of_birth, gender')
+              .eq('id', row.user_id)
+              .maybeSingle()
+          ).data
+        : null;
+    const gender =
+      (profile as { gender?: string | null } | null)?.gender === 'male' ||
+      (profile as { gender?: string | null } | null)?.gender === 'female'
+        ? ((profile as { gender: 'male' | 'female' }).gender)
+        : undefined;
+
     const { data: authUser } = row.user_id
       ? await supabase.auth.admin.getUserById(row.user_id)
       : { data: { user: null } };
@@ -670,6 +714,10 @@ export class StudentsService {
       admissionDate: row.admission_date ?? undefined,
       academicYearId: row.academic_year_id ?? undefined,
       isActive: row.is_active,
+      phone: (profile as { phone?: string | null } | null)?.phone ?? undefined,
+      address: (profile as { address?: string | null } | null)?.address ?? undefined,
+      dateOfBirth: (profile as { date_of_birth?: string | null } | null)?.date_of_birth ?? undefined,
+      gender,
       accountStatus: accountStatusFromRow(row.account_status),
       createdAt: row.created_at,
       updatedAt: row.updated_at,

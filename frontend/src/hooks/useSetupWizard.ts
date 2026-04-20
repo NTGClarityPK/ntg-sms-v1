@@ -23,6 +23,8 @@ export function useSaveSetupWizard() {
     },
     onSuccess: async () => {
       await Promise.all([
+        // Roles/permissions can change as part of setup; refresh current user immediately.
+        qc.invalidateQueries({ queryKey: ['auth', 'me'] }),
         qc.invalidateQueries({ queryKey: ['settingsStatus'] }),
         qc.invalidateQueries({ queryKey: ['academicYears'] }),
         qc.invalidateQueries({ queryKey: ['subjects'] }),

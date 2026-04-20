@@ -37,7 +37,6 @@ async function fetchCurrentUser(): Promise<User> {
     if (shouldSyncFromApi) {
       setUiLocaleCookieOnDocument(preferredNorm);
       try {
-        window.localStorage.setItem('locale', preferredNorm);
         window.sessionStorage.setItem(LOCALE_REPAIR_REFRESH_FLAG, '1');
       } catch {
         // Non-blocking

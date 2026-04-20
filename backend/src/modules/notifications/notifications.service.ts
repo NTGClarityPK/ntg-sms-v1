@@ -36,6 +36,9 @@ function pushUrlForType(type: string, data?: Record<string, unknown> | null): st
   if (type === 'assessment_read' && data?.assessmentId && typeof data.assessmentId === 'string') {
     return `/assessments/${encodeURIComponent(data.assessmentId)}/statistics`;
   }
+  if (type === 'assessment_published') {
+    return '/my-assessments';
+  }
   switch (type) {
     case 'leave':
     case 'leave_request_raised':

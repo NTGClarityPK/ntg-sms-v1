@@ -90,7 +90,6 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 const SHEET_NAMES = {
   schoolInfo: 'school_info',
-  academicYears: 'academic_years',
   subjects: 'subjects',
   classes: 'classes',
   sections: 'sections',
@@ -266,7 +265,6 @@ export class SettingsImportService {
       data: {
         workbookName: 'settings-onboarding-template.xlsx',
         sheets: [
-          { name: SHEET_NAMES.academicYears, columns: ['name', 'start_date', 'end_date', 'set_active'], sample: { name: '2026-2027', start_date: '2026-09-01', end_date: '2027-06-30', set_active: 'true' } },
           { name: SHEET_NAMES.subjects, columns: ['name_en', 'name_ar', 'code'], sample: { name_en: 'Mathematics', name_ar: 'رياضيات', code: 'MATH' } },
           { name: SHEET_NAMES.classes, columns: ['name', 'display_name', 'sort_order'], sample: { name: 'Grade 1', display_name: 'Grade 1', sort_order: '1' } },
           { name: SHEET_NAMES.sections, columns: ['name', 'sort_order'], sample: { name: 'A', sort_order: '1' } },
@@ -298,7 +296,6 @@ export class SettingsImportService {
     const summaryBySheet: Record<string, SheetSummary> = {};
 
     const schoolInfoRows = this.readSheet(workbook, SHEET_NAMES.schoolInfo);
-    const academicYearRows = this.readSheet(workbook, SHEET_NAMES.academicYears);
     const subjectRows = this.readSheet(workbook, SHEET_NAMES.subjects);
     const classRows = this.readSheet(workbook, SHEET_NAMES.classes);
     const sectionRows = this.readSheet(workbook, SHEET_NAMES.sections);
@@ -317,7 +314,7 @@ export class SettingsImportService {
       actorEmail,
       expiresAt: Date.now() + TOKEN_TTL_MS,
       schoolInfo: this.parseSchoolInfoRows(schoolInfoRows, errors),
-      academicYears: this.parseAcademicYears(academicYearRows, errors),
+      academicYears: [],
       subjects: this.parseSubjects(subjectRows, errors),
       classes: this.parseClasses(classRows, errors),
       sections: this.parseSections(sectionRows, errors),
@@ -336,11 +333,6 @@ export class SettingsImportService {
       schoolInfoRows.length,
       errors,
       SHEET_NAMES.schoolInfo,
-    );
-    summaryBySheet[SHEET_NAMES.academicYears] = this.computeSheetSummary(
-      academicYearRows.length,
-      errors,
-      SHEET_NAMES.academicYears,
     );
     summaryBySheet[SHEET_NAMES.subjects] = this.computeSheetSummary(
       subjectRows.length,
@@ -597,9 +589,9 @@ export class SettingsImportService {
       await this.systemSettingsService.upsert('inventory_categories', prepared.categories.inventory);
     }
 
-    // Seed default permissions so Settings → Permissions matrix is populated after bulk setup,
-    // matching wizard behaviour (School Admin gets edit for all features; others start at none).
-    await this.seedDefaultPermissionsIfMissing(prepared.branchId);
+    // Seed default permissions so Settings → Permissions matrix is populated after bulk setup.
+    // Must match Setup Wizard behaviour (view/edit/none matrix per role + school_admin edit-all).
+    await this.seedWizardDefaultPermissionsIfMissing(prepared.branchId, prepared.actorEmail);
 
     // Mark setup as completed for this branch so Settings opens full tabbed view
     // even when optional domains (e.g. schedule/permissions) are intentionally deferred.
@@ -617,7 +609,7 @@ export class SettingsImportService {
     };
   }
 
-  private async seedDefaultPermissionsIfMissing(branchId: string): Promise<void> {
+  private async seedWizardDefaultPermissionsIfMissing(branchId: string, userEmail: string): Promise<void> {
     const supabase = this.supabaseConfig.getClient();
 
     const { data: existing, error: existingError } = await supabase
@@ -628,32 +620,11 @@ export class SettingsImportService {
     throwIfDbError(existingError);
     if ((existing?.length ?? 0) > 0) return;
 
-    const [rolesRes, featuresRes] = await Promise.all([
-      supabase.from('roles').select('id, name'),
-      supabase.from('features').select('id'),
-    ]);
-    throwIfDbError(rolesRes.error);
-    throwIfDbError(featuresRes.error);
-
-    const roles = (rolesRes.data ?? []) as Array<{ id: string; name: string }>;
-    const features = (featuresRes.data ?? []) as Array<{ id: string }>;
-
-    if (roles.length === 0 || features.length === 0) return;
-
-    const rows = roles.flatMap((role) =>
-      features.map((feature) => ({
-        role_id: role.id,
-        feature_id: feature.id,
-        branch_id: branchId,
-        permission: role.name?.toLowerCase() === 'school_admin' ? 'edit' : 'none',
-        updated_at: new Date().toISOString(),
-      })),
-    );
-
-    const { error: upsertError } = await supabase.from('role_permissions').upsert(rows, {
-      onConflict: 'role_id,feature_id,branch_id',
+    const { error } = await supabase.rpc('seed_default_role_permissions', {
+      p_branch_id: branchId,
+      p_user_email: userEmail,
     });
-    throwIfDbError(upsertError);
+    throwIfDbError(error);
   }
 
   private ensureValidUpload(file: Express.Multer.File | undefined): void {
@@ -717,6 +688,9 @@ export class SettingsImportService {
   }
 
   private parseAcademicYears(rows: WorkbookRow[], errors: ValidationError[]) {
+    // Academic years are managed elsewhere in the setup flow.
+    // We keep this parser only for backwards compatibility if someone uploads an older template.
+    // When the sheet is absent (new template), caller should pass an empty array.
     const parsed: PreparedImport['academicYears'] = [];
     rows.forEach((row, index) => {
       const rowNumber = index + 2;
@@ -725,7 +699,7 @@ export class SettingsImportService {
       const endDate = normalizeDate(row.end_date);
       if (!name || !startDate || !endDate) {
         errors.push({
-          sheet: SHEET_NAMES.academicYears,
+          sheet: 'academic_years',
           rowNumber,
           message: 'name, start_date and end_date are required',
         });

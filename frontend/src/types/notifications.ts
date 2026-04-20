@@ -9,6 +9,7 @@ export type NotificationType =
   | 'grade' 
   | 'message'
   | 'assessment_read'
+  | 'assessment_published'
   | 'early_departure'
   | 'early_departure_request_raised'
   | 'early_departure_excused';

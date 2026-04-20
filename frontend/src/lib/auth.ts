@@ -16,24 +16,18 @@ export function syncLocaleCookieFromStorage(): void {
     }
   }
 
-  const cookieNorm =
-    cookieRaw != null && cookieRaw.trim() !== '' ? normalizeUiLocale(cookieRaw) : null;
-  const storedRaw = window.localStorage.getItem('locale');
-  const storedLocale = storedRaw != null ? normalizeUiLocale(storedRaw) : null;
-
-  if (cookieNorm) {
-    if (storedLocale !== cookieNorm) {
-      try {
-        window.localStorage.setItem('locale', cookieNorm);
-      } catch {
-        // Non-blocking
-      }
-    }
-    return;
+  // Locale is stored in the NEXT_LOCALE cookie only.
+  // We intentionally do not read/write locale from localStorage because it can get stale and
+  // cause non-deterministic language flips on refresh.
+  try {
+    window.localStorage.removeItem('locale');
+  } catch {
+    // Non-blocking
   }
 
-  if (storedLocale) {
-    setUiLocaleCookieOnDocument(storedLocale);
+  // Ensure a sane default exists for server rendering when cookie is missing.
+  if (cookieRaw == null || cookieRaw.trim() === '') {
+    setUiLocaleCookieOnDocument('en-US');
   }
 }
 

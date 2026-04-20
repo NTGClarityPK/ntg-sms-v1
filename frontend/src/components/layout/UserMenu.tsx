@@ -154,8 +154,10 @@ export function UserMenu() {
       
       // Use SPA navigation (preserves React Query cache)
       router.push('/dashboard');
-    } catch (error) {
-      console.error('Failed to switch branch:', error);
+    } catch {
+      // Keep modal open so user can retry.
+      // (Avoid console logging in production; UI feedback is handled elsewhere.)
+    } finally {
       setIsSwitching(false);
     }
   };

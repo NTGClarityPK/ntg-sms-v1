@@ -313,9 +313,9 @@ export function Sidebar({
       if (item.href === '/timetable') {
         return canManageTimetable;
       }
-      // For "Conflict Management", show only if user has admin/coordinator role
+      // For "Conflict Management", visibility is permission-controlled (Settings → Permission matrix).
       if (item.href === '/conflict-management') {
-        return canManageTimetable;
+        return true;
       }
       // For "My Events", show for parents, students, and teachers
       if (item.href === '/my-events') {

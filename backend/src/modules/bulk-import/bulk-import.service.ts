@@ -124,12 +124,16 @@ const COLUMN_MAP: Record<string, string[]> = {
     'date_of_birth',
     'Date of Birth',
     'Date of Birth (optional)',
+    'Date Of Birth',
     'DOB',
     'dob',
+    'DOB (optional)',
     'birth_date',
     'Birth Date',
+    'Birthdate',
+    'BirthDate',
   ],
-  gender: ['gender', 'Gender', 'sex', 'Sex'],
+  gender: ['gender', 'Gender', 'Gender (optional)', 'sex', 'Sex'],
   student_id: [
     'student_id',
     'Student ID',
@@ -1080,6 +1084,12 @@ export class BulkImportService {
    */
   private normalizeDate(val: unknown): string | undefined {
     if (val == null || val === '') return undefined;
+    if (val instanceof Date) {
+      if (!Number.isNaN(val.getTime())) {
+        return val.toISOString().slice(0, 10);
+      }
+      return undefined;
+    }
     if (typeof val === 'string') {
       const trimmed = val.trim();
       if (!trimmed) return undefined;

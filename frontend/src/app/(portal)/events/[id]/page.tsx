@@ -34,7 +34,14 @@ export default function EventDetailPage() {
   const { user } = useAuth();
   const { data: eventData, isLoading } = useEvent(eventId);
   const { data: conflictsData } = useEventConflicts(eventId);
-  const { data: consentsData } = useEventConsents(eventId);
+  const canViewConsentStats =
+    user?.roles?.some(
+      (r) =>
+        r.roleName === 'school_admin' ||
+        r.roleName === 'academic_coordinator' ||
+        r.roleName === 'class_teacher',
+    ) ?? false;
+  const { data: consentsData } = useEventConsents(eventId, { enabled: canViewConsentStats });
 
   const event = eventData?.data;
   const conflicts = conflictsData?.data;
@@ -267,8 +274,8 @@ export default function EventDetailPage() {
               </Alert>
             )}
 
-          {/* Consent Statistics (Admin only) */}
-          {isAdmin && event.requiresConsent && (
+          {/* Consent Statistics (Admin + Class Teacher) */}
+          {canViewConsentStats && event.requiresConsent && (
             <Paper p="md" withBorder>
               <Stack gap="md">
                 <Group>
@@ -276,14 +283,18 @@ export default function EventDetailPage() {
                   <Text fw={500}>{t('consentStatistics')}</Text>
                 </Group>
                 <Group>
-                  <Badge color="green" leftSection={<IconCheck size={12} />}>
+                  <Badge variant="light" color="green" leftSection={<IconCheck size={12} />}>
                     {t('approved')}: {consentStats.approved}
                   </Badge>
-                  <Badge color="red" leftSection={<IconX size={12} />}>
+                  <Badge variant="light" color="red" leftSection={<IconX size={12} />}>
                     {t('rejected')}: {consentStats.rejected}
                   </Badge>
-                  <Badge color="yellow">{t('pending')}: {consentStats.pending}</Badge>
-                  <Badge color="gray">{t('total')}: {consentStats.total}</Badge>
+                  <Badge variant="light" color="yellow">
+                    {t('pending')}: {consentStats.pending}
+                  </Badge>
+                  <Badge variant="light" color="gray">
+                    {t('total')}: {consentStats.total}
+                  </Badge>
                 </Group>
 
                 {consents.length > 0 && (

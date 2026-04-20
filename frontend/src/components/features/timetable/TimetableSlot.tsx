@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Card, Stack, Text, Group, useMantineTheme } from '@mantine/core';
+import { Badge, Card, Stack, Text, Group, useMantineTheme, alpha } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import type { TimetableSlot } from '@/types/timetable';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
@@ -60,6 +60,8 @@ export function TimetableSlotComponent({
   };
   const timeRange = `${formatTime(slot.startTime)}-${formatTime(slot.endTime)}`;
 
+  const conflictBackgroundColor = isDark ? alpha(theme.colors.red[8], 0.25) : theme.colors.red[0];
+
   // Get period name
   const periodName = slot.subjectName 
     ? slot.subjectName 
@@ -78,9 +80,7 @@ export function TimetableSlotComponent({
           cursor: onClick ? 'pointer' : 'default',
           height: '100%',
           border: showConflict ? '3px solid var(--mantine-color-red-7)' : undefined,
-          backgroundColor: showConflict 
-            ? 'var(--mantine-color-red-0)' 
-            : cardBackgroundColor,
+          backgroundColor: showConflict ? conflictBackgroundColor : cardBackgroundColor,
           transition: 'all 0.2s',
           position: 'relative',
           display: 'flex',
@@ -151,9 +151,7 @@ export function TimetableSlotComponent({
         cursor: onClick ? 'pointer' : 'default',
         height: '100%',
         border: showConflict ? '3px solid var(--mantine-color-red-7)' : undefined,
-        backgroundColor: showConflict
-          ? 'var(--mantine-color-red-0)'
-          : cardBackgroundColor,
+        backgroundColor: showConflict ? conflictBackgroundColor : cardBackgroundColor,
         transition: 'all 0.2s',
         position: 'relative',
         padding: '4px 6px',

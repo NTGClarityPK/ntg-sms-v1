@@ -33,6 +33,19 @@ function DevServiceWorkerCleanup() {
   return null;
 }
 
+/** Remove legacy locale storage key (cookie is the single source of truth). */
+function LegacyLocaleStorageCleanup() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem('locale');
+    } catch {
+      // Non-blocking
+    }
+  }, []);
+  return null;
+}
+
 /** Auth routes where theme must be default green, not tenant primary */
 function isAuthRoute(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -70,6 +83,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ThemeWrapper>
         <InstallAppProvider>
           <LocaleRepairRefresh />
+          <LegacyLocaleStorageCleanup />
           <DevServiceWorkerCleanup />
           <Notifications />
           <SafariInstallModal />

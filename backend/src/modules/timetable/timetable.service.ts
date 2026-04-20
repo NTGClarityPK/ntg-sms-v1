@@ -1821,6 +1821,9 @@ export class TimetableService {
 
     // Check for invalid school days
     for (const slot of slotsArray) {
+      // Break/assembly slots are non-instructional and are often present even when the school day
+      // configuration is incomplete. Do not surface them as conflicts.
+      if (slot.slot_type === 'break' || slot.slot_type === 'assembly') continue;
       if (!activeDays.includes(slot.day_of_week)) {
         const csInfo = getClassSectionInfo(slot.class_section_id);
         conflicts.push(

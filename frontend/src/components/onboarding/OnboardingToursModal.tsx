@@ -81,7 +81,7 @@ export function OnboardingToursModal({ opened, onClose }: Props) {
     >
       <Stack gap="sm">
         <Text size="sm" c="dimmed">
-          (Optimized for laptops and desktops)
+          (Optimized for viewing on laptops and desktops)
         </Text>
         <Text size="sm" c="dimmed">
           Choose a guided tour below, or launch one anytime from your profile menu (top-right corner).

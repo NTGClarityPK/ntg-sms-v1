@@ -51,6 +51,9 @@ export function usePermissions() {
         return ['events_personal', 'my_events', 'events'];
       case 'timetable_management':
         return ['timetable_management', 'timetable'];
+      case 'conflict_management':
+        // Backward-safe: historically /conflict-management was gated by timetable_management.
+        return ['conflict_management', 'timetable_management', 'timetable'];
       case 'timetable_personal':
       case 'my_timetable':
       case 'my_schedule':

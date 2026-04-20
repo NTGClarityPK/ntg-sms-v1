@@ -76,11 +76,6 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       'en-US';
     const locale = normalizeUiLocale(rawPreferred);
     setUiLocaleCookieOnDocument(locale);
-    try {
-      localStorage.setItem('locale', locale);
-    } catch {
-      // Non-blocking
-    }
 
     const roles = userData.roles ?? [];
     const normalisedRoleNames = roles

@@ -154,11 +154,6 @@ export default function AuthCallbackPage() {
           userData.preferredLocale ?? userData.preferred_locale ?? 'en-US';
         const locale = normalizeUiLocale(rawPreferred);
         setUiLocaleCookieOnDocument(locale);
-        try {
-          localStorage.setItem('locale', locale);
-        } catch {
-          // Non-blocking
-        }
 
         if (roleNames.includes('super_admin')) {
           setStepMsg(2, 'Taking you to admin portal...');

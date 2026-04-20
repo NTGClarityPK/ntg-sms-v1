@@ -636,7 +636,9 @@ export class GradesService {
     throwIfDbError(studentError);
 
     if (!student) {
-      throw new NotFoundException('Student not found.');
+      // Safe behaviour: if the student isn't present in the active academic year for this branch,
+      // return no grades rather than a 404 (prevents noisy logs/failed widgets).
+      return [];
     }
 
     const { data, error } = await supabase

@@ -1222,10 +1222,12 @@ export class EventsService {
   ): Promise<{ data: EventDto[] }> {
     const supabase = this.supabaseConfig.getClient();
 
+    // IMPORTANT:
+    // "My Events" should not become empty just because the branch active academic year
+    // differs from the academic year used when the event was created or when the student
+    // was placed into a class section. We still try to use the active year to resolve
+    // class-section based participation, but we never hard-filter the final event list by it.
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
-    if (!activeYear) {
-      throw new BadRequestException('No active academic year found');
-    }
 
     let eventIds: string[] = [];
     let currentStudentId: string | null = null;
@@ -1266,8 +1268,7 @@ export class EventsService {
           const { data: classSections } = await supabase
             .from('class_sections')
             .select('id, class_id, section_id, branch_id, academic_year_id')
-            .eq('branch_id', branchId)
-            .eq('academic_year_id', activeYear.id);
+            .eq('branch_id', branchId);
 
           const classSectionIds: string[] = [];
           for (const cs of classSections || []) {
@@ -1316,8 +1317,7 @@ export class EventsService {
           .from('class_sections')
           .select('id')
           .eq('class_teacher_id', (staff as { id: string }).id)
-          .eq('branch_id', branchId)
-          .eq('academic_year_id', activeYear.id);
+          .eq('branch_id', branchId);
 
         const classSectionIds = [
           ...new Set((classSections || []).map((cs) => cs.id as string)),
@@ -1340,8 +1340,7 @@ export class EventsService {
           .from('teacher_assignments')
           .select('class_section_id')
           .eq('staff_id', (staff as { id: string }).id)
-          .eq('branch_id', branchId)
-          .eq('academic_year_id', activeYear.id);
+          .eq('branch_id', branchId);
 
         const assignedClassSectionIds = [
           ...new Set(
@@ -1394,7 +1393,6 @@ export class EventsService {
             .eq('class_id', studentData.class_id)
             .eq('section_id', studentData.section_id)
             .eq('branch_id', branchId)
-            .eq('academic_year_id', activeYear.id)
             .maybeSingle();
 
           if (classSection) {
@@ -1423,7 +1421,6 @@ export class EventsService {
       .select('*')
       .in('id', eventIds)
       .eq('branch_id', branchId)
-      .eq('academic_year_id', activeYear.id)
       .order('start_date', { ascending: true });
 
     throwIfDbError(error);

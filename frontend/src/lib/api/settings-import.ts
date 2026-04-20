@@ -50,7 +50,10 @@ export const settingsImportApi = {
     const response = await apiClient.post<SettingsImportValidateResult>(
       '/api/v1/settings-import/validate',
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
+      },
     );
     return response.data;
   },
@@ -59,6 +62,7 @@ export const settingsImportApi = {
     const response = await apiClient.post<SettingsImportApplyResult>(
       '/api/v1/settings-import/apply',
       { validationToken },
+      { timeout: 180000 },
     );
     return response.data;
   },

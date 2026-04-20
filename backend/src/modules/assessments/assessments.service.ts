@@ -133,6 +133,85 @@ export class AssessmentsService {
     private readonly storageService: StorageService,
   ) {}
 
+  private async notifyAssessmentPublished(params: {
+    assessmentId: string;
+    assessmentTitle: string;
+    classSectionId: string;
+    academicYearId: string;
+    branchId: string;
+  }): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const classSection = await this.classSectionsService.getClassSectionById(
+      params.classSectionId,
+      params.branchId,
+    );
+
+    // Active students for this class/section/year via enrolments.
+    const { data: enrolments, error: enrolErr } = await supabase
+      .from('student_enrolments')
+      .select('student_id')
+      .eq('class_id', classSection.classId)
+      .eq('section_id', classSection.sectionId)
+      .eq('branch_id', params.branchId)
+      .eq('academic_year_id', params.academicYearId)
+      .eq('status', 'active');
+    throwIfDbError(enrolErr);
+
+    const studentIds = (enrolments ?? [])
+      .map((e) => (e as { student_id?: string }).student_id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    if (studentIds.length === 0) return;
+
+    const { data: students, error: studentsErr } = await supabase
+      .from('students')
+      .select('id, user_id')
+      .in('id', studentIds)
+      .eq('branch_id', params.branchId)
+      .eq('is_active', true);
+    throwIfDbError(studentsErr);
+
+    const studentUserIds = (students ?? [])
+      .map((s) => (s as { user_id?: string | null }).user_id ?? null)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+    // Parent recipients for these students (if any).
+    const { data: parentLinks, error: parentErr } = await supabase
+      .from('parent_students')
+      .select('parent_user_id, student_id')
+      .in('student_id', studentIds);
+    throwIfDbError(parentErr);
+
+    const parentUserIds = (parentLinks ?? [])
+      .map((p) => (p as { parent_user_id?: string | null }).parent_user_id ?? null)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+    const recipientUserIds = Array.from(
+      new Set<string>([...studentUserIds, ...parentUserIds]),
+    );
+    if (recipientUserIds.length === 0) return;
+
+    const title = 'New assessment published';
+    const body = `A new assessment "${params.assessmentTitle}" has been published.`;
+    const type = 'assessment_published';
+
+    // Create one in-app notification per recipient; NotificationsService will also trigger push (if configured).
+    await Promise.allSettled(
+      recipientUserIds.map((userId) =>
+        this.notificationsService.createNotification({
+          userId,
+          type,
+          title,
+          body,
+          data: {
+            assessmentId: params.assessmentId,
+            classSectionId: params.classSectionId,
+          },
+        }),
+      ),
+    );
+  }
+
   async listAssessments(
     query: QueryAssessmentsDto,
     branchId: string,
@@ -480,6 +559,19 @@ export class AssessmentsService {
         .catch(() => {});
     }
 
+    // If assessment is created as published, notify recipients immediately.
+    for (const row of data as AssessmentRow[]) {
+      if (row.is_published) {
+        this.notifyAssessmentPublished({
+          assessmentId: row.id,
+          assessmentTitle: row.title,
+          classSectionId: row.class_section_id,
+          academicYearId: row.academic_year_id,
+          branchId,
+        }).catch(() => {});
+      }
+    }
+
     const firstAssessmentId = (data[0] as AssessmentRow).id;
     if (input.draftId) {
       await this.commitDraftToAssessment(
@@ -655,6 +747,15 @@ export class AssessmentsService {
     if (!data) {
       throw new NotFoundException('Assessment not found');
     }
+
+    // Notify students + linked parents that the assessment is now published.
+    this.notifyAssessmentPublished({
+      assessmentId: (data as AssessmentRow).id,
+      assessmentTitle: (data as AssessmentRow).title,
+      classSectionId: (data as AssessmentRow).class_section_id,
+      academicYearId: (data as AssessmentRow).academic_year_id,
+      branchId,
+    }).catch(() => {});
 
     return mapAssessment(data as AssessmentRow);
   }

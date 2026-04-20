@@ -88,6 +88,7 @@ export default function NotificationsPage() {
         return notifyColors.warning;
       case 'grade':
       case 'assessment_read':
+      case 'assessment_published':
         return notifyColors.success;
       case 'event':
       case 'event_created':
@@ -128,6 +129,8 @@ export default function NotificationsPage() {
     } else if (notification.type === 'assessment_read' && notification.data) {
       const assessmentId = notification.data.assessmentId as string | undefined;
       router.push(assessmentId ? `/assessments/${assessmentId}/statistics` : '/assessments');
+    } else if (notification.type === 'assessment_published') {
+      router.push('/my-assessments');
     }
   };
 

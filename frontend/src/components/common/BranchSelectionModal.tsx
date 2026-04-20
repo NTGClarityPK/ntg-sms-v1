@@ -85,7 +85,7 @@ export function BranchSelectionModal({
           fullWidth
           onClick={handleContinue}
           disabled={!selectedBranchId}
-          loading={loading}
+          loading={loading && !!selectedBranchId}
           size="lg"
           style={{
             backgroundColor: colors.primary,

@@ -290,7 +290,9 @@ export function TimetableGrid({
                   const height = Math.max(bottom - top, 24);
                   const overlapInfo = overlapColumnLayout.get(slot.id) ?? { index: 0, count: 1 };
                   const hasOverlapLayout = overlapInfo.count > 1;
-                  const hasConflict = conflictSlotIds.has(slot.id) || hasOverlapLayout;
+                  // IMPORTANT: overlap layout is a rendering concern, not a conflict.
+                  // Only show conflict styling when backend reports a conflict for this slot.
+                  const hasConflict = conflictSlotIds.has(slot.id);
 
                   // Calculate duration to determine if compact layout needed
                   const durationMinutes = endMinutes - startMinutes;

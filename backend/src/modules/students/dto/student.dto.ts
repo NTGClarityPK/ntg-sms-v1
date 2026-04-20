@@ -10,6 +10,10 @@ export class StudentDto {
   admissionDate?: string;
   academicYearId?: string;
   isActive!: boolean;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female';
   /** Invitation / login lifecycle (independent of admin is_active for suspended accounts). */
   accountStatus!: 'active' | 'pending_verification' | 'link_expired';
   createdAt!: string;

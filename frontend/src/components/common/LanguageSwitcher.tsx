@@ -31,9 +31,6 @@ export function LanguageSwitcher() {
   const handleChange = async (value: string) => {
     const next = normalizeUiLocale(value);
     setUiLocaleCookieOnDocument(next);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('locale', next);
-    }
     try {
       // Avoid noisy 401s during logout/expired sessions: only persist to backend when authenticated.
       const {

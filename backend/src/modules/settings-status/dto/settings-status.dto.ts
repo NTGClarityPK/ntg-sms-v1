@@ -1,3 +1,5 @@
+import { IsUUID } from 'class-validator';
+
 export class SettingsStatusDto {
   academicYear!: boolean;
   academic!: boolean;
@@ -15,6 +17,7 @@ export class SettingsStatusDto {
 }
 
 export class CopySettingsDto {
+  @IsUUID()
   sourceBranchId!: string;
 }
 

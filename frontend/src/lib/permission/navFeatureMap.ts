@@ -33,7 +33,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/my-schedule': 'timetable_personal',
   '/my-timetable': 'timetable_personal',
   '/timetable': 'timetable_management',
-  '/conflict-management': 'timetable_management',
+  '/conflict-management': 'conflict_management',
   '/promotion-placement': 'students',
   '/reports': 'reports',
   '/results': 'reports',

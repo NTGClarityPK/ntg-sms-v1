@@ -92,7 +92,10 @@ export function useEvent(id: string | undefined) {
 /**
  * Hook to get consents for an event (admin only)
  */
-export function useEventConsents(eventId: string | undefined) {
+export function useEventConsents(
+  eventId: string | undefined,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ['events', eventId, 'consents'],
     queryFn: async () => {
@@ -102,7 +105,7 @@ export function useEventConsents(eventId: string | undefined) {
       // apiClient.get() returns ApiResponse<EventConsent[]> = { data: EventConsent[] }
       return response;
     },
-    enabled: !!eventId,
+    enabled: !!eventId && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 1, // 1 minute
   });
 }
