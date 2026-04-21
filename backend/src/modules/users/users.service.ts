@@ -549,7 +549,8 @@ export class UsersService {
           address: input.address ?? null,
           date_of_birth: input.dateOfBirth ?? null,
           gender: input.gender ?? null,
-          is_active: input.isActive ?? true,
+          // Parents should remain pending until they complete account setup via invitation.
+          is_active: userType === 'parent' ? false : (input.isActive ?? true),
         })
         .select()
         .single();

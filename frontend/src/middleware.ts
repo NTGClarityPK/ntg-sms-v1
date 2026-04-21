@@ -1,9 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
-  normalizeUiLocale,
-  resolveLocaleFromCookieHeader,
-  resolveLocaleFromServerCookieValues,
+  normalizedUiLocaleFromCookieJarEntry,
+  resolveUiLocaleForRequest,
   UI_LOCALE_COOKIE,
   UI_LOCALE_COOKIE_MAX_AGE,
 } from '@/lib/ui-locale';
@@ -17,15 +16,19 @@ export async function middleware(request: NextRequest) {
   // Self-heal: if multiple/invalid locale cookies exist, rewrite one canonical cookie.
   // This prevents non-deterministic locale selection on refresh.
   try {
+    const cookieHeaderStr = request.headers.get('cookie');
     const all = request.cookies.getAll(UI_LOCALE_COOKIE).map((c) => c.value);
     if (all.length > 0) {
-      const resolved =
-        resolveLocaleFromCookieHeader(request.headers.get('cookie')) ??
-        resolveLocaleFromServerCookieValues(all);
+      const normalized = resolveUiLocaleForRequest({
+        cookieHeader: cookieHeaderStr,
+        cookieJarValues: all,
+      });
       const hasDuplicates = all.length > 1;
-      const anyInvalid = all.some((v) => normalizeUiLocale(v) !== v.trim());
-      if (hasDuplicates || anyInvalid) {
-        response.cookies.set(UI_LOCALE_COOKIE, resolved, {
+      const differsFromCanonical = all.some(
+        (v) => normalizedUiLocaleFromCookieJarEntry(v) !== normalized,
+      );
+      if (hasDuplicates || differsFromCanonical) {
+        response.cookies.set(UI_LOCALE_COOKIE, normalized, {
           path: '/',
           maxAge: UI_LOCALE_COOKIE_MAX_AGE,
           sameSite: 'lax',

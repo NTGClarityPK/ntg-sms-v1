@@ -1189,22 +1189,25 @@ export class StudentsService {
         }
 
         // Ensure parent has profile, branch, role (idempotent)
-        const { error: parentProfileError } = await supabase.from('profiles').upsert(
-          {
-            id: parentUserIdToUse,
-            full_name: parentName,
-            avatar_url: null,
-            phone: input.parentPhone ?? null,
-            address: null,
-            date_of_birth: null,
-            gender: null,
-            is_active: true,
-            current_branch_id: branchId,
-            created_by: username,
-            updated_by: username,
-          },
-          { onConflict: 'id' },
-        );
+        const parentProfileUpsertPayload: Record<string, unknown> = {
+          id: parentUserIdToUse,
+          full_name: parentName,
+          avatar_url: null,
+          phone: input.parentPhone ?? null,
+          address: null,
+          date_of_birth: null,
+          gender: null,
+          // Parents should remain pending until they complete account setup.
+          // Only set `is_active` for newly created parents; do not override existing parents.
+          ...(createdNewParent ? { is_active: false } : {}),
+          current_branch_id: branchId,
+          created_by: username,
+          updated_by: username,
+        };
+
+        const { error: parentProfileError } = await supabase
+          .from('profiles')
+          .upsert(parentProfileUpsertPayload, { onConflict: 'id' });
         throwIfDbError(parentProfileError);
 
         const { error: parentBranchError } = await supabase.from('user_branches').upsert(

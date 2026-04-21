@@ -64,6 +64,15 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
   const roles = rolesData?.data || [];
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
+  const invitationTypeForUser = (u: User): 'student' | 'parent_account' | 'staff' => {
+    const roleNames = (u.roles ?? []).map((r) => (r.roleName || '').trim().toLowerCase());
+    const isParent = roleNames.some((n) => ['parent', 'guardian', 'father', 'mother'].includes(n));
+    if (isParent) return 'parent_account';
+    const isStudent = roleNames.some((n) => n === 'student');
+    if (isStudent) return 'student';
+    return 'staff';
+  };
+
   const handleEdit = (user: User) => {
     setSelectedUser(user);
     open();
@@ -358,7 +367,7 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                 if (!resendUser) return;
                 const result = await resend.mutateAsync({
                   userId: resendUser.id,
-                  invitationType: 'student',
+                  invitationType: invitationTypeForUser(resendUser),
                   recipientEmail: recipientEmail.trim() || undefined,
                 });
                 const usedEmail =

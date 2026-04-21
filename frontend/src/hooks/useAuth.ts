@@ -4,11 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import {
   getUiLocaleCookieFromDocument,
-  isSupportedUiLocale,
   LOCALE_REPAIR_REFRESH_FLAG,
   normalizeUiLocale,
+  readResolvedUiLocaleFromBrowser,
   setUiLocaleCookieOnDocument,
 } from '@/lib/ui-locale';
+import { syncProfilePreferredLocaleWithCookie } from '@/lib/locale-preference-sync';
 import { User } from '@/types/auth';
 
 function isEnglishFamily(l: string): boolean {
@@ -25,23 +26,40 @@ async function fetchCurrentUser(): Promise<User> {
     const preferredNorm = normalizeUiLocale(rawPreferred ?? 'en-US');
 
     const cookieRaw = getUiLocaleCookieFromDocument();
-    const cookieNorm =
-      cookieRaw != null && cookieRaw.trim() !== '' ? normalizeUiLocale(cookieRaw) : null;
+    const cookieNorm = readResolvedUiLocaleFromBrowser();
 
-    const cookieMissingOrInvalid =
-      cookieRaw == null || cookieRaw.trim() === '' || !isSupportedUiLocale(cookieRaw);
+    // Profile says English but cookie resolved to Arabic (repair legacy mismatch).
+    const needsEnglishRepair =
+      cookieNorm != null &&
+      isEnglishFamily(preferredNorm) &&
+      cookieNorm === 'ar';
 
-    const shouldSyncFromApi =
-      cookieMissingOrInvalid || (isEnglishFamily(preferredNorm) && cookieNorm === 'ar');
+    // When NEXT_LOCALE is missing in the browser, the server may still render English (default)
+    // while preferred_locale is Arabic — never push profile into the cookie here or the next
+    // refresh will follow the new cookie and flip the UI. Align the cookie with what we already
+    // rendered: <html lang> from the root layout (next-intl / resolveUiLocaleForRequest).
+    const cookieAbsent = cookieRaw == null || cookieRaw.trim() === '';
 
-    if (shouldSyncFromApi) {
-      setUiLocaleCookieOnDocument(preferredNorm);
+    const shouldRepairLocaleCookie = needsEnglishRepair || cookieAbsent;
+
+    if (shouldRepairLocaleCookie) {
+      const nextLocale = needsEnglishRepair
+        ? preferredNorm
+        : normalizeUiLocale(document.documentElement?.lang?.trim() || 'en-US');
+      setUiLocaleCookieOnDocument(nextLocale);
       try {
         window.sessionStorage.setItem(LOCALE_REPAIR_REFRESH_FLAG, '1');
       } catch {
         // Non-blocking
       }
     }
+
+    // Single source of truth: NEXT_LOCALE drives SSR; DB preference follows the cookie when they differ.
+    const finalCookieNorm = readResolvedUiLocaleFromBrowser();
+    await syncProfilePreferredLocaleWithCookie({
+      cookieNorm: finalCookieNorm,
+      profilePreferredRaw: rawPreferred,
+    });
   }
 
   return user;

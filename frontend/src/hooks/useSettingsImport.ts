@@ -27,14 +27,19 @@ export function useSettingsImportApply() {
   return useMutation({
     mutationFn: (validationToken: string): Promise<SettingsImportApplyResult> =>
       settingsImportApi.apply(validationToken),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settingsStatus'] });
-      queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      queryClient.invalidateQueries({ queryKey: ['classes'] });
-      queryClient.invalidateQueries({ queryKey: ['sections'] });
-      queryClient.invalidateQueries({ queryKey: ['levels'] });
-      queryClient.invalidateQueries({ queryKey: ['academicYears'] });
-      queryClient.invalidateQueries({ queryKey: ['assessmentTypes'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['auth', 'me'] }),
+        queryClient.invalidateQueries({ queryKey: ['settingsStatus'] }),
+        queryClient.invalidateQueries({ queryKey: ['permissions'] }),
+        queryClient.invalidateQueries({ queryKey: ['subjects'] }),
+        queryClient.invalidateQueries({ queryKey: ['classes'] }),
+        queryClient.invalidateQueries({ queryKey: ['sections'] }),
+        queryClient.invalidateQueries({ queryKey: ['levels'] }),
+        queryClient.invalidateQueries({ queryKey: ['academicYears'] }),
+        queryClient.invalidateQueries({ queryKey: ['assessmentTypes'] }),
+        queryClient.invalidateQueries({ queryKey: ['systemSettings'] }),
+      ]);
     },
   });
 }

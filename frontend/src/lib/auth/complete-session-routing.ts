@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/api-client';
 import type { Tenant } from '@/types/tenant';
 import { clearLocalSupabaseSession } from '@/lib/auth';
-import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
+import { applyPreferredLocaleToCookieOnlyIfUnset } from '@/lib/ui-locale';
 
 function formatApiErrorBodyMessage(
   data: { error?: { message?: string | string[] }; message?: string | string[] } | undefined,
@@ -74,8 +74,7 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       userData.preferredLocale ??
       (userData as { preferred_locale?: string }).preferred_locale ??
       'en-US';
-    const locale = normalizeUiLocale(rawPreferred);
-    setUiLocaleCookieOnDocument(locale);
+    applyPreferredLocaleToCookieOnlyIfUnset(rawPreferred);
 
     const roles = userData.roles ?? [];
     const normalisedRoleNames = roles

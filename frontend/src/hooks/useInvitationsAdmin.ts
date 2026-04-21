@@ -8,7 +8,7 @@ export function useResendInvitationForUser() {
   return useMutation({
     mutationFn: async (input: {
       userId: string;
-      invitationType: 'student' | 'parent';
+      invitationType: 'student' | 'parent' | 'parent_account' | 'staff';
       recipientEmail?: string;
     }) => {
       const res = await apiClient.post<{ token: string; expiresAt: string }>(

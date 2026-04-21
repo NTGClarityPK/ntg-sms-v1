@@ -41,7 +41,7 @@ export function LanguageSwitcher() {
         return;
       }
       await apiClient.patch('/api/v1/users/me/preferences', {
-        preferred_locale: value,
+        preferred_locale: next,
       });
       router.refresh();
     } catch {

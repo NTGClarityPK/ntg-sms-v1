@@ -390,7 +390,9 @@ export class InvitationsService {
       .eq('id', inv.id);
     throwIfDbError(usedError);
 
-    if (inv.invitation_type !== 'parent_account') {
+    if (inv.invitation_type === 'parent_account') {
+      await this.activateParentAfterPasswordSetup(inv.user_id);
+    } else {
       await this.activateStudentAfterPasswordSetup(inv.user_id);
     }
 
@@ -414,6 +416,28 @@ export class InvitationsService {
     if (error) {
       this.logger.warn(
         `Could not activate student after password setup for user ${userId}: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * When the invited user is a parent/guardian, move them from pending to active.
+   * Parent activation state is tracked on the profile row.
+   */
+  private async activateParentAfterPasswordSetup(userId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        is_active: true,
+        updated_at: now,
+      })
+      .eq('id', userId)
+      .eq('is_active', false);
+    if (error) {
+      this.logger.warn(
+        `Could not activate parent after password setup for user ${userId}: ${error.message}`,
       );
     }
   }
@@ -594,16 +618,33 @@ export class InvitationsService {
     const supabase = this.supabaseConfig.getClient();
     await this.enforceRateLimit(input.createdByUserId);
 
-    const { data, error } = await supabase
+    // First try: resend an unused invitation of the requested type (prevents mixing up parent/student/staff flows).
+    const { data: typedData, error: typedError } = await supabase
       .from('invitations')
       .select('*')
       .eq('user_id', input.userId)
+      .eq('invitation_type', input.invitationType)
       .is('used_at', null)
       .order('created_at', { ascending: false })
       .limit(1);
 
-    throwIfDbError(error);
-    const existing = (data as InvitationRow[] | null)?.[0] ?? null;
+    throwIfDbError(typedError);
+    const typedExisting = (typedData as InvitationRow[] | null)?.[0] ?? null;
+
+    // Fallback (robustness): if UI sent the wrong type, still allow resend of the latest unused invitation
+    // WITHOUT mutating its invitation_type (otherwise we corrupt the record and email template).
+    const existing = await (async (): Promise<InvitationRow | null> => {
+      if (typedExisting) return typedExisting;
+      const { data: anyData, error } = await supabase
+        .from('invitations')
+        .select('*')
+        .eq('user_id', input.userId)
+        .is('used_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      throwIfDbError(error);
+      return (anyData as InvitationRow[] | null)?.[0] ?? null;
+    })();
     if (!existing) {
       throw new NotFoundException('No active invitation found for this user');
     }
@@ -611,7 +652,9 @@ export class InvitationsService {
     return this.resendInvitation({
       invitationId: existing.id,
       recipientEmailOverride: input.recipientEmailOverride,
-      invitationTypeOverride: input.invitationType,
+      // Only override when we actually matched the requested type; otherwise preserve the original type.
+      invitationTypeOverride:
+        existing.invitation_type === input.invitationType ? input.invitationType : undefined,
       createdByUserId: input.createdByUserId,
       userEmailForAudit: input.userEmailForAudit,
       branchId: input.branchId,

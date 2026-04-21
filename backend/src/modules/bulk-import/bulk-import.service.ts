@@ -227,6 +227,7 @@ export class BulkImportService {
   private readonly sectionIdCache = new Map<string, string | null>();
   private readonly templateIdCache = new Map<string, string | null>();
   private readonly classTemplateLinkCache = new Map<string, boolean>();
+  private readonly classLevelIdsCache = new Map<string, string[]>(); // key: `${branchId}::${classId}`
 
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
@@ -241,7 +242,7 @@ export class BulkImportService {
     supabase: SupabaseClient,
     branchId: string,
   ): Promise<PlacementRefs> {
-    const [classesRes, sectionsRes, templatesRes, assignmentsRes] = await Promise.all([
+    const [classesRes, sectionsRes, templatesRes, assignmentsRes, levelClassesRes] = await Promise.all([
       supabase
         .from('classes')
         .select('id, name, display_name')
@@ -255,6 +256,8 @@ export class BulkImportService {
         .from('class_subject_template_assignments')
         .select('class_id, subject_template_id')
         .eq('branch_id', branchId),
+      // Note: `level_classes` is used elsewhere without `branch_id` filtering.
+      supabase.from('level_classes').select('class_id, level_id'),
     ]);
 
     const classes = (classesRes.data ?? []) as Array<{
@@ -267,6 +270,10 @@ export class BulkImportService {
     const assignments = (assignmentsRes.data ?? []) as Array<{
       class_id: string;
       subject_template_id: string;
+    }>;
+    const levelClasses = (levelClassesRes.data ?? []) as Array<{
+      class_id: string;
+      level_id: string;
     }>;
 
     const classById = new Map<string, { id: string; name: string; displayName: string | null }>();
@@ -299,6 +306,33 @@ export class BulkImportService {
       classTemplateLinks.add(`${a.class_id}::${a.subject_template_id}`);
     }
 
+    // Expand links via level assignments:
+    // level_subject_template_assignments + level_classes => treat as linked to all classes in those levels.
+    const levelIds = Array.from(new Set(levelClasses.map((lc) => lc.level_id).filter(Boolean)));
+    if (levelIds.length > 0) {
+      const { data: levelAssignments } = await supabase
+        .from('level_subject_template_assignments')
+        .select('level_id, subject_template_id')
+        .in('level_id', levelIds)
+        .eq('branch_id', branchId);
+
+      const templateIdsByLevelId = new Map<string, string[]>();
+      for (const la of (levelAssignments ?? []) as Array<{ level_id: string; subject_template_id: string }>) {
+        const list = templateIdsByLevelId.get(la.level_id) ?? [];
+        list.push(la.subject_template_id);
+        templateIdsByLevelId.set(la.level_id, list);
+      }
+
+      for (const lc of levelClasses) {
+        const templateIds = templateIdsByLevelId.get(lc.level_id) ?? [];
+        if (templateIds.length === 0) continue;
+        classHasAnyTemplates.add(lc.class_id);
+        for (const tid of templateIds) {
+          classTemplateLinks.add(`${lc.class_id}::${tid}`);
+        }
+      }
+    }
+
     return {
       classById,
       classIdByNameLower,
@@ -309,6 +343,32 @@ export class BulkImportService {
       classHasAnyTemplates,
       classTemplateLinks,
     };
+  }
+
+  private async getLevelIdsForClass(
+    supabase: SupabaseClient,
+    classId: string,
+    branchId: string,
+  ): Promise<string[]> {
+    const cacheKey = `${branchId}::${classId}`;
+    const cached = this.classLevelIdsCache.get(cacheKey);
+    if (cached) return cached;
+
+    const { data, error } = await supabase
+      .from('level_classes')
+      .select('level_id')
+      .eq('class_id', classId);
+    if (error) return [];
+
+    const ids = Array.from(
+      new Set(
+        ((data ?? []) as Array<{ level_id: string }>)
+          .map((r) => r.level_id)
+          .filter(Boolean),
+      ),
+    );
+    this.classLevelIdsCache.set(cacheKey, ids);
+    return ids;
   }
 
   private resolvePlacementForRowFromRefs(
@@ -589,7 +649,23 @@ export class BulkImportService {
       .eq('branch_id', branchId)
       .limit(1)
       .maybeSingle();
-    const linked = !!data;
+    let linked = !!data;
+
+    // Accept level-based assignment (level_subject_template_assignments + level_classes).
+    if (!linked) {
+      const levelIds = await this.getLevelIdsForClass(supabase, classId, branchId);
+      if (levelIds.length > 0) {
+        const { data: levelLink } = await supabase
+          .from('level_subject_template_assignments')
+          .select('level_id')
+          .in('level_id', levelIds)
+          .eq('subject_template_id', subjectTemplateId)
+          .eq('branch_id', branchId)
+          .limit(1)
+          .maybeSingle();
+        linked = !!levelLink;
+      }
+    }
     this.classTemplateLinkCache.set(cacheKey, linked);
     return linked;
   }
@@ -606,7 +682,18 @@ export class BulkImportService {
       .eq('class_id', classId)
       .eq('branch_id', branchId)
       .limit(1);
-    return (data ?? []).length > 0;
+    if ((data ?? []).length > 0) return true;
+
+    const levelIds = await this.getLevelIdsForClass(supabase, classId, branchId);
+    if (levelIds.length === 0) return false;
+
+    const { data: levelAssignments } = await supabase
+      .from('level_subject_template_assignments')
+      .select('id')
+      .in('level_id', levelIds)
+      .eq('branch_id', branchId)
+      .limit(1);
+    return (levelAssignments ?? []).length > 0;
   }
 
   private async resolvePlacementForRow(
