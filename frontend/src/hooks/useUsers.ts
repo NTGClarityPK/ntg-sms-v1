@@ -179,6 +179,9 @@ export function useDeleteUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', branchId] });
+      // Deactivating a user can affect staff pickers (teacher mapping, timetable, etc.)
+      // which read from `useStaff()` and are cached for a while.
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
       notifications.show({
         title: 'Success',
         message: 'User deactivated successfully',

@@ -6,7 +6,7 @@
  */
 
 import { useTranslations } from 'next-intl';
-import { Title, Paper, Stack, Text, Skeleton, Group, Button } from '@mantine/core';
+import { Title, Paper, Stack, Text, Skeleton, Group, Button, Badge } from '@mantine/core';
 import { useRouter, useParams } from 'next/navigation';
 import { useAssessment } from '@/hooks/api/useAssessments';
 import { GradeEntrySheet } from '@/components/assessments/GradeEntrySheet';
@@ -21,6 +21,9 @@ export default function AssessmentGradesPage() {
   const assessmentId = params.id as string;
   const { data: assessmentData, isLoading } = useAssessment(assessmentId);
   const assessment = assessmentData; // Hook already returns response.data, so assessmentData is the Assessment directly
+
+  const subjectName = assessment?.subjectName;
+  const teacherName = assessment?.teacherName;
 
   if (isLoading) {
     return (
@@ -72,7 +75,19 @@ export default function AssessmentGradesPage() {
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>{canEdit ? t('gradeEntryTitle', { title: assessment.title }) : t('gradeTitle', { title: assessment.title })}</Title>
+          <Stack gap={4}>
+            <Title order={1}>
+              {canEdit ? t('gradeEntryTitle', { title: assessment.title }) : t('gradeTitle', { title: assessment.title })}
+            </Title>
+            <Group gap="xs" wrap="wrap">
+              <Badge variant="light" color="blue">
+                {t('subject')}: {subjectName ?? '—'}
+              </Badge>
+              <Badge variant="light" color="teal">
+                {t('postedBy')}: {teacherName ?? '—'}
+              </Badge>
+            </Group>
+          </Stack>
           <Button variant="subtle" onClick={() => router.back()}>
             {tCommon('back')}
           </Button>

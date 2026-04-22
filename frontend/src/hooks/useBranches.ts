@@ -123,8 +123,11 @@ export function useAssignBranchToTenant() {
 
   return useMutation({
     mutationFn: async (payload: AssignBranchToTenantPayload) => {
-      const res = await apiClient.post<BranchDetails>('/api/v1/branches/assign-to-tenant', payload);
-      return res;
+      const res = await apiClient.post<ApiResponse<BranchDetails>>(
+        '/api/v1/branches/assign-to-tenant',
+        payload,
+      );
+      return res.data.data;
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: branchesKeys.all });

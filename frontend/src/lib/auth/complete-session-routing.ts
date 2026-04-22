@@ -2,6 +2,7 @@ import { apiClient } from '@/lib/api-client';
 import type { Tenant } from '@/types/tenant';
 import { clearLocalSupabaseSession } from '@/lib/auth';
 import { applyPreferredLocaleToCookieOnlyIfUnset } from '@/lib/ui-locale';
+import { queryClient } from '@/lib/query-client';
 
 function formatApiErrorBodyMessage(
   data: { error?: { message?: string | string[] }; message?: string | string[] } | undefined,
@@ -41,6 +42,10 @@ export async function selectBranchAndGoDashboard(
   await apiClient.post('/api/v1/auth/select-branch', { branchId });
   localStorage.setItem('currentBranchId', branchId);
 
+  // Ensure the dashboard doesn't mount with a cached `auth/me` missing currentBranch.
+  // (React Query has a 5m staleTime; without this, it may not refetch immediately after login.)
+  queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+
   try {
     const tenantResponse = await apiClient.get<Tenant>('/api/v1/tenants/me');
     const tenantTheme = tenantResponse.data?.primaryColor;
@@ -66,6 +71,7 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       preferred_locale?: string;
       roles?: Array<{ roleName?: string }>;
       branches?: BranchForSelection[];
+      currentBranch?: BranchForSelection | null;
     }>('/api/v1/auth/me');
 
     const userData = userResponse.data ?? {};
@@ -88,17 +94,38 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       return;
     }
 
+    // IMPORTANT: Portal routes assume a branch exists (many queries are branch-gated).
+    // Ensure a branch is selected before navigating to /dashboard for any non-super-admin user.
+    const userBranches = (userData.branches || []) as BranchForSelection[];
+    if (userBranches.length === 0) {
+      setError('No branches assigned to your account. Please contact your administrator.');
+      setLoading?.(false);
+      return;
+    }
+    const branchHint = typeof window !== 'undefined' ? window.localStorage.getItem('currentBranchId') : null;
+    const desiredBranchId =
+      userData.currentBranch?.id ??
+      (branchHint && branchHint.trim() !== '' ? branchHint : null) ??
+      userBranches[0]?.id ??
+      null;
+
+    if (desiredBranchId) {
+      try {
+        await apiClient.post('/api/v1/auth/select-branch', { branchId: desiredBranchId });
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('currentBranchId', desiredBranchId);
+        }
+        // Ensure the dashboard doesn't mount with a cached `auth/me` missing currentBranch.
+        queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+      } catch {
+        // Non-blocking: user may still be able to continue (e.g. header branch picker).
+      }
+    }
+
     const isSchoolAdmin = normalisedRoleNames.includes('school_admin');
 
     if (!isSchoolAdmin) {
       router.push('/dashboard');
-      setLoading?.(false);
-      return;
-    }
-    const userBranches = (userData.branches || []) as BranchForSelection[];
-
-    if (userBranches.length === 0) {
-      setError('No branches assigned to your account. Please contact your administrator.');
       setLoading?.(false);
       return;
     }

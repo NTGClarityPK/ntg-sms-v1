@@ -45,30 +45,13 @@ export default function SubjectTemplatesPage() {
 
   const handleCreate = async (values: SubjectTemplateFormValues) => {
     try {
-      const created = await createTemplate.mutateAsync({
+      await createTemplate.mutateAsync({
         name: values.name,
         description: values.description,
         subjectIds: values.subjectIds,
+        classIds: values.classIds,
+        levelIds: values.levelIds,
       });
-
-      // Assign classes and levels if provided
-      if (values.classIds.length > 0 || values.levelIds.length > 0) {
-        const templateId = created.data?.id;
-        if (templateId) {
-          if (values.classIds.length > 0) {
-            await assignClasses.mutateAsync({
-              templateId,
-              classIds: values.classIds,
-            });
-          }
-          if (values.levelIds.length > 0) {
-            await assignLevels.mutateAsync({
-              templateId,
-              levelIds: values.levelIds,
-            });
-          }
-        }
-      }
 
       notifications.show({
         title: 'Success',

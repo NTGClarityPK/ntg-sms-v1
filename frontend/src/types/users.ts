@@ -8,6 +8,7 @@ export interface User {
   dateOfBirth?: string;
   gender?: 'male' | 'female';
   isActive: boolean;
+  accountStatus?: 'active' | 'pending_verification' | 'link_expired' | 'inactive';
   roles?: Array<{
     roleId: string;
     roleName: string;
@@ -32,7 +33,6 @@ export interface CreateUserInput {
   dateOfBirth?: string;
   gender?: 'male' | 'female';
   roleIds: string[];
-  isActive?: boolean;
 }
 
 export interface UpdateUserInput {

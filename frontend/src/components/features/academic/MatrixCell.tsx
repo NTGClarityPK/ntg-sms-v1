@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ActionIcon, Badge, Button, Group, Menu, Text, Tooltip, Stack } from '@mantine/core';
+import { ActionIcon, Badge, Button, Group, Menu, Text, Tooltip, Stack, ScrollArea } from '@mantine/core';
 import { IconPlus, IconX } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
@@ -157,20 +157,27 @@ export function MatrixCell({
 
   const assignMenuDropdown = (
     <Menu.Dropdown>
-      <AssignMenuContent
-        staffOptions={staffOptions}
-        onAssign={handleAssign}
-        emptyMessage={
-          assignments.length > 0 ? t('allTeachersAssigned') : t('noTeachersAvailable')
-        }
-      />
+      <ScrollArea.Autosize mah={280} type="auto" scrollbarSize={8} offsetScrollbars>
+        <AssignMenuContent
+          staffOptions={staffOptions}
+          onAssign={handleAssign}
+          emptyMessage={
+            assignments.length > 0 ? t('allTeachersAssigned') : t('noTeachersAvailable')
+          }
+        />
+      </ScrollArea.Autosize>
     </Menu.Dropdown>
   );
 
   // Empty slot: small green "+" icon only
   if (assignments.length === 0) {
     return (
-      <Menu opened={assignMenuOpened} onChange={setAssignMenuOpened}>
+      <Menu
+        opened={assignMenuOpened}
+        onChange={setAssignMenuOpened}
+        withinPortal
+        zIndex={4000}
+      >
         <Menu.Target>
           <Tooltip label={t('assignTeacher')} withArrow>
             <Button
@@ -195,7 +202,12 @@ export function MatrixCell({
   return (
     <Stack gap={4} align="flex-start">
       <Group gap={4} wrap="nowrap" align="center">
-        <Menu opened={assignMenuOpened} onChange={setAssignMenuOpened}>
+        <Menu
+          opened={assignMenuOpened}
+          onChange={setAssignMenuOpened}
+          withinPortal
+          zIndex={4000}
+        >
           <Menu.Target>
             <Tooltip label={t('assignTeacher')} withArrow>
               <Button

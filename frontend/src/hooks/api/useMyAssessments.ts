@@ -36,7 +36,10 @@ export interface MyAssessment {
     title: string;
     description?: string;
     subjectId: string;
+    subjectName?: string;
     classSectionId: string;
+    createdBy: string;
+    teacherName?: string;
     totalMarks: number;
     dueDate?: string;
     publishDate?: string;

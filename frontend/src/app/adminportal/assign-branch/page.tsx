@@ -47,7 +47,7 @@ export default function AssignBranchPage() {
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      await assignBranch.mutateAsync({
+      const created = await assignBranch.mutateAsync({
         tenantId: values.tenantId,
         name: values.name.trim(),
         nameAr: values.nameAr.trim() || undefined,
@@ -59,9 +59,12 @@ export default function AssignBranchPage() {
         isActive: values.isActive,
       });
 
+      const createdCode = created?.code ?? null;
       notifications.show({
         title: 'Success',
-        message: 'Branch assigned to tenant successfully. All school_admin users for this tenant have been granted access to the new branch.',
+        message:
+          `Branch assigned to tenant successfully${createdCode ? ` (Code: ${createdCode})` : ''}. ` +
+          'All school_admin users for this tenant have been granted access to the new branch.',
         color: notifyColors.success,
       });
 

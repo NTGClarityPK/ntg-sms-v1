@@ -135,15 +135,18 @@ export class StaffService {
     const emailEntries = await Promise.all(emailPromises);
     const emailMap = new Map(emailEntries);
 
-    // Fetch profiles separately
+    // Fetch profiles separately (include activation state)
     const { data: profilesData } = await supabase
       .from('profiles')
-      .select('id, full_name')
+      .select('id, full_name, is_active')
       .in('id', userIds);
 
     const profileMap = new Map<string, string>();
+    const profileActiveMap = new Map<string, boolean>();
     (profilesData || []).forEach((profile) => {
       profileMap.set(profile.id, profile.full_name || '');
+      // Default to true if missing for safety; most rows should have it.
+      profileActiveMap.set(profile.id, profile.is_active !== false);
     });
 
     // If search was provided, filter by profile name and employee_id client-side
@@ -225,6 +228,8 @@ export class StaffService {
     }>).map((row) => {
       const fullName = profileMap.get(row.user_id);
       const roles = userRolesMap.get(row.user_id) || [];
+      const profileIsActive = profileActiveMap.get(row.user_id) ?? true;
+      const effectiveIsActive = row.is_active && profileIsActive;
 
       return new StaffDto({
         id: row.id,
@@ -233,7 +238,8 @@ export class StaffService {
         employeeId: row.employee_id ?? undefined,
         department: row.department ?? undefined,
         joinDate: row.join_date ?? undefined,
-        isActive: row.is_active,
+        // Treat user as active only when BOTH staff row and profile are active.
+        isActive: effectiveIsActive,
         deactivatedAt: row.deactivated_at ?? undefined,
         deactivationReason: row.deactivation_reason ?? undefined,
         createdAt: row.created_at,
@@ -244,8 +250,14 @@ export class StaffService {
       });
     });
 
+    // Honour query.isActive against the effective combined flag
+    const finalStaff =
+      query.isActive === undefined
+        ? staff
+        : staff.filter((s) => s.isActive === query.isActive);
+
     return {
-      data: staff,
+      data: finalStaff,
       meta: { total, page, limit, totalPages },
     };
   }

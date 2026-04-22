@@ -96,6 +96,23 @@ function mapAssessment(row: AssessmentRow): AssessmentDto {
   });
 }
 
+function mapAssessmentWithLookups(
+  row: AssessmentRow,
+  lookups: {
+    subjectNameById?: Map<string, string>;
+    teacherNameByUserId?: Map<string, string>;
+  },
+): AssessmentDto {
+  const base = mapAssessment(row);
+  const subjectName = lookups.subjectNameById?.get(base.subjectId);
+  const teacherName = lookups.teacherNameByUserId?.get(base.createdBy);
+  return new AssessmentDto({
+    ...base,
+    subjectName: subjectName ?? undefined,
+    teacherName: teacherName ?? undefined,
+  });
+}
+
 function mapStudentStatusRow(
   row: StudentAssessmentStatusRow,
 ): StudentAssessmentStatusDto {
@@ -721,7 +738,32 @@ export class AssessmentsService {
       throw new NotFoundException('Assessment not found');
     }
 
-    return mapAssessment(data as AssessmentRow);
+    const row = data as AssessmentRow;
+
+    const [subjectRes, profileRes] = await Promise.all([
+      supabase
+        .from('subjects')
+        .select('id, name')
+        .eq('id', row.subject_id)
+        .eq('branch_id', branchId)
+        .maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('id', row.created_by)
+        .maybeSingle(),
+    ]);
+
+    const subjectNameById = new Map<string, string>();
+    if (!subjectRes.error && subjectRes.data?.id && (subjectRes.data as any)?.name) {
+      subjectNameById.set(subjectRes.data.id as any, (subjectRes.data as any).name as any);
+    }
+    const teacherNameByUserId = new Map<string, string>();
+    if (!profileRes.error && profileRes.data?.id && (profileRes.data as any)?.full_name) {
+      teacherNameByUserId.set(profileRes.data.id as any, (profileRes.data as any).full_name as any);
+    }
+
+    return mapAssessmentWithLookups(row, { subjectNameById, teacherNameByUserId });
   }
 
   async publishAssessment(
@@ -1385,6 +1427,39 @@ export class AssessmentsService {
     // If student has no template, show all assessments (backward compatibility)
 
     const assessmentIds = filteredAssessments.map((a) => a.id);
+    const subjectIds = Array.from(new Set(filteredAssessments.map((a) => a.subject_id)));
+    const creatorUserIds = Array.from(
+      new Set(filteredAssessments.map((a) => a.created_by).filter((id): id is string => !!id)),
+    );
+
+    const [subjectsRes, profilesRes] = await Promise.all([
+      subjectIds.length > 0
+        ? supabase
+            .from('subjects')
+            .select('id, name')
+            .in('id', subjectIds)
+            .eq('branch_id', branchId)
+        : Promise.resolve({ data: [], error: null } as any),
+      creatorUserIds.length > 0
+        ? supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', creatorUserIds)
+        : Promise.resolve({ data: [], error: null } as any),
+    ]);
+
+    throwIfDbError(subjectsRes.error ?? null);
+    throwIfDbError(profilesRes.error ?? null);
+
+    const subjectNameById = new Map<string, string>();
+    for (const s of (subjectsRes.data ?? []) as any[]) {
+      if (s?.id && s?.name) subjectNameById.set(s.id, s.name);
+    }
+
+    const teacherNameByUserId = new Map<string, string>();
+    for (const p of (profilesRes.data ?? []) as any[]) {
+      if (p?.id && p?.full_name) teacherNameByUserId.set(p.id, p.full_name);
+    }
 
     // Fetch attachments for these assessments
     const { data: attachments, error: attachmentsError } = await supabase
@@ -1434,7 +1509,7 @@ export class AssessmentsService {
     }
 
     return filteredAssessments.map((row) => {
-      const assessment = mapAssessment(row);
+      const assessment = mapAssessmentWithLookups(row, { subjectNameById, teacherNameByUserId });
       const status = statusMap.get(assessment.id);
       const att = attachmentsByAssessment.get(assessment.id) ?? [];
       return {
@@ -1547,6 +1622,39 @@ export class AssessmentsService {
     }
 
     const assessmentIds = filteredAssessments.map((a) => a.id);
+    const subjectIds = Array.from(new Set(filteredAssessments.map((a) => a.subject_id)));
+    const creatorUserIds = Array.from(
+      new Set(filteredAssessments.map((a) => a.created_by).filter((id): id is string => !!id)),
+    );
+
+    const [subjectsRes, profilesRes] = await Promise.all([
+      subjectIds.length > 0
+        ? supabase
+            .from('subjects')
+            .select('id, name')
+            .in('id', subjectIds)
+            .eq('branch_id', branchId)
+        : Promise.resolve({ data: [], error: null } as any),
+      creatorUserIds.length > 0
+        ? supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', creatorUserIds)
+        : Promise.resolve({ data: [], error: null } as any),
+    ]);
+
+    throwIfDbError(subjectsRes.error ?? null);
+    throwIfDbError(profilesRes.error ?? null);
+
+    const subjectNameById = new Map<string, string>();
+    for (const s of (subjectsRes.data ?? []) as any[]) {
+      if (s?.id && s?.name) subjectNameById.set(s.id, s.name);
+    }
+
+    const teacherNameByUserId = new Map<string, string>();
+    for (const p of (profilesRes.data ?? []) as any[]) {
+      if (p?.id && p?.full_name) teacherNameByUserId.set(p.id, p.full_name);
+    }
 
     const { data: attachments, error: attachmentsError } = await supabase
       .from('assessment_attachments')
@@ -1587,7 +1695,7 @@ export class AssessmentsService {
     }
 
     return filteredAssessments.map((row) => {
-      const assessment = mapAssessment(row);
+      const assessment = mapAssessmentWithLookups(row, { subjectNameById, teacherNameByUserId });
       return {
         assessment,
         status: statusMap.get(assessment.id),

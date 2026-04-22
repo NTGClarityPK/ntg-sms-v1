@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import {
   getUiLocaleCookieFromDocument,
@@ -11,6 +12,7 @@ import {
 } from '@/lib/ui-locale';
 import { syncProfilePreferredLocaleWithCookie } from '@/lib/locale-preference-sync';
 import { User } from '@/types/auth';
+import { supabase } from '@/lib/supabase/client';
 
 function isEnglishFamily(l: string): boolean {
   return l === 'en' || l === 'en-US' || l === 'en-GB';
@@ -18,7 +20,23 @@ function isEnglishFamily(l: string): boolean {
 
 async function fetchCurrentUser(): Promise<User> {
   const response = await apiClient.get<User>('/api/v1/auth/me');
-  const user = response.data;
+  let user = response.data;
+
+  // Critical: right after login/OAuth, we can have a branchId in localStorage (set by auth callback)
+  // but `/auth/me` may still return `currentBranch: null` until the branch is selected server-side.
+  // If we cache that response, dashboard queries stay disabled and the UI can get stuck on skeletons.
+  if (typeof window !== 'undefined' && !user?.currentBranch?.id) {
+    const branchIdHint = window.localStorage.getItem('currentBranchId');
+    if (branchIdHint && branchIdHint.trim() !== '') {
+      try {
+        await apiClient.post('/api/v1/auth/select-branch', { branchId: branchIdHint });
+        const refreshed = await apiClient.get<User>('/api/v1/auth/me');
+        user = refreshed.data;
+      } catch {
+        // Non-blocking: if select-branch fails (e.g. user not allowed), keep original user.
+      }
+    }
+  }
 
   if (typeof window !== 'undefined') {
     const rawPreferred =
@@ -66,6 +84,7 @@ async function fetchCurrentUser(): Promise<User> {
 }
 
 export function useAuth() {
+  const queryClient = useQueryClient();
   const {
     data: user,
     isLoading,
@@ -77,21 +96,60 @@ export function useAuth() {
     queryKey: ['auth', 'me'],
     queryFn: fetchCurrentUser,
     retry: (failureCount, error) => {
-      // Retry on network error (e.g. backend not ready on refresh), up to 2 times
-      const isNetwork = (error as { code?: string; message?: string })?.code === 'ERR_NETWORK' || (error as Error)?.message === 'Network Error';
-      return isNetwork && failureCount < 2;
+      // Retry on network error, and on the "session not ready yet" 401 right after login.
+      // This prevents dashboard from getting stuck on skeletons until manual refresh.
+      const err = error as {
+        code?: string;
+        message?: string;
+        response?: { status?: number; data?: { error?: { message?: string }; message?: string } };
+      };
+
+      const isNetwork =
+        err?.code === 'ERR_NETWORK' ||
+        err?.message === 'Network Error';
+
+      const status = err?.response?.status;
+      const bodyMsg =
+        err?.response?.data?.error?.message ??
+        err?.response?.data?.message ??
+        err?.message ??
+        '';
+      const isNoToken401 =
+        status === 401 &&
+        typeof bodyMsg === 'string' &&
+        bodyMsg.toLowerCase().includes('no token provided');
+
+      if (isNoToken401) return failureCount < 5;
+      if (isNetwork) return failureCount < 2;
+      return false;
     },
-    retryDelay: 800,
+    retryDelay: (attempt) => Math.min(250 * (attempt + 1), 1200),
     refetchOnWindowFocus: false,
     enabled: true,
     staleTime: 5 * 60 * 1000,  // 5 minutes - user data rarely changes
     gcTime: 10 * 60 * 1000,    // 10 minutes
   });
 
-  // Store branch ID in localStorage when user data changes
-  if (user?.currentBranch?.id && typeof window !== 'undefined') {
-    localStorage.setItem('currentBranchId', user.currentBranch.id);
-  }
+  // Keep branch ID in localStorage when user data changes (avoid side effects during render).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (user?.currentBranch?.id) {
+      window.localStorage.setItem('currentBranchId', user.currentBranch.id);
+    }
+  }, [user?.currentBranch?.id]);
+
+  // When Supabase session becomes available/changes, refetch /auth/me.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      }
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, [queryClient]);
 
   return {
     user: user as User | undefined,

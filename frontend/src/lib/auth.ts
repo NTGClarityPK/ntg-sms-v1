@@ -1,4 +1,5 @@
 import { supabase } from './supabase/client';
+import { queryClient } from '@/lib/query-client';
 import {
   getUiLocaleCookieFromDocument,
   normalizeUiLocale,
@@ -68,6 +69,12 @@ export async function signOut() {
   }
 
   if (typeof window !== 'undefined') {
+    // Prevent stale `auth/me` (and branch-gated queries) from keeping the dashboard on skeletons after re-login.
+    // A hard refresh clears caches; we do it explicitly here so normal login works first time.
+    queryClient.removeQueries({ queryKey: ['auth'] });
+    queryClient.removeQueries({ queryKey: ['permissions'] });
+    queryClient.removeQueries({ queryKey: ['settingsStatus'] });
+
     // Keep the currently active language on the login screen.
     // Do NOT overwrite NEXT_LOCALE from potentially-stale localStorage during logout.
     syncLocaleCookieFromStorage();

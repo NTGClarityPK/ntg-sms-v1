@@ -8,6 +8,28 @@ const STUDENT_TOKEN_STORAGE_KEY = 'studentToken';
 
 const LOCAL_API = 'http://localhost:3001';
 
+async function sleep(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function getSupabaseAccessTokenWithRetry(input: {
+  attempts: number;
+  delayMs: number;
+}): Promise<string | null> {
+  for (let i = 0; i < input.attempts; i++) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) return session.access_token;
+    } catch {
+      // ignore and retry
+    }
+    if (i < input.attempts - 1) await sleep(input.delayMs);
+  }
+  return null;
+}
+
 /**
  * Effective API base URL for this request. Use this so old builds/cache don't keep hitting a previous URL (e.g. Cloudflare tunnel).
  * - On localhost/127.0.0.1 → always local API.
@@ -70,6 +92,9 @@ class ApiClient {
           // Must match /api/v1/student/ (with trailing slash) to avoid catching /api/v1/students/...
           const isStudentApi =
             typeof url === 'string' && url.startsWith('/api/v1/student/');
+          const isAuthBootstrap =
+            typeof url === 'string' &&
+            (url.startsWith('/api/v1/auth/me') || url.startsWith('/api/v1/auth/select-branch'));
 
           const studentToken =
             typeof window !== 'undefined'
@@ -81,12 +106,12 @@ class ApiClient {
             config.headers.Authorization = `Bearer ${studentToken}`;
           } else {
             // All other APIs: use Supabase session (multi-role auth)
-            const {
-              data: { session },
-            } = await supabase.auth.getSession();
-            if (session?.access_token) {
-              config.headers.Authorization = `Bearer ${session.access_token}`;
-            }
+            // IMPORTANT: auth bootstrap requests must not go out without a token right after login/logout,
+            // otherwise we can cache `/auth/me` without a currentBranch and the dashboard gets stuck until hard refresh.
+            const token = isAuthBootstrap
+              ? await getSupabaseAccessTokenWithRetry({ attempts: 10, delayMs: 100 })
+              : await getSupabaseAccessTokenWithRetry({ attempts: 1, delayMs: 0 });
+            if (token) config.headers.Authorization = `Bearer ${token}`;
           }
         } catch {
           // Supabase slow/unavailable on first load; send request without auth (backend will 401 if needed)

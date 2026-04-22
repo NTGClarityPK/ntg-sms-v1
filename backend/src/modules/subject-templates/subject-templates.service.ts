@@ -85,6 +85,12 @@ export class SubjectTemplatesService {
     userEmail: string,
   ): Promise<SubjectTemplateDto> {
     const supabase = this.supabaseConfig.getClient();
+    const uniqueClassIds = Array.from(new Set(input.classIds ?? []));
+    const uniqueLevelIds = Array.from(new Set(input.levelIds ?? []));
+
+    if (uniqueClassIds.length > 0 && uniqueLevelIds.length > 0) {
+      throw new BadRequestException('Provide either classIds or levelIds, not both.');
+    }
 
     // Create template
     const { data: template, error: templateError } = await supabase
@@ -130,6 +136,56 @@ export class SubjectTemplatesService {
           })
           .catch(() => {});
       }
+    }
+
+    // Create class assignments if provided
+    if (uniqueClassIds.length > 0) {
+      const { data: validClasses, error: validateError } = await supabase
+        .from('classes')
+        .select('id')
+        .in('id', uniqueClassIds)
+        .eq('branch_id', branchId);
+      throwIfDbError(validateError);
+      const validIds = new Set(((validClasses as { id: string }[]) ?? []).map((c) => c.id));
+      const invalid = uniqueClassIds.filter((id) => !validIds.has(id));
+      if (invalid.length > 0) {
+        throw new BadRequestException(`Invalid class IDs: ${invalid.join(', ')}`);
+      }
+
+      const toInsert = uniqueClassIds.map((classId) => ({
+        class_id: classId,
+        subject_template_id: templateRow.id,
+        branch_id: branchId,
+      }));
+      const { error: insertError } = await supabase
+        .from('class_subject_template_assignments')
+        .insert(toInsert);
+      throwIfDbError(insertError);
+    }
+
+    // Create level assignments if provided
+    if (uniqueLevelIds.length > 0) {
+      const { data: validLevels, error: validateError } = await supabase
+        .from('levels')
+        .select('id')
+        .in('id', uniqueLevelIds)
+        .eq('branch_id', branchId);
+      throwIfDbError(validateError);
+      const validIds = new Set(((validLevels as { id: string }[]) ?? []).map((l) => l.id));
+      const invalid = uniqueLevelIds.filter((id) => !validIds.has(id));
+      if (invalid.length > 0) {
+        throw new BadRequestException(`Invalid level IDs: ${invalid.join(', ')}`);
+      }
+
+      const toInsert = uniqueLevelIds.map((levelId) => ({
+        level_id: levelId,
+        subject_template_id: templateRow.id,
+        branch_id: branchId,
+      }));
+      const { error: insertError } = await supabase
+        .from('level_subject_template_assignments')
+        .insert(toInsert);
+      throwIfDbError(insertError);
     }
 
     // Fetch related data in parallel for response
@@ -273,75 +329,19 @@ export class SubjectTemplatesService {
     throwIfDbError(checkError);
     if (!oldRow) throw new NotFoundException('Subject template not found');
 
-    // Block delete only when the template is still used in the *active* academic year (branch-scoped).
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
-    if (activeYear) {
-      const [studentsActive, slotsActive] = await Promise.all([
-        supabase
-          .from('student_subject_template_assignments')
-          .select('id', { count: 'exact', head: true })
-          .eq('subject_template_id', id)
-          .eq('branch_id', branchId)
-          .eq('academic_year_id', activeYear.id),
-        supabase
-          .from('timetable_slots')
-          .select('id', { count: 'exact', head: true })
-          .eq('subject_template_id', id)
-          .eq('branch_id', branchId)
-          .eq('academic_year_id', activeYear.id),
-      ]);
-      throwIfDbError(studentsActive.error);
-      throwIfDbError(slotsActive.error);
-      if (studentsActive.count && studentsActive.count > 0) {
-        throw new BadRequestException(
-          'Cannot delete this subject template while students are assigned to it in the active academic year. Remove those assignments first.',
-        );
-      }
-      if (slotsActive.count && slotsActive.count > 0) {
-        throw new BadRequestException(
-          "Cannot delete this subject template while the active academic year's timetable still references it. Clear or change those slots first.",
-        );
-      }
+
+    // Transactional delete: prevents partial unlinking if deletion is blocked.
+    const { error: rpcError } = await supabase.rpc('delete_subject_template_safe', {
+      p_template_id: id,
+      p_branch_id: branchId,
+      p_active_academic_year_id: activeYear?.id ?? null,
+    });
+
+    if (rpcError) {
+      // Surface the DB function's message in a user-friendly way.
+      throw new BadRequestException(rpcError.message);
     }
-
-    // Remove dependent rows so the template row can be deleted (FK-safe). Historical student assignments
-    // and non-active timetable references are cleared here once the active-year guard above passes.
-    const { error: delStudentAssignErr } = await supabase
-      .from('student_subject_template_assignments')
-      .delete()
-      .eq('subject_template_id', id)
-      .eq('branch_id', branchId);
-    throwIfDbError(delStudentAssignErr);
-
-    const { error: delSubjectsErr } = await supabase
-      .from('subject_template_subjects')
-      .delete()
-      .eq('subject_template_id', id);
-    throwIfDbError(delSubjectsErr);
-
-    const { error: delClassAssignErr } = await supabase
-      .from('class_subject_template_assignments')
-      .delete()
-      .eq('subject_template_id', id)
-      .eq('branch_id', branchId);
-    throwIfDbError(delClassAssignErr);
-
-    const { error: delLevelAssignErr } = await supabase
-      .from('level_subject_template_assignments')
-      .delete()
-      .eq('subject_template_id', id)
-      .eq('branch_id', branchId);
-    throwIfDbError(delLevelAssignErr);
-
-    const { error: clearSlotsErr } = await supabase
-      .from('timetable_slots')
-      .update({ subject_template_id: null })
-      .eq('subject_template_id', id)
-      .eq('branch_id', branchId);
-    throwIfDbError(clearSlotsErr);
-
-    const { error: deleteError } = await supabase.from('subject_templates').delete().eq('id', id);
-    throwIfDbError(deleteError);
 
     this.auditLogService
       .logDelete('subject_templates', id, userEmail, oldRow as Record<string, unknown>, {

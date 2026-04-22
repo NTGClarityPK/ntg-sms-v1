@@ -22,10 +22,16 @@ export function useSaveSetupWizard() {
       return res.data;
     },
     onSuccess: async () => {
+      // Setup can create users/roles and update session context. If we only invalidate, some screens can still
+      // render cached data (staleTime) and show "None" for roles until a hard refresh. Remove + refetch fixes it.
+      qc.removeQueries({ queryKey: ['users'] });
+      qc.removeQueries({ queryKey: ['roles'] });
+      qc.removeQueries({ queryKey: ['auth', 'me'] });
+
       await Promise.all([
-        // Roles/permissions can change as part of setup; refresh current user immediately.
-        qc.invalidateQueries({ queryKey: ['auth', 'me'] }),
         qc.invalidateQueries({ queryKey: ['settingsStatus'] }),
+        qc.invalidateQueries({ queryKey: ['permissions'] }),
+        qc.invalidateQueries({ queryKey: ['features'] }),
         qc.invalidateQueries({ queryKey: ['academicYears'] }),
         qc.invalidateQueries({ queryKey: ['subjects'] }),
         qc.invalidateQueries({ queryKey: ['classes'] }),
@@ -34,6 +40,8 @@ export function useSaveSetupWizard() {
         qc.invalidateQueries({ queryKey: ['schedule'] }),
         qc.invalidateQueries({ queryKey: ['assessment'] }),
         qc.invalidateQueries({ queryKey: ['systemSettings'] }),
+        // Force immediate session refresh so branch/roles are correct without reload.
+        qc.refetchQueries({ queryKey: ['auth', 'me'] }),
       ]);
       notifications.show({
         title: 'Success',

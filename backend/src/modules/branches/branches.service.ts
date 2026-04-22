@@ -27,6 +27,17 @@ type BranchRow = {
   public_stats_password?: string | null;
 };
 
+function generateBranchCodeFromName(name: string): string {
+  const cleaned = (name || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .substring(0, 6);
+  const random = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0');
+  return `${cleaned || 'BRANCH'}${random}`;
+}
+
 function resolveBranchName(
   row: { name: string; name_translations?: Record<string, string> | null },
   language: string,
@@ -166,24 +177,57 @@ export class BranchesService {
   async create(input: CreateBranchDto, userEmail: string): Promise<BranchDto> {
     const supabase = this.supabaseConfig.getClient();
     const nameTranslations = input.name_translations ?? { en: input.name, ar: input.nameAr ?? input.name };
-    const { data, error } = await supabase
-      .from('branches')
-      .insert({
-        name: input.name,
-        name_ar: input.nameAr ?? null,
-        name_translations: nameTranslations,
-        code: input.code ?? null,
-        address: input.address ?? null,
-        phone: input.phone ?? null,
-        email: input.email ?? null,
-        storage_quota_gb: input.storageQuotaGb ?? 100,
-        is_active: input.isActive ?? true,
-      })
-      .select('*')
-      .single();
+    const requestedCode = (input.code ?? '').trim();
 
-    throwIfDbError(error);
-    const row = data as BranchRow;
+    let lastError: PostgrestError | null = null;
+    let row: BranchRow | null = null;
+
+    for (let attempt = 0; attempt < 7; attempt++) {
+      const generated = generateBranchCodeFromName(input.name);
+      const codeToUse = requestedCode !== '' ? requestedCode : generated;
+
+      const { data, error } = await supabase
+        .from('branches')
+        .insert({
+          name: input.name,
+          name_ar: input.nameAr ?? null,
+          name_translations: nameTranslations,
+          code: codeToUse,
+          address: input.address ?? null,
+          phone: input.phone ?? null,
+          email: input.email ?? null,
+          storage_quota_gb: input.storageQuotaGb ?? 100,
+          is_active: input.isActive ?? true,
+        })
+        .select('*')
+        .single();
+
+      if (!error && data) {
+        row = data as BranchRow;
+        break;
+      }
+
+      lastError = error;
+
+      // If user provided a code and it's not unique, fail fast with a useful message.
+      if (requestedCode !== '' && error?.code === '23505') {
+        throw new BadRequestException(
+          `Branch code "${requestedCode}" already exists. Please choose a different code.`,
+        );
+      }
+
+      // Auto-generated codes: retry on unique violation.
+      if (requestedCode === '' && error?.code === '23505') {
+        continue;
+      }
+
+      break;
+    }
+
+    throwIfDbError(lastError);
+    if (!row) {
+      throw new BadRequestException('Failed to create branch');
+    }
     this.auditLogService
       .logCreate('branches', row.id, userEmail, { ...row } as Record<string, unknown>, {
         branchId: row.id,
@@ -345,31 +389,64 @@ export class BranchesService {
       throw new NotFoundException('Tenant not found');
     }
 
-    // Create branch with tenant_id
-    const { data: branch, error: branchError } = await supabase
-      .from('branches')
-      .insert({
-        tenant_id: input.tenantId,
-        name: input.name,
-        name_ar: input.nameAr ?? null,
-        code: input.code ?? null,
-        address: input.address ?? null,
-        phone: input.phone ?? null,
-        email: input.email ?? null,
-        storage_quota_gb: input.storageQuotaGb ?? 100,
-        is_active: input.isActive ?? true,
-      })
-      .select('*')
-      .single();
+    const requestedCode = (input.code ?? '').trim();
 
-    throwIfDbError(branchError);
-    const newBranch = mapBranch(branch as BranchRow);
+    let lastError: PostgrestError | null = null;
+    let branchRow: BranchRow | null = null;
+
+    for (let attempt = 0; attempt < 7; attempt++) {
+      const generated = generateBranchCodeFromName(input.name);
+      const codeToUse = requestedCode !== '' ? requestedCode : generated;
+
+      const { data: branch, error: branchError } = await supabase
+        .from('branches')
+        .insert({
+          tenant_id: input.tenantId,
+          name: input.name,
+          name_ar: input.nameAr ?? null,
+          name_translations: { en: input.name, ar: input.nameAr ?? input.name },
+          code: codeToUse,
+          address: input.address ?? null,
+          phone: input.phone ?? null,
+          email: input.email ?? null,
+          storage_quota_gb: input.storageQuotaGb ?? 100,
+          is_active: input.isActive ?? true,
+        })
+        .select('*')
+        .single();
+
+      if (!branchError && branch) {
+        branchRow = branch as BranchRow;
+        break;
+      }
+
+      lastError = branchError;
+
+      if (requestedCode !== '' && branchError?.code === '23505') {
+        throw new BadRequestException(
+          `Branch code "${requestedCode}" already exists. Please choose a different code.`,
+        );
+      }
+
+      if (requestedCode === '' && branchError?.code === '23505') {
+        continue;
+      }
+
+      break;
+    }
+
+    throwIfDbError(lastError);
+    if (!branchRow) {
+      throw new BadRequestException('Failed to create branch');
+    }
+
+    const newBranch = mapBranch(branchRow);
     this.auditLogService
       .logCreate(
         'branches',
         newBranch.id,
         userEmail,
-        { ...(branch as BranchRow) } as Record<string, unknown>,
+        { ...branchRow } as Record<string, unknown>,
         { branchId: newBranch.id, tenantId: input.tenantId },
       )
       .catch(() => {});

@@ -212,9 +212,35 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                 </Table.Td>
                 <Table.Td>{getRoleBadges(user.roles)}</Table.Td>
                 <Table.Td>
-                  <Badge color={user.isActive ? 'green' : 'red'} variant="light">
-                    {user.isActive ? t('active') : t('inactive')}
-                  </Badge>
+                  {(() => {
+                    const status = user.accountStatus ?? (user.isActive ? 'active' : 'inactive');
+                    if (status === 'pending_verification') {
+                      return (
+                        <Badge color="yellow" variant="light">
+                          {t('pendingVerification')}
+                        </Badge>
+                      );
+                    }
+                    if (status === 'link_expired') {
+                      return (
+                        <Badge color="red" variant="light">
+                          {t('linkExpired')}
+                        </Badge>
+                      );
+                    }
+                    if (status === 'inactive') {
+                      return (
+                        <Badge color="gray" variant="light">
+                          {t('inactive')}
+                        </Badge>
+                      );
+                    }
+                    return (
+                      <Badge color="green" variant="light">
+                        {t('active')}
+                      </Badge>
+                    );
+                  })()}
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">

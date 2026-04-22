@@ -16,5 +16,15 @@ export class CreateSubjectTemplateDto {
   @IsArray()
   @IsUUID('4', { each: true })
   subjectIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  classIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  levelIds?: string[];
 }
 

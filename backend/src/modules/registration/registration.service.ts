@@ -10,6 +10,12 @@ function throwIfDbError(error: PostgrestError | null): void {
   throw new BadRequestException(error.message);
 }
 
+function isUniqueViolation(error: PostgrestError | null): boolean {
+  // Postgres unique violation: 23505
+  // Supabase can surface this via PostgrestError.code.
+  return !!error && error.code === '23505';
+}
+
 @Injectable()
 export class RegistrationService {
   constructor(
@@ -28,18 +34,26 @@ export class RegistrationService {
 
     try {
       // Step 1: Create Tenant
-      const tenantCode = input.schoolCode || this.generateCode(input.schoolName);
+      // If user supplied a code, enforce uniqueness directly. If not, auto-generate with retries.
+      const providedTenantCode = input.schoolCode?.trim();
+      let tenantCode =
+        providedTenantCode && providedTenantCode.length > 0
+          ? this.normalizeTenantCode(providedTenantCode)
+          : '';
       const tenantDomain = input.schoolDomain.trim().toLowerCase();
       
-      // Check if tenant code already exists
-      const { data: existingTenant } = await supabase
-        .from('tenants')
-        .select('id')
-        .eq('code', tenantCode)
-        .maybeSingle();
+      if (tenantCode) {
+        const { data: existingTenant } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('code', tenantCode)
+          .maybeSingle();
 
-      if (existingTenant) {
-        throw new ConflictException(`School code "${tenantCode}" already exists. Please choose a different code.`);
+        if (existingTenant) {
+          throw new ConflictException(
+            `School code "${tenantCode}" already exists. Please choose a different code.`,
+          );
+        }
       }
 
       // Check if tenant domain already exists (global uniqueness)
@@ -52,16 +66,16 @@ export class RegistrationService {
         throw new ConflictException(`Domain "${tenantDomain}" already exists. Please choose a different domain.`);
       }
 
-      const { data: tenant, error: tenantError } = await supabase
-        .from('tenants')
-        .insert({
-          name: input.schoolName,
-          code: tenantCode,
-          domain: tenantDomain,
-          is_active: true,
-        })
-        .select('id')
-        .single();
+      if (!tenantCode) {
+        tenantCode = await this.generateUniqueTenantCode(supabase, input.schoolName);
+      }
+
+      const { data: tenant, error: tenantError } = await this.insertTenantWithRetry(supabase, {
+        name: input.schoolName,
+        code: tenantCode,
+        domain: tenantDomain,
+        is_active: true,
+      });
 
       throwIfDbError(tenantError);
       if (!tenant) {
@@ -82,6 +96,8 @@ export class RegistrationService {
       if (existingBranch) {
         // Rollback tenant
         await supabase.from('tenants').delete().eq('id', tenantId);
+        // Branch code is typically auto-generated, but can be provided manually.
+        // If it's a collision on auto-generated code, surface a generic error.
         throw new ConflictException(`Branch code "${branchCode}" already exists. Please choose a different code.`);
       }
 
@@ -273,16 +289,82 @@ export class RegistrationService {
     }
   }
 
-  private generateCode(name: string): string {
-    // Generate a code from school name: "Alekaf High School" -> "ALEKAF001"
-    const cleaned = name
+  private normalizeTenantCode(code: string): string {
+    // Keep codes URL-safe and human-friendly.
+    // Example input: "Alekaf High School" -> "ALEKAF-3FQ9K2"
+    return code
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 32);
+  }
+
+  private buildTenantCodeBase(name: string): string {
+    const base = name
+      .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '')
-      .substring(0, 6);
-    const random = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, '0');
-    return `${cleaned}${random}`;
+      .substring(0, 8);
+    return base || 'SCHOOL';
+  }
+
+  private randomBase36(len: number): string {
+    // Node supports crypto.getRandomValues? Use crypto module for strong randomness.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const crypto = require('crypto') as typeof import('crypto');
+    const bytes = crypto.randomBytes(Math.ceil((len * 5) / 8)); // 5 bits per base32 char approx; good enough
+    // base36: take hex -> bigint-ish via parseInt chunks; simplest: use base64url then strip.
+    const s = bytes.toString('base64url').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return s.substring(0, len);
+  }
+
+  private generateCandidateTenantCode(name: string): string {
+    const base = this.buildTenantCodeBase(name);
+    const suffix = this.randomBase36(6);
+    return this.normalizeTenantCode(`${base}-${suffix}`);
+  }
+
+  private async generateUniqueTenantCode(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    schoolName: string,
+  ): Promise<string> {
+    // Extremely low collision probability, but still verify uniqueness.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = this.generateCandidateTenantCode(schoolName);
+      const { data } = await supabase.from('tenants').select('id').eq('code', candidate).maybeSingle();
+      if (!data) return candidate;
+    }
+    throw new BadRequestException('Failed to generate a unique school code. Please try again.');
+  }
+
+  private async insertTenantWithRetry(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    row: { name: string; code: string; domain: string; is_active: boolean },
+  ): Promise<{ data: { id: string } | null; error: PostgrestError | null }> {
+    // Handles race conditions where another request inserts the same code between "check" and "insert".
+    // If code was auto-generated, we can retry with a fresh candidate. If user provided it, caller should not use this.
+    let current = row;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data, error } = await supabase
+        .from('tenants')
+        .insert(current)
+        .select('id')
+        .single();
+
+      if (!error) return { data, error: null };
+      if (!isUniqueViolation(error)) return { data: null, error };
+
+      // Unique violation: retry with a fresh code.
+      current = {
+        ...current,
+        code: this.generateCandidateTenantCode(current.name),
+      };
+    }
+
+    // If we somehow collided repeatedly, surface a user-friendly message.
+    throw new BadRequestException('Failed to generate a unique school code. Please try again.');
   }
 }
 

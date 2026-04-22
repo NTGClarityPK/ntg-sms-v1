@@ -307,11 +307,15 @@ export function Sidebar({
       }
       // For "My Timetable", show only if user is a student
       if (item.href === '/my-timetable') {
-        return isStudent;
+        // Students see their timetable; teachers may also have a personal timetable view on this route.
+        // Permission gating is handled above via `getFeatureCodeForPath` + `canView`.
+        return isStudent || isTeacher;
       }
       // For "Timetable Management", show only if user has admin/coordinator role
       if (item.href === '/timetable') {
-        return canManageTimetable;
+        // Prefer permission matrix gating (Settings → Permission matrix).
+        // Keep role-based fallback for existing deployments that rely on roles.
+        return canView('timetable_management') || canManageTimetable;
       }
       // For "Conflict Management", visibility is permission-controlled (Settings → Permission matrix).
       if (item.href === '/conflict-management') {

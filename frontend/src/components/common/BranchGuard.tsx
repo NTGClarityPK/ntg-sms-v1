@@ -1,21 +1,53 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Skeleton, Container, Stack } from '@mantine/core';
 import { useAuth } from '@/hooks/useAuth';
 import type { User } from '@/types/auth';
 import { apiClient } from '@/lib/api-client';
+import { getSession } from '@/lib/auth';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface BranchGuardProps {
   children: React.ReactNode;
 }
 
 export function BranchGuard({ children }: BranchGuardProps) {
-  const router = useRouter();
-  const { user, isLoading, refetch } = useAuth();
+  const qc = useQueryClient();
+  const { user, isLoading, refetch, error } = useAuth();
   const userTyped = user as User | undefined;
   const [isSelectingBranch, setIsSelectingBranch] = useState(false);
+  const [isRecoveringAuth, setIsRecoveringAuth] = useState(false);
+
+  const needsAuthRecovery =
+    !isLoading &&
+    !isSelectingBranch &&
+    !userTyped &&
+    !!error;
+
+  // If we have a Supabase session but `auth/me` is still missing (common right after signup),
+  // force a refetch so branch-gated queries (dashboard) can unblock without a hard refresh.
+  useEffect(() => {
+    const recoverAuth = async () => {
+      if (isLoading || isSelectingBranch || isRecoveringAuth) return;
+      if (userTyped) return;
+      if (!error) return;
+
+      try {
+        setIsRecoveringAuth(true);
+        const session = await getSession();
+        if (!session?.access_token) return;
+
+        // Drop potentially-cached error response for auth/me before refetching.
+        qc.removeQueries({ queryKey: ['auth', 'me'] });
+        await refetch();
+      } finally {
+        setIsRecoveringAuth(false);
+      }
+    };
+
+    void recoverAuth();
+  }, [error, isLoading, isSelectingBranch, isRecoveringAuth, userTyped, qc, refetch]);
 
   // Auto-select first branch if user has branches but no current branch selected
   useEffect(() => {
@@ -23,6 +55,7 @@ export function BranchGuard({ children }: BranchGuardProps) {
       if (
         !isLoading &&
         !isSelectingBranch &&
+        !isRecoveringAuth &&
         userTyped &&
         !userTyped.currentBranch &&
         userTyped.branches &&
@@ -40,9 +73,10 @@ export function BranchGuard({ children }: BranchGuardProps) {
           localStorage.setItem('currentBranchId', firstBranch.id);
           
           // Refetch user data to get updated current branch
+          qc.removeQueries({ queryKey: ['auth', 'me'] });
           await refetch();
-        } catch (error) {
-          console.error('Failed to auto-select branch:', error);
+        } catch {
+          // Non-blocking: user may still select a branch from the header picker.
         } finally {
           setIsSelectingBranch(false);
         }
@@ -50,10 +84,11 @@ export function BranchGuard({ children }: BranchGuardProps) {
     };
 
     autoSelectBranch();
-  }, [user, isLoading, isSelectingBranch, refetch]);
+  }, [user, isLoading, isSelectingBranch, isRecoveringAuth, refetch, qc]);
 
   // Show loading while checking or auto-selecting branch
-  if (isLoading || isSelectingBranch) {
+  // Also hold render if auth is currently errored/missing (prevents blank screen during signup redirect).
+  if (isLoading || isRecoveringAuth || isSelectingBranch || needsAuthRecovery) {
     return (
       <Container size="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <Stack gap="md" align="center">

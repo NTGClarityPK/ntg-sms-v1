@@ -19,6 +19,7 @@ export function AssignClassTeacherModal({
   classSection,
 }: AssignClassTeacherModalProps) {
   const t = useTranslations('class');
+  const tCommon = useTranslations('common');
   const assignClassTeacher = useAssignClassTeacher();
   const { data: staffData } = useStaff();
   const staffResponse = staffData as
@@ -42,7 +43,7 @@ export function AssignClassTeacherModal({
 
   const form = useForm({
     initialValues: {
-      staffId: classSection.classTeacherId || '',
+      staffId: classSection.classTeacherId || null,
     },
   });
 
@@ -50,20 +51,17 @@ export function AssignClassTeacherModal({
     await assignClassTeacher.mutateAsync({
       id: classSection.id,
       input: {
-        staffId: values.staffId || null,
+        staffId: values.staffId ?? null,
       },
     });
     form.reset();
     onClose();
   };
 
-  const staffOptions = [
-    { value: '', label: t('noneUnassign') },
-    ...availableStaff.map((s) => ({
-      value: s.id,
-      label: s.fullName || s.employeeId || 'Unknown',
-    })),
-  ];
+  const staffOptions = availableStaff.map((s) => ({
+    value: s.id,
+    label: s.fullName || s.employeeId || 'Unknown',
+  }));
 
   return (
     <Modal
@@ -75,8 +73,11 @@ export function AssignClassTeacherModal({
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <Select
+            searchable
+            clearable
+            nothingFoundMessage={tCommon('notFound')}
             label={t('classTeacher')}
-            placeholder={t('classTeacherPlaceholder')}
+            placeholder={t('noneUnassign')}
             data={staffOptions}
             {...form.getInputProps('staffId')}
           />

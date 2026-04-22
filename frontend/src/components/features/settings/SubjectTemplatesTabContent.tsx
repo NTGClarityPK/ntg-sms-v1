@@ -32,6 +32,7 @@ export function SubjectTemplatesTabContent() {
 
   const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [editEntity, setEditEntity] = useState<SubjectTemplate | null>(null);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [searchValue, setSearchValue] = useState('');
   const [debouncedSearch] = useDebouncedValue(searchValue, 300);
@@ -48,23 +49,13 @@ export function SubjectTemplatesTabContent() {
 
   const handleCreate = async (values: SubjectTemplateFormValues) => {
     try {
-      const created = await createTemplate.mutateAsync({
+      await createTemplate.mutateAsync({
         name: values.name,
         description: values.description,
         subjectIds: values.subjectIds,
+        classIds: values.classIds,
+        levelIds: values.levelIds,
       });
-
-      if (values.classIds.length > 0 || values.levelIds.length > 0) {
-        const templateId = created.data?.id;
-        if (templateId) {
-          if (values.classIds.length > 0) {
-            await assignClasses.mutateAsync({ templateId, classIds: values.classIds });
-          }
-          if (values.levelIds.length > 0) {
-            await assignLevels.mutateAsync({ templateId, levelIds: values.levelIds });
-          }
-        }
-      }
 
       notifications.show({
         title: tCommon('success'),
@@ -122,10 +113,16 @@ export function SubjectTemplatesTabContent() {
         </Text>
       ),
       labels: { confirm: tCommon('delete'), cancel: tCommon('cancel') },
-      confirmProps: { color: 'red', id: `subject-template-delete-confirm-${template.id}` },
+      confirmProps: {
+        color: 'red',
+        id: `subject-template-delete-confirm-${template.id}`,
+        loading: deletingTemplateId === template.id && deleteTemplate.isPending,
+        disabled: deletingTemplateId != null && deletingTemplateId !== template.id,
+      },
       cancelProps: { id: `subject-template-delete-cancel-${template.id}` },
       onConfirm: async () => {
         try {
+          setDeletingTemplateId(template.id);
           await deleteTemplate.mutateAsync(template.id);
           notifications.show({
             title: tCommon('success'),
@@ -135,6 +132,8 @@ export function SubjectTemplatesTabContent() {
         } catch (error) {
           const message = error instanceof Error ? error.message : tCommon('errors.generic');
           notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+        } finally {
+          setDeletingTemplateId(null);
         }
       },
     });
@@ -205,7 +204,7 @@ export function SubjectTemplatesTabContent() {
                     template={template}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
-                    isDeleting={deleteTemplate.isPending}
+                    isDeleting={deletingTemplateId === template.id && deleteTemplate.isPending}
                   />
                 ))}
               </Stack>

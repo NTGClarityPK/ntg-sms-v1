@@ -46,9 +46,31 @@ type RoleRow = {
   display_name: string;
 };
 
+type InvitationLite = {
+  user_id: string;
+  invitation_type: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+};
+
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
   throw new BadRequestException(error.message);
+}
+
+function accountStatusFromUserAndInvites(input: {
+  isActive: boolean;
+  latestInvitation?: InvitationLite | null;
+  nowMs: number;
+}): 'active' | 'pending_verification' | 'link_expired' | 'inactive' {
+  if (input.isActive) return 'active';
+  const inv = input.latestInvitation ?? null;
+  if (!inv) return 'inactive';
+  if (inv.used_at) return 'active';
+  const expMs = new Date(inv.expires_at).getTime();
+  if (!Number.isFinite(expMs)) return 'pending_verification';
+  return expMs <= input.nowMs ? 'link_expired' : 'pending_verification';
 }
 
 @Injectable()
@@ -290,6 +312,25 @@ export class UsersService {
     throwIfDbError(rolesError);
     const roleMap = new Map((rolesData || []).map((r: RoleRow) => [r.id, r]));
 
+    // Step 4.5: Invitation lifecycle status (for staff/parent users created via invitation flow)
+    // We derive account status from the latest invitation for that user (unused → pending, expired → link_expired).
+    const nowMs = Date.now();
+    const { data: invRows } = profileIds.length > 0
+      ? await supabase
+          .from('invitations')
+          .select('user_id, invitation_type, expires_at, used_at, created_at')
+          .in('user_id', profileIds)
+          .in('invitation_type', ['staff', 'parent_account'])
+          .order('created_at', { ascending: false })
+      : { data: [] };
+
+    const latestInvitationByUserId = new Map<string, InvitationLite>();
+    for (const r of (invRows ?? []) as InvitationLite[]) {
+      if (!latestInvitationByUserId.has(r.user_id)) {
+        latestInvitationByUserId.set(r.user_id, r);
+      }
+    }
+
     // Step 5: Email resolution
     // For large seeded tenants (like abcschool) calling auth.admin.getUserById
     // hundreds of times per page was causing unstable \"fetch failed\" errors.
@@ -355,6 +396,12 @@ export class UsersService {
         })
         .filter((r): r is NonNullable<typeof r> => r !== null);
 
+      const accountStatus = accountStatusFromUserAndInvites({
+        isActive: profile.is_active,
+        latestInvitation: latestInvitationByUserId.get(profile.id) ?? null,
+        nowMs,
+      });
+
       return new UserDto({
         id: profile.id,
         email: profile.email ?? emailMap.get(profile.id) ?? '',
@@ -365,6 +412,7 @@ export class UsersService {
         dateOfBirth: profile.date_of_birth ?? undefined,
         gender: profile.gender ?? undefined,
         isActive: profile.is_active,
+        accountStatus,
         roles,
         createdAt: profile.created_at,
         updatedAt: profile.updated_at,
@@ -443,6 +491,21 @@ export class UsersService {
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
     const row = profile as ProfileRow;
+
+    const { data: invRows } = await supabase
+      .from('invitations')
+      .select('user_id, invitation_type, expires_at, used_at, created_at')
+      .eq('user_id', id)
+      .in('invitation_type', ['staff', 'parent_account'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const latestInvitation = ((invRows ?? []) as InvitationLite[])[0] ?? null;
+    const accountStatus = accountStatusFromUserAndInvites({
+      isActive: row.is_active,
+      latestInvitation,
+      nowMs: Date.now(),
+    });
+
     return new UserDto({
       id: row.id,
       email: row.email ?? '',
@@ -453,6 +516,7 @@ export class UsersService {
       dateOfBirth: row.date_of_birth ?? undefined,
       gender: row.gender ?? undefined,
       isActive: row.is_active,
+      accountStatus,
       roles,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -549,8 +613,9 @@ export class UsersService {
           address: input.address ?? null,
           date_of_birth: input.dateOfBirth ?? null,
           gender: input.gender ?? null,
-          // Parents should remain pending until they complete account setup via invitation.
-          is_active: userType === 'parent' ? false : (input.isActive ?? true),
+          // Users created via invitations should remain pending until they complete account setup.
+          // Admin can activate/deactivate later via Edit.
+          is_active: false,
         })
         .select()
         .single();

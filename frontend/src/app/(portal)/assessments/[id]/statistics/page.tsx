@@ -97,6 +97,8 @@ export default function AssessmentStatisticsPage() {
       </>
     );
   }
+  const subjectName = assessment.subjectName;
+  const teacherName = assessment.teacherName;
 
   const statCards = [
     { title: t('totalStudents'), value: statistics.totalStudents, icon: IconUsers, color: 'blue' },
@@ -122,6 +124,14 @@ export default function AssessmentStatisticsPage() {
             <Title order={1}>
               {t('statisticsTitle')}: {assessment.title}
             </Title>
+            <Group gap="xs" wrap="wrap">
+              <Badge variant="light" color="blue">
+                {t('subject')}: {subjectName ?? '—'}
+              </Badge>
+              <Badge variant="light" color="teal">
+                {t('postedBy')}: {teacherName ?? '—'}
+              </Badge>
+            </Group>
           </Stack>
           <Button variant="subtle" onClick={() => router.back()}>
             {tCommon('back')}

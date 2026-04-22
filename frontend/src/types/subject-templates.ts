@@ -15,6 +15,8 @@ export interface CreateSubjectTemplateInput {
   name: string;
   description?: string;
   subjectIds?: string[];
+  classIds?: string[];
+  levelIds?: string[];
 }
 
 export interface UpdateSubjectTemplateInput {

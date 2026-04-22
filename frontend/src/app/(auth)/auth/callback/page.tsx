@@ -10,6 +10,7 @@ import { clearLocalSupabaseSession } from '@/lib/auth';
 import { applyPreferredLocaleToCookieOnlyIfUnset } from '@/lib/ui-locale';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
+import { selectBranchAndGoDashboard } from '@/lib/auth/complete-session-routing';
 
 interface Branch {
   id: string;
@@ -165,14 +166,15 @@ export default function AuthCallbackPage() {
 
         if (!roleNames.includes('school_admin')) {
           const branchId = userData.currentBranch?.id ?? userBranches[0]?.id;
-          if (branchId) {
-            localStorage.setItem('currentBranchId', branchId);
-          }
           setStepMsg(2, 'Taking you to dashboard...');
           if (typeof window !== 'undefined') {
             window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
           }
-          router.push('/dashboard');
+          if (branchId) {
+            await selectBranchAndGoDashboard(branchId, router);
+          } else {
+            router.push('/dashboard');
+          }
           return;
         }
 
@@ -183,12 +185,11 @@ export default function AuthCallbackPage() {
 
         if (userBranches.length === 1) {
           const branchId = userBranches[0].id;
-          localStorage.setItem('currentBranchId', branchId);
           setStepMsg(2, 'Taking you to dashboard...');
           if (typeof window !== 'undefined') {
             window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
           }
-          router.push('/dashboard');
+          await selectBranchAndGoDashboard(branchId, router);
           return;
         }
 
@@ -237,11 +238,9 @@ export default function AuthCallbackPage() {
   const handleBranchSelection = async (branchId: string) => {
     setBranchSelectionLoading(true);
     try {
-      await apiClient.post('/api/v1/auth/select-branch', { branchId });
-      localStorage.setItem('currentBranchId', branchId);
       setShowBranchSelection(false);
       setMessage('Taking you to dashboard...');
-      router.push('/dashboard');
+      await selectBranchAndGoDashboard(branchId, router);
     } catch (err) {
       setError('Failed to select branch. Please try again.');
     } finally {

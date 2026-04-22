@@ -77,7 +77,8 @@ export function SubjectTemplateCard({
               size="compact-sm"
               leftSection={<IconTrash size={16} />}
               onClick={() => onDelete(template)}
-              loading={isDeleting}
+              disabled={isDeleting}
+              loading={!isDeleting ? false : true}
             >
               {tSettings('subjectTemplateDeleteButton')}
             </Button>

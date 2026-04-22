@@ -198,12 +198,22 @@ export default function MyAssessmentsPage() {
                       const a = item.assessment;
                       const status = item.status;
                       const isRead = status?.isRead ?? false;
+                      const subjectName = a.subjectName;
+                      const teacherName = a.teacherName;
 
                       return (
                         <Table.Tr key={a.id}>
                           <Table.Td>
                             <Stack gap={2}>
                               <Text fw={500}>{a.title}</Text>
+                              <Group gap="xs" wrap="wrap">
+                                <Text size="xs" c="dimmed">
+                                  {t('subject')}: {subjectName ?? '—'}
+                                </Text>
+                                <Text size="xs" c="dimmed">
+                                  {t('postedBy')}: {teacherName ?? '—'}
+                                </Text>
+                              </Group>
                               {a.description && (
                                 <Text size="xs" c="dimmed">
                                   {a.description}

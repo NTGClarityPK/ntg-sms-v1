@@ -8,6 +8,8 @@ export class UserDto {
   dateOfBirth?: string;
   gender?: 'male' | 'female';
   isActive!: boolean;
+  /** Invitation / login lifecycle (independent of admin is_active for suspended accounts). */
+  accountStatus!: 'active' | 'pending_verification' | 'link_expired' | 'inactive';
   roles?: Array<{
     roleId: string;
     roleName: string;

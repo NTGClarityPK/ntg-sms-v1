@@ -8,8 +8,10 @@ export interface Assessment {
   description?: string;
   assessmentTypeId: string;
   subjectId: string;
+  subjectName?: string;
   classSectionId: string;
   createdBy: string;
+  teacherName?: string;
   totalMarks: number;
   dueDate?: string;
   publishDate?: string;

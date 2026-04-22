@@ -392,6 +392,8 @@ export class InvitationsService {
 
     if (inv.invitation_type === 'parent_account') {
       await this.activateParentAfterPasswordSetup(inv.user_id);
+    } else if (inv.invitation_type === 'staff') {
+      await this.activateStaffAfterPasswordSetup(inv.user_id);
     } else {
       await this.activateStudentAfterPasswordSetup(inv.user_id);
     }
@@ -438,6 +440,24 @@ export class InvitationsService {
     if (error) {
       this.logger.warn(
         `Could not activate parent after password setup for user ${userId}: ${error.message}`,
+      );
+    }
+  }
+
+  private async activateStaffAfterPasswordSetup(userId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        is_active: true,
+        updated_at: now,
+      })
+      .eq('id', userId)
+      .eq('is_active', false);
+    if (error) {
+      this.logger.warn(
+        `Could not activate staff after password setup for user ${userId}: ${error.message}`,
       );
     }
   }
@@ -646,7 +666,41 @@ export class InvitationsService {
       return (anyData as InvitationRow[] | null)?.[0] ?? null;
     })();
     if (!existing) {
-      throw new NotFoundException('No active invitation found for this user');
+      // Legacy/edge case: user exists but has no unused invitation row (already used or never created).
+      // Create a fresh invitation so admins can resend setup email without requiring DB cleanup.
+      const { data: authUserResult } = await supabase.auth.admin.getUserById(input.userId);
+      const loginEmail = authUserResult.user?.email;
+      if (!loginEmail) throw new NotFoundException('User not found');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, invitation_recipient_email')
+        .eq('id', input.userId)
+        .maybeSingle();
+
+      const profileRow = profile as { full_name?: string | null; invitation_recipient_email?: string | null } | null;
+      const recipientEmail =
+        input.recipientEmailOverride?.trim() ||
+        profileRow?.invitation_recipient_email?.trim() ||
+        loginEmail;
+
+      const inv = await this.createInvitation({
+        userId: input.userId,
+        recipientEmail,
+        invitationType: input.invitationType,
+        createdByUserId: input.createdByUserId,
+      });
+
+      const recipientName = profileRow?.full_name?.trim() || loginEmail;
+      await this.sendInvitationEmail({
+        invitation: inv,
+        recipientName,
+        loginEmail,
+        userEmailForAudit: input.userEmailForAudit,
+        branchId: input.branchId,
+      });
+
+      return { token: inv.token, expiresAt: inv.expires_at };
     }
 
     return this.resendInvitation({

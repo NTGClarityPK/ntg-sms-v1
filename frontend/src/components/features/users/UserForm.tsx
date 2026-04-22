@@ -181,7 +181,6 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
           dateOfBirth: values.dateOfBirth || undefined,
           gender: values.gender,
           roleIds: values.roleIds,
-          isActive: values.isActive,
         };
 
         await createUser.mutateAsync(createData);
@@ -357,16 +356,18 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
             />
           )}
 
-          <Select
-            id="user-form-status"
-            label={t('status')}
-            data={[
-              { value: 'true', label: t('active') },
-              { value: 'false', label: t('inactive') },
-            ]}
-            value={form.values.isActive ? 'true' : 'false'}
-            onChange={(value) => form.setFieldValue('isActive', value === 'true')}
-          />
+          {isEdit && (
+            <Select
+              id="user-form-status"
+              label={t('status')}
+              data={[
+                { value: 'true', label: t('active') },
+                { value: 'false', label: t('inactive') },
+              ]}
+              value={form.values.isActive ? 'true' : 'false'}
+              onChange={(value) => form.setFieldValue('isActive', value === 'true')}
+            />
+          )}
 
           <Group justify="flex-end" mt="md">
             <Button id="user-form-cancel" variant="subtle" onClick={onClose}>
