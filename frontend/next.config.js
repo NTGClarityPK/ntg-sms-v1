@@ -22,7 +22,11 @@ const pwaConfig = withPWA({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
   register: true,
-  skipWaiting: false, // Avoid immediate reload when SW updates after going online; new SW applies on next visit
+  // Critical: avoid serving stale app shell after deployments/auth redirects.
+  // Without this, users can get stuck on an old build that boots with mismatched env/session until refresh.
+  skipWaiting: true,
+  clientsClaim: true,
+  cleanupOutdatedCaches: true,
   // Do not cache API requests in the SW: when network fails, Workbox would throw "no-response"
   // and break the app. Let API calls go to the network only.
   runtimeCaching: [],

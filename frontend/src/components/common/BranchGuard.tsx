@@ -19,6 +19,16 @@ export function BranchGuard({ children }: BranchGuardProps) {
   const [isSelectingBranch, setIsSelectingBranch] = useState(false);
   const [isRecoveringAuth, setIsRecoveringAuth] = useState(false);
 
+  // Occasionally (especially right after signup redirect), React Query can be between states where
+  // `isLoading` is false but `user` is still undefined and `error` is not yet populated.
+  // Rendering the portal shell in this window can lead to a blank page if any child assumes user exists.
+  const isAuthIndeterminate =
+    !isLoading &&
+    !isSelectingBranch &&
+    !isRecoveringAuth &&
+    !userTyped &&
+    !error;
+
   const needsAuthRecovery =
     !isLoading &&
     !isSelectingBranch &&
@@ -88,7 +98,7 @@ export function BranchGuard({ children }: BranchGuardProps) {
 
   // Show loading while checking or auto-selecting branch
   // Also hold render if auth is currently errored/missing (prevents blank screen during signup redirect).
-  if (isLoading || isRecoveringAuth || isSelectingBranch || needsAuthRecovery) {
+  if (isLoading || isRecoveringAuth || isSelectingBranch || needsAuthRecovery || isAuthIndeterminate) {
     return (
       <Container size="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <Stack gap="md" align="center">

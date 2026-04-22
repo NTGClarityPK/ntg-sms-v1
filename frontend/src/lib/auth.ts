@@ -97,8 +97,31 @@ export async function getSession() {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-
   return session;
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Supabase can briefly return `null` session immediately after redirects (OAuth) or on first mount.
+ * This helper makes guards resilient without forcing a full refresh.
+ */
+export async function getSessionWithRetry(input?: {
+  attempts?: number;
+  delayMs?: number;
+}) {
+  const attempts = Math.max(1, input?.attempts ?? 10);
+  const delayMs = Math.max(0, input?.delayMs ?? 100);
+
+  for (let i = 0; i < attempts; i++) {
+    const session = await getSession();
+    if (session?.access_token) return session;
+    if (i < attempts - 1) await sleep(delayMs);
+  }
+
+  return null;
 }
 
 export async function resetPasswordForEmail(email: string) {

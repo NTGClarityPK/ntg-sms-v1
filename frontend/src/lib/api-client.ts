@@ -12,6 +12,28 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+type RefreshLock = Promise<string | null> | null;
+let refreshLock: RefreshLock = null;
+
+async function refreshSupabaseSessionOnce(): Promise<string | null> {
+  if (refreshLock) return refreshLock;
+
+  refreshLock = (async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) return null;
+      const token = data.session?.access_token ?? null;
+      return token;
+    } catch {
+      return null;
+    } finally {
+      refreshLock = null;
+    }
+  })();
+
+  return refreshLock;
+}
+
 async function getSupabaseAccessTokenWithRetry(input: {
   attempts: number;
   delayMs: number;
@@ -199,10 +221,39 @@ class ApiClient {
           const body = error.response.data as { error?: { message?: string } } | undefined;
           const message = body?.error?.message ?? (body as { message?: string })?.message ?? '';
 
+          // If Supabase has a local session but the backend rejected the access token,
+          // attempt a single refresh and retry the original request.
+          //
+          // This fixes the common "redirect to dashboard → /auth/me 401 invalid/expired → blank shell until manual refresh"
+          // race on first mount after login/OAuth.
+          const originalConfig = error.config as (InternalAxiosRequestConfig & {
+            _ntgRetriedAfterRefresh?: boolean;
+          }) | undefined;
+          const isRetriable =
+            typeof window !== 'undefined' &&
+            Boolean(originalConfig) &&
+            !originalConfig?._ntgRetriedAfterRefresh;
+
+          const isNoToken =
+            typeof message === 'string' && message.toLowerCase().includes('no token provided');
+
+          if (!isNoToken && isRetriable) {
+            try {
+              const refreshedToken = await refreshSupabaseSessionOnce();
+              if (refreshedToken && originalConfig) {
+                originalConfig._ntgRetriedAfterRefresh = true;
+                originalConfig.headers = originalConfig.headers ?? {};
+                originalConfig.headers.Authorization = `Bearer ${refreshedToken}`;
+                return await this.client.request(originalConfig);
+              }
+            } catch {
+              // Fall through to normal 401 handling
+            }
+          }
+
             // Only force logout when the token was sent but invalid/expired.
             // "No token provided" means the request went out without a token (e.g. session not
             // ready yet or race on page load) – do NOT logout so the user isn’t kicked out unnecessarily.
-          const isNoToken = typeof message === 'string' && message.toLowerCase().includes('no token provided');
           if (!isNoToken && typeof window !== 'undefined') {
             try {
               const {

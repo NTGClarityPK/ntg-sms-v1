@@ -3,6 +3,20 @@ import type { Tenant } from '@/types/tenant';
 import { clearLocalSupabaseSession } from '@/lib/auth';
 import { applyPreferredLocaleToCookieOnlyIfUnset } from '@/lib/ui-locale';
 import { queryClient } from '@/lib/query-client';
+import { getSessionWithRetry } from '@/lib/auth';
+
+const POST_SIGNUP_RELOAD_FLAG = 'ntg_post_signup_reload_v1';
+const POST_SIGNUP_RELOADED_FLAG = 'ntg_post_signup_reloaded_v1';
+
+function setPostSignupReloadFlags(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(POST_SIGNUP_RELOAD_FLAG, '1');
+    window.sessionStorage.removeItem(POST_SIGNUP_RELOADED_FLAG);
+  } catch {
+    // Non-blocking
+  }
+}
 
 function formatApiErrorBodyMessage(
   data: { error?: { message?: string | string[] }; message?: string | string[] } | undefined,
@@ -54,6 +68,24 @@ export async function selectBranchAndGoDashboard(
     }
   } catch {
     // Non-blocking: dashboard will still bootstrap theme via AuthGuard/Header
+  }
+
+  // After signup (especially on first tenant creation), client-side navigation can occasionally
+  // get stuck with the URL updated but the portal segment not mounted yet. A hard navigation
+  // ensures the portal layout bootstraps cleanly with the fresh session + branch context.
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/signup')) {
+    // Make sure the session is actually persisted/readable before we hard-navigate,
+    // otherwise the first /dashboard load can boot without auth and appear blank until refresh.
+    try {
+      await getSessionWithRetry({ attempts: 30, delayMs: 100 });
+    } catch {
+      // Non-blocking — auth guard will still retry on the dashboard.
+    }
+    // Ask the portal layout to do one controlled hard reload after landing.
+    // This mirrors the manual refresh that reliably fixes the blank dashboard after signup.
+    setPostSignupReloadFlags();
+    window.location.href = '/dashboard';
+    return;
   }
 
   router.push('/dashboard');
@@ -125,7 +157,13 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
     const isSchoolAdmin = normalisedRoleNames.includes('school_admin');
 
     if (!isSchoolAdmin) {
-      router.push('/dashboard');
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/signup')) {
+        // Ensure the portal layout will hard-reload once after landing.
+        setPostSignupReloadFlags();
+        window.location.href = '/dashboard';
+      } else {
+        router.push('/dashboard');
+      }
       setLoading?.(false);
       return;
     }

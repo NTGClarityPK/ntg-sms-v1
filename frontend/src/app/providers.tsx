@@ -33,6 +33,63 @@ function DevServiceWorkerCleanup() {
   return null;
 }
 
+/**
+ * Recover from transient client boot failures (e.g. ChunkLoadError) by reloading once.
+ * This prevents "blank page until manual refresh" after auth redirects or deployments.
+ */
+function GlobalClientBootRecovery() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onceKey = 'ntg_reload_once_after_boot_error';
+
+    const shouldReloadFor = (reason: unknown): boolean => {
+      const message =
+        typeof reason === 'string'
+          ? reason
+          : reason instanceof Error
+            ? reason.message
+            : (reason as { message?: string })?.message ?? '';
+
+      const msg = String(message || '').toLowerCase();
+      return (
+        msg.includes('chunkloaderror') ||
+        msg.includes('loading chunk') ||
+        msg.includes('failed to fetch dynamically imported module') ||
+        msg.includes('hydration') ||
+        msg.includes('minified react error')
+      );
+    };
+
+    const reloadOnce = () => {
+      try {
+        if (window.sessionStorage.getItem(onceKey) === '1') return;
+        window.sessionStorage.setItem(onceKey, '1');
+      } catch {
+        // If sessionStorage is blocked, still attempt a reload once per page load.
+      }
+      window.location.reload();
+    };
+
+    const onError = (event: ErrorEvent) => {
+      if (shouldReloadFor(event.error ?? event.message)) reloadOnce();
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (shouldReloadFor(event.reason)) reloadOnce();
+    };
+
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, []);
+
+  return null;
+}
+
 /** Remove legacy locale storage key (cookie is the single source of truth). */
 function LegacyLocaleStorageCleanup() {
   useEffect(() => {
@@ -83,6 +140,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ThemeWrapper>
         <InstallAppProvider>
           <LocaleRepairRefresh />
+          <GlobalClientBootRecovery />
           <LegacyLocaleStorageCleanup />
           <DevServiceWorkerCleanup />
           <Notifications />

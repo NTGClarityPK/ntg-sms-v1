@@ -31,7 +31,7 @@ import {
   IconBrandGoogle,
 } from '@tabler/icons-react';
 import { apiClient, getEffectiveApiBaseURL } from '@/lib/api-client';
-import { signIn } from '@/lib/auth';
+import { getSessionWithRetry, signIn } from '@/lib/auth';
 import {
   completeSessionRouting,
   selectBranchAndGoDashboard,
@@ -280,6 +280,9 @@ export default function SignupPage() {
         if (!sessionResult.session) {
           throw new Error('Session not created');
         }
+        // Ensure session is readable/persisted before routing, otherwise first /dashboard load
+        // can mount without auth and appear blank until a manual refresh.
+        await getSessionWithRetry({ attempts: 30, delayMs: 100 });
       } catch {
         setLoading(false);
         notifications.show({
