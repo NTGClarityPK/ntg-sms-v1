@@ -87,6 +87,7 @@ export class AttendanceController {
   async listAttendance(
     @Query() query: QueryAttendanceDto,
     @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const activeYear = await this.academicYearsService.getActiveForBranch(branch.branchId);
     if (!activeYear) {
@@ -96,6 +97,7 @@ export class AttendanceController {
       query,
       branch.branchId,
       query.academicYearId || activeYear.id,
+      user,
     );
   }
 
@@ -225,6 +227,7 @@ export class AttendanceController {
   async generateAttendanceReport(
     @Query() query: QueryAttendanceDto,
     @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
     const activeYear = await this.academicYearsService.getActiveForBranch(branch.branchId);
     if (!activeYear) {
@@ -234,6 +237,7 @@ export class AttendanceController {
       query,
       branch.branchId,
       query.academicYearId || activeYear.id,
+      user,
     );
     return { data };
   }

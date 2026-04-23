@@ -237,17 +237,19 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                             <IconEdit size={isMobile ? 14 : 16} />
                           </ActionIcon>
                         </Tooltip>
-                        <Tooltip label={t('resendInvitationTitle')} withArrow>
-                          <ActionIcon
-                            id={`students-resend-invite-${student.id}`}
-                            variant="light"
-                            size={isMobile ? 'sm' : 'md'}
-                            onClick={() => handleResend(student)}
-                            aria-label={t('resendInvitationTitle')}
-                          >
-                            <IconMailForward size={isMobile ? 14 : 16} />
-                          </ActionIcon>
-                        </Tooltip>
+                        {student.accountStatus !== 'active' && !student.isActive ? (
+                          <Tooltip label={t('resendInvitationTitle')} withArrow>
+                            <ActionIcon
+                              id={`students-resend-invite-${student.id}`}
+                              variant="light"
+                              size={isMobile ? 'sm' : 'md'}
+                              onClick={() => handleResend(student)}
+                              aria-label={t('resendInvitationTitle')}
+                            >
+                              <IconMailForward size={isMobile ? 14 : 16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        ) : null}
                       </Group>
                     )}
                   </Table.Td>

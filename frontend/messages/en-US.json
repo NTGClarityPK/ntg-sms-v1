@@ -224,7 +224,8 @@
     "studentId": "Student ID",
     "class": "Class",
     "section": "Section",
-    "statusColumn": "Status"
+    "statusColumn": "Status",
+    "markedByColumn": "Marked by"
   },
   "auth": {
     "signIn": "Sign in",

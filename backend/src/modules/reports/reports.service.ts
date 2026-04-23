@@ -210,16 +210,17 @@ export class ReportsService {
       const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (!activeYear) return null;
       const today = new Date().toISOString().split('T')[0];
-      const yearEnd = activeYear.endDate.split('T')[0];
       const start = activeYear.startDate.split('T')[0];
-      const end = today <= yearEnd ? today : yearEnd;
+      // "Year to date" should include up to today even if academic year end is misconfigured in the past.
+      // All queries are still scoped by academic_year_id, so using today here is safe and prevents empty YTD.
+      const end = today;
       // Guard against misconfigured future-dated academic years where start > end.
-      // In that case, treat the period as a single-day range at `end` (usually "today"),
-      // so reports still work with real data timestamps.
-      return {
-        startDate: start <= end ? start : end,
-        endDate: end,
-      };
+      // If we collapse to a single-day range, "Year to date" can show 0% for assignments
+      // even though there is data in this academic year (created earlier than today).
+      // Since queries are already scoped by academic_year_id, it's safe to widen the start.
+      return start <= end
+        ? { startDate: start, endDate: end }
+        : { startDate: '1900-01-01', endDate: end };
     }
 
     if (periodType === ReportPeriodType.CUSTOM) {
@@ -477,19 +478,21 @@ export class ReportsService {
     const student = await this.studentsService.getStudentById(studentId, branchId);
 
     // Get date range for period filtering
-    // IMPORTANT: treat "year" as the academic-year scope itself, not an extra created_at filter.
-    // This keeps on-screen report consistent with PDF export (which does not pass period params),
-    // and avoids accidental empty stats when academic years are configured in the future.
-    const dateRange =
-      periodParams?.periodType && periodParams.periodType !== ReportPeriodType.YEAR
-        ? await this.getDateRangeForPeriod(
-            periodParams.periodType,
-            periodParams.startDate,
-            periodParams.endDate,
-            branchId,
-            yearId,
-          )
-        : null;
+    // For "Year to date", we still need a real date window (academic-year start → today, clamped)
+    // so assignment/behavioural period stats don't accidentally show 0% when the academic year
+    // is misconfigured (e.g. future start/end dates).
+    //
+    // Note: PDF/Excel exports call getStudentReport without periodParams, so exports remain
+    // full academic-year by default unless the export endpoint passes a period explicitly.
+    const dateRange = periodParams?.periodType
+      ? await this.getDateRangeForPeriod(
+          periodParams.periodType,
+          periodParams.startDate,
+          periodParams.endDate,
+          branchId,
+          yearId,
+        )
+      : null;
 
     const [grades, attendanceSummary, behavioralRes] = await Promise.all([
       this.gradesService.getGradesByStudent(studentId, branchId).catch(() => [] as StudentGradeDto[]),

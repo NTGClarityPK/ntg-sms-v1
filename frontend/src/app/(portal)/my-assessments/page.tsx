@@ -73,24 +73,16 @@ export default function MyAssessmentsPage() {
   }, [previewAttachment]);
 
   const handleMarkRead = (assessmentId: string, currentStatus?: string, isRead?: boolean) => {
-    if (isRead) {
-      // Toggle to unread and reset status to not_started
-      updateStatus.mutate({ assessmentId, isRead: false, status: 'not_started' });
-    } else {
-      // Mark as read and move to in_progress (unless already submitted)
-      const nextStatus = currentStatus === 'submitted' ? 'submitted' : 'in_progress';
-      updateStatus.mutate({ assessmentId, isRead: true, status: nextStatus });
-    }
+    if (isRead) return;
+    // Mark as read and move to in_progress (unless already submitted)
+    const nextStatus = currentStatus === 'submitted' ? 'submitted' : 'in_progress';
+    updateStatus.mutate({ assessmentId, isRead: true, status: nextStatus });
   };
 
   const handleMarkSubmitted = (assessmentId: string, currentStatus?: string) => {
-    if (currentStatus === 'submitted') {
-      // Toggle to not submitted, keep as read and in progress
-      updateStatus.mutate({ assessmentId, status: 'in_progress', isRead: true });
-    } else {
-      // Mark as submitted and read
-      updateStatus.mutate({ assessmentId, status: 'submitted', isRead: true });
-    }
+    if (currentStatus === 'submitted') return;
+    // Mark as submitted and read
+    updateStatus.mutate({ assessmentId, status: 'submitted', isRead: true });
   };
 
   const renderStatusBadge = (status?: string, isRead?: boolean) => {
@@ -188,7 +180,7 @@ export default function MyAssessmentsPage() {
                       <Table.Th>{t('status')}</Table.Th>
                       <Table.Th>{t('dueDate')}</Table.Th>
                       <Table.Th>{t('attachments')}</Table.Th>
-                      <Table.Th style={{ textAlign: isMobile ? 'left' : 'right', minWidth: isMobile ? 200 : undefined }}>
+                      <Table.Th style={{ textAlign: 'center', minWidth: isMobile ? 200 : undefined }}>
                         {tCommon('actions')}
                       </Table.Th>
                     </Table.Tr>
@@ -200,25 +192,28 @@ export default function MyAssessmentsPage() {
                       const isRead = status?.isRead ?? false;
                       const subjectName = a.subjectName;
                       const teacherName = a.teacherName;
+                      const statusValue = status?.status;
 
                       return (
                         <Table.Tr key={a.id}>
                           <Table.Td>
-                            <Stack gap={2}>
-                              <Text fw={500}>{a.title}</Text>
+                            <Stack gap={6}>
+                              <Text fw={600} lh={1.25}>
+                                {a.title}
+                              </Text>
                               <Group gap="xs" wrap="wrap">
-                                <Text size="xs" c="dimmed">
+                                <Badge variant="light" color="blue">
                                   {t('subject')}: {subjectName ?? '—'}
-                                </Text>
-                                <Text size="xs" c="dimmed">
-                                  {t('postedBy')}: {teacherName ?? '—'}
+                                </Badge>
+                                <Text size="sm" c="dimmed">
+                                  {t('postedBy')}: <Text span fw={500} c="dark">{teacherName ?? '—'}</Text>
                                 </Text>
                               </Group>
-                              {a.description && (
-                                <Text size="xs" c="dimmed">
+                              {a.description ? (
+                                <Text size="sm" c="dimmed" lineClamp={2}>
                                   {a.description}
                                 </Text>
-                              )}
+                              ) : null}
                             </Stack>
                           </Table.Td>
                           <Table.Td>{renderStatusBadge(status?.status, isRead)}</Table.Td>
@@ -255,45 +250,33 @@ export default function MyAssessmentsPage() {
                               </Text>
                             )}
                           </Table.Td>
-                          <Table.Td style={{ verticalAlign: 'top' }}>
-                            {isMobile ? (
-                              <Stack gap="xs" maw={220}>
+                          <Table.Td style={{ verticalAlign: 'middle' }}>
+                            <Group justify={isMobile ? 'flex-start' : 'center'}>
+                              {statusValue === 'submitted' ? (
+                                <Badge color="green" variant="filled">
+                                  {t('submitted')}
+                                </Badge>
+                              ) : !isRead ? (
                                 <Button
                                   size="xs"
                                   variant="light"
-                                  fullWidth
-                                  onClick={() => handleMarkRead(a.id, status?.status, isRead)}
+                                  miw={140}
+                                  onClick={() => handleMarkRead(a.id, statusValue, isRead)}
                                 >
-                                  {isRead ? t('markUnread') : t('markAsRead')}
+                                  {t('markAsRead')}
                                 </Button>
+                              ) : (
                                 <Button
                                   size="xs"
                                   color="green"
                                   variant="light"
-                                  fullWidth
-                                  onClick={() => handleMarkSubmitted(a.id, status?.status)}
+                                  miw={140}
+                                  onClick={() => handleMarkSubmitted(a.id, statusValue)}
                                 >
-                                  {status?.status === 'submitted' ? t('markNotSubmitted') : t('markSubmitted')}
+                                  {t('markSubmitted')}
                                 </Button>
-                              </Stack>
-                            ) : (
-                              <Group justify="flex-end" gap="xs" wrap="nowrap">
-                                <Button
-                                  size="xs"
-                                  variant="subtle"
-                                  onClick={() => handleMarkRead(a.id, status?.status, isRead)}
-                                >
-                                  {isRead ? t('markUnread') : t('markAsRead')}
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  color="green"
-                                  onClick={() => handleMarkSubmitted(a.id, status?.status)}
-                                >
-                                  {status?.status === 'submitted' ? t('markNotSubmitted') : t('markSubmitted')}
-                                </Button>
-                              </Group>
-                            )}
+                              )}
+                            </Group>
                           </Table.Td>
                         </Table.Tr>
                       );

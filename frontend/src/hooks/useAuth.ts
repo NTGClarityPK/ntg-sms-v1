@@ -3,84 +3,67 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import {
-  getUiLocaleCookieFromDocument,
-  LOCALE_REPAIR_REFRESH_FLAG,
-  normalizeUiLocale,
-  readResolvedUiLocaleFromBrowser,
-  setUiLocaleCookieOnDocument,
-} from '@/lib/ui-locale';
-import { syncProfilePreferredLocaleWithCookie } from '@/lib/locale-preference-sync';
 import { User } from '@/types/auth';
 import { supabase } from '@/lib/supabase/client';
 
-function isEnglishFamily(l: string): boolean {
-  return l === 'en' || l === 'en-US' || l === 'en-GB';
-}
+/** Temporary diagnostics — `npm run dev` only; stripped from production bundles via `NODE_ENV`. */
+const AUTH_ME_DIAG = process.env.NODE_ENV === 'development';
 
 async function fetchCurrentUser(): Promise<User> {
-  const response = await apiClient.get<User>('/api/v1/auth/me');
-  let user = response.data;
-
-  // Critical: right after login/OAuth, we can have a branchId in localStorage (set by auth callback)
-  // but `/auth/me` may still return `currentBranch: null` until the branch is selected server-side.
-  // If we cache that response, dashboard queries stay disabled and the UI can get stuck on skeletons.
-  if (typeof window !== 'undefined' && !user?.currentBranch?.id) {
-    const branchIdHint = window.localStorage.getItem('currentBranchId');
-    if (branchIdHint && branchIdHint.trim() !== '') {
-      try {
-        await apiClient.post('/api/v1/auth/select-branch', { branchId: branchIdHint });
-        const refreshed = await apiClient.get<User>('/api/v1/auth/me');
-        user = refreshed.data;
-      } catch {
-        // Non-blocking: if select-branch fails (e.g. user not allowed), keep original user.
-      }
-    }
+  if (AUTH_ME_DIAG) {
+    console.log('🟡 FETCH_CURRENT_USER: Starting...');
   }
 
-  if (typeof window !== 'undefined') {
-    const rawPreferred =
-      user.preferredLocale ?? (user as { preferred_locale?: string }).preferred_locale;
-    const preferredNorm = normalizeUiLocale(rawPreferred ?? 'en-US');
+  try {
+    const response = await apiClient.get<User>('/api/v1/auth/me');
+    const user = response.data;
 
-    const cookieRaw = getUiLocaleCookieFromDocument();
-    const cookieNorm = readResolvedUiLocaleFromBrowser();
+    if (AUTH_ME_DIAG) {
+      console.log('🟡 FETCH_CURRENT_USER: Got response:', {
+        hasUser: !!user,
+        userId: user?.id,
+        currentBranch: user?.currentBranch,
+      });
+    }
 
-    // Profile says English but cookie resolved to Arabic (repair legacy mismatch).
-    const needsEnglishRepair =
-      cookieNorm != null &&
-      isEnglishFamily(preferredNorm) &&
-      cookieNorm === 'ar';
-
-    // When NEXT_LOCALE is missing in the browser, the server may still render English (default)
-    // while preferred_locale is Arabic — never push profile into the cookie here or the next
-    // refresh will follow the new cookie and flip the UI. Align the cookie with what we already
-    // rendered: <html lang> from the root layout (next-intl / resolveUiLocaleForRequest).
-    const cookieAbsent = cookieRaw == null || cookieRaw.trim() === '';
-
-    const shouldRepairLocaleCookie = needsEnglishRepair || cookieAbsent;
-
-    if (shouldRepairLocaleCookie) {
-      const nextLocale = needsEnglishRepair
-        ? preferredNorm
-        : normalizeUiLocale(document.documentElement?.lang?.trim() || 'en-US');
-      setUiLocaleCookieOnDocument(nextLocale);
-      try {
-        window.sessionStorage.setItem(LOCALE_REPAIR_REFRESH_FLAG, '1');
-      } catch {
-        // Non-blocking
+    // Critical: right after login/OAuth, we can have a branchId in localStorage (set by auth callback)
+    // but `/auth/me` may still return `currentBranch: null` until the branch is selected server-side.
+    // Keep this logic, but do NOT do anything else in this function that can block returning the user.
+    if (typeof window !== 'undefined' && !user?.currentBranch?.id) {
+      const branchIdHint = window.localStorage.getItem('currentBranchId');
+      if (branchIdHint && branchIdHint.trim() !== '') {
+        try {
+          await apiClient.post('/api/v1/auth/select-branch', { branchId: branchIdHint });
+          const refreshed = await apiClient.get<User>('/api/v1/auth/me');
+          if (AUTH_ME_DIAG) {
+            console.log('🟢 FETCH_CURRENT_USER: Returning user (after branch selection):', {
+              userId: refreshed.data?.id,
+              currentBranchId: refreshed.data?.currentBranch?.id,
+            });
+          }
+          return refreshed.data;
+        } catch (branchErr: unknown) {
+          if (AUTH_ME_DIAG) {
+            console.warn('Branch selection failed; continuing with original user.', branchErr);
+          }
+        }
       }
     }
 
-    // Single source of truth: NEXT_LOCALE drives SSR; DB preference follows the cookie when they differ.
-    const finalCookieNorm = readResolvedUiLocaleFromBrowser();
-    await syncProfilePreferredLocaleWithCookie({
-      cookieNorm: finalCookieNorm,
-      profilePreferredRaw: rawPreferred,
-    });
-  }
+    if (AUTH_ME_DIAG) {
+      console.log('🟢 FETCH_CURRENT_USER: Returning user:', {
+        userId: user?.id,
+        currentBranchId: user?.currentBranch?.id,
+      });
+    }
 
-  return user;
+    return user;
+  } catch (error: unknown) {
+    if (AUTH_ME_DIAG) {
+      console.error('❌ FETCH_CURRENT_USER: Error:', error);
+    }
+    throw error;
+  }
 }
 
 export function useAuth() {
@@ -129,6 +112,16 @@ export function useAuth() {
     staleTime: 5 * 60 * 1000,  // 5 minutes - user data rarely changes
     gcTime: 10 * 60 * 1000,    // 10 minutes
   });
+
+  if (AUTH_ME_DIAG) {
+    console.log('🔵 USE_AUTH STATE:', {
+      user,
+      isLoading,
+      error,
+      status,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   // Keep branch ID in localStorage when user data changes (avoid side effects during render).
   useEffect(() => {

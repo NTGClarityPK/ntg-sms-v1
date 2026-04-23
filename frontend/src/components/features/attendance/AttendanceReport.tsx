@@ -60,7 +60,7 @@ export function AttendanceReport({
   const handleExport = () => {
     // Future: Export to CSV/Excel
     const csv = [
-      ['Date', 'Student Name', 'Student ID', 'Class', 'Section', 'Status', 'Entry Time', 'Exit Time', 'Notes'].join(','),
+      ['Date', 'Student Name', 'Student ID', 'Class', 'Section', 'Status', 'Marked By', 'Entry Time', 'Exit Time', 'Notes'].join(','),
       ...attendance.map((a) =>
         [
           a.date,
@@ -69,6 +69,7 @@ export function AttendanceReport({
           a.className,
           a.sectionName,
           a.status,
+          a.markedByName || '',
           a.entryTime || '',
           a.exitTime || '',
           (a.notes || '').replace(/,/g, ';'),
@@ -250,6 +251,7 @@ export function AttendanceReport({
                     <Table.Th>{t('class')}</Table.Th>
                     <Table.Th>{t('section')}</Table.Th>
                     <Table.Th>{t('statusColumn')}</Table.Th>
+                  <Table.Th>{t('markedByColumn')}</Table.Th>
                     <Table.Th>{t('entryTime')}</Table.Th>
                     <Table.Th>{t('exitTime')}</Table.Th>
                     <Table.Th>{t('notes')}</Table.Th>
@@ -279,6 +281,7 @@ export function AttendanceReport({
                           {record.status.toUpperCase()}
                         </Badge>
                       </Table.Td>
+                      <Table.Td>{record.markedByName || '-'}</Table.Td>
                       <Table.Td>{record.entryTime || '-'}</Table.Td>
                       <Table.Td>{record.exitTime || '-'}</Table.Td>
                       <Table.Td>{record.notes || '-'}</Table.Td>

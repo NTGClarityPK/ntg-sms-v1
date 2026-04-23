@@ -4,8 +4,7 @@
  *
  * Resolution rules (must stay aligned everywhere):
  * - **Authoritative for UI (SSR + refresh)**: `NEXT_LOCALE` — see {@link resolveUiLocaleForRequest}.
- * - **`profiles.preferred_locale`**: kept in sync from the cookie after `/auth/me` when they differ (cookie wins); login/OAuth
- *   only seeds the cookie when it is unset ({@link applyPreferredLocaleToCookieOnlyIfUnset}).
+ * - **`profiles.preferred_locale`**: the DB preference; used to align the cookie after login/OAuth flows.
  * - **Middleware + next-intl server (`i18n/request.ts`)**: use {@link resolveUiLocaleForRequest} only.
  * - **Browser reads**: use {@link readResolvedUiLocaleFromBrowser} (or next-intl’s `useLocale()` after cookie is canonical).
  * - Low-level helpers ({@link resolveLocaleFromCookieHeader}, etc.) exist for tests and edge cases; prefer the functions above.
@@ -13,9 +12,6 @@
 
 export const UI_LOCALE_COOKIE = 'NEXT_LOCALE';
 export const UI_LOCALE_COOKIE_MAX_AGE = 31536000;
-
-/** Session flag: client repaired NEXT_LOCALE; trigger one RSC refresh (see LocaleRepairRefresh). */
-export const LOCALE_REPAIR_REFRESH_FLAG = 'ntg_locale_cookie_repaired';
 
 const SUPPORTED = new Set(['en', 'en-US', 'en-GB', 'ar']);
 
@@ -126,20 +122,6 @@ export function readResolvedUiLocaleFromBrowser(): string | null {
   const raw = getUiLocaleCookieFromDocument();
   if (raw == null || raw.trim() === '') return null;
   return normalizeUiLocale(decodeCookieValue(raw));
-}
-
-/**
- * Login / OAuth only: apply `profiles.preferred_locale` to `NEXT_LOCALE` when no cookie exists yet.
- * Never overwrite an existing cookie — preferred_locale may still be `ar` while the user already has
- * `NEXT_LOCALE=en` from the language switcher or from alignment with the server-rendered locale.
- */
-export function applyPreferredLocaleToCookieOnlyIfUnset(
-  preferredRaw: string | null | undefined,
-): void {
-  if (typeof document === 'undefined') return;
-  const raw = getUiLocaleCookieFromDocument();
-  if (raw != null && raw.trim() !== '') return;
-  setUiLocaleCookieOnDocument(normalizeUiLocale(preferredRaw ?? 'en-US'));
 }
 
 export function setUiLocaleCookieOnDocument(locale: string): void {

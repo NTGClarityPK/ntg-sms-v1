@@ -224,7 +224,8 @@
     "studentId": "رقم الطالب",
     "class": "الصف",
     "section": "الشعبة",
-    "statusColumn": "الحالة"
+    "statusColumn": "الحالة",
+    "markedByColumn": "سجّله"
   },
   "auth": {
     "signIn": "تسجيل الدخول",

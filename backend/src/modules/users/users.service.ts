@@ -848,6 +848,68 @@ export class UsersService {
   ): Promise<void> {
     const supabase = this.supabaseConfig.getClient();
 
+    // Prevent deactivating users who are still linked to core entities.
+    // This avoids orphaned mappings (teacher assignments, class teacher, parent/student links).
+    const linkedTo = await (async (): Promise<string[]> => {
+      const reasons: string[] = [];
+
+      // Student account link
+      const { count: studentCount, error: studentErr } = await supabase
+        .from('students')
+        .select('id', { count: 'exact', head: true })
+        .eq('branch_id', branchId)
+        .eq('user_id', id);
+      throwIfDbError(studentErr);
+      if ((studentCount ?? 0) > 0) reasons.push('student record');
+
+      // Parent/guardian link (not branch-scoped in all schemas, so check by user id only)
+      const { count: parentLinkCount, error: parentErr } = await supabase
+        .from('parent_students')
+        .select('student_id', { count: 'exact', head: true })
+        .eq('parent_user_id', id);
+      throwIfDbError(parentErr);
+      if ((parentLinkCount ?? 0) > 0) reasons.push('parent-student link');
+
+      // Staff mapping (teacher assignments / class teacher)
+      const { data: staffRow, error: staffErr } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('user_id', id)
+        .maybeSingle();
+      throwIfDbError(staffErr);
+      const staffId = (staffRow as { id?: string } | null)?.id;
+      if (staffId) {
+        const [{ count: classTeacherCount, error: ctErr }, { count: assignmentCount, error: taErr }] =
+          await Promise.all([
+            supabase
+              .from('class_sections')
+              .select('id', { count: 'exact', head: true })
+              .eq('branch_id', branchId)
+              .eq('class_teacher_id', staffId),
+            supabase
+              .from('teacher_assignments')
+              .select('id', { count: 'exact', head: true })
+              .eq('branch_id', branchId)
+              .eq('staff_id', staffId),
+          ]);
+        throwIfDbError(ctErr);
+        throwIfDbError(taErr);
+        if ((classTeacherCount ?? 0) > 0) reasons.push('class teacher assignment');
+        if ((assignmentCount ?? 0) > 0) reasons.push('subject/class mapping');
+      }
+
+      return reasons;
+    })();
+
+    if (linkedTo.length > 0) {
+      throw new BadRequestException(
+        `Cannot deactivate this user because they are linked to: ${linkedTo.join(
+          ', ',
+        )}. Remove these links first, then try again.`,
+      );
+    }
+
     const { data: oldRow, error: fetchError } = await supabase
       .from('profiles')
       .select('*')

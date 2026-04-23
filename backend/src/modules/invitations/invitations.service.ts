@@ -638,6 +638,34 @@ export class InvitationsService {
     const supabase = this.supabaseConfig.getClient();
     await this.enforceRateLimit(input.createdByUserId);
 
+    // Do not resend invitations for users who have already activated.
+    // Activation status is tracked differently depending on invitation type.
+    if (input.invitationType === 'student') {
+      const { data: stu, error: stuErr } = await supabase
+        .from('students')
+        .select('account_status, is_active')
+        .eq('user_id', input.userId)
+        .maybeSingle();
+      throwIfDbError(stuErr);
+      const row = stu as { account_status?: string | null; is_active?: boolean | null } | null;
+      const isActiveStudent =
+        row?.account_status === 'active' || row?.is_active === true;
+      if (isActiveStudent) {
+        throw new BadRequestException('User is already active');
+      }
+    } else {
+      const { data: profile, error: profErr } = await supabase
+        .from('profiles')
+        .select('is_active')
+        .eq('id', input.userId)
+        .maybeSingle();
+      throwIfDbError(profErr);
+      const row = profile as { is_active?: boolean | null } | null;
+      if (row?.is_active === true) {
+        throw new BadRequestException('User is already active');
+      }
+    }
+
     // First try: resend an unused invitation of the requested type (prevents mixing up parent/student/staff flows).
     const { data: typedData, error: typedError } = await supabase
       .from('invitations')

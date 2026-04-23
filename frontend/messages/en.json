@@ -92,6 +92,7 @@
     "classSection": "Class Section",
     "selectClassSection": "Select class section",
     "subject": "Subject",
+    "postedBy": "Posted by",
     "selectSubject": "Select subject",
     "selectClassSectionFirst": "Select class section first",
     "class": "Class",
@@ -222,7 +223,8 @@
     "studentId": "Student ID",
     "class": "Class",
     "section": "Section",
-    "statusColumn": "Status"
+    "statusColumn": "Status",
+    "markedByColumn": "Marked by"
   },
   "auth": {
     "signIn": "Sign in",

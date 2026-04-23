@@ -7,7 +7,7 @@ import { IconAlertCircle, IconCheck, IconBrandGoogle, IconLayoutDashboard } from
 import { supabase } from '@/lib/supabase/client';
 import { apiClient } from '@/lib/api-client';
 import { clearLocalSupabaseSession } from '@/lib/auth';
-import { applyPreferredLocaleToCookieOnlyIfUnset } from '@/lib/ui-locale';
+import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 import { selectBranchAndGoDashboard } from '@/lib/auth/complete-session-routing';
@@ -153,7 +153,7 @@ export default function AuthCallbackPage() {
 
         const rawPreferred =
           userData.preferredLocale ?? userData.preferred_locale ?? 'en-US';
-        applyPreferredLocaleToCookieOnlyIfUnset(rawPreferred);
+        setUiLocaleCookieOnDocument(normalizeUiLocale(rawPreferred));
 
         if (roleNames.includes('super_admin')) {
           setStepMsg(2, 'Taking you to admin portal...');

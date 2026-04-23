@@ -7,6 +7,7 @@ import type { User } from '@/types/auth';
 import { apiClient } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
 import { useQueryClient } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 
 interface BranchGuardProps {
   children: React.ReactNode;
@@ -44,6 +45,15 @@ export function BranchGuard({ children }: BranchGuardProps) {
       if (!error) return;
 
       try {
+        // Only recover for the specific post-login race where the request went out without a token.
+        // If the token is invalid/expired, recovery would loop and hammer `/auth/me`.
+        const msg = (error as { message?: unknown })?.message;
+        const msgLower = typeof msg === 'string' ? msg.toLowerCase() : '';
+        const status = (error as AxiosError)?.response?.status;
+        const isNoTokenProvided =
+          status === 401 && msgLower.includes('no token provided');
+        if (!isNoTokenProvided) return;
+
         setIsRecoveringAuth(true);
         const session = await getSession();
         if (!session?.access_token) return;

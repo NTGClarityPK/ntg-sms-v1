@@ -246,6 +246,22 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                   <Group gap="xs">
                     {canEdit && (
                       <>
+                        {(() => {
+                          const status = user.accountStatus ?? (user.isActive ? 'active' : 'inactive');
+                          const canResend = status !== 'active';
+                          return canResend ? (
+                            <Tooltip label={t('resendInvitationTitle')} withArrow>
+                              <ActionIcon
+                                variant="light"
+                                onClick={() => handleResend(user)}
+                                aria-label={t('resendInvitationTitle')}
+                                id={`users-resend-invite-${user.id}`}
+                              >
+                                <IconMailForward size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                          ) : null;
+                        })()}
                         <Tooltip label={tCommon('edit')} withArrow>
                           <ActionIcon
                             id={`users-edit-${user.id}`}
@@ -265,16 +281,6 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                             aria-label={t('deactivateUser')}
                           >
                             <IconTrash size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label={t('resendInvitationTitle')} withArrow>
-                          <ActionIcon
-                            variant="light"
-                            onClick={() => handleResend(user)}
-                            aria-label={t('resendInvitationTitle')}
-                            id={`users-resend-invite-${user.id}`}
-                          >
-                            <IconMailForward size={16} />
                           </ActionIcon>
                         </Tooltip>
                       </>

@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
@@ -33,7 +38,13 @@ function mapAcademicYear(row: AcademicYearRow): AcademicYearDto {
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
-  throw new BadRequestException(error.message);
+  const raw = error.message || 'Database error';
+  const looksLikeHtml = typeof raw === 'string' && raw.trim().startsWith('<!DOCTYPE html');
+  const message = looksLikeHtml ? 'Database temporarily unavailable. Please try again.' : raw;
+  if (looksLikeHtml) {
+    throw new ServiceUnavailableException(message);
+  }
+  throw new BadRequestException(message);
 }
 
 @Injectable()

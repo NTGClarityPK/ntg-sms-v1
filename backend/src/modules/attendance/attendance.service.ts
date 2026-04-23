@@ -16,6 +16,7 @@ import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LeaveRequestsService } from '../leave-requests/leave-requests.service';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
+import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 type AttendanceRow = {
   id: string;
@@ -160,6 +161,7 @@ export class AttendanceService {
     query: QueryAttendanceDto,
     branchId: string,
     academicYearId?: string,
+    user?: CurrentUserPayload,
   ): Promise<{
     data: AttendanceDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
@@ -183,6 +185,54 @@ export class AttendanceService {
     const requestedPage = Math.min(Number(requestedPageRaw) || 1, 10000);
     const limit = Math.min(Number(requestedLimitRaw) || 20, 500);
 
+    // Teacher scoping: class teachers + subject teacher mappings.
+    // This is security-critical: the frontend may omit classSectionIds, so we enforce on the API.
+    const roleNames = (user?.roles || []).map((r) => String(r).toLowerCase());
+    const isPrivileged =
+      roleNames.includes('school_admin') || roleNames.includes('principal');
+    const isTeacher =
+      roleNames.includes('class_teacher') || roleNames.includes('subject_teacher');
+
+    const scopedClassSectionIds = await (async (): Promise<string[] | null> => {
+      if (!user || isPrivileged || !isTeacher) return null;
+
+      const { data: staffRow, error: staffErr } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      throwIfDbError(staffErr as PostgrestError | null);
+      const staffId = (staffRow as { id?: string } | null)?.id;
+      if (!staffId) return [];
+
+      const [classTeacherRes, subjectTeacherRes] = await Promise.all([
+        supabase
+          .from('class_sections')
+          .select('id')
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', activeYearId)
+          .eq('class_teacher_id', staffId),
+        supabase
+          .from('teacher_assignments')
+          .select('class_section_id')
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', activeYearId)
+          .eq('staff_id', staffId),
+      ]);
+      throwIfDbError(classTeacherRes.error as PostgrestError | null);
+      throwIfDbError(subjectTeacherRes.error as PostgrestError | null);
+
+      const ids = new Set<string>();
+      for (const row of (classTeacherRes.data || []) as Array<{ id: string }>) {
+        if (row?.id) ids.add(row.id);
+      }
+      for (const row of (subjectTeacherRes.data || []) as Array<{ class_section_id: string }>) {
+        if (row?.class_section_id) ids.add(row.class_section_id);
+      }
+      return [...ids];
+    })();
+
     const applyFilters = <T extends { eq: any; in: any }>(q: T): T => {
       let next: any = q
         .eq('branch_id', branchId)
@@ -193,10 +243,30 @@ export class AttendanceService {
       }
 
       // Support both single and multiple filters
-      if (query.classSectionIds && query.classSectionIds.length > 0) {
-        next = next.in('class_section_id', query.classSectionIds);
-      } else if (query.classSectionId) {
-        next = next.eq('class_section_id', query.classSectionId);
+      const requestedIds =
+        query.classSectionIds && query.classSectionIds.length > 0
+          ? query.classSectionIds
+          : query.classSectionId
+            ? [query.classSectionId]
+            : undefined;
+
+      if (scopedClassSectionIds) {
+        // Teacher: always restrict to allowed class sections.
+        if (scopedClassSectionIds.length === 0) {
+          next = next.in('class_section_id', ['00000000-0000-0000-0000-000000000000']);
+        } else if (requestedIds && requestedIds.length > 0) {
+          const allowed = new Set(scopedClassSectionIds);
+          const intersection = requestedIds.filter((id) => allowed.has(id));
+          if (intersection.length === 0) {
+            next = next.in('class_section_id', ['00000000-0000-0000-0000-000000000000']);
+          } else {
+            next = next.in('class_section_id', intersection);
+          }
+        } else {
+          next = next.in('class_section_id', scopedClassSectionIds);
+        }
+      } else if (requestedIds && requestedIds.length > 0) {
+        next = next.in('class_section_id', requestedIds);
       }
 
       if (query.studentId) {
@@ -1129,8 +1199,14 @@ export class AttendanceService {
       if (!academicYear) {
         throw new NotFoundException('Academic year not found');
       }
-      dateStart = academicYear.start_date;
-      dateEnd = academicYear.end_date;
+      const yearStart = academicYear.start_date;
+      const yearEnd = academicYear.end_date;
+      const today = new Date().toISOString().split('T')[0];
+      // "Year to date" should never exclude current data if the year is misconfigured in the future.
+      // Clamp end to today (or yearEnd if already passed) and guard against start > end.
+      const endClamped = today <= yearEnd ? today : yearEnd;
+      dateStart = yearStart <= endClamped ? yearStart : endClamped;
+      dateEnd = endClamped;
     }
 
     // Count attendance by status using database-level aggregation
@@ -1212,14 +1288,20 @@ export class AttendanceService {
     throwIfDbError(yearError);
     if (!academicYear) return result;
 
+    const yearStart = (academicYear as { start_date: string }).start_date;
+    const yearEnd = (academicYear as { end_date: string }).end_date;
+    const today = new Date().toISOString().split('T')[0];
+    const endClamped = today <= yearEnd ? today : yearEnd;
+    const startClamped = yearStart <= endClamped ? yearStart : endClamped;
+
     const { data: rows, error } = await supabase
       .from('attendance')
       .select('student_id, status')
       .in('student_id', studentIds)
       .eq('branch_id', branchId)
       .eq('academic_year_id', activeYearId)
-      .gte('date', (academicYear as { start_date: string }).start_date)
-      .lte('date', (academicYear as { end_date: string }).end_date);
+      .gte('date', startClamped)
+      .lte('date', endClamped);
     throwIfDbError(error);
 
     const byStudent = new Map<
@@ -1356,6 +1438,7 @@ export class AttendanceService {
     query: QueryAttendanceDto,
     branchId: string,
     academicYearId?: string,
+    user?: CurrentUserPayload,
   ): Promise<AttendanceReportDto> {
     // Get attendance records for report; cap at 2000 to avoid timeouts and heavy payloads
     const cappedLimit = Math.min(query.limit ?? 10000, 2000);
@@ -1363,6 +1446,7 @@ export class AttendanceService {
       { ...query, page: 1, limit: cappedLimit } as QueryAttendanceDto,
       branchId,
       academicYearId,
+      user,
     );
 
     // Calculate summary

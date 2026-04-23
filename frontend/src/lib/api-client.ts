@@ -228,6 +228,8 @@ class ApiClient {
           // race on first mount after login/OAuth.
           const originalConfig = error.config as (InternalAxiosRequestConfig & {
             _ntgRetriedAfterRefresh?: boolean;
+            _ntgRefreshAttempted?: boolean;
+            _ntgRefreshFailed?: boolean;
           }) | undefined;
           const isRetriable =
             typeof window !== 'undefined' &&
@@ -240,6 +242,10 @@ class ApiClient {
           if (!isNoToken && isRetriable) {
             try {
               const refreshedToken = await refreshSupabaseSessionOnce();
+              if (originalConfig) {
+                originalConfig._ntgRefreshAttempted = true;
+                originalConfig._ntgRefreshFailed = !refreshedToken;
+              }
               if (refreshedToken && originalConfig) {
                 originalConfig._ntgRetriedAfterRefresh = true;
                 originalConfig.headers = originalConfig.headers ?? {};
@@ -261,7 +267,12 @@ class ApiClient {
               } = await supabase.auth.getSession();
 
               const hasSession = Boolean(session?.access_token);
-              if (!hasSession) {
+              // If Supabase doesn't have a usable session, clear local state and go to login.
+              // Also clear when the backend rejects the token and refresh didn't yield a new token
+              // (prevents repeated `/auth/me` hammering due to stale local sessions).
+              const refreshFailed = Boolean(originalConfig?._ntgRefreshAttempted) && Boolean(originalConfig?._ntgRefreshFailed);
+
+              if (!hasSession || refreshFailed) {
                 await clearLocalSupabaseSession();
                 if (window.location.pathname !== '/login') {
                   window.location.href = '/login';

@@ -14,7 +14,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const [checkingSession, setCheckingSession] = useState(true);
   const [hasSession, setHasSession] = useState(false);
-  const { user, isLoading: isLoadingAuth, error } = useAuth();
+  const { user } = useAuth();
 
   // Check Supabase session directly - this is the source of truth
   useEffect(() => {
@@ -59,9 +59,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
   }, [hasSession, user, router]);
 
-  // Critical: don't render portal until BOTH session check and /auth/me are resolved.
-  // After hard navigations (signup redirect), session can exist but /auth/me may still be loading.
-  if (checkingSession || (hasSession && isLoadingAuth)) {
+  // Critical: don't render the portal until Supabase session is known and `/auth/me` has produced a user.
+  // `isLoading` alone is not enough: after `removeQueries(['auth','me'])` React Query can briefly report
+  // not-loading while user is still undefined and error is unset → previously we rendered AppShell with no user (blank UI).
+  if (checkingSession || (hasSession && !user)) {
     return (
       <Container size="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <Stack gap="md" align="center">
@@ -75,21 +76,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
   // If we have no session, keep the skeleton while routing to /login.
   if (!hasSession) {
     // Avoid rendering a blank portal shell if router navigation hasn't completed yet.
-    return (
-      <Container
-        size="sm"
-        style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}
-      >
-        <Stack gap="md" align="center">
-          <Skeleton height={40} width="60%" />
-          <Skeleton height={200} width="100%" />
-        </Stack>
-      </Container>
-    );
-  }
-
-  // If session exists but user failed to load (e.g. 401/403), keep skeleton while guards/routing recover.
-  if (!user && error) {
     return (
       <Container
         size="sm"
