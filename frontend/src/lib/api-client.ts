@@ -130,8 +130,10 @@ class ApiClient {
             // All other APIs: use Supabase session (multi-role auth)
             // IMPORTANT: auth bootstrap requests must not go out without a token right after login/logout,
             // otherwise we can cache `/auth/me` without a currentBranch and the dashboard gets stuck until hard refresh.
+            // Optimise login→dashboard latency: keep retries, but shorten worst-case wait.
+            // If the session isn’t ready, requests may still 401 and be retried via the response interceptor.
             const token = isAuthBootstrap
-              ? await getSupabaseAccessTokenWithRetry({ attempts: 10, delayMs: 100 })
+              ? await getSupabaseAccessTokenWithRetry({ attempts: 6, delayMs: 50 })
               : await getSupabaseAccessTokenWithRetry({ attempts: 1, delayMs: 0 });
             if (token) config.headers.Authorization = `Bearer ${token}`;
           }

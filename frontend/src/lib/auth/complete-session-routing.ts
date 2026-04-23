@@ -56,9 +56,19 @@ export async function selectBranchAndGoDashboard(
   await apiClient.post('/api/v1/auth/select-branch', { branchId });
   localStorage.setItem('currentBranchId', branchId);
 
-  // Ensure the dashboard doesn't mount with a cached `auth/me` missing currentBranch.
-  // (React Query has a 5m staleTime; without this, it may not refetch immediately after login.)
-  queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+  // Optimise login→dashboard latency:
+  // Warm the auth cache *after* branch selection so the dashboard can render immediately
+  // without waiting for another /auth/me bootstrap round-trip.
+  try {
+    const me = await apiClient.get<{
+      id: string;
+      currentBranch?: { id: string } | null;
+    }>('/api/v1/auth/me');
+    queryClient.setQueryData(['auth', 'me'], me.data);
+  } catch {
+    // Non-blocking: dashboard will refetch if needed.
+    queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+  }
 
   try {
     const tenantResponse = await apiClient.get<Tenant>('/api/v1/tenants/me');

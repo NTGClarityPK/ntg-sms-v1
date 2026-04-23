@@ -106,7 +106,8 @@ export function useAuth() {
       if (isNetwork) return failureCount < 2;
       return false;
     },
-    retryDelay: (attempt) => Math.min(250 * (attempt + 1), 1200),
+    // Keep dashboard responsive on first mount after sign-in.
+    retryDelay: (attempt) => Math.min(100 * (attempt + 1), 600),
     refetchOnWindowFocus: false,
     enabled: true,
     staleTime: 5 * 60 * 1000,  // 5 minutes - user data rarely changes
