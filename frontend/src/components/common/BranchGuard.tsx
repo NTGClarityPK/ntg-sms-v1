@@ -8,6 +8,7 @@ import { apiClient } from '@/lib/api-client';
 import { getSession } from '@/lib/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
+import { useAuthStore } from '@/lib/store/auth-store';
 
 interface BranchGuardProps {
   children: React.ReactNode;
@@ -19,6 +20,9 @@ export function BranchGuard({ children }: BranchGuardProps) {
   const userTyped = user as User | undefined;
   const [isSelectingBranch, setIsSelectingBranch] = useState(false);
   const [isRecoveringAuth, setIsRecoveringAuth] = useState(false);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const setStoreUser = useAuthStore((s) => s.setUser);
+  const setStoreBranchId = useAuthStore((s) => s.setBranchId);
 
   // Occasionally (especially right after signup redirect), React Query can be between states where
   // `isLoading` is false but `user` is still undefined and `error` is not yet populated.
@@ -91,10 +95,12 @@ export function BranchGuard({ children }: BranchGuardProps) {
           
           // Store in localStorage
           localStorage.setItem('currentBranchId', firstBranch.id);
+          setStoreBranchId(firstBranch.id);
           
-          // Refetch user data to get updated current branch
-          qc.removeQueries({ queryKey: ['auth', 'me'] });
-          await refetch();
+          // Update caches instead of evicting (eviction forces slow refetch during redirect).
+          const refreshed = await apiClient.get<User>('/api/v1/auth/me');
+          qc.setQueryData(['auth', 'me'], refreshed.data);
+          setStoreUser(refreshed.data);
         } catch {
           // Non-blocking: user may still select a branch from the header picker.
         } finally {
@@ -104,11 +110,26 @@ export function BranchGuard({ children }: BranchGuardProps) {
     };
 
     autoSelectBranch();
-  }, [user, isLoading, isSelectingBranch, isRecoveringAuth, refetch, qc]);
+  }, [
+    user,
+    isLoading,
+    isSelectingBranch,
+    isRecoveringAuth,
+    qc,
+    setStoreBranchId,
+    setStoreUser,
+  ]);
 
   // Show loading while checking or auto-selecting branch
   // Also hold render if auth is currently errored/missing (prevents blank screen during signup redirect).
-  if (isLoading || isRecoveringAuth || isSelectingBranch || needsAuthRecovery || isAuthIndeterminate) {
+  if (
+    isLoading ||
+    isRecoveringAuth ||
+    isSelectingBranch ||
+    needsAuthRecovery ||
+    isAuthIndeterminate ||
+    (!hasHydrated && !userTyped)
+  ) {
     return (
       <Container size="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <Stack gap="md" align="center">

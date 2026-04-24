@@ -3,6 +3,8 @@ import type { Tenant } from '@/types/tenant';
 import { clearLocalSupabaseSession } from '@/lib/auth';
 import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
 import { queryClient } from '@/lib/query-client';
+import { useAuthStore } from '@/lib/store/auth-store';
+import type { User } from '@/types/auth';
 
 function formatApiErrorBodyMessage(
   data: { error?: { message?: string | string[] }; message?: string | string[] } | undefined,
@@ -85,15 +87,12 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
   const { router, setError, setLoading, setPrimaryColor, onMultiBranch } = params;
 
   try {
-    const userResponse = await apiClient.get<{
-      preferredLocale?: string;
-      preferred_locale?: string;
-      roles?: Array<{ roleName?: string }>;
-      branches?: BranchForSelection[];
-      currentBranch?: BranchForSelection | null;
-    }>('/api/v1/auth/me');
+    const userResponse = await apiClient.get<User>('/api/v1/auth/me');
 
     const userData = userResponse.data ?? {};
+
+    // Persist immediately so guards/dashboard can render without waiting for React Query refetch.
+    useAuthStore.getState().setUser(userData);
 
     // DB is the single source of truth: align NEXT_LOCALE cookie before any navigation/refresh.
     if (typeof window !== 'undefined') {
@@ -148,8 +147,13 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
         if (typeof window !== 'undefined') {
           window.localStorage.setItem('currentBranchId', desiredBranchId);
         }
-        // Ensure the dashboard doesn't mount with a cached `auth/me` missing currentBranch.
-        queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+        // Update local caches instead of evicting (eviction forces a slow refetch during redirect).
+        useAuthStore.getState().setBranchId(desiredBranchId);
+        queryClient.setQueryData<User>(['auth', 'me'], {
+          ...userData,
+          currentBranch:
+            userBranches.find((b) => b.id === desiredBranchId) ?? userData.currentBranch ?? null,
+        });
       } catch {
         // Non-blocking: user may still be able to continue (e.g. header branch picker).
       }

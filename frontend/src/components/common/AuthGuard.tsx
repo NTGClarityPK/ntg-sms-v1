@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton, Container, Stack } from '@mantine/core';
-import { getSessionWithRetry } from '@/lib/auth';
 import { useAuth } from '@/hooks/useAuth';
+import { getSessionWithRetry } from '@/lib/auth';
+import { useAuthStore } from '@/lib/store/auth-store';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -15,32 +16,23 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const [checkingSession, setCheckingSession] = useState(true);
   const [hasSession, setHasSession] = useState(false);
   const { user } = useAuth();
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
   // Check Supabase session directly - this is the source of truth
   useEffect(() => {
     const checkSupabaseSession = async () => {
-      // Important: right after login/signup redirects, Supabase session can take a moment to become readable.
-      // If we immediately return `null` and rely on a router redirect, users can see an empty portal background.
-      // Keep a short "boot window" with retries and only redirect once we are confident there is no session.
-      const maxRounds = 6; // ~3s total
-      for (let round = 0; round < maxRounds; round++) {
-        try {
-          const session = await getSessionWithRetry({ attempts: 10, delayMs: 100 });
-          if (session?.access_token) {
-            setHasSession(true);
-            setCheckingSession(false);
-            return;
-          }
-        } catch {
-          // Ignore and retry; storage/network can throw transiently on first mount.
-        }
-        // Small delay before next round.
-        await new Promise((r) => setTimeout(r, 500));
+      try {
+        // Short boot window only (avoid multi-second artificial delays).
+        const session = await getSessionWithRetry({ attempts: 3, delayMs: 50 });
+        const nextHasSession = !!session?.access_token;
+        setHasSession(nextHasSession);
+        setCheckingSession(false);
+        if (!nextHasSession) router.push('/login');
+      } catch {
+        setHasSession(false);
+        setCheckingSession(false);
+        router.push('/login');
       }
-
-      setHasSession(false);
-      setCheckingSession(false);
-      router.push('/login');
     };
 
     checkSupabaseSession();
@@ -62,7 +54,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
   // Critical: don't render the portal until Supabase session is known and `/auth/me` has produced a user.
   // `isLoading` alone is not enough: after `removeQueries(['auth','me'])` React Query can briefly report
   // not-loading while user is still undefined and error is unset → previously we rendered AppShell with no user (blank UI).
-  if (checkingSession || (hasSession && !user)) {
+  // With persisted auth store, allow a brief hydration window before expecting `user`.
+  if (checkingSession || (hasSession && !user && !hasHydrated)) {
     return (
       <Container size="sm" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <Stack gap="md" align="center">

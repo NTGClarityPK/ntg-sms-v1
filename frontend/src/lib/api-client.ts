@@ -43,7 +43,15 @@ async function getSupabaseAccessTokenWithRetry(input: {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (session?.access_token) return session.access_token;
+      if (session?.access_token) {
+        // Avoid sending expired tokens (they cause `/auth/me` loops + refresh/retry storms).
+        // Supabase `expires_at` is unix seconds.
+        const expiresAtMs =
+          typeof session.expires_at === 'number' ? session.expires_at * 1000 : null;
+        const isExpired =
+          expiresAtMs !== null ? expiresAtMs <= Date.now() + 5_000 : false; // 5s skew
+        if (!isExpired) return session.access_token;
+      }
     } catch {
       // ignore and retry
     }
