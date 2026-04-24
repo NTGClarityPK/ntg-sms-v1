@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Table, Badge, Group, ActionIcon, Pagination, Text } from '@mantine/core';
-import { IconTrash, IconEdit } from '@tabler/icons-react';
+import { Table, Badge, Group, ActionIcon, Pagination, Text, Modal, Stack, Tooltip, Button } from '@mantine/core';
+import { IconTrash, IconEdit, IconUser } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import { useDisclosure } from '@mantine/hooks';
 import { useTranslations } from 'next-intl';
@@ -27,9 +27,12 @@ export function ParentAssociationTable({
   onPageChange,
 }: ParentAssociationTableProps) {
   const t = useTranslations('user');
+  const tCommon = useTranslations('common');
   const deleteAssociation = useDeleteParentAssociation();
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedAssociation, setSelectedAssociation] = useState<ParentAssociation | null>(null);
+  const [parentInfoOpened, parentInfoModal] = useDisclosure(false);
+  const [selectedParentRow, setSelectedParentRow] = useState<ParentAssociation | null>(null);
 
   const handleEdit = (association: ParentAssociation) => {
     setSelectedAssociation(association);
@@ -93,7 +96,23 @@ export function ParentAssociationTable({
             {associations.map((association) => (
               <Table.Tr key={association.id}>
                 <Table.Td>
-                  <Text fw={500}>{association.parentName || 'N/A'}</Text>
+                  <Group gap={6} wrap="nowrap">
+                    <Text fw={500}>{association.parentName || 'N/A'}</Text>
+                    <Tooltip label={t('viewParentDetails')} withArrow>
+                      <ActionIcon
+                        id={`parent-association-parent-info-${association.id}`}
+                        variant="subtle"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedParentRow(association);
+                          parentInfoModal.open();
+                        }}
+                        aria-label={t('viewParentDetails')}
+                      >
+                        <IconUser size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
                 </Table.Td>
                 <Table.Td>
                   <Text>{association.studentName || 'N/A'}</Text>
@@ -183,6 +202,56 @@ export function ParentAssociationTable({
         }}
         association={selectedAssociation}
       />
+
+      <Modal
+        opened={parentInfoOpened}
+        onClose={() => {
+          parentInfoModal.close();
+          setSelectedParentRow(null);
+        }}
+        title={t('parentDetailsTitle')}
+        size="md"
+        centered
+      >
+        <Stack gap="sm">
+          <Table withTableBorder withColumnBorders>
+            <Table.Tbody>
+              <Table.Tr>
+                <Table.Th w={160}>{t('parentName')}</Table.Th>
+                <Table.Td>{selectedParentRow?.parentName || '—'}</Table.Td>
+              </Table.Tr>
+              <Table.Tr>
+                <Table.Th>{t('email')}</Table.Th>
+                <Table.Td>{selectedParentRow?.parentEmail || '—'}</Table.Td>
+              </Table.Tr>
+              <Table.Tr>
+                <Table.Th>{t('phone')}</Table.Th>
+                <Table.Td>{selectedParentRow?.parentPhone || '—'}</Table.Td>
+              </Table.Tr>
+              <Table.Tr>
+                <Table.Th>{t('relationship')}</Table.Th>
+                <Table.Td>{selectedParentRow?.relationship || '—'}</Table.Td>
+              </Table.Tr>
+              <Table.Tr>
+                <Table.Th>{t('priority')}</Table.Th>
+                <Table.Td>
+                  {selectedParentRow?.priority === 1
+                    ? t('primary')
+                    : selectedParentRow?.priority === 2
+                      ? t('secondary')
+                      : '—'}
+                </Table.Td>
+              </Table.Tr>
+            </Table.Tbody>
+          </Table>
+
+          <Group justify="flex-end">
+            <Button id="parent-association-parent-info-close" variant="light" onClick={parentInfoModal.close}>
+              {tCommon('close')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

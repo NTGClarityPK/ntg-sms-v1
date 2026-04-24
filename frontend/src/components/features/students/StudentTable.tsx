@@ -19,14 +19,17 @@ import {
   useMantineTheme,
   CopyButton,
   Alert,
+  Divider,
+  Paper,
 } from '@mantine/core';
-import { IconEdit, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
+import { IconEdit, IconChevronUp, IconChevronDown, IconMailForward, IconUsers, IconPhone, IconUser, IconMail } from '@tabler/icons-react';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import type { Student } from '@/types/students';
 import { StudentForm } from './StudentForm';
 import { useResendInvitationForUser } from '@/hooks/useInvitationsAdmin';
 import { useReinviteStudentAfterExpiry } from '@/hooks/useStudents';
+import { useStudentGuardians } from '@/hooks/useParentAssociations';
 
 interface StudentTableProps {
   students: Student[];
@@ -50,6 +53,8 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
   const tCommon = useTranslations('common');
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [contactsOpened, contactsModal] = useDisclosure(false);
+  const [contactsStudent, setContactsStudent] = useState<Student | null>(null);
   const [resendOpened, resendModal] = useDisclosure(false);
   const [resendStudent, setResendStudent] = useState<Student | null>(null);
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -63,6 +68,8 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
   } | null>(null);
   const resend = useResendInvitationForUser();
   const reinvite = useReinviteStudentAfterExpiry();
+  const guardiansQuery = useStudentGuardians(contactsOpened ? contactsStudent?.id : null);
+  const guardians = guardiansQuery.data?.data || [];
 
   const needsReinviteFlow = (s: Student | null) =>
     Boolean(s && (s.accountStatus === 'link_expired' || !s.userId));
@@ -70,6 +77,11 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student);
     open();
+  };
+
+  const handleOpenContacts = (student: Student) => {
+    setContactsStudent(student);
+    contactsModal.open();
   };
 
   const openInvitationSentModal = (input: { recipientEmail: string; expiresAt?: string }) => {
@@ -226,6 +238,17 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                   <Table.Td>
                     {canEdit && (
                       <Group gap={6} wrap="nowrap">
+                        <Tooltip label={t('emergencyContacts')} withArrow>
+                          <ActionIcon
+                            id={`students-emergency-contacts-${student.id}`}
+                            variant="light"
+                            size={isMobile ? 'sm' : 'md'}
+                            onClick={() => handleOpenContacts(student)}
+                            aria-label={t('emergencyContacts')}
+                          >
+                            <IconUsers size={isMobile ? 14 : 16} />
+                          </ActionIcon>
+                        </Tooltip>
                         <Tooltip label={tCommon('edit')} withArrow>
                           <ActionIcon
                             id={`students-edit-${student.id}`}
@@ -282,6 +305,106 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
         }}
         student={selectedStudent}
       />
+
+      <Modal
+        opened={contactsOpened}
+        onClose={() => {
+          contactsModal.close();
+          setContactsStudent(null);
+        }}
+        title={t('emergencyContacts')}
+        size="md"
+        centered
+      >
+        <Stack gap="sm">
+          <Group gap="xs">
+            <IconUsers size={18} />
+            <Text fw={600}>
+              {contactsStudent
+                ? `${`${contactsStudent.firstName ?? ''} ${contactsStudent.lastName ?? ''}`.trim() || contactsStudent.studentId || '—'}`
+                : '—'}
+            </Text>
+          </Group>
+
+          <Divider />
+
+          {guardiansQuery.isLoading || guardiansQuery.isFetching ? (
+            <Text size="sm" c="dimmed">
+              {tCommon('loading')}
+            </Text>
+          ) : guardiansQuery.error ? (
+            <Alert color="red" title={t('failedToLoad')}>
+              <Text size="sm">{t('pleaseTryAgain')}</Text>
+            </Alert>
+          ) : guardians.length === 0 ? (
+            <Alert color="yellow" title={t('noGuardiansAssigned')}>
+              <Text size="sm">{t('noGuardiansAssigned')}</Text>
+            </Alert>
+          ) : (
+            <Paper withBorder p="md" radius="md">
+              <Stack gap="xs">
+                {guardians.map((guardian) => (
+                  <Group
+                    key={guardian.id}
+                    justify="space-between"
+                    p="xs"
+                    style={{
+                      border: '1px solid var(--mantine-color-gray-3)',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    <Group gap="xs">
+                      <Badge
+                        size="sm"
+                        color={guardian.priority === 1 ? 'green' : 'blue'}
+                        variant="light"
+                      >
+                        {guardian.priority === 1 ? t('primary') : t('secondary')}
+                      </Badge>
+                      <Stack gap={2}>
+                        <Group gap={6} wrap="nowrap">
+                          <IconUser size={16} />
+                          <Text size="sm" fw={500}>
+                            {guardian.parentName || 'N/A'}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            ({guardian.relationship})
+                          </Text>
+                        </Group>
+                        {guardian.parentEmail ? (
+                          <Group gap={6} wrap="nowrap">
+                            <IconMail size={14} />
+                            <Text size="xs" c="dimmed">
+                              {guardian.parentEmail}
+                            </Text>
+                          </Group>
+                        ) : null}
+                      </Stack>
+                    </Group>
+
+                    {guardian.parentPhone ? (
+                      <Group gap={6}>
+                        <IconPhone size={14} />
+                        <Text size="sm">{guardian.parentPhone}</Text>
+                      </Group>
+                    ) : null}
+                  </Group>
+                ))}
+              </Stack>
+            </Paper>
+          )}
+
+          <Group justify="flex-end">
+            <Button
+              id="students-emergency-contacts-close"
+              variant="light"
+              onClick={contactsModal.close}
+            >
+              {tCommon('close')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={resendOpened}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Badge, Alert, Text, Radio, Checkbox, CopyButton, Table } from '@mantine/core';
+import { Modal, TextInput, Select, Button, Stack, Textarea, Group, Paper, Divider, Alert, Text, Radio, Checkbox, CopyButton, Table } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
@@ -12,8 +12,7 @@ import { useTemplatesForClass, useStudentTemplate } from '@/hooks/useSubjectTemp
 import { useAuth } from '@/hooks/useAuth';
 import type { Student, CreateStudentWithInvitationInput, UpdateStudentInput } from '@/types/students';
 import { useQueryClient } from '@tanstack/react-query';
-import { useStudentGuardians } from '@/hooks/useParentAssociations';
-import { IconPhone, IconUser } from '@tabler/icons-react';
+import { IconUser } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useTenantMe } from '@/hooks/useTenant';
 import { modals } from '@mantine/modals';
@@ -212,9 +211,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const currentTemplate = studentTemplateData?.data;
 
   // Fetch guardians for this student (when editing)
-  const { data: guardiansData } = useStudentGuardians(isEdit ? student?.id : null);
-  const guardians = guardiansData?.data || [];
-
   // Reset form when student prop changes (for edit mode)
   useEffect(() => {
     if (student) {
@@ -644,54 +640,6 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
             value={form.values.isActive ? 'true' : 'false'}
             onChange={(value) => form.setFieldValue('isActive', value === 'true')}
           />
-
-          {/* Emergency Contacts (only shown when editing) */}
-          {isEdit && student && (
-            <>
-              <Divider my="md" />
-              <Paper p="md" withBorder>
-                <Stack gap="sm">
-                  <Group>
-                    <IconUser size={20} />
-                    <Text fw={500}>{t('emergencyContacts')}</Text>
-                  </Group>
-                  {guardians.length === 0 ? (
-                    <Alert color="yellow">
-                      <Text size="sm">{t('noGuardiansAssigned')}</Text>
-                    </Alert>
-                  ) : (
-                    <Stack gap="xs">
-                      {guardians.map((guardian) => (
-                        <Group key={guardian.id} justify="space-between" p="xs" style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: '4px' }}>
-                          <Group gap="xs">
-                            <Badge
-                              size="sm"
-                              color={guardian.priority === 1 ? 'green' : 'blue'}
-                              variant="light"
-                            >
-                              {guardian.priority === 1 ? t('primary') : t('secondary')}
-                            </Badge>
-                            <Text size="sm" fw={500}>
-                              {guardian.parentName || 'N/A'}
-                            </Text>
-                            <Text size="xs" c="dimmed">
-                              ({guardian.relationship})
-                            </Text>
-                          </Group>
-                          {guardian.parentPhone && (
-                            <Group gap={4}>
-                              <IconPhone size={14} />
-                              <Text size="sm">{guardian.parentPhone}</Text>
-                            </Group>
-                          )}
-                        </Group>
-                      ))}
-                    </Stack>
-                  )}
-                </Stack>
-              </Paper>
-            </>
-          )}
 
           <Group justify="flex-end" mt="md">
             <Button id="student-form-cancel" variant="subtle" onClick={onClose}>

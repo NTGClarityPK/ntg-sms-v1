@@ -168,6 +168,48 @@ export function useUpdateUserRoles() {
   });
 }
 
+/**
+ * Update user profile fields + roles in one go (single refresh + single toast).
+ * This avoids duplicate notifications and double query invalidation when saving the edit user modal.
+ */
+export function useUpdateUserWithRoles() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      input,
+      roles,
+    }: {
+      id: string;
+      input: UpdateUserInput;
+      roles: UpdateUserRolesInput;
+    }) => {
+      await apiClient.put<{ data: User }>(`/api/v1/users/${id}`, input);
+      const rolesResponse = await apiClient.put<{ data: User }>(`/api/v1/users/${id}/roles`, roles);
+      return rolesResponse.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['users', branchId] });
+      queryClient.invalidateQueries({ queryKey: ['user', variables.id] });
+      notifications.show({
+        title: 'Success',
+        message: 'User updated successfully',
+        color: 'green',
+      });
+    },
+    onError: (error: unknown) => {
+      notifications.show({
+        title: 'Error',
+        message: getApiErrorMessage(error, 'Failed to update user'),
+        color: 'red',
+      });
+    },
+  });
+}
+
 export function useDeleteUser() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

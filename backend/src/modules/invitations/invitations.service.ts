@@ -49,6 +49,7 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class InvitationsService {
   private readonly logger = new Logger(InvitationsService.name);
   private readonly invitationsPerMinuteLimit: number;
+  private readonly expireUnusedInvitationsEnabled: boolean;
 
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
@@ -59,6 +60,14 @@ export class InvitationsService {
     const configured = Number(this.configService.get<string>('INVITATIONS_RATE_LIMIT_PER_MINUTE'));
     // Default to 20 invitations/min so bulk import can do ~10 students/min when creating parent accounts too.
     this.invitationsPerMinuteLimit = Number.isFinite(configured) && configured > 0 ? configured : 20;
+
+    // This cron is useful in production to clean up unused, expired invitations.
+    // In development it creates unnecessary background DB traffic and log noise,
+    // so we default it to OFF unless explicitly enabled.
+    const enabledRaw = this.configService.get<string>('INVITATIONS_EXPIRE_UNUSED_JOB_ENABLED')?.trim().toLowerCase();
+    if (enabledRaw === 'true') this.expireUnusedInvitationsEnabled = true;
+    else if (enabledRaw === 'false') this.expireUnusedInvitationsEnabled = false;
+    else this.expireUnusedInvitationsEnabled = this.configService.get<string>('NODE_ENV') === 'production';
   }
 
   private getFrontendUrl(): string {
@@ -467,6 +476,7 @@ export class InvitationsService {
    */
   @Cron(CronExpression.EVERY_10_MINUTES)
   async expireUnusedInvitationsJob(): Promise<void> {
+    if (!this.expireUnusedInvitationsEnabled) return;
     const supabase = this.supabaseConfig.getClient();
     const now = new Date().toISOString();
 

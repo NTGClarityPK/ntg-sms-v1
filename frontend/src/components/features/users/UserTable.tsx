@@ -17,16 +17,18 @@ import {
   useMantineTheme,
   CopyButton,
   Alert,
+  Skeleton,
 } from '@mantine/core';
-import { IconEdit, IconTrash, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
+import { IconEdit, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import { useTranslations } from 'next-intl';
 import type { User } from '@/types/users';
 import { UserForm } from './UserForm';
 import { useRoles } from '@/hooks/useRoles';
-import { useDeleteUser } from '@/hooks/useUsers';
 import { useResendInvitationForUser } from '@/hooks/useInvitationsAdmin';
+import { useParentChildren } from '@/hooks/useParentAssociations';
+import { IconUser } from '@tabler/icons-react';
 
 interface UserTableProps {
   users: User[];
@@ -59,10 +61,18 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
     expiresAt?: string;
   } | null>(null);
   const { data: rolesData } = useRoles();
-  const deleteUser = useDeleteUser();
   const resend = useResendInvitationForUser();
   const roles = rolesData?.data || [];
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [linkedStudentsOpened, linkedStudentsModal] = useDisclosure(false);
+  const [selectedParentUser, setSelectedParentUser] = useState<User | null>(null);
+  const parentChildrenQuery = useParentChildren(linkedStudentsOpened ? selectedParentUser?.id : null);
+
+  const resolveUserStatus = (u: User): NonNullable<User['accountStatus']> => {
+    // Backend enforces lifecycle rules (pending is one-time, never returns after setup).
+    // Trust it, with safe fallback.
+    return u.accountStatus ?? (u.isActive ? 'active' : 'inactive');
+  };
 
   const invitationTypeForUser = (u: User): 'student' | 'parent_account' | 'staff' => {
     const roleNames = (u.roles ?? []).map((r) => (r.roleName || '').trim().toLowerCase());
@@ -72,6 +82,7 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
     if (isStudent) return 'student';
     return 'staff';
   };
+  const isParentUser = (u: User) => invitationTypeForUser(u) === 'parent_account';
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);
@@ -132,22 +143,6 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
     resendModal.open();
   };
 
-  const handleDelete = (user: User) => {
-    modals.openConfirmModal({
-      title: t('deactivateUser'),
-      children: (
-        <Text size="sm">
-          {t('deactivateConfirm', { name: user.fullName ?? '' })}
-        </Text>
-      ),
-      labels: { confirm: t('deactivate'), cancel: t('cancel') },
-      confirmProps: { color: 'red' },
-      onConfirm: () => {
-        deleteUser.mutate(user.id);
-      },
-    });
-  };
-
   const getRoleBadges = (userRoles?: User['roles']) => {
     if (!userRoles || userRoles.length === 0) return <Text c="dimmed" size="sm">{t('noRoles')}</Text>;
 
@@ -205,7 +200,25 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
             {users.map((user) => (
               <Table.Tr key={user.id}>
                 <Table.Td>
-                  <Text fw={500}>{user.fullName}</Text>
+                  <Group gap={6} wrap="nowrap">
+                    <Text fw={500}>{user.fullName}</Text>
+                    {isParentUser(user) && (
+                      <Tooltip label={t('viewLinkedStudents')} withArrow>
+                        <ActionIcon
+                          id={`users-linked-students-${user.id}`}
+                          variant="subtle"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedParentUser(user);
+                            linkedStudentsModal.open();
+                          }}
+                          aria-label={t('viewLinkedStudents')}
+                        >
+                          <IconUser size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">{user.email}</Text>
@@ -213,7 +226,7 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                 <Table.Td>{getRoleBadges(user.roles)}</Table.Td>
                 <Table.Td>
                   {(() => {
-                    const status = user.accountStatus ?? (user.isActive ? 'active' : 'inactive');
+                    const status = resolveUserStatus(user);
                     if (status === 'pending_verification') {
                       return (
                         <Badge color="yellow" variant="light">
@@ -247,8 +260,9 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                     {canEdit && (
                       <>
                         {(() => {
-                          const status = user.accountStatus ?? (user.isActive ? 'active' : 'inactive');
-                          const canResend = status !== 'active';
+                          const status = resolveUserStatus(user);
+                          const canResend =
+                            status === 'pending_verification' || status === 'link_expired';
                           return canResend ? (
                             <Tooltip label={t('resendInvitationTitle')} withArrow>
                               <ActionIcon
@@ -270,17 +284,6 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
                             aria-label={tCommon('edit')}
                           >
                             <IconEdit size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label={t('deactivateUser')} withArrow>
-                          <ActionIcon
-                            id={`users-deactivate-${user.id}`}
-                            variant="light"
-                            color="red"
-                            onClick={() => handleDelete(user)}
-                            aria-label={t('deactivateUser')}
-                          >
-                            <IconTrash size={16} />
                           </ActionIcon>
                         </Tooltip>
                       </>
@@ -316,6 +319,61 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
         user={selectedUser}
         roles={roles}
       />
+
+      <Modal
+        opened={linkedStudentsOpened}
+        onClose={() => {
+          linkedStudentsModal.close();
+          setSelectedParentUser(null);
+        }}
+        title={t('linkedStudentsTitle')}
+        size="md"
+        centered
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            {selectedParentUser?.fullName || '—'}
+          </Text>
+
+          {parentChildrenQuery.isLoading || parentChildrenQuery.isFetching ? (
+            <Stack gap="xs">
+              <Skeleton height={18} width="50%" />
+              <Skeleton height={80} />
+            </Stack>
+          ) : parentChildrenQuery.error ? (
+            <Alert color="red" title={t('failedToLoadLinkedStudents')}>
+              <Text size="sm">{t('pleaseTryAgain')}</Text>
+            </Alert>
+          ) : !parentChildrenQuery.data || parentChildrenQuery.data.length === 0 ? (
+            <Alert color="blue" title={t('noLinkedStudents')}>
+              <Text size="sm">{t('noLinkedStudentsHint')}</Text>
+            </Alert>
+          ) : (
+            <Table withTableBorder withColumnBorders>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('studentName')}</Table.Th>
+                  <Table.Th w={180}>{t('studentId')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {parentChildrenQuery.data.map((row) => (
+                  <Table.Tr key={row.id}>
+                    <Table.Td>{row.studentName || '—'}</Table.Td>
+                    <Table.Td>{row.studentStudentId || '—'}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+
+          <Group justify="flex-end">
+            <Button id="users-linked-students-close" variant="light" onClick={linkedStudentsModal.close}>
+              {tCommon('close')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={resendOpened}

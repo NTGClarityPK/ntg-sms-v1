@@ -61,13 +61,26 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 function accountStatusFromUserAndInvites(input: {
   isActive: boolean;
+  /**
+   * Has the user ever completed the setup flow at least once?
+   * If yes, they must never go back to pending_verification/link_expired.
+   */
+  hasEverUsedInvitation: boolean;
   latestInvitation?: InvitationLite | null;
+  /** Fallback evidence for invite-sent when invitation rows aren't available for some reason. */
+  hasInvitationEvidence: boolean;
   nowMs: number;
 }): 'active' | 'pending_verification' | 'link_expired' | 'inactive' {
-  if (input.isActive) return 'active';
+  // Once setup has been completed, lifecycle status is strictly active/inactive forever.
+  if (input.hasEverUsedInvitation) {
+    return input.isActive ? 'active' : 'inactive';
+  }
+
+  // Pre-setup lifecycle.
   const inv = input.latestInvitation ?? null;
-  if (!inv) return 'inactive';
-  if (inv.used_at) return 'active';
+  if (!inv) {
+    return input.hasInvitationEvidence ? 'pending_verification' : 'inactive';
+  }
   const expMs = new Date(inv.expires_at).getTime();
   if (!Number.isFinite(expMs)) return 'pending_verification';
   return expMs <= input.nowMs ? 'link_expired' : 'pending_verification';
@@ -325,9 +338,13 @@ export class UsersService {
       : { data: [] };
 
     const latestInvitationByUserId = new Map<string, InvitationLite>();
+    const hasEverUsedInvitationByUserId = new Map<string, boolean>();
     for (const r of (invRows ?? []) as InvitationLite[]) {
       if (!latestInvitationByUserId.has(r.user_id)) {
         latestInvitationByUserId.set(r.user_id, r);
+      }
+      if (r.used_at) {
+        hasEverUsedInvitationByUserId.set(r.user_id, true);
       }
     }
 
@@ -398,7 +415,11 @@ export class UsersService {
 
       const accountStatus = accountStatusFromUserAndInvites({
         isActive: profile.is_active,
+        hasEverUsedInvitation: hasEverUsedInvitationByUserId.get(profile.id) === true,
         latestInvitation: latestInvitationByUserId.get(profile.id) ?? null,
+        hasInvitationEvidence: Boolean(
+          profile.invitation_sent_at || profile.invitation_recipient_email,
+        ),
         nowMs,
       });
 
@@ -500,9 +521,18 @@ export class UsersService {
       .order('created_at', { ascending: false })
       .limit(1);
     const latestInvitation = ((invRows ?? []) as InvitationLite[])[0] ?? null;
+    const { count: usedCount } = await supabase
+      .from('invitations')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', id)
+      .in('invitation_type', ['staff', 'parent_account'])
+      .not('used_at', 'is', null);
+    const hasEverUsedInvitation = (usedCount ?? 0) > 0;
     const accountStatus = accountStatusFromUserAndInvites({
       isActive: row.is_active,
+      hasEverUsedInvitation,
       latestInvitation,
+      hasInvitationEvidence: Boolean(row.invitation_sent_at || row.invitation_recipient_email),
       nowMs: Date.now(),
     });
 
@@ -692,6 +722,16 @@ export class UsersService {
         userEmailForAudit: adminUser.email,
         branchId,
       });
+
+      // Persist latest invitation destination for UI/status fallback without extra joins.
+      await supabase
+        .from('profiles')
+        .update({
+          invitation_recipient_email: invitationRecipientEmail,
+          invitation_sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
 
       return this.getUserById(user.id, branchId);
     } catch (error) {

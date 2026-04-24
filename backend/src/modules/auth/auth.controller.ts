@@ -51,7 +51,10 @@ export class AuthController {
   async getCurrentUser(
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: UserResponseDto }> {
-    const userData = await this.authService.getCurrentUser(user.id);
+    const userData = await this.authService.getCurrentUser(user.id, {
+      email: user.email,
+      roleNames: user.roles ?? [],
+    });
     return { data: userData };
   }
 
@@ -60,7 +63,10 @@ export class AuthController {
   async validate(
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: UserResponseDto }> {
-    const userData = await this.authService.getCurrentUser(user.id);
+    const userData = await this.authService.getCurrentUser(user.id, {
+      email: user.email,
+      roleNames: user.roles ?? [],
+    });
     return { data: userData };
   }
 

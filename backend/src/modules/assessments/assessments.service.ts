@@ -101,15 +101,18 @@ function mapAssessmentWithLookups(
   lookups: {
     subjectNameById?: Map<string, string>;
     teacherNameByUserId?: Map<string, string>;
+    classSectionNameById?: Map<string, string>;
   },
 ): AssessmentDto {
   const base = mapAssessment(row);
   const subjectName = lookups.subjectNameById?.get(base.subjectId);
   const teacherName = lookups.teacherNameByUserId?.get(base.createdBy);
+  const classSectionName = lookups.classSectionNameById?.get(base.classSectionId);
   return new AssessmentDto({
     ...base,
     subjectName: subjectName ?? undefined,
     teacherName: teacherName ?? undefined,
+    classSectionName: classSectionName ?? undefined,
   });
 }
 
@@ -385,8 +388,63 @@ export class AssessmentsService {
     const total = count ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
+    // Hydrate list rows with subject + teacher names (same info shown on My Assessments).
+    const subjectIds = Array.from(new Set(rows.map((r) => r.subject_id).filter(Boolean)));
+    const teacherUserIds = Array.from(new Set(rows.map((r) => r.created_by).filter(Boolean)));
+    const classSectionIds = Array.from(new Set(rows.map((r) => r.class_section_id).filter(Boolean)));
+
+    const [subjectsRes, profilesRes, classSectionsRes] = await Promise.all([
+      subjectIds.length > 0
+        ? supabase
+            .from('subjects')
+            .select('id, name')
+            .in('id', subjectIds)
+            .eq('branch_id', branchId)
+        : Promise.resolve({ data: [], error: null } as unknown as { data: any[]; error: PostgrestError | null }),
+      teacherUserIds.length > 0
+        ? supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', teacherUserIds)
+        : Promise.resolve({ data: [], error: null } as unknown as { data: any[]; error: PostgrestError | null }),
+      classSectionIds.length > 0
+        ? supabase
+            .from('class_sections')
+            .select('id, class_id, section_id, classes:class_id(name, display_name), sections:section_id(name)')
+            .in('id', classSectionIds)
+            .eq('branch_id', branchId)
+        : Promise.resolve({ data: [], error: null } as unknown as { data: any[]; error: PostgrestError | null }),
+    ]);
+    throwIfDbError(subjectsRes.error);
+    throwIfDbError(profilesRes.error);
+    throwIfDbError(classSectionsRes.error);
+
+    const subjectNameById = new Map<string, string>();
+    for (const s of (subjectsRes.data || []) as Array<{ id: string; name: string }>) {
+      if (s?.id && s?.name) subjectNameById.set(s.id, s.name);
+    }
+    const teacherNameByUserId = new Map<string, string>();
+    for (const p of (profilesRes.data || []) as Array<{ id: string; full_name: string }>) {
+      if (p?.id && p?.full_name) teacherNameByUserId.set(p.id, p.full_name);
+    }
+    const classSectionNameById = new Map<string, string>();
+    for (const row of (classSectionsRes.data || []) as Array<{
+      id: string;
+      classes?: { name?: string | null; display_name?: string | null } | Array<{ name?: string | null; display_name?: string | null }> | null;
+      sections?: { name?: string | null } | Array<{ name?: string | null }> | null;
+    }>) {
+      const classData = Array.isArray(row.classes) ? row.classes[0] : row.classes;
+      const sectionData = Array.isArray(row.sections) ? row.sections[0] : row.sections;
+      const classLabel = (classData?.display_name ?? classData?.name ?? '').trim();
+      const sectionLabel = (sectionData?.name ?? '').trim();
+      const label = [classLabel, sectionLabel].filter(Boolean).join(' - ').trim();
+      if (row.id && label) classSectionNameById.set(row.id, label);
+    }
+
     return {
-      data: rows.map(mapAssessment),
+      data: rows.map((row) =>
+        mapAssessmentWithLookups(row, { subjectNameById, teacherNameByUserId, classSectionNameById }),
+      ),
       meta: {
         total,
         page,

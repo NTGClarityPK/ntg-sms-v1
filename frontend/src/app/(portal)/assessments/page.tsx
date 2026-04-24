@@ -303,14 +303,27 @@ export default function AssessmentsPage() {
                     {data.data.map((assessment: Assessment) => (
                       <Table.Tr key={assessment.id}>
                         <Table.Td>
-                          <Box>
-                            <Text fw={500}>{assessment.title}</Text>
-                            {assessment.description && (
-                              <Text size="sm" c="dimmed" lineClamp={1}>
+                          <Stack gap={6}>
+                            <Text fw={600} lh={1.25}>
+                              {assessment.title}
+                            </Text>
+                            <Group gap="xs" wrap="wrap">
+                              <Badge variant="light" color="blue">
+                                {t('subject')}: {assessment.subjectName ?? '—'}
+                              </Badge>
+                              <Badge variant="light" color="grape">
+                                {t('classSection')}: {assessment.classSectionName ?? '—'}
+                              </Badge>
+                              <Text size="sm" c="dimmed">
+                                {t('postedBy')}: <Text span fw={500} c="dark">{assessment.teacherName ?? '—'}</Text>
+                              </Text>
+                            </Group>
+                            {assessment.description ? (
+                              <Text size="sm" c="dimmed" lineClamp={2}>
                                 {assessment.description}
                               </Text>
-                            )}
-                          </Box>
+                            ) : null}
+                          </Stack>
                         </Table.Td>
                         <Table.Td>
                           <Badge color={assessment.isPublished ? 'green' : 'gray'}>

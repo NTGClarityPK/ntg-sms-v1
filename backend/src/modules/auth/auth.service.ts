@@ -82,13 +82,27 @@ export class AuthService {
     return row?.current_branch_id ?? null;
   }
 
-  async getCurrentUser(userId: string): Promise<UserResponseDto> {
+  async getCurrentUser(
+    userId: string,
+    hint?: { email?: string; roleNames?: string[] },
+  ): Promise<UserResponseDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // OPTIMISED: Run all independent queries in parallel (first batch)
-    const [authResult, profileResult, userBranchesResult, userRolesResult] = await Promise.all([
-      // Get user from auth.users
-      supabase.auth.admin.getUserById(userId),
+    let resolvedEmail = (hint?.email ?? '').trim();
+    const hintedRoleNames = hint?.roleNames ?? [];
+
+    // Fallback: some internal code paths may call `getCurrentUser()` without going through JwtAuthGuard.
+    // In that case, we still need the email for privileged checks and the response payload.
+    if (!resolvedEmail) {
+      const { data, error } = await supabase.auth.admin.getUserById(userId);
+      if (error || !data?.user) {
+        throw new NotFoundException('User not found');
+      }
+      resolvedEmail = data.user.email ?? '';
+    }
+
+    // OPTIMISED: skip `auth.admin.getUserById` when email is already available from JwtAuthGuard.
+    const [profileResult, userBranchesResult, userRolesResult] = await Promise.all([
       // Get profile from public.profiles (only needed fields)
       supabase
         .from('profiles')
@@ -108,11 +122,6 @@ export class AuthService {
         .select('role_id, branch_id')
         .eq('user_id', userId),
     ]);
-
-    const { data: { user }, error: userError } = authResult;
-    if (userError || !user) {
-      throw new NotFoundException('User not found');
-    }
 
     const { data: profile, error: profileError } = profileResult;
     if (profileError && profileError.code !== 'PGRST116') {
@@ -173,28 +182,16 @@ export class AuthService {
       }));
     }
 
-    // Determine super admin even if rolesResult failed (avoid accidental lockout)
-    const { data: superAdminRoleRow, error: superAdminRoleError } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', 'super_admin')
-      .maybeSingle();
-
-    if (superAdminRoleError) {
-      throw new BadRequestException(`Failed to resolve super_admin role: ${superAdminRoleError.message}`);
-    }
-
-    const superAdminRoleId = (superAdminRoleRow as { id: string } | null)?.id ?? null;
     const hasSuperAdminRole =
-      !!superAdminRoleId &&
-      (userRolesData || []).some((ur) => (ur as { role_id: string }).role_id === superAdminRoleId);
+      roles.some((r) => (r.roleName || '').toLowerCase() === 'super_admin') ||
+      hintedRoleNames.some((n) => (n || '').toLowerCase() === 'super_admin');
 
     const isPrivileged =
       hasSuperAdminRole ||
-      (user.email || '').endsWith('@ntg.com') ||
-      (user.email || '').endsWith('@example.com') ||
-      (user.email || '').endsWith('@ntgclarity.com') ||
-      (user.email || '').endsWith('@superuser.com');
+      resolvedEmail.endsWith('@ntg.com') ||
+      resolvedEmail.endsWith('@example.com') ||
+      resolvedEmail.endsWith('@ntgclarity.com') ||
+      resolvedEmail.endsWith('@superuser.com');
 
     let filteredBranchesRaw = branchesRaw;
     if (!isPrivileged) {
@@ -235,11 +232,11 @@ export class AuthService {
         }),
     );
 
-    if ((user.email || '').endsWith('@superuser.com')) {
+    if (resolvedEmail.endsWith('@superuser.com')) {
       const already = roles.some((r) => (r.roleName || '').toLowerCase() === 'super_admin');
-      if (!already && superAdminRoleId) {
+      if (!already) {
         roles.push({
-          roleId: superAdminRoleId,
+          roleId: '',
           roleName: 'super_admin',
           branchId: '',
         });
@@ -350,9 +347,9 @@ export class AuthService {
 
     const profileRow = profile as { preferred_locale?: string | null } | null;
     const userResponse = new UserResponseDto({
-      id: user.id,
-      email: user.email || '',
-      fullName: profile?.full_name || user.email || 'User',
+      id: userId,
+      email: resolvedEmail,
+      fullName: profile?.full_name || resolvedEmail || 'User',
       avatarUrl: profile?.avatar_url || undefined,
       preferredLocale: profileRow?.preferred_locale ?? 'en-US',
       onboardingSeenToursModal:
@@ -379,7 +376,7 @@ export class AuthService {
       throw new NotFoundException('Invalid token');
     }
 
-    return this.getCurrentUser(user.id);
+    return this.getCurrentUser(user.id, { email: user.email ?? '' });
   }
 
   async getProfile(userId: string): Promise<ProfileResponseDto> {

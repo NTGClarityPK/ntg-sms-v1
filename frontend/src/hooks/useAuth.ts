@@ -6,8 +6,14 @@ import { apiClient } from '@/lib/api-client';
 import { User } from '@/types/auth';
 import { supabase } from '@/lib/supabase/client';
 
-/** Temporary diagnostics — `npm run dev` only; stripped from production bundles via `NODE_ENV`. */
-const AUTH_ME_DIAG = process.env.NODE_ENV === 'development';
+/**
+ * Diagnostics for debugging auth bootstrap.
+ * Off by default to avoid noisy logs; enable locally by setting:
+ * `NEXT_PUBLIC_AUTH_ME_DIAG=true`
+ */
+const AUTH_ME_DIAG =
+  process.env.NODE_ENV === 'development' &&
+  process.env.NEXT_PUBLIC_AUTH_ME_DIAG === 'true';
 
 async function fetchCurrentUser(): Promise<User> {
   if (AUTH_ME_DIAG) {
@@ -114,15 +120,7 @@ export function useAuth() {
     gcTime: 10 * 60 * 1000,    // 10 minutes
   });
 
-  if (AUTH_ME_DIAG) {
-    console.log('🔵 USE_AUTH STATE:', {
-      user,
-      isLoading,
-      error,
-      status,
-      timestamp: new Date().toISOString(),
-    });
-  }
+  // Intentionally no render-time logging by default (too noisy).
 
   // Keep branch ID in localStorage when user data changes (avoid side effects during render).
   useEffect(() => {

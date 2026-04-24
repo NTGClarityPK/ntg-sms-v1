@@ -186,3 +186,21 @@ export function useStudentGuardians(studentId: string | null | undefined) {
   });
 }
 
+export function useParentChildren(parentUserId: string | null | undefined) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['parent-children', branchId, parentUserId],
+    queryFn: async () => {
+      if (!branchId || !parentUserId) return null;
+      const response = await apiClient.get<ParentAssociation[]>(
+        `/api/v1/parents/${parentUserId}/children`,
+      );
+      return response.data;
+    },
+    enabled: !!branchId && !!parentUserId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+

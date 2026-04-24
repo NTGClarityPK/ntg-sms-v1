@@ -56,31 +56,26 @@ export async function selectBranchAndGoDashboard(
   await apiClient.post('/api/v1/auth/select-branch', { branchId });
   localStorage.setItem('currentBranchId', branchId);
 
-  // Optimise login→dashboard latency:
-  // Warm the auth cache *after* branch selection so the dashboard can render immediately
-  // without waiting for another /auth/me bootstrap round-trip.
-  try {
-    const me = await apiClient.get<{
-      id: string;
-      currentBranch?: { id: string } | null;
-    }>('/api/v1/auth/me');
-    queryClient.setQueryData(['auth', 'me'], me.data);
-  } catch {
-    // Non-blocking: dashboard will refetch if needed.
-    queryClient.removeQueries({ queryKey: ['auth', 'me'] });
-  }
-
-  try {
-    const tenantResponse = await apiClient.get<Tenant>('/api/v1/tenants/me');
-    const tenantTheme = tenantResponse.data?.primaryColor;
-    if (tenantTheme && setPrimaryColor) {
-      setPrimaryColor(tenantTheme);
-    }
-  } catch {
-    // Non-blocking: dashboard will still bootstrap theme via AuthGuard/Header
-  }
-
+  // Navigate ASAP; do not block on cache-warming/theme.
   pushPortalRoute(router, '/dashboard');
+
+  // Background: warm the auth cache so dashboard renders with branch context quickly.
+  // Never block navigation for this.
+  void (async () => {
+    try {
+      const me = await apiClient.get<{
+        id: string;
+        currentBranch?: { id: string } | null;
+      }>('/api/v1/auth/me');
+      queryClient.setQueryData(['auth', 'me'], me.data);
+    } catch {
+      // If warmup fails, let dashboard refetch normally.
+    }
+  })();
+
+  // Theme fetch is intentionally NOT done here (login critical path).
+  // Portal layout/components handle tenant theme bootstrap.
+  void setPrimaryColor;
 }
 
 /**
@@ -121,6 +116,8 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       return;
     }
 
+    const isSchoolAdmin = normalisedRoleNames.includes('school_admin');
+
     // IMPORTANT: Portal routes assume a branch exists (many queries are branch-gated).
     // Ensure a branch is selected before navigating to /dashboard for any non-super-admin user.
     const userBranches = (userData.branches || []) as BranchForSelection[];
@@ -129,6 +126,15 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       setLoading?.(false);
       return;
     }
+
+    // Performance: school admins with multiple branches should see the branch modal immediately.
+    // Do NOT pre-select a branch here (it adds a blocking network call and delays the modal).
+    if (isSchoolAdmin && userBranches.length > 1) {
+      onMultiBranch(Array.from(new Map(userBranches.map((b) => [b.id, b])).values()));
+      setLoading?.(false);
+      return;
+    }
+
     const branchHint = typeof window !== 'undefined' ? window.localStorage.getItem('currentBranchId') : null;
     const desiredBranchId =
       userData.currentBranch?.id ??
@@ -149,8 +155,6 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       }
     }
 
-    const isSchoolAdmin = normalisedRoleNames.includes('school_admin');
-
     if (!isSchoolAdmin) {
       pushPortalRoute(router, '/dashboard');
       setLoading?.(false);
@@ -162,10 +166,6 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       setLoading?.(false);
       return;
     }
-
-    onMultiBranch(Array.from(new Map(userBranches.map((b) => [b.id, b])).values()));
-    setLoading?.(false);
-    return;
   } catch (branchError: unknown) {
     const err = branchError as {
       response?: { status?: number; data?: { error?: { message?: string }; message?: string } };

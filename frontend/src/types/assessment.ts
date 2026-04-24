@@ -10,6 +10,7 @@ export interface Assessment {
   subjectId: string;
   subjectName?: string;
   classSectionId: string;
+  classSectionName?: string;
   createdBy: string;
   teacherName?: string;
   totalMarks: number;

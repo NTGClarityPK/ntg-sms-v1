@@ -6,7 +6,7 @@ import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { useCreateUser, useUpdateUser, useUpdateUserRoles } from '@/hooks/useUsers';
+import { useCreateUser, useUpdateUserWithRoles } from '@/hooks/useUsers';
 import type { User, CreateUserInput, UpdateUserInput } from '@/types/users';
 import type { Role } from '@/types/permissions';
 import { useTenantMe } from '@/hooks/useTenant';
@@ -109,8 +109,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
   );
   const isEdit = !!user;
   const createUser = useCreateUser();
-  const updateUser = useUpdateUser();
-  const updateUserRoles = useUpdateUserRoles();
+  const updateUserWithRoles = useUpdateUserWithRoles();
 
   const form = useForm({
     initialValues: {
@@ -160,15 +159,11 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
           isActive: values.isActive,
         };
 
-        await updateUser.mutateAsync({ id: user.id, input: updateData });
-
-        // Update roles separately
-        if (values.roleIds) {
-          await updateUserRoles.mutateAsync({
-            id: user.id,
-            input: { roleIds: values.roleIds },
-          });
-        }
+        await updateUserWithRoles.mutateAsync({
+          id: user.id,
+          input: updateData,
+          roles: { roleIds: values.roleIds || [] },
+        });
       } else {
         const userType = classifyUserType(values.roleIds);
         const createData: CreateUserInput = {
@@ -376,7 +371,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
             <Button
               id="user-form-submit"
               type="submit"
-              loading={createUser.isPending || updateUser.isPending || updateUserRoles.isPending}
+              loading={createUser.isPending || updateUserWithRoles.isPending}
             >
               {isEdit ? t('update') : t('create')}
             </Button>

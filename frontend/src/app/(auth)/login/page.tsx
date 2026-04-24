@@ -370,7 +370,8 @@ export default function LoginPage() {
 
   return (
     <>
-      <Stack gap="lg">
+      <Box pos="relative">
+        <Stack gap="lg">
         <Box>
           <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
             {t('signInTitle')}
@@ -546,7 +547,8 @@ export default function LoginPage() {
               )}
             </Stack>
           </Box>
-      </Stack>
+        </Stack>
+      </Box>
 
       <Modal
         opened={forgotPasswordOpened}
