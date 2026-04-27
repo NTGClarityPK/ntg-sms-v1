@@ -3,6 +3,8 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  ForbiddenException,
+  HttpException,
   Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
@@ -63,6 +65,11 @@ export class JwtAuthGuard implements CanActivate {
         roles.push('super_admin');
       }
 
+      await this.ensureUserIsActive({
+        userId: user.id,
+        roles,
+      });
+
       // Attach user info to request
       request['user'] = {
         id: user.id,
@@ -70,6 +77,9 @@ export class JwtAuthGuard implements CanActivate {
         roles,
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`JWT validation failed: ${errorMessage}`);
       throw new UnauthorizedException('Invalid or expired token');
@@ -81,6 +91,53 @@ export class JwtAuthGuard implements CanActivate {
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     return type === 'Bearer' ? token : undefined;
+  }
+
+  private async ensureUserIsActive(input: {
+    userId: string;
+    roles: string[];
+  }): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('is_active')
+      .eq('id', input.userId)
+      .maybeSingle();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      this.logger.warn(`Failed to fetch profile status: ${profileError.message}`);
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    const isProfileInactive = (profile as { is_active?: boolean | null } | null)?.is_active === false;
+    if (isProfileInactive) {
+      throw new ForbiddenException(
+        'Your account has been marked as inactive by an administrator. Please contact your school if you need help.',
+      );
+    }
+
+    const isStudentUser = input.roles.some((role) => role.toLowerCase() === 'student');
+    if (!isStudentUser) return;
+
+    const { data: studentRows, error: studentRowsError } = await supabase
+      .from('students')
+      .select('is_active')
+      .eq('user_id', input.userId);
+
+    if (studentRowsError) {
+      this.logger.warn(`Failed to fetch student status: ${studentRowsError.message}`);
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    const hasInactiveStudent = ((studentRows || []) as Array<{ is_active: boolean }>).some(
+      (row) => row.is_active === false,
+    );
+    if (hasInactiveStudent) {
+      throw new ForbiddenException(
+        'Your account has been marked as inactive by an administrator. Please contact your school if you need help.',
+      );
+    }
   }
 }
 

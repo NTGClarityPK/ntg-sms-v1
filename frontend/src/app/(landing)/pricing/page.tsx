@@ -5,7 +5,7 @@ import { MarketingFooter } from '@/components/marketing/Footer';
 import { Container, Title, Text, Stack, Card, Button, List, ThemeIcon, Group, Box, Badge } from '@mantine/core';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { IconCheck } from '@tabler/icons-react';
+import { IconCheck, IconX } from '@tabler/icons-react';
 import { GeometricAccent } from '@/components/marketing/GeometricAccent';
 import { useMarketingColors } from '@/lib/hooks/use-marketing-colors';
 import { PageCTASection } from '@/components/marketing/sections/PageCTASection';
@@ -82,61 +82,38 @@ function PricingCard({ plan, index }: { plan: typeof plans[0]; index: number }) 
             </Group>
           </div>
 
-          <Stack gap="xs" mt="md">
-            <Group gap="xs">
-              <Text size="sm" fw={600} style={{ color: marketingColors.textSecondary }}>
-                Branches:
-              </Text>
-              <Text size="sm" style={{ color: marketingColors.textPrimary }}>
-                {plan.locations}
-              </Text>
-            </Group>
-            <Group gap="xs">
-              <Text size="sm" fw={600} style={{ color: marketingColors.textSecondary }}>
-                Staff users:
-              </Text>
-              <Text size="sm" style={{ color: marketingColors.textPrimary }}>
-                {plan.users}
-              </Text>
-            </Group>
-            <Group gap="xs">
-              <Text size="sm" fw={600} style={{ color: marketingColors.textSecondary }}>
-                Student cap:
-              </Text>
-              <Text size="sm" style={{ color: marketingColors.textPrimary }}>
-                {plan.studentCap}
-              </Text>
-            </Group>
-            <Group gap="xs">
-              <Text size="sm" fw={600} style={{ color: marketingColors.textSecondary }}>
-                Records/month:
-              </Text>
-              <Text size="sm" style={{ color: marketingColors.textPrimary }}>
-                {plan.monthlyRecords}
-              </Text>
-            </Group>
-          </Stack>
+          <Text size="sm" mt="md" style={{ color: marketingColors.textSecondary }}>
+            {plan.summary}
+          </Text>
 
           <List
             spacing="xs"
             size="sm"
             mt="md"
-            icon={
-              <ThemeIcon color={marketingColors.primary} size={20} radius="xl">
-                <IconCheck size={12} />
-              </ThemeIcon>
-            }
           >
-            {plan.features.map((feature, idx) => (
+            {plan.highlights.map((feature, idx) => (
               <List.Item key={idx} style={{ color: marketingColors.textSecondary }}>
-                {feature}
+                <Group gap="xs" wrap="nowrap">
+                  <ThemeIcon color={feature.included ? marketingColors.primary : 'gray'} size={20} radius="xl">
+                    {feature.included ? <IconCheck size={12} /> : <IconX size={12} />}
+                  </ThemeIcon>
+                  <Text
+                    size="sm"
+                    style={{
+                      color: feature.included ? marketingColors.textSecondary : marketingColors.textTertiary,
+                      textDecoration: feature.included ? 'none' : 'line-through',
+                    }}
+                  >
+                    {feature.label}
+                  </Text>
+                </Group>
               </List.Item>
             ))}
           </List>
 
           <Button
             component={Link}
-            href={plan.price === 'Custom' ? '/contact' : '/login'}
+            href={plan.name === 'Enterprise' ? '/contact' : '/login'}
             fullWidth
             mt="auto"
             color={undefined}
@@ -170,7 +147,7 @@ function PricingCard({ plan, index }: { plan: typeof plans[0]; index: number }) 
               e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            {plan.price === 'Custom' ? 'Contact Sales' : 'Get Started'}
+            {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
           </Button>
         </Stack>
       </Card>

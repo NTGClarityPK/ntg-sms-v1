@@ -3,7 +3,7 @@
 import { Container, Title, Text, Stack, Card, Button, Group, Box, Badge } from '@mantine/core';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { IconArrowRight } from '@tabler/icons-react';
+import { IconArrowRight, IconCircleCheckFilled, IconCircleXFilled } from '@tabler/icons-react';
 import { GeometricAccent } from '../GeometricAccent';
 import { useMarketingColors } from '@/lib/hooks/use-marketing-colors';
 import { plans } from '@/lib/constants/plans';
@@ -75,6 +75,11 @@ function PricingCard({ plan, index }: { plan: typeof plans[0]; index: number }) 
             >
               {plan.name} Plan
             </Text>
+            {'summary' in plan && (
+              <Text size="sm" mt="xs" style={{ color: marketingColors.textSecondary, lineHeight: 1.45 }}>
+                {plan.summary}
+              </Text>
+            )}
             <Group align="baseline" gap={4} mt="xs">
               <Text
                 size="2.5rem"
@@ -95,28 +100,25 @@ function PricingCard({ plan, index }: { plan: typeof plans[0]; index: number }) 
           </div>
 
           <Stack gap="xs" mt="md">
-            <Group justify="space-between">
-              <Text size="sm" style={{ color: marketingColors.textSecondary }}>Branches:</Text>
-              <Text size="sm" fw={600} style={{ color: marketingColors.textPrimary }}>{plan.locations}</Text>
-            </Group>
-            <Group justify="space-between">
-              <Text size="sm" style={{ color: marketingColors.textSecondary }}>Staff users:</Text>
-              <Text size="sm" fw={600} style={{ color: marketingColors.textPrimary }}>{plan.users}</Text>
-            </Group>
-            <Group justify="space-between">
-              <Text size="sm" style={{ color: marketingColors.textSecondary }}>Student cap:</Text>
-              <Text size="sm" fw={600} style={{ color: marketingColors.textPrimary }}>{plan.studentCap}</Text>
-            </Group>
-            <Group justify="space-between">
-              <Text size="sm" style={{ color: marketingColors.textSecondary }}>Records/month:</Text>
-              <Text size="sm" fw={600} style={{ color: marketingColors.textPrimary }}>{plan.monthlyRecords}</Text>
-            </Group>
+            {'highlights' in plan &&
+              plan.highlights.map((item) => (
+                <Group key={item.label} align="flex-start" gap="xs" wrap="nowrap">
+                  {item.included ? (
+                    <IconCircleCheckFilled size={16} style={{ marginTop: 2, flexShrink: 0 }} color={marketingColors.textPrimary} />
+                  ) : (
+                    <IconCircleXFilled size={16} style={{ marginTop: 2, flexShrink: 0 }} color="#ef4444" />
+                  )}
+                  <Text size="sm" style={{ color: marketingColors.textPrimary, lineHeight: 1.4 }}>
+                    {item.label}
+                  </Text>
+                </Group>
+              ))}
           </Stack>
 
 
           <Button
             component={Link}
-            href={plan.price === 'Custom' ? '/contact' : '/login'}
+            href={plan.price === 'Contact sales' ? '/contact' : '/login'}
             fullWidth
             mt="auto"
             color={undefined}
@@ -150,7 +152,7 @@ function PricingCard({ plan, index }: { plan: typeof plans[0]; index: number }) 
               e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            {plan.price === 'Custom' ? 'Contact Sales' : 'Get Started'}
+            {plan.price === 'Contact sales' ? 'Contact Sales' : 'Get Started'}
           </Button>
         </Stack>
       </Card>

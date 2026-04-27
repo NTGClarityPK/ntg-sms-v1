@@ -495,14 +495,19 @@ export class InvitationsService {
       ...new Set((rows ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean)),
     ];
 
+    let failedCount = 0;
     for (const userId of userIds) {
       try {
         await this.purgeExpiredInvitationUser(supabase, userId);
       } catch (e) {
-        this.logger.warn(
-          `expireUnusedInvitationsJob: failed for user ${userId}: ${e instanceof Error ? e.message : e}`,
-        );
+        failedCount += 1;
       }
+    }
+
+    if (failedCount > 0) {
+      this.logger.debug(
+        `expireUnusedInvitationsJob: ${failedCount} user cleanup operation(s) could not be completed in this run`,
+      );
     }
   }
 

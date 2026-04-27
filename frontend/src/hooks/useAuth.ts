@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { User } from '@/types/auth';
 import { supabase } from '@/lib/supabase/client';
+import { isLogoutInProgress } from '@/lib/auth';
 import { useAuthStore } from '@/lib/store/auth-store';
 
 /**
@@ -87,6 +88,11 @@ export function useAuth() {
   useEffect(() => {
     let alive = true;
     void (async () => {
+      if (isLogoutInProgress()) {
+        if (!alive) return;
+        setHasSession(false);
+        return;
+      }
       try {
         const { data } = await supabase.auth.getSession();
         if (!alive) return;
@@ -193,6 +199,11 @@ export function useAuth() {
         useAuthStore.getState().clear();
         queryClient.cancelQueries({ queryKey: ['auth', 'me'] });
         queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+        return;
+      }
+
+      if (isLogoutInProgress()) {
+        setHasSession(false);
         return;
       }
 

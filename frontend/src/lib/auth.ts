@@ -6,6 +6,30 @@ import {
   setUiLocaleCookieOnDocument,
 } from './ui-locale';
 
+const LOGOUT_IN_PROGRESS_KEY = 'ntg_logout_in_progress';
+
+export function isLogoutInProgress(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage.getItem(LOGOUT_IN_PROGRESS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setLogoutInProgress(value: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (value) {
+      window.sessionStorage.setItem(LOGOUT_IN_PROGRESS_KEY, '1');
+    } else {
+      window.sessionStorage.removeItem(LOGOUT_IN_PROGRESS_KEY);
+    }
+  } catch {
+    // Non-blocking
+  }
+}
+
 export function syncLocaleCookieFromStorage(): void {
   if (typeof window === 'undefined') return;
 
@@ -47,6 +71,7 @@ function clearAuthClientState(): void {
 }
 
 export async function signIn(email: string, password: string) {
+  setLogoutInProgress(false);
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -60,11 +85,14 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
+  setLogoutInProgress(true);
+
   // Use local sign-out so refresh tokens remain valid for PIN-based login.
   // This clears auth state from this browser without revoking tokens server-side.
   const { error } = await supabase.auth.signOut({ scope: 'local' });
 
   if (error) {
+    setLogoutInProgress(false);
     throw error;
   }
 
@@ -85,6 +113,7 @@ export async function signOut() {
 
 /** Clear Supabase session in this browser only; does not redirect (for login flows that must show an error first). */
 export async function clearLocalSupabaseSession(): Promise<void> {
+  setLogoutInProgress(true);
   const { error } = await supabase.auth.signOut({ scope: 'local' });
   if (error) {
     throw error;

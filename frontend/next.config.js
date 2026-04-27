@@ -21,7 +21,9 @@ const nextConfig = {
 const pwaConfig = withPWA({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
-  register: true,
+  // Register SW manually after auth (inside portal layout) so login/signup
+  // pages do not trigger large Workbox precache bursts.
+  register: false,
   // Critical: avoid serving stale app shell after deployments/auth redirects.
   // Without this, users can get stuck on an old build that boots with mismatched env/session until refresh.
   skipWaiting: true,

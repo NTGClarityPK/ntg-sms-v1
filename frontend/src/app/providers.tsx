@@ -32,6 +32,34 @@ function DevServiceWorkerCleanup() {
   return null;
 }
 
+/** On auth pages, remove old global SW registrations to avoid Workbox precache bursts. */
+function AuthRouteServiceWorkerCleanup() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') return;
+    if (typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator)) return;
+
+    const isAuth =
+      !!pathname &&
+      (pathname.startsWith('/login') ||
+        pathname.startsWith('/signup') ||
+        pathname.startsWith('/reset-password') ||
+        pathname.startsWith('/select-child'));
+
+    if (!isAuth) return;
+
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((reg) => {
+        reg.unregister();
+      });
+    });
+  }, [pathname]);
+
+  return null;
+}
+
 /**
  * Recover from transient client boot failures (e.g. ChunkLoadError) by reloading once.
  * This prevents "blank page until manual refresh" after auth redirects or deployments.
@@ -141,6 +169,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <GlobalClientBootRecovery />
           <LegacyLocaleStorageCleanup />
           <DevServiceWorkerCleanup />
+          <AuthRouteServiceWorkerCleanup />
           <Notifications />
           <SafariInstallModal />
           <PushSubscribe />

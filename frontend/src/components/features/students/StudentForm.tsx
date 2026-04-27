@@ -252,21 +252,50 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const handleSubmit = async (values: typeof form.values) => {
     try {
       if (isEdit && student) {
-        const updateData: UpdateStudentInput = {
-          firstName: values.firstName,
-          lastName: values.lastName,
-          phone: values.phone || undefined,
-          address: values.address || undefined,
-          dateOfBirth: values.dateOfBirth || undefined,
-          gender: values.gender,
-          classId: values.classId || undefined,
-          sectionId: values.sectionId || undefined,
-          bloodGroup: values.bloodGroup || undefined,
-          medicalNotes: values.medicalNotes || undefined,
-          admissionDate: values.admissionDate || undefined,
-          isActive: values.isActive,
-          subjectTemplateId: values.subjectTemplateId || undefined,
-        };
+        const normalize = (v?: string | null) => (v ?? '').trim();
+        const currentTemplateId = normalize(student.subjectTemplateId || currentTemplate?.id || '');
+        const nextTemplateId = normalize(values.subjectTemplateId || '');
+        const updateData: UpdateStudentInput = {};
+
+        if (normalize(values.firstName) !== normalize(student.firstName)) {
+          updateData.firstName = values.firstName;
+        }
+        if (normalize(values.lastName) !== normalize(student.lastName)) {
+          updateData.lastName = values.lastName;
+        }
+        if (normalize(values.phone) !== normalize(student.phone)) {
+          updateData.phone = values.phone || undefined;
+        }
+        if (normalize(values.address) !== normalize(student.address)) {
+          updateData.address = values.address || undefined;
+        }
+        if (normalize(values.dateOfBirth) !== normalize(student.dateOfBirth)) {
+          updateData.dateOfBirth = values.dateOfBirth || undefined;
+        }
+        if ((values.gender ?? '') !== (student.gender ?? '')) {
+          updateData.gender = values.gender;
+        }
+        if (normalize(values.classId) !== normalize(student.classId)) {
+          updateData.classId = values.classId || undefined;
+        }
+        if (normalize(values.sectionId) !== normalize(student.sectionId)) {
+          updateData.sectionId = values.sectionId || undefined;
+        }
+        if (normalize(values.bloodGroup) !== normalize(student.bloodGroup)) {
+          updateData.bloodGroup = values.bloodGroup || undefined;
+        }
+        if (normalize(values.medicalNotes) !== normalize(student.medicalNotes)) {
+          updateData.medicalNotes = values.medicalNotes || undefined;
+        }
+        if (normalize(values.admissionDate) !== normalize(student.admissionDate)) {
+          updateData.admissionDate = values.admissionDate || undefined;
+        }
+        if ((values.isActive ?? true) !== (student.isActive ?? true)) {
+          updateData.isActive = values.isActive;
+        }
+        if (nextTemplateId !== currentTemplateId) {
+          updateData.subjectTemplateId = values.subjectTemplateId || undefined;
+        }
 
         await updateStudent.mutateAsync({ id: student.id, input: updateData });
       } else {

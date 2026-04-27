@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconCalendar, IconSchool, IconClock, IconClipboardList, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconSchool, IconClock, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -171,7 +171,7 @@ export default function SettingsPage() {
   const { user, isLoading: isLoadingAuth } = useAuth();
   const [wizardOpened, { open: openWizard, close: closeWizard }] = useDisclosure(false);
   const [copyModalOpened, { open: openCopyModal, close: closeCopyModal }] = useDisclosure(false);
-  const [activeTab, setActiveTab] = useState<string | null>('permissions');
+  const [activeTab, setActiveTab] = useState<string | null>('business-information');
   const [showBulkImportPanel, setShowBulkImportPanel] = useState(false);
   const statusQuery = useSettingsStatus();
   const branchesQuery = useTenantBranches();
@@ -277,26 +277,23 @@ export default function SettingsPage() {
                   scrollbarWidth: 'thin',
                 }}
               >
-                <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
-                  {tSettings('tabPermissions')}
-                </Tabs.Tab>
                 <Tabs.Tab value="business-information" leftSection={<IconBuilding size={16} />}>
                   {tSettings('tabBusinessInformation')}
                 </Tabs.Tab>
-                <Tabs.Tab value="academic-years" leftSection={<IconCalendar size={16} />}>
-                  {tSettings('tabAcademicYears')}
-                </Tabs.Tab>
-                <Tabs.Tab value="academic" leftSection={<IconSchool size={16} />}>
+                <Tabs.Tab value="academic-years" leftSection={<IconSchool size={16} />}>
                   {tSettings('tabAcademic')}
+                </Tabs.Tab>
+                <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
+                  {tSettings('tabPermissions')}
                 </Tabs.Tab>
                 <Tabs.Tab value="schedule" leftSection={<IconClock size={16} />}>
                   {tSettings('tabSchedule')}
                 </Tabs.Tab>
-                <Tabs.Tab value="assessment" leftSection={<IconClipboardList size={16} />}>
-                  {tSettings('tabAssessment')}
-                </Tabs.Tab>
                 <Tabs.Tab value="communication" leftSection={<IconMessage size={16} />}>
                   {tSettings('tabCommunication')}
+                </Tabs.Tab>
+                <Tabs.Tab value="general" leftSection={<IconAdjustments size={16} />}>
+                  {tSettings('tabGeneral')}
                 </Tabs.Tab>
                 <Tabs.Tab value="inventory-management" leftSection={<IconPackage size={16} />}>
                   {tSettings('tabInventoryManagement')}
@@ -309,15 +306,7 @@ export default function SettingsPage() {
                     {tSettings('tabPublicStatistics')}
                   </Tabs.Tab>
                 )}
-                <Tabs.Tab value="general" leftSection={<IconAdjustments size={16} />}>
-                  {tSettings('tabGeneral')}
-                </Tabs.Tab>
               </Tabs.List>
-
-              {/* Permissions Tab */}
-              <Tabs.Panel value="permissions" pt="md" px="md" pb="md">
-                <PermissionsTabContent />
-              </Tabs.Panel>
 
               {/* Business Information Tab */}
               <Tabs.Panel value="business-information" pt="md" px="md" pb="md">
@@ -326,12 +315,16 @@ export default function SettingsPage() {
 
               {/* Academic Years Tab */}
               <Tabs.Panel value="academic-years" pt="md" px="md" pb="md">
-                <AcademicYearsTabContent />
+                <Stack gap="xl">
+                  <AcademicYearsTabContent />
+                  <AcademicTabContent />
+                  <AssessmentTabContent />
+                </Stack>
               </Tabs.Panel>
 
-              {/* Academic Tab */}
-              <Tabs.Panel value="academic" pt="md" px="md" pb="md">
-                <AcademicTabContent />
+              {/* Permissions Tab */}
+              <Tabs.Panel value="permissions" pt="md" px="md" pb="md">
+                <PermissionsTabContent />
               </Tabs.Panel>
 
               {/* Schedule Tab */}
@@ -339,14 +332,14 @@ export default function SettingsPage() {
                 <ScheduleTabContent />
               </Tabs.Panel>
 
-              {/* Assessment Tab */}
-              <Tabs.Panel value="assessment" pt="md" px="md" pb="md">
-                <AssessmentTabContent />
-              </Tabs.Panel>
-
               {/* Communication Tab */}
               <Tabs.Panel value="communication" pt="md" px="md" pb="md">
                 <CommunicationTabContent />
+              </Tabs.Panel>
+
+              {/* General: leave quota, library categories, behaviour */}
+              <Tabs.Panel value="general" pt="md" px="md" pb="md">
+                <GeneralTabContent />
               </Tabs.Panel>
 
               {/* Inventory Management Tab */}
@@ -365,10 +358,6 @@ export default function SettingsPage() {
                 </Tabs.Panel>
               )}
 
-              {/* General: leave quota, library categories, behaviour */}
-              <Tabs.Panel value="general" pt="md" px="md" pb="md">
-                <GeneralTabContent />
-              </Tabs.Panel>
             </Tabs>
           </>
         )}
@@ -1157,31 +1146,34 @@ function BusinessInformationTabContent() {
 function AcademicTabContent() {
   const tSettings = useTranslations('settings');
   return (
-    <Tabs defaultValue="subjects">
-      <Tabs.List>
-        <Tabs.Tab value="subjects">{tSettings('academicTabSubjects')}</Tabs.Tab>
-        <Tabs.Tab value="classes">{tSettings('academicTabClasses')}</Tabs.Tab>
-        <Tabs.Tab value="sections">{tSettings('academicTabSections')}</Tabs.Tab>
-        <Tabs.Tab value="levels">{tSettings('academicTabLevels')}</Tabs.Tab>
-        <Tabs.Tab value="subject-templates">{tSettings('academicTabSubjectTemplates')}</Tabs.Tab>
-      </Tabs.List>
+    <Stack gap="md">
+      <Title order={2}>Academic Settings</Title>
+      <Tabs defaultValue="subjects">
+        <Tabs.List>
+          <Tabs.Tab value="subjects">{tSettings('academicTabSubjects')}</Tabs.Tab>
+          <Tabs.Tab value="classes">{tSettings('academicTabClasses')}</Tabs.Tab>
+          <Tabs.Tab value="sections">{tSettings('academicTabSections')}</Tabs.Tab>
+          <Tabs.Tab value="levels">{tSettings('academicTabLevels')}</Tabs.Tab>
+          <Tabs.Tab value="subject-templates">{tSettings('academicTabSubjectTemplates')}</Tabs.Tab>
+        </Tabs.List>
 
-      <Tabs.Panel value="subjects" pt="md">
-        <SubjectList />
-      </Tabs.Panel>
-      <Tabs.Panel value="classes" pt="md">
-        <ClassList />
-      </Tabs.Panel>
-      <Tabs.Panel value="sections" pt="md">
-        <SectionList />
-      </Tabs.Panel>
-      <Tabs.Panel value="levels" pt="md">
-        <LevelManager />
-      </Tabs.Panel>
-      <Tabs.Panel value="subject-templates" pt="md">
-        <SubjectTemplatesTabContent />
-      </Tabs.Panel>
-    </Tabs>
+        <Tabs.Panel value="subjects" pt="md">
+          <SubjectList />
+        </Tabs.Panel>
+        <Tabs.Panel value="classes" pt="md">
+          <ClassList />
+        </Tabs.Panel>
+        <Tabs.Panel value="sections" pt="md">
+          <SectionList />
+        </Tabs.Panel>
+        <Tabs.Panel value="levels" pt="md">
+          <LevelManager />
+        </Tabs.Panel>
+        <Tabs.Panel value="subject-templates" pt="md">
+          <SubjectTemplatesTabContent />
+        </Tabs.Panel>
+      </Tabs>
+    </Stack>
   );
 }
 
@@ -1421,19 +1413,22 @@ function AssessmentTabContent() {
   const tSettings = useTranslations('settings');
 
   return (
-    <Tabs defaultValue="types">
-      <Tabs.List>
-        <Tabs.Tab value="types">{tSettings('assessmentTabTypes')}</Tabs.Tab>
-        <Tabs.Tab value="templates">{tSettings('assessmentTabTemplates')}</Tabs.Tab>
-      </Tabs.List>
+    <Stack gap="md">
+      <Title order={2}>Assessment Settings</Title>
+      <Tabs defaultValue="types">
+        <Tabs.List>
+          <Tabs.Tab value="types">{tSettings('assessmentTabTypes')}</Tabs.Tab>
+          <Tabs.Tab value="templates">{tSettings('assessmentTabTemplates')}</Tabs.Tab>
+        </Tabs.List>
 
-      <Tabs.Panel value="types" pt="md">
-        <AssessmentTypeList />
-      </Tabs.Panel>
-      <Tabs.Panel value="templates" pt="md">
-        <GradeTemplateBuilder />
-      </Tabs.Panel>
-    </Tabs>
+        <Tabs.Panel value="types" pt="md">
+          <AssessmentTypeList />
+        </Tabs.Panel>
+        <Tabs.Panel value="templates" pt="md">
+          <GradeTemplateBuilder />
+        </Tabs.Panel>
+      </Tabs>
+    </Stack>
   );
 }
 
