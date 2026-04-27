@@ -75,5 +75,54 @@ export class AuthPublicController {
     });
     return { data: res };
   }
+
+  /**
+   * Lightweight login pre-check used only after Supabase returns "invalid credentials".
+   * Helps the UI show a clearer message for deactivated users.
+   * Always returns 200 with a generic shape to avoid account enumeration via status codes.
+   */
+  @Post('login-status')
+  async loginStatus(
+    @Body() body: { email?: string },
+  ): Promise<{ data: { inactive: boolean; message?: string } }> {
+    const email = body?.email?.trim().toLowerCase();
+    if (!email) return { data: { inactive: false } };
+
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: userIdResult, error: userIdErr } = await supabase.rpc('auth_user_id_by_email', {
+      p_email: email,
+    });
+    if (userIdErr) {
+      throw new BadRequestException(userIdErr.message);
+    }
+
+    const userId =
+      typeof userIdResult === 'string' && userIdResult.trim().length > 0 ? userIdResult : null;
+    if (!userId) {
+      return { data: { inactive: false } };
+    }
+
+    const [{ data: profile }, { data: studentRows }] = await Promise.all([
+      supabase.from('profiles').select('is_active').eq('id', userId).maybeSingle(),
+      supabase.from('students').select('is_active').eq('user_id', userId),
+    ]);
+
+    const profileInactive = (profile as { is_active?: boolean | null } | null)?.is_active === false;
+    const studentInactive = ((studentRows || []) as Array<{ is_active: boolean }>).some(
+      (row) => row.is_active === false,
+    );
+
+    if (profileInactive || studentInactive) {
+      return {
+        data: {
+          inactive: true,
+          message: 'Your account has been marked as inactive. Please contact your administrator.',
+        },
+      };
+    }
+
+    return { data: { inactive: false } };
+  }
 }
 

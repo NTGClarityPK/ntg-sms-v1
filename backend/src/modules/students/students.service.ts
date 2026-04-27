@@ -1615,11 +1615,52 @@ export class StudentsService {
       .eq('id', id)
       .single();
 
-    const academicYearToLockCheck =
-      input.academicYearId !== undefined
-        ? (input.academicYearId ?? null)
-        : ((studentData as { academic_year_id?: string | null } | null)?.academic_year_id ?? null);
-    if (academicYearToLockCheck) {
+    const currentAcademicYearId =
+      (studentData as { academic_year_id?: string | null } | null)?.academic_year_id ?? null;
+    const currentClassId =
+      (studentData as { class_id?: string | null } | null)?.class_id ?? null;
+    const currentSectionId =
+      (oldRow as { section_id?: string | null } | null)?.section_id ?? null;
+    const currentAdmissionDate =
+      (oldRow as { admission_date?: string | null } | null)?.admission_date ?? null;
+
+    const nextAcademicYearId =
+      input.academicYearId !== undefined ? (input.academicYearId ?? null) : currentAcademicYearId;
+    const nextClassId =
+      input.classId !== undefined ? (input.classId ?? null) : currentClassId;
+    const nextSectionId =
+      input.sectionId !== undefined ? (input.sectionId ?? null) : currentSectionId;
+    const nextAdmissionDate =
+      input.admissionDate !== undefined ? (input.admissionDate ?? null) : currentAdmissionDate;
+
+    let currentSubjectTemplateId: string | null = null;
+    if (input.subjectTemplateId !== undefined && nextAcademicYearId) {
+      const { data: currentTemplateRow, error: currentTemplateErr } = await supabase
+        .from('student_subject_template_assignments')
+        .select('subject_template_id')
+        .eq('student_id', id)
+        .eq('academic_year_id', nextAcademicYearId)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(currentTemplateErr);
+      currentSubjectTemplateId =
+        (currentTemplateRow as { subject_template_id?: string | null } | null)?.subject_template_id ??
+        null;
+    }
+    const nextSubjectTemplateId =
+      input.subjectTemplateId !== undefined ? (input.subjectTemplateId ?? null) : currentSubjectTemplateId;
+
+    const academicYearToLockCheck = nextAcademicYearId;
+    const mutatesAcademicPlacement =
+      nextAcademicYearId !== currentAcademicYearId ||
+      nextClassId !== currentClassId ||
+      nextSectionId !== currentSectionId ||
+      nextAdmissionDate !== currentAdmissionDate ||
+      nextSubjectTemplateId !== currentSubjectTemplateId;
+
+    // Academic-year lock protects placement/curriculum edits.
+    // Allow account-status toggles (isActive) and profile edits even when the year is locked.
+    if (academicYearToLockCheck && mutatesAcademicPlacement) {
       await this.academicYearsService.assertNotLockedForBranch(branchId, academicYearToLockCheck);
     }
 

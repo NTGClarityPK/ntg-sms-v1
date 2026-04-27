@@ -192,6 +192,27 @@ export default function LoginPage() {
         errorMsg = 'Failed to login. Please check your credentials.';
       }
 
+      // Supabase often returns the same message for wrong password and blocked users.
+      // If credentials look invalid, do a server-side inactive-status probe to improve UX.
+      if (
+        typeof errorMsg === 'string' &&
+        errorMsg.toLowerCase().includes('invalid login credentials')
+      ) {
+        try {
+          const statusRes = await apiClient.post<{ inactive: boolean; message?: string }>(
+            '/api/v1/public/login-status',
+            { email: values.email },
+          );
+          if (statusRes.data?.inactive) {
+            errorMsg =
+              statusRes.data.message ||
+              'Your account has been marked as inactive. Please contact your administrator.';
+          }
+        } catch {
+          // Keep original login error if status probe fails.
+        }
+      }
+
       setError(errorMsg);
       setLoading(false);
     }

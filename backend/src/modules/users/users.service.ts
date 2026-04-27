@@ -79,7 +79,14 @@ function accountStatusFromUserAndInvites(input: {
   // Pre-setup lifecycle.
   const inv = input.latestInvitation ?? null;
   if (!inv) {
-    return input.hasInvitationEvidence ? 'pending_verification' : 'inactive';
+    // Invitation rows exist only for staff/parent invite flows. Users created or managed
+    // without that workflow have no invitation — their status must follow admin suspension.
+    // Previously we returned 'inactive' whenever there was no invite + no invitation_* profile
+    // columns, which ignored profiles.is_active and made everyone show inactive after activation.
+    if (input.hasInvitationEvidence) {
+      return 'pending_verification';
+    }
+    return input.isActive ? 'active' : 'inactive';
   }
   const expMs = new Date(inv.expires_at).getTime();
   if (!Number.isFinite(expMs)) return 'pending_verification';
