@@ -23,12 +23,15 @@ export class SettingsStatusService {
       .maybeSingle();
     throwIfDbError(importInitError);
 
-    // Check Academic Year: at least one active academic year exists
-    const { data: academicYears, error: academicYearsError } = await supabase
+    // Check Academic Year: at least one active academic year exists (scope by tenant when possible)
+    const academicYearQuery = supabase
       .from('academic_years')
       .select('id')
       .eq('is_active', true)
       .limit(1);
+    const { data: academicYears, error: academicYearsError } = tenantId
+      ? await academicYearQuery.eq('tenant_id', tenantId)
+      : await academicYearQuery;
     throwIfDbError(academicYearsError);
     const academicYear = (academicYears?.length ?? 0) > 0;
 
@@ -153,21 +156,21 @@ export class SettingsStatusService {
       return [];
     }
 
-    // Check which branches have settings initialized
-    const branchesWithSettings: Array<{ id: string; name: string; code: string | null }> = [];
+    // Check which branches have settings initialized (parallel to avoid N+1 latency)
+    const statuses = await Promise.all(
+      branches.map(async (branch) => ({
+        branch,
+        status: await this.checkInitializationStatus(branch.id, tenantId),
+      })),
+    );
 
-    for (const branch of branches) {
-      const status = await this.checkInitializationStatus(branch.id, tenantId);
-      if (status.isInitialized) {
-        branchesWithSettings.push({
-          id: branch.id,
-          name: branch.name,
-          code: branch.code,
-        });
-      }
-    }
-
-    return branchesWithSettings;
+    return statuses
+      .filter(({ status }) => status.isInitialized)
+      .map(({ branch }) => ({
+        id: branch.id,
+        name: branch.name,
+        code: branch.code,
+      }));
   }
 
   async copySettingsFromBranch(

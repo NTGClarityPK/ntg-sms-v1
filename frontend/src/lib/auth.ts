@@ -107,6 +107,26 @@ export async function signOut() {
     // Do NOT overwrite NEXT_LOCALE from potentially-stale localStorage during logout.
     syncLocaleCookieFromStorage();
     clearAuthClientState();
+
+    // Best-effort: remove SW + caches so auth redirects never use stale Workbox state.
+    // Non-blocking; logout must still proceed even if these throw.
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+    } catch {
+      // Non-blocking
+    }
+    try {
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
+      }
+    } catch {
+      // Non-blocking
+    }
+
     window.location.href = '/login';
   }
 }

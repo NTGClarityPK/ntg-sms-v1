@@ -1458,7 +1458,25 @@ export class ReportsService {
     userRoles: string[] | undefined,
   ): Promise<{ data: AttendanceSummaryBranchDto }> {
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
-    if (!activeYear) throw new BadRequestException('No active academic year found');
+    if (!activeYear) {
+      // Avoid a hard 400 on dashboards/widgets when a branch hasn't configured an academic year yet.
+      // Return an empty summary so the UI can render gracefully without retry/error storms.
+      return {
+        data: new AttendanceSummaryBranchDto({
+          startDate,
+          endDate,
+          byClass: [],
+          overall: {
+            averageAttendance: 0,
+            totalStudents: 0,
+            totalPresent: 0,
+            totalAbsent: 0,
+            totalLate: 0,
+            totalExcused: 0,
+          },
+        }),
+      };
+    }
     const yearId = activeYear.id;
 
     const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);

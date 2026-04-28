@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Group,
@@ -10,17 +10,28 @@ import {
   MultiSelect,
   SegmentedControl,
   Box,
+  Select,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { IconCalendar, IconTable, IconFilter } from '@tabler/icons-react';
+import { IconCalendar, IconFilter } from '@tabler/icons-react';
+import { useDebouncedValue } from '@mantine/hooks';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useClassSections } from '@/hooks/useClassSections';
 import { AttendanceCalendar } from '@/components/features/attendance/AttendanceCalendar';
 import { AttendanceReport } from '@/components/features/attendance/AttendanceReport';
 import { useMyStaff } from '@/hooks/useStaff';
 import { useAuth } from '@/hooks/useAuth';
+import { useStudent, useStudents } from '@/hooks/useStudents';
 import type { User } from '@/types/auth';
+import type { Student } from '@/types/students';
 import '@mantine/dates/styles.css';
+
+function studentToSelectOption(s: Student): { value: string; label: string } {
+  const name = `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim();
+  const suffix = s.studentId ? ` (${s.studentId})` : '';
+  const label = `${name}${suffix}`.trim();
+  return { value: s.id, label: label || s.id };
+}
 
 /**
  * Attendance history filters + calendar/table views.
@@ -31,6 +42,9 @@ export function AttendanceHistoryContent() {
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('table');
   const [showAllFilters, setShowAllFilters] = useState(false);
   const [selectedClassSectionIds, setSelectedClassSectionIds] = useState<string[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [studentSearchInput, setStudentSearchInput] = useState('');
+  const [debouncedStudentSearch] = useDebouncedValue(studentSearchInput, 300);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
@@ -54,6 +68,44 @@ export function AttendanceHistoryContent() {
   });
   const classSections = classSectionsData?.data || [];
 
+  const classIdsForStudentPicker = useMemo(() => {
+    if (selectedClassSectionIds.length > 0) {
+      const ids = selectedClassSectionIds
+        .map((sid) => classSections.find((cs) => cs.id === sid)?.classId)
+        .filter((id): id is string => !!id);
+      return [...new Set(ids)];
+    }
+    const all = classSections.map((cs) => cs.classId).filter((id): id is string => !!id);
+    return [...new Set(all)];
+  }, [selectedClassSectionIds, classSections]);
+
+  const { data: studentsData, isLoading: isLoadingStudents } = useStudents({
+    page: 1,
+    limit: 100,
+    search: debouncedStudentSearch.trim() || undefined,
+    isActive: true,
+    ...(classIdsForStudentPicker.length > 0 ? { classIds: classIdsForStudentPicker } : {}),
+  });
+
+  const studentsFromQuery = studentsData?.data ?? [];
+  const needsSelectedStudentDetail =
+    !!selectedStudentId &&
+    !studentsFromQuery.some((s) => s.id === selectedStudentId);
+  const { data: selectedStudentDetail } = useStudent(
+    needsSelectedStudentDetail ? selectedStudentId : null,
+  );
+
+  const studentSelectData = useMemo(() => {
+    const map = new Map<string, { value: string; label: string }>();
+    for (const s of studentsFromQuery) {
+      map.set(s.id, studentToSelectOption(s));
+    }
+    if (selectedStudentDetail) {
+      map.set(selectedStudentDetail.id, studentToSelectOption(selectedStudentDetail));
+    }
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [studentsFromQuery, selectedStudentDetail]);
+
   // Calendar needs enough rows to cover multiple days (rows scale with student count).
   // Backend caps `limit` at 500, so fetch a few pages when in calendar view.
   const calendarLimit = 500;
@@ -62,6 +114,7 @@ export function AttendanceHistoryContent() {
   const commonParams = {
     classSectionIds:
       selectedClassSectionIds.length > 0 ? selectedClassSectionIds : undefined,
+    studentId: selectedStudentId ?? undefined,
     statuses:
       selectedStatuses.length > 0
         ? (selectedStatuses as ('present' | 'absent' | 'late' | 'excused')[])
@@ -146,6 +199,23 @@ export function AttendanceHistoryContent() {
                 clearable
               />
             </Box>
+            <Box style={{ minWidth: 0, flex: '1 1 220px' }}>
+              <Select
+                id="attendance-history-filter-student"
+                label={t('student')}
+                placeholder={t('searchByStudentNameOrId')}
+                data={studentSelectData}
+                value={selectedStudentId}
+                onChange={(v) => setSelectedStudentId(v)}
+                searchable
+                searchValue={studentSearchInput}
+                onSearchChange={setStudentSearchInput}
+                filter={({ options }) => options}
+                clearable
+                disabled={isLoadingStudents}
+                nothingFoundMessage={t('noStudentsFound')}
+              />
+            </Box>
             {showAllFilters && (
               <>
                 <Box style={{ minWidth: 0, flex: '1 1 160px' }}>
@@ -195,6 +265,8 @@ export function AttendanceHistoryContent() {
               variant="subtle"
               onClick={() => {
                 setSelectedClassSectionIds([]);
+                setSelectedStudentId(null);
+                setStudentSearchInput('');
                 setSelectedStatuses([]);
                 setStartDate(null);
                 setEndDate(null);

@@ -34,29 +34,9 @@ async function fetchCurrentUser(): Promise<User> {
       });
     }
 
-    // Critical: right after login/OAuth, we can have a branchId in localStorage (set by auth callback)
-    // but `/auth/me` may still return `currentBranch: null` until the branch is selected server-side.
-    // Keep this logic, but do NOT do anything else in this function that can block returning the user.
-    if (typeof window !== 'undefined' && !user?.currentBranch?.id) {
-      const branchIdHint = window.localStorage.getItem('currentBranchId');
-      if (branchIdHint && branchIdHint.trim() !== '') {
-        try {
-          await apiClient.post('/api/v1/auth/select-branch', { branchId: branchIdHint });
-          const refreshed = await apiClient.get<User>('/api/v1/auth/me');
-          if (AUTH_ME_DIAG) {
-            console.log('🟢 FETCH_CURRENT_USER: Returning user (after branch selection):', {
-              userId: refreshed.data?.id,
-              currentBranchId: refreshed.data?.currentBranch?.id,
-            });
-          }
-          return refreshed.data;
-        } catch (branchErr: unknown) {
-          if (AUTH_ME_DIAG) {
-            console.warn('Branch selection failed; continuing with original user.', branchErr);
-          }
-        }
-      }
-    }
+    // IMPORTANT: Avoid "me → select-branch → me" loops here.
+    // Branch selection is handled during login routing and/or by the backend (profile current_branch_id).
+    // Keeping this function as a single request prevents duplicate `/auth/me` calls on app bootstrap.
 
     if (AUTH_ME_DIAG) {
       console.log('🟢 FETCH_CURRENT_USER: Returning user:', {

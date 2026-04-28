@@ -82,6 +82,28 @@ export class AuthService {
     return row?.current_branch_id ?? null;
   }
 
+  private async getProfileBranchAndStudent(userId: string): Promise<{
+    currentBranchId: string | null;
+    currentStudentId: string | null;
+  }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('current_branch_id, current_student_id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new BadRequestException(error.message);
+    }
+
+    const row = data as { current_branch_id: string | null; current_student_id: string | null } | null;
+    return {
+      currentBranchId: row?.current_branch_id ?? null,
+      currentStudentId: row?.current_student_id ?? null,
+    };
+  }
+
   async getCurrentUser(
     userId: string,
     hint?: { email?: string; roleNames?: string[] },
@@ -314,18 +336,20 @@ export class AuthService {
         .limit(1);
 
       if (!hasTypes || hasTypes.length === 0) {
-        let fallbackBranchId: string | null = null;
-        for (const b of branches) {
-          const { data: otherTypes } = await supabase
-            .from('assessment_types')
-            .select('id')
-            .eq('branch_id', b.id)
-            .limit(1);
-          if (otherTypes && otherTypes.length > 0) {
-            fallbackBranchId = b.id;
-            break;
-          }
+        const branchIdsForFallback = branches.map((b) => b.id);
+        const { data: anyAssessmentTypes, error: anyAssessmentTypesError } = await supabase
+          .from('assessment_types')
+          .select('branch_id')
+          .in('branch_id', branchIdsForFallback)
+          .limit(1);
+
+        if (anyAssessmentTypesError) {
+          throw new BadRequestException(
+            `Failed to check assessment types for fallback branch: ${anyAssessmentTypesError.message}`,
+          );
         }
+
+        const fallbackBranchId = (anyAssessmentTypes?.[0] as { branch_id?: string } | null)?.branch_id ?? null;
 
         if (fallbackBranchId && fallbackBranchId !== currentBranchId) {
           const { error: updateError } = await supabase
@@ -581,33 +605,15 @@ export class AuthService {
   } | null> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Get user's current branch from profile
-    const currentBranchId = await this.getProfileCurrentBranchId(userId);
+    const { currentBranchId, currentStudentId } = await this.getProfileBranchAndStudent(userId);
     if (!currentBranchId) {
       return null;
     }
 
-    // First, check if user has a current_student_id set (for parents)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('current_student_id')
-      .eq('id', userId)
-      .maybeSingle();
-
     let studentIdToFetch: string | null = null;
 
-    if (profile && (profile as { current_student_id: string | null }).current_student_id) {
-      // Parent has selected a child - verify it's in the current branch
-      const { data: studentCheck } = await supabase
-        .from('students')
-        .select('id')
-        .eq('id', (profile as { current_student_id: string }).current_student_id)
-        .eq('branch_id', currentBranchId)
-        .maybeSingle();
-
-      if (studentCheck) {
-        studentIdToFetch = studentCheck.id;
-      }
+    if (currentStudentId) {
+      studentIdToFetch = currentStudentId;
     } else {
       // No current_student_id set - check if user is a student themselves
       // (student record linked directly to user_id) - filter by current branch
@@ -631,6 +637,7 @@ export class AuthService {
       .from('students')
       .select('id, student_id, user_id, first_name, last_name')
       .eq('id', studentIdToFetch)
+      .eq('branch_id', currentBranchId)
       .single();
 
     if (studentError || !student) {

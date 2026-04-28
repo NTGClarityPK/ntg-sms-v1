@@ -24,14 +24,20 @@ const pwaConfig = withPWA({
   // Register SW manually after auth (inside portal layout) so login/signup
   // pages do not trigger large Workbox precache bursts.
   register: false,
+  // IMPORTANT: next-pwa extends Workbox defaults unless we disable it.
+  // Defaults include aggressive page/navigation caching which can cause repeated
+  // /login navigations to be fetched "from Workbox" during logout/redirect flows.
+  extendDefaultRuntimeCaching: false,
   // Critical: avoid serving stale app shell after deployments/auth redirects.
   // Without this, users can get stuck on an old build that boots with mismatched env/session until refresh.
   skipWaiting: true,
   clientsClaim: true,
   cleanupOutdatedCaches: true,
-  // Do not cache API requests in the SW: when network fails, Workbox would throw "no-response"
-  // and break the app. Let API calls go to the network only.
-  runtimeCaching: [],
+  // Keep runtime caching disabled (don't intercept app navigations like /login).
+  // Note: @ducanh2912/next-pwa reads runtimeCaching from workboxOptions.
+  workboxOptions: {
+    runtimeCaching: [],
+  },
 });
 
 module.exports = withNextIntl(pwaConfig(nextConfig));

@@ -61,20 +61,6 @@ export async function selectBranchAndGoDashboard(
   // Navigate ASAP; do not block on cache-warming/theme.
   pushPortalRoute(router, '/dashboard');
 
-  // Background: warm the auth cache so dashboard renders with branch context quickly.
-  // Never block navigation for this.
-  void (async () => {
-    try {
-      const me = await apiClient.get<{
-        id: string;
-        currentBranch?: { id: string } | null;
-      }>('/api/v1/auth/me');
-      queryClient.setQueryData(['auth', 'me'], me.data);
-    } catch {
-      // If warmup fails, let dashboard refetch normally.
-    }
-  })();
-
   // Theme fetch is intentionally NOT done here (login critical path).
   // Portal layout/components handle tenant theme bootstrap.
   void setPrimaryColor;
