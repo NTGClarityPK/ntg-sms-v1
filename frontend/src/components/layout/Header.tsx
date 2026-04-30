@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Group, Text, Badge, Tooltip, Box, Image, Menu } from '@mantine/core';
+import { Group, Text, Badge, Tooltip, Box, Image, Menu, useMantineColorScheme } from '@mantine/core';
 import { IconCircle, IconSchool, IconCrown } from '@tabler/icons-react';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { UserMenu } from './UserMenu';
 import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranchBadge';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useTheme } from '@/lib/hooks/use-theme';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { useMantineTheme } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -36,7 +36,8 @@ const headerBadgeStyle = {
 export function Header() {
   const theme = useMantineTheme();
   const isMobileNav = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
-  const { isDark } = useTheme();
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
   const themeConfig = (theme.other ?? {}) as ThemeConfig | undefined;
   const onlineBadgeColor = themeConfig?.components?.statusOnline?.badgeColor ?? '#22c55e';
   const offlineBadgeColor = themeConfig?.components?.statusOffline?.badgeColor ?? '#868e96';
@@ -180,36 +181,47 @@ export function Header() {
           </Box>
         )}
 
-        {/* NTG Logo - desktop only */}
+        {/* NTG Alma brand - desktop only */}
         <Box
           visibleFrom="sm"
           style={{
-            width: '64px',
-            height: '32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            opacity: 0.9,
+            opacity: 0.95,
+            textDecoration: 'none',
+            color: '#537d5d',
           }}
-          component="a"
-          href="https://ntgclarity.com/"
+          component={Link}
+          href="/home"
           id="header-link-ntg"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="NTG Clarity"
+          title="NTG Alma"
         >
-          <Image
-            src="/ntg-logo.svg"
-            alt="NTG Clarity"
-            width="100%"
-            height="100%"
-            fit="contain"
-            style={{
-              objectFit: 'contain',
-              filter: isDark ? 'brightness(0) saturate(100%) invert(100%)' : 'none',
-            }}
-          />
+          <Group gap={10} align="center" wrap="nowrap">
+            <Box style={{ width: 48, height: 48, display: 'flex', alignItems: 'center' }}>
+              <Image
+                src="/alma-logo-darkgreen.svg"
+                alt="NTG Alma"
+                width="100%"
+                height="100%"
+                fit="contain"
+                style={{ objectFit: 'contain' }}
+              />
+            </Box>
+            <Box
+              component="span"
+              style={{
+                fontFamily: 'var(--font-audiowide)',
+                lineHeight: 1,
+                fontSize: 'var(--mantine-font-size-xl)',
+                fontWeight: 400,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              NTG Alma
+            </Box>
+          </Group>
         </Box>
 
         {isParent && children.length > 0 && (

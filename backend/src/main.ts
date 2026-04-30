@@ -59,7 +59,11 @@ async function bootstrap() {
     .setTitle('School Management System API')
     .setDescription('API documentation for the School Management System')
     .setVersion('1.0')
-    .addBearerAuth()
+    // Name the scheme so we can reference it in security requirements
+    .addBearerAuth(undefined, 'bearer')
+    // Apply Bearer auth globally in Swagger UI so the token entered in "Authorize"
+    // is sent for endpoints unless they explicitly override security.
+    .addSecurityRequirements('bearer')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);

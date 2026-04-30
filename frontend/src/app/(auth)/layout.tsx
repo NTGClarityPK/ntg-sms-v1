@@ -2,8 +2,7 @@
 
 import { ReactNode, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
-import { Box, Title, Text, Card, Group } from '@mantine/core';
-import { IconSchool } from '@tabler/icons-react';
+import { Box, Title, Text, Card, Group, Image } from '@mantine/core';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { useTheme } from '@/lib/hooks/use-theme';
@@ -70,20 +69,20 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         >
           <Box
             style={{
-              width: '120px',
-              height: '120px',
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.15)',
-              border: '3px solid rgba(255, 255, 255, 0.3)',
+              width: 155,
+              height: 155,
+              margin: '28px auto 24px',
+              borderRadius: 9999,
+              border: '2px solid rgba(255, 255, 255, 0.55)',
+              background: 'rgba(255, 255, 255, 0.12)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 24px',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+              padding: 12,
+              backdropFilter: 'blur(8px)',
             }}
           >
-            <IconSchool size={60} stroke={2} />
+            <Image src="/alma-logo.svg" alt="NTG Alma" fit="contain" />
           </Box>
           <Title order={1} size="2.5rem" fw={800} mb="md" c="white">
             School Management
@@ -91,6 +90,27 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <Text size="lg" c="white" opacity={0.9}>
             Streamline your school operations
           </Text>
+          <Box
+            mt="md"
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+          >
+            <Box style={{ width: 260, height: 84 }}>
+              <Image
+                src="/ntg-logo.svg"
+                alt="NTG Clarity"
+                fit="contain"
+                width="100%"
+                height="100%"
+                style={{
+                  objectFit: 'contain',
+                  filter: 'brightness(0) saturate(100%) invert(100%)',
+                }}
+              />
+            </Box>
+          </Box>
         </Box>
       </Box>
 

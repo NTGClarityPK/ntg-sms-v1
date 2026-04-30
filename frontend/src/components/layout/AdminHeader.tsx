@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Group, Badge, Tooltip, Box, Image, Text, Stack, useMantineTheme } from '@mantine/core';
+import { Group, Badge, Tooltip, Box, Image, Text, Stack, useMantineTheme, useMantineColorScheme } from '@mantine/core';
 import { IconCircle, IconCrown } from '@tabler/icons-react';
+import Link from 'next/link';
 import { UserMenu } from './UserMenu';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { useAuth } from '@/hooks/useAuth';
-import { useTheme } from '@/lib/hooks/use-theme';
 
 const headerBadgeStyle = {
   cursor: 'default' as const,
@@ -20,7 +20,8 @@ const headerBadgeStyle = {
 
 export function AdminHeader() {
   const theme = useMantineTheme();
-  const { isDark } = useTheme();
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
   const themeConfig = (theme.other ?? {}) as ThemeConfig | undefined;
   const onlineBadgeColor = themeConfig?.components?.statusOnline?.badgeColor ?? '#22c55e';
   const offlineBadgeColor = themeConfig?.components?.statusOffline?.badgeColor ?? '#868e96';
@@ -87,35 +88,46 @@ export function AdminHeader() {
           SUPER USER
         </Badge>
 
-        {/* NTG Logo */}
+        {/* NTG Alma brand */}
         <Box
           style={{
-            width: '64px',
-            height: '32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            opacity: 0.9,
+            opacity: 0.95,
+            textDecoration: 'none',
+            color: '#537d5d',
           }}
-          component="a"
-          href="https://ntgclarity.com/"
+          component={Link}
+          href="/home"
           id="admin-header-link-ntg"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="NTG Clarity"
+          title="NTG Alma"
         >
-          <Image
-            src="/ntg-logo.svg"
-            alt="NTG Clarity"
-            width="100%"
-            height="100%"
-            fit="contain"
-            style={{
-              objectFit: 'contain',
-              filter: isDark ? 'brightness(0) saturate(100%) invert(100%)' : 'none',
-            }}
-          />
+          <Group gap={10} align="center" wrap="nowrap">
+            <Box style={{ width: 48, height: 48, display: 'flex', alignItems: 'center' }}>
+              <Image
+                src="/alma-logo-darkgreen.svg"
+                alt="NTG Alma"
+                width="100%"
+                height="100%"
+                fit="contain"
+                style={{ objectFit: 'contain' }}
+              />
+            </Box>
+            <Box
+              component="span"
+              style={{
+                fontFamily: 'var(--font-audiowide)',
+                lineHeight: 1,
+                fontSize: 'var(--mantine-font-size-xl)',
+                fontWeight: 400,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              NTG Alma
+            </Box>
+          </Group>
         </Box>
 
         {/* Online/Offline Status Badge (green when online, gray when offline) */}

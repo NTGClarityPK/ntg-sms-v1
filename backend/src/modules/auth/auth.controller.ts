@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Put, UseGuards, Res, Query } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
@@ -10,6 +11,8 @@ import { ProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('api/v1/auth')
+@ApiTags('Auth')
+@ApiBearerAuth()
 export class AuthController {
   constructor(
     private readonly authService: AuthService,

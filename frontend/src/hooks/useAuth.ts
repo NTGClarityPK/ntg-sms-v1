@@ -7,6 +7,7 @@ import { User } from '@/types/auth';
 import { supabase } from '@/lib/supabase/client';
 import { isLogoutInProgress } from '@/lib/auth';
 import { useAuthStore } from '@/lib/store/auth-store';
+import { queryClient as globalQueryClient } from '@/lib/query-client';
 
 /**
  * Diagnostics for debugging auth bootstrap.
@@ -53,6 +54,12 @@ async function fetchCurrentUser(): Promise<User> {
     throw error;
   }
 }
+
+// Supabase auth event subscription must be global/singleton.
+// If we subscribe inside every `useAuth()` call, tab focus / token refresh can trigger N invalidations
+// and produce a "storm" of `/api/v1/auth/me` requests.
+let supabaseAuthListenerCount = 0;
+let supabaseAuthUnsubscribe: (() => void) | null = null;
 
 export function useAuth() {
   const queryClient = useQueryClient();
@@ -167,41 +174,51 @@ export function useAuth() {
   // When Supabase session becomes available/changes, refetch /auth/me.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
-        setHasSession(false);
-        try {
-          window.localStorage.removeItem('currentBranchId');
-        } catch {
-          // ignore
+    supabaseAuthListenerCount += 1;
+
+    if (!supabaseAuthUnsubscribe) {
+      const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT') {
+          try {
+            window.localStorage.removeItem('currentBranchId');
+          } catch {
+            // ignore
+          }
+          // Clear persisted auth snapshot so guards don't think we're logged in.
+          useAuthStore.getState().clear();
+          globalQueryClient.cancelQueries({ queryKey: ['auth', 'me'] });
+          globalQueryClient.removeQueries({ queryKey: ['auth', 'me'] });
+          return;
         }
-        // Clear persisted auth snapshot so guards don't think we're logged in.
-        useAuthStore.getState().clear();
-        queryClient.cancelQueries({ queryKey: ['auth', 'me'] });
-        queryClient.removeQueries({ queryKey: ['auth', 'me'] });
-        return;
-      }
 
-      if (isLogoutInProgress()) {
-        setHasSession(false);
-        return;
-      }
+        if (isLogoutInProgress()) {
+          return;
+        }
 
-      if (event === 'SIGNED_IN') {
-        setHasSession(true);
-        queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
-        return;
-      }
+        if (event === 'SIGNED_IN') {
+          globalQueryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+          return;
+        }
 
-      if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        setHasSession(true);
-        queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
-      }
-    });
+        if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          globalQueryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+        }
+      });
+
+      supabaseAuthUnsubscribe = () => {
+        sub.subscription.unsubscribe();
+      };
+    }
+
     return () => {
-      sub.subscription.unsubscribe();
+      supabaseAuthListenerCount -= 1;
+      if (supabaseAuthListenerCount <= 0) {
+        supabaseAuthListenerCount = 0;
+        supabaseAuthUnsubscribe?.();
+        supabaseAuthUnsubscribe = null;
+      }
     };
-  }, [queryClient]);
+  }, []);
 
   const resolvedUser = useMemo(() => (user as User | undefined) ?? storeUser ?? undefined, [user, storeUser]);
 

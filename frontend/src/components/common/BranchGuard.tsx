@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Skeleton, Container, Stack } from '@mantine/core';
 import { useAuth } from '@/hooks/useAuth';
 import type { User } from '@/types/auth';
@@ -20,6 +20,7 @@ export function BranchGuard({ children }: BranchGuardProps) {
   const userTyped = user as User | undefined;
   const [isSelectingBranch, setIsSelectingBranch] = useState(false);
   const [isRecoveringAuth, setIsRecoveringAuth] = useState(false);
+  const hasAttemptedAutoSelectRef = useRef(false);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const setStoreUser = useAuthStore((s) => s.setUser);
   const setStoreBranchId = useAuthStore((s) => s.setBranchId);
@@ -85,6 +86,12 @@ export function BranchGuard({ children }: BranchGuardProps) {
         userTyped.branches &&
         userTyped.branches.length > 0
       ) {
+        // Safety: never allow an infinite "select-branch → me → still no branch → select-branch" loop.
+        // If the backend fails to persist current branch (or response is missing it), attempting repeatedly
+        // will hammer `/auth/me` and flood the network tab.
+        if (hasAttemptedAutoSelectRef.current) return;
+        hasAttemptedAutoSelectRef.current = true;
+
         setIsSelectingBranch(true);
         try {
           // Auto-select the first available branch
@@ -97,10 +104,15 @@ export function BranchGuard({ children }: BranchGuardProps) {
           localStorage.setItem('currentBranchId', firstBranch.id);
           setStoreBranchId(firstBranch.id);
           
-          // Update caches instead of evicting (eviction forces slow refetch during redirect).
-          const refreshed = await apiClient.get<User>('/api/v1/auth/me');
-          qc.setQueryData(['auth', 'me'], refreshed.data);
-          setStoreUser(refreshed.data);
+          // Refresh auth state via the canonical hook query, rather than manually calling `/auth/me`.
+          // This ensures React Query de-dupes fetches and we don't accidentally double-hit the endpoint.
+          qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+          await refetch();
+
+          // If refetch didn't produce a current branch, keep store as-is but do NOT retry here.
+          // The user can still select a branch from the header picker.
+          const nextUser = qc.getQueryData<User>(['auth', 'me']);
+          if (nextUser) setStoreUser(nextUser);
         } catch {
           // Non-blocking: user may still select a branch from the header picker.
         } finally {
@@ -118,6 +130,7 @@ export function BranchGuard({ children }: BranchGuardProps) {
     qc,
     setStoreBranchId,
     setStoreUser,
+    refetch,
   ]);
 
   // Show loading while checking or auto-selecting branch
