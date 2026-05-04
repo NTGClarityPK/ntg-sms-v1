@@ -8,6 +8,31 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   transpilePackages: ['nextstepjs'],
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'alma.ntgapps.com',
+        pathname: '/features/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.pexels.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'hpqpdeysaoxtfouksvcw.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
   
   // Skip type checking in production build (temporary workaround)
   typescript: {

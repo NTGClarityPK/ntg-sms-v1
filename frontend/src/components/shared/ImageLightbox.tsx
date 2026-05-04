@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { Modal, Image, Box } from '@mantine/core';
 import { useState } from 'react';
 import { IconX } from '@tabler/icons-react';
@@ -8,9 +9,11 @@ interface ImageLightboxProps {
   src: string;
   alt: string;
   children: React.ReactNode;
+  /** Merged onto the clickable wrapper so children can fill grid/flex parents (e.g. height: '100%'). */
+  wrapperStyle?: CSSProperties;
 }
 
-export function ImageLightbox({ src, alt, children }: ImageLightboxProps) {
+export function ImageLightbox({ src, alt, children, wrapperStyle }: ImageLightboxProps) {
   const [opened, setOpened] = useState(false);
 
   return (
@@ -20,6 +23,7 @@ export function ImageLightbox({ src, alt, children }: ImageLightboxProps) {
         style={{
           cursor: 'pointer',
           transition: 'transform 0.2s ease',
+          ...wrapperStyle,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'scale(1.02)';
@@ -39,6 +43,7 @@ export function ImageLightbox({ src, alt, children }: ImageLightboxProps) {
         padding={0}
         withCloseButton={false}
         closeOnClickOutside={true}
+        closeOnEscape={true}
         overlayProps={{
           backgroundOpacity: 0.85,
           blur: 3,

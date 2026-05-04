@@ -1,255 +1,89 @@
 'use client';
 
-import { MarketingHeader } from '@/components/marketing/Header';
-import { MarketingFooter } from '@/components/marketing/Footer';
-import { Container, Title, Text, Stack, Card, Button, List, ThemeIcon, Group, Box, Badge } from '@mantine/core';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { IconCheck, IconX } from '@tabler/icons-react';
-import { GeometricAccent } from '@/components/marketing/GeometricAccent';
-import { useMarketingColors } from '@/lib/hooks/use-marketing-colors';
-import { PageCTASection } from '@/components/marketing/sections/PageCTASection';
+import { Navigation } from '@/components/Navigation';
+import { Footer } from '@/components/Footer';
+import { AlmaMarketingCTA } from '@/components/AlmaMarketingCTA';
 import { plans } from '@/lib/constants/plans';
 
-function PricingCard({ plan, index }: { plan: typeof plans[0]; index: number }) {
-  const marketingColors = useMarketingColors();
-  
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-      style={{ width: '100%', height: '100%', display: 'flex', flex: 1 }}
-    >
-      <Card
-        shadow={plan.popular ? 'xl' : 'md'}
-        padding="xl"
-        radius="lg"
-        withBorder
-        style={{
-          border: plan.popular ? `3px solid ${marketingColors.primary}` : `2px solid ${marketingColors.borderPrimary}`,
-          background: marketingColors.gradientCard,
-          position: 'relative',
-          transition: 'all 0.3s ease',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: '600px',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-8px)';
-          e.currentTarget.style.boxShadow = `0 20px 40px ${marketingColors.shadowCardHover}`;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '';
-        }}
-      >
-        <Stack gap="md" style={{ flex: 1, position: 'relative' }}>
-          {plan.popular && (
-            <Badge
-              style={{
-                position: 'absolute',
-                top: '-8px',
-                right: '-8px',
-                backgroundColor: marketingColors.primary,
-                color: marketingColors.textOnPrimary,
-                fontWeight: 700,
-                padding: '6px 16px',
-                borderRadius: '20px',
-                fontSize: '0.75rem',
-                zIndex: 10,
-              }}
-            >
-              Most Popular
-            </Badge>
-          )}
-          <div>
-            <Title order={2} size="h3" fw={700} style={{ color: marketingColors.textPrimary }}>
-              {plan.name}
-            </Title>
-            <Group gap={4} align="baseline" mt="xs">
-              <Text size="2.5rem" fw={900} style={{ color: marketingColors.primary }}>
-                {plan.price}
-              </Text>
-              {plan.priceNote && (
-                <Text size="md" style={{ color: marketingColors.textSecondary }}>
-                  {plan.priceNote}
-                </Text>
-              )}
-            </Group>
-          </div>
-
-          <Text size="sm" mt="md" style={{ color: marketingColors.textSecondary }}>
-            {plan.summary}
-          </Text>
-
-          <List
-            spacing="xs"
-            size="sm"
-            mt="md"
-          >
-            {plan.highlights.map((feature, idx) => (
-              <List.Item key={idx} style={{ color: marketingColors.textSecondary }}>
-                <Group gap="xs" wrap="nowrap">
-                  <ThemeIcon color={feature.included ? marketingColors.primary : 'gray'} size={20} radius="xl">
-                    {feature.included ? <IconCheck size={12} /> : <IconX size={12} />}
-                  </ThemeIcon>
-                  <Text
-                    size="sm"
-                    style={{
-                      color: feature.included ? marketingColors.textSecondary : marketingColors.textTertiary,
-                      textDecoration: feature.included ? 'none' : 'line-through',
-                    }}
-                  >
-                    {feature.label}
-                  </Text>
-                </Group>
-              </List.Item>
-            ))}
-          </List>
-
-          <Button
-            component={Link}
-            href={plan.name === 'Enterprise' ? '/contact' : '/login'}
-            fullWidth
-            mt="auto"
-            color={undefined}
-            styles={{
-              root: {
-                backgroundColor: `${marketingColors.primary} !important`,
-                color: `${marketingColors.textOnPrimary} !important`,
-                fontWeight: 600,
-                padding: '14px 24px',
-                borderRadius: '12px',
-                border: '2px solid transparent',
-                transition: 'all 0.3s ease',
-                fontSize: '0.9rem',
-                lineHeight: 1.5,
-                minHeight: '52px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.setProperty('background-color', marketingColors.backgroundPrimary, 'important');
-              e.currentTarget.style.setProperty('color', marketingColors.textPrimary, 'important');
-              e.currentTarget.style.setProperty('border', `2px solid ${marketingColors.primary}`, 'important');
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.setProperty('background-color', marketingColors.primary, 'important');
-              e.currentTarget.style.setProperty('color', marketingColors.textOnPrimary, 'important');
-              e.currentTarget.style.setProperty('border-color', 'transparent', 'important');
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
-          </Button>
-        </Stack>
-      </Card>
-    </motion.div>
-  );
-}
-
 export default function PricingPage() {
-  const marketingColors = useMarketingColors();
-
   return (
     <>
-      <MarketingHeader />
-      <main style={{ paddingTop: '80px' }}>
-        {/* Hero Section */}
-        <Box style={{ position: 'relative', overflow: 'hidden' }}>
-          <GeometricAccent position="top-right" color="primary" size="large" />
-          <GeometricAccent position="bottom-left" color="secondary" size="medium" />
-          <GeometricAccent position="top-left" color="primary" size="small" />
-          <GeometricAccent position="bottom-right" color="secondary" size="small" />
-          
-          <Container size="xl" pt={{ base: 'xl', md: 100 }} pb={{ base: 'xl', md: 40 }} style={{ position: 'relative', zIndex: 1 }}>
-            <Stack gap="xl" align="center">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-              >
-                <Title
-                  order={1}
-                  fw={900}
-                  style={{
-                    fontFamily: 'var(--font-audiowide)',
-                    lineHeight: 1.2,
-                    background: marketingColors.gradientPrimaryToSecondary,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    textShadow: `0 4px 20px ${marketingColors.shadowPrimary}`,
-                    letterSpacing: '-0.02em',
-                    color: marketingColors.textPrimary,
-                    fontSize: 'clamp(2.5rem, 5vw, 4rem)',
-                  }}
-                >
-                  Simple, Transparent Pricing
-                </Title>
-              </motion.div>
+      <Navigation />
+      <main className="bg-white font-sans">
+        <section className="bg-gradient-to-br from-gray-50 to-white py-32">
+          <div className="container mx-auto px-6 text-center">
+            <h1 className="mb-8 bg-gradient-to-r from-brand-green to-brand-green-light bg-clip-text font-heading text-4xl text-transparent md:text-6xl">
+              Simple, Transparent Pricing
+            </h1>
+            <p className="mx-auto max-w-3xl text-xl text-gray-600">
+              Choose the plan that fits your school. All plans include core attendance, academics, and parent access.
+            </p>
+          </div>
+        </section>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-              >
-                <Text 
-                  size="md"
-                  maw={700}
-                  fz={{ base: 'var(--mantine-font-size-md)', md: 'var(--mantine-font-size-xl)' }}
-                  style={{ 
-                    color: marketingColors.textSecondary,
-                    fontWeight: 500,
-                  }}
-                >
-                  Choose the perfect plan for your school or trust. All plans include our core features with no hidden fees.
-                </Text>
-              </motion.div>
-            </Stack>
-          </Container>
-        </Box>
+        <section className="pb-32 pt-8">
+          <div className="container mx-auto px-6">
+            <div className="grid items-stretch gap-12 md:grid-cols-2 lg:grid-cols-4">
+              {plans.map((plan) => {
+                const isPro = plan.popular;
+                return (
+                  <div
+                    key={plan.name}
+                    className={
+                      isPro
+                        ? 'relative flex flex-col rounded-[2.5rem] border-4 border-brand-green bg-gradient-to-br from-brand-green-pale/40 to-white p-10 shadow-2xl md:scale-105'
+                        : 'flex flex-col rounded-[2.5rem] border-2 border-gray-200 bg-white p-10 shadow-xl'
+                    }
+                  >
+                    {isPro && (
+                      <span className="absolute -right-2 -top-2 rounded-full bg-gradient-to-r from-brand-green to-brand-green-light px-4 py-1 text-xs font-bold text-white shadow-lg">
+                        Most Popular
+                      </span>
+                    )}
+                    <h2 className="text-3xl font-bold text-gray-900">{plan.name}</h2>
+                    <div className="mt-4 flex flex-wrap items-baseline gap-1">
+                      <span className="text-4xl font-black text-brand-green">{plan.price}</span>
+                      {plan.priceNote ? <span className="text-gray-600">{plan.priceNote}</span> : null}
+                    </div>
+                    <p className="mt-4 text-gray-600">{plan.summary}</p>
+                    <ul className="mt-8 flex-grow space-y-3">
+                      {plan.highlights.map((h) => (
+                        <li key={h.label} className="flex gap-2 text-sm text-gray-700">
+                          <span className={h.included ? 'text-brand-green' : 'text-gray-400 line-through'}>
+                            {h.included ? '✓' : '✗'}
+                          </span>
+                          <span className={h.included ? '' : 'text-gray-400 line-through'}>{h.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      href={plan.name === 'Enterprise' ? '/contact' : '/login'}
+                      className={
+                        isPro
+                          ? 'mt-auto block rounded-full bg-gradient-to-r from-brand-green to-brand-green-light px-8 py-4 text-center font-bold text-white transition hover:shadow-xl'
+                          : 'mt-auto block rounded-full border-2 border-brand-green-lighter px-8 py-4 text-center font-bold text-brand-green transition hover:border-brand-green hover:shadow-lg'
+                      }
+                    >
+                      {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
-        {/* Pricing Cards */}
-        <Box style={{ position: 'relative', overflow: 'hidden' }}>
-          <GeometricAccent position="top-left" color="primary" size="medium" />
-          <GeometricAccent position="bottom-right" color="secondary" size="large" />
-          
-          <Container size="xl" py={{ base: 'xl', md: 80 }} style={{ position: 'relative', zIndex: 1 }}>
-            <Box
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: 'var(--mantine-spacing-md)',
-                width: '100%',
-              }}
-            >
-              {plans.map((plan, index) => (
-                <PricingCard key={plan.name} plan={plan} index={index} />
-              ))}
-            </Box>
-          </Container>
-        </Box>
-
-        {/* CTA Section */}
-        <PageCTASection
-          title="Ready to Get Started?"
-          description="Sign up to get started right away or contact us to discuss your school&apos;s needs and find the perfect plan"
-          primaryButtonText="Signup"
-          primaryButtonHref="/login"
-          secondaryButtonText="Contact Sales"
-          secondaryButtonHref="/contact"
+        <AlmaMarketingCTA
+          title="Questions About Pricing?"
+          description="We will help you pick the right plan for your school or trust"
+          primaryLabel="Talk to Sales"
+          primaryHref="/contact"
+          secondaryLabel="View Features"
+          secondaryHref="/features"
         />
       </main>
-      <MarketingFooter />
+      <Footer />
     </>
   );
 }
-
