@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { BulkImportService } from './bulk-import.service';
 import { BulkStudentRowDto } from './dto/bulk-student-row.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -24,6 +24,7 @@ const ALLOWED_MIME_TYPES = [
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+@ApiTags('Bulk import')
 @Controller('api/v1/bulk-import')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @ApiBearerAuth()

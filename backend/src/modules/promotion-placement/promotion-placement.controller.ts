@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
@@ -8,6 +9,7 @@ import { PromotionPlacementService } from './promotion-placement.service';
 import { QueryPromotionStudentsDto } from './dto/query-promotion-students.dto';
 import { SavePromotionDecisionsDto } from './dto/save-promotion-decisions.dto';
 
+@ApiTags('Promotion & placement')
 @Controller('api/v1/promotion-placement')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class PromotionPlacementController {

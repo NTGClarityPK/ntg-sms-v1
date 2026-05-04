@@ -10,6 +10,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
@@ -25,6 +26,7 @@ import { UpdateClassSectionDto } from './dto/update-class-section.dto';
 import { AssignClassTeacherDto } from './dto/assign-class-teacher.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Class sections')
 @Controller('api/v1/class-sections')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class ClassSectionsController {

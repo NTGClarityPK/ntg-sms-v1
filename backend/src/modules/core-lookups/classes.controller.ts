@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -10,6 +11,7 @@ import { UpdateClassDto } from './dto/update-class.dto';
 import { ClassDto } from './dto/class.dto';
 import { DeletionStatusDto, EntityDeletedDto } from './dto/deletion-status.dto';
 
+@ApiTags('Academic structure')
 @Controller('api/v1/classes')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class ClassesController {

@@ -7,11 +7,13 @@ import {
   UseGuards,
   Body,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { QueryNotificationsDto } from './dto/query-notifications.dto';
 
+@ApiTags('Notifications')
 @Controller('api/v1/notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {

@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, type CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -17,6 +18,7 @@ import { StorageService } from './storage.service';
 import { QueryStorageFilesDto } from './dto/query-storage-files.dto';
 import { QueryStorageAlertsDto } from './dto/query-storage-alerts.dto';
 
+@ApiTags('Storage')
 @Controller('api/v1/storage')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class StorageController {

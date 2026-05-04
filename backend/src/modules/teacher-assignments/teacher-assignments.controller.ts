@@ -10,6 +10,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
@@ -23,6 +24,7 @@ import { CreateTeacherAssignmentDto } from './dto/create-teacher-assignment.dto'
 import { UpdateTeacherAssignmentDto } from './dto/update-teacher-assignment.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Teacher assignments')
 @Controller('api/v1/teacher-assignments')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class TeacherAssignmentsController {

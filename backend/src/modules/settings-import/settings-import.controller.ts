@@ -9,7 +9,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -17,6 +17,7 @@ import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current
 import { SettingsImportService } from './settings-import.service';
 import { ApplySettingsImportDto } from './dto/apply-settings-import.dto';
 
+@ApiTags('Settings import')
 @Controller('api/v1/settings-import')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @ApiBearerAuth()

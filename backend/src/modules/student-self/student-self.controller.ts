@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { StudentJwtGuard } from '../../common/guards/student-jwt.guard';
 import { CurrentStudent, CurrentStudentPayload } from '../../common/decorators/current-student.decorator';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AssessmentsService } from '../assessments/assessments.service';
 import { UpdateStudentAssessmentStatusDto } from '../assessments/dto/update-student-assessment-status.dto';
 
+@ApiTags('Student self-service')
 @Controller('api/v1/student')
 @UseGuards(StudentJwtGuard)
 export class StudentSelfController {

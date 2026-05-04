@@ -12,6 +12,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -29,6 +30,7 @@ type UploadedLogoFile = {
   buffer: Buffer;
 };
 
+@ApiTags('Tenants & branches')
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/tenants')
 export class TenantsController {

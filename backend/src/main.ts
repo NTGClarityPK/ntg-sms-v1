@@ -54,8 +54,53 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger API documentation at /api/docs
-  const config = new DocumentBuilder()
+  // Swagger API documentation at /api/docs — tag order defines feature group order in the UI
+  const swaggerFeatureTags: ReadonlyArray<{ name: string; description: string }> = [
+    { name: 'Application', description: 'Service root, health, and static path stubs' },
+    { name: 'Authentication', description: 'Sign-in, session, profile, and tenant registration' },
+    { name: 'Public API', description: 'Unauthenticated endpoints (password reset, roll lookup, public stats)' },
+    { name: 'Tenants & branches', description: 'Organisation tenants and branch records' },
+    { name: 'Users', description: 'User directory and administration' },
+    { name: 'Roles & permissions', description: 'Roles, features, and permission matrix' },
+    { name: 'Invitations', description: 'Staff invitations and onboarding tokens' },
+    { name: 'Students', description: 'Student records and lifecycle' },
+    { name: 'Parents', description: 'Parent and guardian records' },
+    { name: 'Staff', description: 'Staff records' },
+    { name: 'Academic structure', description: 'Levels, sections, classes, and subjects' },
+    { name: 'Academic years', description: 'Academic year configuration' },
+    { name: 'Class sections', description: 'Class–section assignments' },
+    { name: 'Subject templates', description: 'Reusable subject templates' },
+    { name: 'Teacher assignments', description: 'Teacher-to-class-subject assignments' },
+    { name: 'Timetable', description: 'Periods and weekly timetable' },
+    { name: 'Schedule & calendar', description: 'School days, timing templates, holidays, and vacations' },
+    { name: 'Assessment configuration', description: 'Assessment types and grade templates' },
+    { name: 'Assessments', description: 'Assessment instances, marks, attachments, and statistics' },
+    { name: 'Grades', description: 'Published grades and reporting' },
+    { name: 'Results', description: 'Consolidated results and reporting' },
+    { name: 'Attendance', description: 'Daily attendance marking and queries' },
+    { name: 'Leave requests', description: 'Staff and student leave workflows' },
+    { name: 'Early departures', description: 'Early departure requests and approvals' },
+    { name: 'Behavioural', description: 'Behaviour incidents and records' },
+    { name: 'Events', description: 'School events' },
+    { name: 'Library', description: 'Library catalogue and circulation' },
+    { name: 'Uniforms', description: 'Uniform catalogue, requests, and issuances' },
+    { name: 'Messaging', description: 'Direct messages and conversations' },
+    { name: 'Notifications', description: 'In-app notifications and preferences' },
+    { name: 'Push', description: 'Web push subscription management' },
+    { name: 'Dashboard', description: 'Dashboard summaries' },
+    { name: 'Reports', description: 'Operational and academic reports' },
+    { name: 'Bulk import', description: 'Spreadsheet and bulk data import' },
+    { name: 'System settings', description: 'Branch and tenant settings' },
+    { name: 'Settings import', description: 'Import settings from files' },
+    { name: 'Settings status', description: 'Configuration completeness and readiness' },
+    { name: 'Setup wizard', description: 'Initial branch setup wizard' },
+    { name: 'Student self-service', description: 'Endpoints for the signed-in student role' },
+    { name: 'Promotion & placement', description: 'Year-end promotion and class placement' },
+    { name: 'Audit logs', description: 'Audit trail queries' },
+    { name: 'Storage', description: 'File upload and signed URLs' },
+  ];
+
+  let swaggerConfig = new DocumentBuilder()
     .setTitle('School Management System API')
     .setDescription('API documentation for the School Management System')
     .setVersion('1.0')
@@ -63,8 +108,13 @@ async function bootstrap() {
     .addBearerAuth(undefined, 'bearer')
     // Apply Bearer auth globally in Swagger UI so the token entered in "Authorize"
     // is sent for endpoints unless they explicitly override security.
-    .addSecurityRequirements('bearer')
-    .build();
+    .addSecurityRequirements('bearer');
+
+  for (const tag of swaggerFeatureTags) {
+    swaggerConfig = swaggerConfig.addTag(tag.name, tag.description);
+  }
+
+  const config = swaggerConfig.build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 

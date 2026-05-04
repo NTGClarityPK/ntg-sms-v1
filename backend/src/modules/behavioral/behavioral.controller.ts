@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, type CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -23,6 +24,7 @@ import { PendingStudentDto } from './dto/pending-student.dto';
 import { BehavioralMatrixResponseDto } from './dto/matrix-response.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Behavioural')
 @Controller('api/v1/behavioral')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class BehavioralController {

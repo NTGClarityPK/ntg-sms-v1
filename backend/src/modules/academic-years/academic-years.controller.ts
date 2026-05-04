@@ -1,4 +1,5 @@
 import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -10,6 +11,7 @@ import { AcademicYearDto } from './dto/academic-year.dto';
 import { PromotionPlacementService } from '../promotion-placement/promotion-placement.service';
 import { RolloverAcademicYearDto } from './dto/rollover-academic-year.dto';
 
+@ApiTags('Academic years')
 @Controller('api/v1/academic-years')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class AcademicYearsController {

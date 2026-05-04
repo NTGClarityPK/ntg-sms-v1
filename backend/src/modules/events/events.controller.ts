@@ -11,6 +11,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -31,6 +32,7 @@ import { UpdateEventDto } from './dto/update-event.dto';
 import { SubmitConsentDto } from './dto/submit-consent.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Events')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/events')
 export class EventsController {

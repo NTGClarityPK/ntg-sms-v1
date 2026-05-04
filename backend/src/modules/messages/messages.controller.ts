@@ -1,4 +1,5 @@
 import { Controller, Param, Put, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import {
@@ -7,6 +8,7 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { MessagesService } from './messages.service';
 
+@ApiTags('Messaging')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/messages')
 export class MessagesController {

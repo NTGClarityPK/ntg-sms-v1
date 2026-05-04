@@ -1,8 +1,10 @@
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { PasswordResetService } from './password-reset.service';
 
+@ApiTags('Public API')
 @Controller('api/v1/public')
 export class AuthPublicController {
   constructor(

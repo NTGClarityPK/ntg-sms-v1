@@ -1,9 +1,11 @@
 import { Controller, Get, Query, Param, UseGuards, ForbiddenException } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { AuditLogsService } from './audit-logs.service';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 
+@ApiTags('Audit logs')
 @Controller('api/v1/audit-logs')
 @UseGuards(JwtAuthGuard)
 export class AuditLogsController {

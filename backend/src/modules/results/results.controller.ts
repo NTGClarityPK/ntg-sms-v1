@@ -11,6 +11,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -28,6 +29,7 @@ import { UpdateResultStatusDto } from './dto/update-result-status.dto';
 import { UpdateResultCommentDto } from './dto/update-result-comment.dto';
 import type { ResultType } from './dto/result-type.enum';
 
+@ApiTags('Results')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/results')
 export class ResultsController {

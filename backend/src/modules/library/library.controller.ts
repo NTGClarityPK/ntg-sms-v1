@@ -14,6 +14,7 @@ import {
   UseInterceptors,
   BadRequestException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -44,6 +45,7 @@ type UploadedFileType = {
 // Enforce a hard limit to prevent timeouts on large uploads.
 const MAX_LIBRARY_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB
 
+@ApiTags('Library')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/library')
 export class LibraryController {

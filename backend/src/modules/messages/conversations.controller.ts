@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import {
@@ -25,6 +26,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { QueryConversationsDto } from './dto/query-conversations.dto';
 import { QueryMessagesDto } from './dto/query-messages.dto';
 
+@ApiTags('Messaging')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/conversations')
 export class ConversationsController {

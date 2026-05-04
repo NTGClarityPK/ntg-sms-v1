@@ -9,6 +9,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { StudentsService } from './students.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -24,6 +25,7 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { ReinviteStudentDto } from './dto/reinvite-student.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Students')
 @Controller('api/v1/students')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class StudentsController {

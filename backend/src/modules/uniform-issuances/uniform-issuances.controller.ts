@@ -8,6 +8,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import {
@@ -23,6 +24,7 @@ import { CreateDirectIssuanceDto } from './dto/create-direct-issuance.dto';
 import { QueryIssuanceReportDto } from './dto/query-issuance-report.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Uniforms')
 @Controller('api/v1/uniform-issuances')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class UniformIssuancesController {

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -13,6 +14,7 @@ import { CreateGradeTemplateDto } from './dto/create-grade-template.dto';
 import { AssignGradeTemplateDto } from './dto/assign-grade-template.dto';
 import { ClassGradeAssignmentDto } from './dto/class-grade-assignment.dto';
 
+@ApiTags('Assessment configuration')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1')
 export class AssessmentController {

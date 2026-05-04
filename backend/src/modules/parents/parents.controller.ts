@@ -10,6 +10,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { ParentsService } from './parents.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -23,6 +24,7 @@ import { SelectChildDto } from './dto/select-child.dto';
 import { UpdateParentAssociationDto } from './dto/update-parent-association.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Parents')
 @Controller('api/v1/parents')
 @UseGuards(JwtAuthGuard)
 export class ParentsController {

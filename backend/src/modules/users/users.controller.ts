@@ -11,6 +11,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -29,6 +30,7 @@ import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Users')
 @Controller('api/v1/users')
 export class UsersController {
   constructor(

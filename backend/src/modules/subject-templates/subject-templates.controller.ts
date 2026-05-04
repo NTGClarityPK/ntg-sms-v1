@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -12,6 +13,7 @@ import { AssignClassesToTemplateDto } from './dto/assign-classes.dto';
 import { AssignLevelsToTemplateDto } from './dto/assign-levels.dto';
 import { AssignStudentToTemplateDto } from './dto/assign-student.dto';
 
+@ApiTags('Subject templates')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/subject-templates')
 export class SubjectTemplatesController {

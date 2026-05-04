@@ -1,4 +1,5 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -6,6 +7,7 @@ import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current
 import { CommitSetupWizardDto } from './dto/commit-setup-wizard.dto';
 import { SetupWizardService } from './setup-wizard.service';
 
+@ApiTags('Setup wizard')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1')
 export class SetupWizardController {

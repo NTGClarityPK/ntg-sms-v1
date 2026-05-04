@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -14,6 +15,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 /**
  * Controller for managing student grades
  */
+@ApiTags('Grades')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/grades')
 export class GradesController {

@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -19,6 +20,7 @@ import { LowAttendanceReportDto } from './dto/low-attendance.dto';
 import { AcademicReportBySubjectDto } from './dto/academic-report-by-subject.dto';
 import { AcademicComparisonDto } from './dto/academic-comparison.dto';
 
+@ApiTags('Reports')
 @Controller('api/v1/reports')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class ReportsController {

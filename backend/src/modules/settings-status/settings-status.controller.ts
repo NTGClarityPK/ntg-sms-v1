@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
@@ -7,6 +8,7 @@ import { SettingsStatusService } from './settings-status.service';
 import { SettingsStatusDto } from './dto/settings-status.dto';
 import { CopySettingsDto } from './dto/settings-status.dto';
 
+@ApiTags('Settings status')
 @Controller('api/v1/settings-status')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class SettingsStatusController {

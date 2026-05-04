@@ -11,7 +11,7 @@ import { ProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('api/v1/auth')
-@ApiTags('Auth')
+@ApiTags('Authentication')
 @ApiBearerAuth()
 export class AuthController {
   constructor(

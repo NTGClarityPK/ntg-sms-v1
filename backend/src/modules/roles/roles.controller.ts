@@ -1,10 +1,12 @@
 import { Controller, Get, Put, Body, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { RolesService } from './roles.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
 import { UpdatePermissionsDto } from './dto/permission-matrix.dto';
 
+@ApiTags('Roles & permissions')
 @Controller('api/v1')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class RolesController {

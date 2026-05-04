@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
@@ -22,6 +23,7 @@ import { UpdateEarlyDepartureStatusDto } from './dto/update-early-departure-stat
 import { QueryEarlyDepartureRequestsDto } from './dto/query-early-departure.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Early departures')
 @Controller('api/v1/early-departures')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class EarlyDepartureController {

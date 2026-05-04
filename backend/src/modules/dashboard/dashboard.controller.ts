@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
@@ -10,6 +11,7 @@ import { DashboardService } from './dashboard.service';
 import { UpdateDashboardPreferencesDto } from './dto/update-dashboard-preferences.dto';
 import { QueryWidgetsDto } from './dto/query-widgets.dto';
 
+@ApiTags('Dashboard')
 @Controller('api/v1/dashboard')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class DashboardController {

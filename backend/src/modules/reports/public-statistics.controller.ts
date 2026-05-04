@@ -8,6 +8,7 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtService } from '@nestjs/jwt';
 import { ReportsService } from './reports.service';
 import { BranchesService } from '../branches/branches.service';
@@ -15,6 +16,7 @@ import { ClassStudentCountDto } from './dto/class-student-count.dto';
 
 const PUBLIC_STATS_TOKEN_EXPIRY = '1h';
 
+@ApiTags('Public API')
 @Controller('api/v1/public/statistics')
 export class PublicStatisticsController {
   constructor(

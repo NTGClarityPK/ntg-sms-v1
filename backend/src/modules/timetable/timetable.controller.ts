@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import {
@@ -28,6 +29,7 @@ import { ReplicateFromSectionDto } from './dto/replicate-from-section.dto';
 import { StaffService } from '../staff/staff.service';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Timetable')
 @Controller('api/v1/timetable')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class TimetableController {

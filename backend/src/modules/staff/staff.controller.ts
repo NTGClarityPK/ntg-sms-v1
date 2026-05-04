@@ -9,6 +9,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { StaffService } from './staff.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -20,6 +21,7 @@ import { UpdateStaffDto } from './dto/update-staff.dto';
 import { DeactivateStaffDto } from './dto/deactivate-staff.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Staff')
 @Controller('api/v1/staff')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class StaffController {

@@ -15,6 +15,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -51,6 +52,7 @@ type UploadedFileType = {
   size: number;
 };
 
+@ApiTags('Assessments')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/assessments')
 export class AssessmentsController {

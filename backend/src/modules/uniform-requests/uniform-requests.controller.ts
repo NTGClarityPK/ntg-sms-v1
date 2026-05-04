@@ -9,6 +9,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch } from '../../common/decorators/current-branch.decorator';
@@ -22,6 +23,7 @@ import { QueryUniformRequestsDto } from './dto/query-uniform-requests.dto';
 import { ApproveRejectDto } from './dto/approve-reject.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
+@ApiTags('Uniforms')
 @Controller('api/v1/uniform-requests')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class UniformRequestsController {

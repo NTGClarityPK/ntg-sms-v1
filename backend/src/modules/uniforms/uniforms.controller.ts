@@ -15,6 +15,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -44,6 +45,7 @@ type UploadedImageFile = {
   size: number;
 };
 
+@ApiTags('Uniforms')
 @UseGuards(JwtAuthGuard, BranchGuard)
 @Controller('api/v1/uniforms')
 export class UniformsController {

@@ -1,4 +1,5 @@
 import { Body, Controller, ForbiddenException, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { BranchesService } from './branches.service';
@@ -10,6 +11,7 @@ import { AssignBranchToTenantDto } from './dto/assign-branch-to-tenant.dto';
 import { UpdatePublicStatsDto } from './dto/update-public-stats.dto';
 import { AuthService } from '../auth/auth.service';
 
+@ApiTags('Tenants & branches')
 @Controller('api/v1/branches')
 @UseGuards(JwtAuthGuard)
 export class BranchesController {

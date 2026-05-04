@@ -1,4 +1,5 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
@@ -10,6 +11,7 @@ import { InvitationsService } from './invitations.service';
 import { ResendInvitationDto } from './dto/resend-invitation.dto';
 import { ResendInvitationForUserDto } from './dto/resend-invitation-for-user.dto';
 
+@ApiTags('Invitations')
 @Controller('api/v1/invitations')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class InvitationsController {
