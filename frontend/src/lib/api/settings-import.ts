@@ -24,6 +24,8 @@ export interface SettingsImportTemplateSheet {
   name: string;
   columns: string[];
   sample: Record<string, string>;
+  /** When set, each row is appended after the header (e.g. multiple example behavioural attributes). */
+  samples?: Record<string, string>[];
 }
 
 export interface SettingsImportTemplateDefinition {

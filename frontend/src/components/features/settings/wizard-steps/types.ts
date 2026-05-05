@@ -66,6 +66,8 @@ export interface AssessmentTypeData {
   name: string;
   nameAr?: string;
   sortOrder: number;
+  /** When true, this type is treated as a formal term examination (examination schedule). */
+  isTermExamination?: boolean;
 }
 
 export interface GradeRangeData {

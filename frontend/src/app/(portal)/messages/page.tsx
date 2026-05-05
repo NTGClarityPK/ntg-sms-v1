@@ -20,12 +20,16 @@ import {
   SimpleGrid,
   useMantineTheme,
   ActionIcon,
+  Checkbox,
+  SegmentedControl,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useMediaQuery } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';
 import { IconMessage, IconPlus, IconSend, IconArrowLeft, IconTrash, IconEraser } from '@tabler/icons-react';
 import { useConversations, useConversation, useConversationMessages, useSendMessage, useMarkConversationRead, useCreateConversation, useDeleteConversation, useClearConversationMessages } from '@/hooks/api/useMessages';
 import { useClassSections } from '@/hooks/useClassSections';
+import { useTenantBranches } from '@/hooks/useBranches';
 import { useUsers } from '@/hooks/useUsers';
 import { useSystemSetting } from '@/hooks/useSystemSettings';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,23 +38,30 @@ import { supabase } from '@/lib/supabase/client';
 import type { MessageType, ConversationListItem, Message } from '@/types/messages';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { useTheme } from '@/lib/hooks/use-theme';
+import { ADMIN_BROADCAST_ROLE_NAMES } from '@/constants/admin-broadcast-roles';
+
+type NewConversationMode = 'one_to_one' | 'broadcast_class' | 'broadcast_school';
 
 export default function MessagesPage() {
   const t = useTranslations('messages');
+  const tCommon = useTranslations('common');
   const searchParams = useSearchParams();
   const theme = useMantineTheme();
   const colors = useThemeColors();
   const themeConfig = (theme.other as any) as ThemeConfig | undefined;
   const { isDark } = useTheme();
   const { user } = useAuth();
-  const conversationIdFromUrl = searchParams.get('conversation');
+  const conversationIdFromUrl = searchParams?.get('conversation') ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(conversationIdFromUrl);
   const [body, setBody] = useState('');
   const [newConversationOpen, setNewConversationOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [newType, setNewType] = useState<'one_to_one' | 'broadcast'>('one_to_one');
+  const [newConvMode, setNewConvMode] = useState<NewConversationMode>('one_to_one');
   const [newRecipientUserId, setNewRecipientUserId] = useState<string | null>(null);
   const [newClassSectionId, setNewClassSectionId] = useState<string | null>(null);
+  const [adminBroadcastScope, setAdminBroadcastScope] = useState<'tenant' | 'branch'>('tenant');
+  const [adminBroadcastBranchId, setAdminBroadcastBranchId] = useState<string | null>(null);
+  const [adminBroadcastRoles, setAdminBroadcastRoles] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
@@ -327,22 +338,172 @@ export default function MessagesPage() {
   }, [user?.id, queryClient, allConversationIds]);
 
   const { data: commSetting } = useSystemSetting<{ teacher_student?: string; teacher_parent?: string }>('communication_direction');
+  const { data: branchBroadcastSetting } = useSystemSetting<{
+    allow_admin_assistant?: boolean;
+    allow_principal?: boolean;
+  }>('communication_branch_broadcast');
   const teacherStudentBoth = (commSetting?.data?.value?.teacher_student ?? 'both') === 'both';
   const teacherParentBoth = (commSetting?.data?.value?.teacher_parent ?? 'both') === 'both';
-  const isTeacher = user?.roles?.some(
-    (r) => ['class_teacher', 'subject_teacher', 'principal', 'school_admin', 'academic_coordinator', 'guidance_counselor', 'admin_assistant', 'super_admin'].includes(r.roleName ?? ''),
+
+  const currentBranchId = user?.currentBranch?.id;
+
+  const messagingStaffRoleNames = useMemo(
+    () =>
+      new Set([
+        'class_teacher',
+        'subject_teacher',
+        'principal',
+        'school_admin',
+        'academic_coordinator',
+        'guidance_counselor',
+        'admin_assistant',
+        'super_admin',
+      ]),
+    [],
   );
-  const isStudent = user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'student');
-  const isParent = user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'parent');
-  const canReply =
-    isTeacher ||
-    (isStudent && teacherStudentBoth) ||
-    (isParent && teacherParentBoth);
+
+  const hasStaffMessagingRoleOnBranch = useMemo(() => {
+    if (!currentBranchId || !user?.roles?.length) return false;
+    return user.roles.some(
+      (r) =>
+        r.branchId === currentBranchId &&
+        messagingStaffRoleNames.has((r.roleName ?? '').toLowerCase()),
+    );
+  }, [user?.roles, currentBranchId, messagingStaffRoleNames]);
+
+  const isSuperAdminUser = useMemo(
+    () => user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'super_admin') ?? false,
+    [user?.roles],
+  );
+
+  const hasMessagingPrivilegedStaff = hasStaffMessagingRoleOnBranch || isSuperAdminUser;
+
+  const isStudentOnBranch = useMemo(() => {
+    if (!currentBranchId || !user?.roles?.length) return false;
+    return user.roles.some(
+      (r) => r.branchId === currentBranchId && (r.roleName ?? '').toLowerCase() === 'student',
+    );
+  }, [user?.roles, currentBranchId]);
+
+  const isParentOnBranch = useMemo(() => {
+    if (!currentBranchId || !user?.roles?.length) return false;
+    return user.roles.some(
+      (r) => r.branchId === currentBranchId && (r.roleName ?? '').toLowerCase() === 'parent',
+    );
+  }, [user?.roles, currentBranchId]);
+
+  const canInitiateOrReplyMessaging =
+    hasMessagingPrivilegedStaff ||
+    (isStudentOnBranch && teacherStudentBoth) ||
+    (isParentOnBranch && teacherParentBoth);
+
+  const canReply = canInitiateOrReplyMessaging;
 
   const { data: classSectionsResponse } = useClassSections({ limit: 200, minimal: true });
   const classSectionsList = (classSectionsResponse as { data?: Array<{ id: string; className?: string; sectionName?: string }> })?.data ?? [];
   const { data: usersResponse } = useUsers({ limit: 200 });
   const usersList = (usersResponse as { data?: Array<{ id: string; email?: string; fullName?: string }> })?.data ?? [];
+  const { data: tenantBranchesPayload } = useTenantBranches();
+  const tenantBranches = tenantBranchesPayload?.data ?? [];
+  const canTenantWideBroadcast = useMemo(() => {
+    if (!currentBranchId || !user?.roles?.length) return false;
+    return user.roles.some(
+      (r) =>
+        r.branchId === currentBranchId && (r.roleName ?? '').toLowerCase() === 'school_admin',
+    );
+  }, [user?.roles, currentBranchId]);
+
+  const hasPrincipalOnBranch = useMemo(() => {
+    if (!currentBranchId || !user?.roles?.length) return false;
+    return user.roles.some(
+      (r) => r.branchId === currentBranchId && (r.roleName ?? '').toLowerCase() === 'principal',
+    );
+  }, [user?.roles, currentBranchId]);
+
+  const hasAdminAssistantOnBranch = useMemo(() => {
+    if (!currentBranchId || !user?.roles?.length) return false;
+    return user.roles.some(
+      (r) => r.branchId === currentBranchId && (r.roleName ?? '').toLowerCase() === 'admin_assistant',
+    );
+  }, [user?.roles, currentBranchId]);
+
+  const allowDelegatedPrincipal = Boolean(branchBroadcastSetting?.data?.value?.allow_principal);
+  const allowDelegatedAdminAssistant = Boolean(branchBroadcastSetting?.data?.value?.allow_admin_assistant);
+
+  const canDelegatedBranchBroadcast = useMemo(
+    () =>
+      (hasPrincipalOnBranch && allowDelegatedPrincipal) ||
+      (hasAdminAssistantOnBranch && allowDelegatedAdminAssistant),
+    [hasPrincipalOnBranch, allowDelegatedPrincipal, hasAdminAssistantOnBranch, allowDelegatedAdminAssistant],
+  );
+
+  const canSchoolBroadcast = canTenantWideBroadcast || canDelegatedBranchBroadcast;
+
+  const newConversationTypeOptions = useMemo(() => {
+    const opts: { value: NewConversationMode; label: string }[] = [];
+    if (canInitiateOrReplyMessaging) {
+      opts.push({ value: 'one_to_one', label: t('oneToOne') });
+    }
+    if (hasMessagingPrivilegedStaff) {
+      opts.push({ value: 'broadcast_class', label: t('broadcastToClass') });
+    }
+    if (canSchoolBroadcast) {
+      opts.push({ value: 'broadcast_school', label: t('broadcastWholeSchool') });
+    }
+    return opts;
+  }, [t, canInitiateOrReplyMessaging, hasMessagingPrivilegedStaff, canSchoolBroadcast]);
+
+  const canOpenNewConversationModal = newConversationTypeOptions.length > 0;
+
+  useEffect(() => {
+    if (!newConversationOpen || newConversationTypeOptions.length === 0) return;
+    const allowed = new Set(newConversationTypeOptions.map((o) => o.value));
+    if (!allowed.has(newConvMode)) {
+      const first = newConversationTypeOptions[0]?.value;
+      if (first) setNewConvMode(first);
+    }
+  }, [newConversationOpen, newConversationTypeOptions, newConvMode]);
+
+  useEffect(() => {
+    if (newConvMode !== 'broadcast_school') return;
+    if (!canTenantWideBroadcast && currentBranchId) {
+      setAdminBroadcastScope('branch');
+      setAdminBroadcastBranchId(currentBranchId);
+    }
+  }, [newConvMode, canTenantWideBroadcast, currentBranchId]);
+
+  const adminBroadcastRoleCheckboxData = useMemo(() => {
+    const labelFor = (role: (typeof ADMIN_BROADCAST_ROLE_NAMES)[number]) => {
+      switch (role) {
+        case 'student':
+          return tCommon('roleName.student');
+        case 'parent':
+          return tCommon('roleName.parent');
+        case 'class_teacher':
+          return tCommon('roleName.class_teacher');
+        case 'subject_teacher':
+          return tCommon('roleName.subject_teacher');
+        case 'academic_coordinator':
+          return tCommon('roleName.academic_coordinator');
+        case 'guidance_counselor':
+          return tCommon('roleName.guidance_counselor');
+        case 'principal':
+          return tCommon('roleName.principal');
+        case 'school_admin':
+          return tCommon('roleName.school_admin');
+        case 'admin_assistant':
+          return tCommon('roleName.admin_assistant');
+        case 'super_admin':
+          return tCommon('roleName.super_admin');
+        default:
+          return role;
+      }
+    };
+    return ADMIN_BROADCAST_ROLE_NAMES.map((role) => ({
+      value: role,
+      label: labelFor(role),
+    }));
+  }, [tCommon]);
 
   const handleSend = useCallback(() => {
     const trimmed = body.trim();
@@ -363,7 +524,7 @@ export default function MessagesPage() {
   }, [selectedId, body, sendMessage]);
 
   const handleCreateConversation = useCallback(() => {
-    if (newType === 'one_to_one' && newRecipientUserId) {
+    if (newConvMode === 'one_to_one' && newRecipientUserId) {
       createConversation.mutate(
         { type: 'one_to_one', recipientUserId: newRecipientUserId },
         {
@@ -371,13 +532,14 @@ export default function MessagesPage() {
             if (data?.id) {
               setNewConversationOpen(false);
               setNewRecipientUserId(null);
+              setNewConvMode('one_to_one');
               setSelectedId(data.id);
               window.history.replaceState(null, '', `/messages?conversation=${data.id}`);
             }
           },
         },
       );
-    } else if (newType === 'broadcast' && newClassSectionId) {
+    } else if (newConvMode === 'broadcast_class' && newClassSectionId) {
       createConversation.mutate(
         { type: 'broadcast', classSectionId: newClassSectionId },
         {
@@ -385,19 +547,70 @@ export default function MessagesPage() {
             if (data?.id) {
               setNewConversationOpen(false);
               setNewClassSectionId(null);
+              setNewConvMode('one_to_one');
               setSelectedId(data.id);
               window.history.replaceState(null, '', `/messages?conversation=${data.id}`);
             }
           },
         },
       );
+    } else if (newConvMode === 'broadcast_school') {
+      const scope = canTenantWideBroadcast ? adminBroadcastScope : 'branch';
+      const branchIdForPayload =
+        scope === 'branch'
+          ? (canTenantWideBroadcast ? adminBroadcastBranchId : currentBranchId) ?? undefined
+          : undefined;
+      createConversation.mutate(
+        {
+          type: 'broadcast',
+          adminBroadcastScope: scope,
+          adminBroadcastBranchId: branchIdForPayload,
+          adminBroadcastRoleNames: adminBroadcastRoles,
+        },
+        {
+          onSuccess: (data) => {
+            if (data?.id) {
+              setNewConversationOpen(false);
+              setNewClassSectionId(null);
+              setNewConvMode('one_to_one');
+              setAdminBroadcastScope('tenant');
+              setAdminBroadcastBranchId(null);
+              setAdminBroadcastRoles([]);
+              setSelectedId(data.id);
+              window.history.replaceState(null, '', `/messages?conversation=${data.id}`);
+              const linked = data.linkedBroadcastConversationIds?.length ?? 0;
+              if (linked > 0) {
+                notifications.show({
+                  title: t('broadcastCreatedTitle'),
+                  message: t('broadcastCreatedOtherBranches', { count: linked }),
+                  color: colors.primary,
+                });
+              }
+            }
+          },
+        },
+      );
     }
-  }, [newType, newRecipientUserId, newClassSectionId, createConversation]);
+  }, [
+    newConvMode,
+    newRecipientUserId,
+    newClassSectionId,
+    createConversation,
+    adminBroadcastScope,
+    adminBroadcastBranchId,
+    adminBroadcastRoles,
+    canTenantWideBroadcast,
+    currentBranchId,
+    t,
+    colors.primary,
+  ]);
 
   const conversationTitle = conversation
-    ? conversation.type === 'broadcast' && (conversation.className || conversation.sectionName)
-      ? `${conversation.className ?? ''} ${conversation.sectionName ?? ''}`.trim()
-      : conversation.participants?.map((p) => p.fullName).filter(Boolean).join(', ') || t('conversation')
+    ? conversation.type === 'broadcast' && !conversation.classSectionId
+      ? t('broadcastWholeSchool')
+      : conversation.type === 'broadcast' && (conversation.className || conversation.sectionName)
+        ? `${conversation.className ?? ''} ${conversation.sectionName ?? ''}`.trim()
+        : conversation.participants?.map((p) => p.fullName).filter(Boolean).join(', ') || t('conversation')
     : '';
 
   const isOwnMessage = (m: Message) => m.senderId === user?.id;
@@ -465,12 +678,14 @@ export default function MessagesPage() {
           ) : (
             <>
               <Title order={1}>{t('title')}</Title>
-              <Button
-                leftSection={<IconPlus size={18} />}
-                onClick={() => setNewConversationOpen(true)}
-              >
-                {t('newConversation')}
-              </Button>
+              {canOpenNewConversationModal ? (
+                <Button
+                  leftSection={<IconPlus size={18} />}
+                  onClick={() => setNewConversationOpen(true)}
+                >
+                  {t('newConversation')}
+                </Button>
+              ) : null}
             </>
           )}
         </Group>
@@ -509,9 +724,11 @@ export default function MessagesPage() {
                   <Stack align="center" justify="center" p="xl" h={400}>
                     <IconMessage size={48} style={{ opacity: 0.3 }} />
                     <Text c="dimmed">{t('noConversationsYet')}</Text>
-                    <Button variant="light" onClick={() => setNewConversationOpen(true)}>
-                      {t('startConversation')}
-                    </Button>
+                    {canOpenNewConversationModal ? (
+                      <Button variant="light" onClick={() => setNewConversationOpen(true)}>
+                        {t('startConversation')}
+                      </Button>
+                    ) : null}
                   </Stack>
                 ) : (
                   <Stack gap={0}>
@@ -541,7 +758,9 @@ export default function MessagesPage() {
                         <Group justify="space-between" wrap="nowrap" gap="xs">
                           <Text fw={selectedId === c.id ? 600 : 400} size="sm" lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
                             {c.type === 'broadcast'
-                              ? `${c.className ?? ''} ${c.sectionName ?? ''}`.trim() || t('broadcast')
+                              ? !c.classSectionId
+                                ? t('broadcastWholeSchool')
+                                : `${c.className ?? ''} ${c.sectionName ?? ''}`.trim() || t('broadcast')
                               : c.participantNames?.join(', ') || t('conversation')}
                           </Text>
                           <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
@@ -704,20 +923,33 @@ export default function MessagesPage() {
           setNewConversationOpen(false);
           setNewRecipientUserId(null);
           setNewClassSectionId(null);
+          setNewConvMode('one_to_one');
+          setAdminBroadcastScope('tenant');
+          setAdminBroadcastBranchId(null);
+          setAdminBroadcastRoles([]);
         }}
         title={t('newConversation')}
       >
         <Stack gap="md">
           <Select
             label={t('conversationType')}
-            data={[
-              { value: 'one_to_one', label: t('oneToOne') },
-              { value: 'broadcast', label: t('broadcastToClass') },
-            ]}
-            value={newType}
-            onChange={(v) => v && setNewType(v as 'one_to_one' | 'broadcast')}
+            data={newConversationTypeOptions}
+            value={newConvMode}
+            onChange={(v) => {
+              if (!v) return;
+              const next = v as NewConversationMode;
+              setNewConvMode(next);
+              if (next !== 'broadcast_school') {
+                setAdminBroadcastScope('tenant');
+                setAdminBroadcastBranchId(null);
+                setAdminBroadcastRoles([]);
+              } else if (!canTenantWideBroadcast && currentBranchId) {
+                setAdminBroadcastScope('branch');
+                setAdminBroadcastBranchId(currentBranchId);
+              }
+            }}
           />
-          {newType === 'one_to_one' && (
+          {newConvMode === 'one_to_one' && (
             <Select
               label={t('selectUser')}
               placeholder={t('chooseUser')}
@@ -730,7 +962,7 @@ export default function MessagesPage() {
               onChange={setNewRecipientUserId}
             />
           )}
-          {newType === 'broadcast' && (
+          {newConvMode === 'broadcast_class' && (
             <Select
               label={t('classSection')}
               placeholder={t('chooseClass')}
@@ -743,19 +975,88 @@ export default function MessagesPage() {
               onChange={setNewClassSectionId}
             />
           )}
+          {newConvMode === 'broadcast_school' && (
+            <Stack gap="sm">
+              <Text size="sm" fw={500}>
+                {t('broadcastAudienceScope')}
+              </Text>
+              {canTenantWideBroadcast ? (
+                <SegmentedControl
+                  id="messages-admin-broadcast-scope"
+                  value={adminBroadcastScope}
+                  onChange={(v) => {
+                    const next = v as 'tenant' | 'branch';
+                    setAdminBroadcastScope(next);
+                    if (next === 'tenant') setAdminBroadcastBranchId(null);
+                  }}
+                  data={[
+                    { value: 'tenant', label: t('broadcastScopeAllBranches') },
+                    { value: 'branch', label: t('broadcastScopeSpecificBranch') },
+                  ]}
+                />
+              ) : (
+                <Text size="sm" c="dimmed">
+                  {t('branchBroadcastCurrentBranchOnly')}
+                </Text>
+              )}
+              {adminBroadcastScope === 'branch' && canTenantWideBroadcast && (
+                <Select
+                  id="messages-admin-broadcast-branch"
+                  label={t('broadcastSelectBranch')}
+                  placeholder={t('broadcastSelectBranch')}
+                  searchable
+                  data={tenantBranches.map((b) => ({
+                    value: b.id,
+                    label: b.code ? `${b.name} (${b.code})` : b.name,
+                  }))}
+                  value={adminBroadcastBranchId}
+                  onChange={setAdminBroadcastBranchId}
+                />
+              )}
+              <Text size="sm" fw={500} mt="xs">
+                {t('broadcastRecipientRoles')}
+              </Text>
+              <Checkbox.Group value={adminBroadcastRoles} onChange={setAdminBroadcastRoles}>
+                <Stack gap="xs">
+                  {adminBroadcastRoleCheckboxData.map((opt) => (
+                    <Checkbox
+                      key={opt.value}
+                      id={`messages-admin-broadcast-role-${opt.value}`}
+                      value={opt.value}
+                      label={opt.label}
+                    />
+                  ))}
+                </Stack>
+              </Checkbox.Group>
+            </Stack>
+          )}
           <Group justify="flex-end" mt="md">
             <Button
               variant="default"
-              onClick={() => setNewConversationOpen(false)}
+              onClick={() => {
+                setNewConversationOpen(false);
+                setNewRecipientUserId(null);
+                setNewClassSectionId(null);
+                setNewConvMode('one_to_one');
+                setAdminBroadcastScope('tenant');
+                setAdminBroadcastBranchId(null);
+                setAdminBroadcastRoles([]);
+              }}
             >
               {t('cancel')}
             </Button>
             <Button
+              id="messages-modal-create-conversation"
               onClick={handleCreateConversation}
               loading={createConversation.isPending}
               disabled={
-                (newType === 'one_to_one' && !newRecipientUserId) ||
-                (newType === 'broadcast' && !newClassSectionId)
+                (newConvMode === 'one_to_one' && !newRecipientUserId) ||
+                (newConvMode === 'broadcast_class' && !newClassSectionId) ||
+                (newConvMode === 'broadcast_school' &&
+                  (adminBroadcastRoles.length === 0 ||
+                    (canTenantWideBroadcast &&
+                      adminBroadcastScope === 'branch' &&
+                      !adminBroadcastBranchId)))
               }
             >
               {t('create')}

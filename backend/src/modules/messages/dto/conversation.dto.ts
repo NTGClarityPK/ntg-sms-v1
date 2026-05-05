@@ -22,6 +22,8 @@ export class ConversationDto {
   participants!: ConversationParticipantDto[];
   className?: string;
   sectionName?: string;
+  /** When a school-admin broadcast created threads in other branches, those conversation ids (excluding `id`). */
+  linkedBroadcastConversationIds?: string[];
 
   constructor(partial: Partial<ConversationDto>) {
     Object.assign(this, partial);

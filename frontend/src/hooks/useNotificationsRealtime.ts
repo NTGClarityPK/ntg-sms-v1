@@ -38,10 +38,10 @@ export function useNotificationsRealtime(
   const colors = useThemeColors();
   const alertsEnabled = options?.alertsEnabled ?? true;
   const alertsEnabledRef = useRef<boolean>(alertsEnabled);
-  const pathnameRef = useRef<string>(pathname);
+  const pathnameRef = useRef<string>('');
 
   alertsEnabledRef.current = alertsEnabled;
-  pathnameRef.current = pathname;
+  pathnameRef.current = pathname ?? '';
 
   useEffect(() => {
     if (!userId) return;

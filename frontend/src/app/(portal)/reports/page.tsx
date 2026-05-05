@@ -146,7 +146,7 @@ export default function ReportsPage() {
   }, [isStudent, myStudentQuery.data?.data, studentId]);
 
   useEffect(() => {
-    const tab = searchParams.get('tab');
+    const tab = searchParams?.get('tab');
     if (tab === 'administrative' && showAdministrativeTab) {
       setActiveTab('administrative');
     }

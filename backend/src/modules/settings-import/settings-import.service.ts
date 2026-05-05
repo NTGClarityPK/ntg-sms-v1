@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import { randomUUID } from 'crypto';
+import { DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES } from '../../common/constants/default-behavioral-attributes';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { CoreLookupsService } from '../core-lookups/core-lookups.service';
@@ -59,6 +60,8 @@ type PreparedImport = {
     library: string[];
     inventory: string[];
   };
+  /** Optional behavioural attribute labels from `behavioral_attributes` sheet; may be empty to use code defaults. */
+  behavioralAttributeNames: string[];
   summaryBySheet: Record<string, SheetSummary>;
   warnings: string[];
 };
@@ -98,6 +101,7 @@ const SHEET_NAMES = {
   leaveQuota: 'leave_quota',
   libraryCategories: 'library_categories',
   inventoryCategories: 'inventory_categories',
+  behavioralAttributes: 'behavioral_attributes',
 } as const;
 
 function asString(value: unknown): string {
@@ -273,6 +277,12 @@ export class SettingsImportService {
           { name: SHEET_NAMES.leaveQuota, columns: ['annual_quota'], sample: { annual_quota: '10' } },
           { name: SHEET_NAMES.libraryCategories, columns: ['category'], sample: { category: 'General Knowledge' } },
           { name: SHEET_NAMES.inventoryCategories, columns: ['category'], sample: { category: 'Uniforms' } },
+          {
+            name: SHEET_NAMES.behavioralAttributes,
+            columns: ['attribute_name'],
+            sample: { attribute_name: DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES[0] },
+            samples: DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES.map((attribute_name) => ({ attribute_name })),
+          },
         ],
       },
     };
@@ -304,6 +314,7 @@ export class SettingsImportService {
     const leaveQuotaRows = this.readSheet(workbook, SHEET_NAMES.leaveQuota);
     const libraryCategoryRows = this.readSheet(workbook, SHEET_NAMES.libraryCategories);
     const inventoryCategoryRows = this.readSheet(workbook, SHEET_NAMES.inventoryCategories);
+    const behavioralAttributeRows = this.readSheet(workbook, SHEET_NAMES.behavioralAttributes);
 
     this.validateRowCap(workbook, errors);
 
@@ -325,6 +336,7 @@ export class SettingsImportService {
         library: this.parseSimpleCategories(libraryCategoryRows),
         inventory: this.parseSimpleCategories(inventoryCategoryRows),
       },
+      behavioralAttributeNames: this.parseBehavioralAttributes(behavioralAttributeRows, errors),
       summaryBySheet,
       warnings,
     };
@@ -373,6 +385,11 @@ export class SettingsImportService {
       inventoryCategoryRows.length,
       errors,
       SHEET_NAMES.inventoryCategories,
+    );
+    summaryBySheet[SHEET_NAMES.behavioralAttributes] = this.computeSheetSummary(
+      behavioralAttributeRows.length,
+      errors,
+      SHEET_NAMES.behavioralAttributes,
     );
 
     if (errors.length > 0) {
@@ -431,6 +448,7 @@ export class SettingsImportService {
       assessmentTypes: 0,
       libraryCategories: prepared.categories.library.length,
       inventoryCategories: prepared.categories.inventory.length,
+      behavioralAssessment: 1,
     };
 
     if (Object.keys(prepared.schoolInfo).length > 0) {
@@ -589,6 +607,16 @@ export class SettingsImportService {
       await this.systemSettingsService.upsert('inventory_categories', prepared.categories.inventory);
     }
 
+    const behaviouralAttrs =
+      prepared.behavioralAttributeNames.length > 0
+        ? prepared.behavioralAttributeNames
+        : [...DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES];
+    await this.systemSettingsService.upsert('behavioral_assessment', {
+      enabled: false,
+      mandatory: false,
+      attributes: behaviouralAttrs,
+    });
+
     // Seed default permissions so Settings → Permissions matrix is populated after bulk setup.
     // Must match Setup Wizard behaviour (view/edit/none matrix per role + school_admin edit-all).
     await this.seedWizardDefaultPermissionsIfMissing(prepared.branchId, prepared.actorEmail);
@@ -656,6 +684,31 @@ export class SettingsImportService {
         });
       }
     }
+  }
+
+  private parseBehavioralAttributes(rows: WorkbookRow[], errors: ValidationError[]): string[] {
+    const seen = new Set<string>();
+    const parsed: string[] = [];
+    rows.forEach((row, index) => {
+      const rowNumber = index + 2;
+      const raw = (row as { attribute_name?: unknown }).attribute_name;
+      const name = asString(raw);
+      if (!name) {
+        return;
+      }
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        errors.push({
+          sheet: SHEET_NAMES.behavioralAttributes,
+          rowNumber,
+          message: `Duplicate behavioural attribute "${name}"`,
+        });
+        return;
+      }
+      seen.add(key);
+      parsed.push(name);
+    });
+    return parsed;
   }
 
   private parseSchoolInfoRows(rows: WorkbookRow[], errors: ValidationError[]) {

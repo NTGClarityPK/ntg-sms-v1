@@ -382,7 +382,7 @@ export default function SignupPage() {
             </Text>
           </Box>
 
-          {searchParams.get('google') === 'not_found' && (
+          {searchParams?.get('google') === 'not_found' && (
             <Alert
               icon={<IconAlertCircle size={16} />}
               style={{

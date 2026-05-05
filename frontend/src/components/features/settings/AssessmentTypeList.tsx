@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, ActionIcon, Button, Group, Skeleton, Modal, Paper, Stack, Table, Text } from '@mantine/core';
+import { Alert, ActionIcon, Badge, Button, Group, Skeleton, Modal, Paper, Stack, Switch, Table, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconRefresh, IconPencil } from '@tabler/icons-react';
 import { useCreateAssessmentType, useAssessmentTypes, useUpdateAssessmentType } from '@/hooks/useAssessmentSettings';
@@ -25,26 +25,30 @@ export function AssessmentTypeList() {
   const createMutation = useCreateAssessmentType();
   const updateMutation = useUpdateAssessmentType();
 
-  const form = useForm<{ nameTranslations: TranslatableValue }>({
-    initialValues: { nameTranslations: { ...emptyTranslations } },
+  const form = useForm<{ nameTranslations: TranslatableValue; isTermExamination: boolean }>({
+    initialValues: { nameTranslations: { ...emptyTranslations }, isTermExamination: false },
     validate: {
       nameTranslations: (v) =>
         (!(v.en ?? '').trim() && !(v.ar ?? '').trim()) ? tSettings('assessmentTypeNameRequired') : null,
     },
     transformValues: (v) => ({
       nameTranslations: { en: (v.nameTranslations.en ?? '').trim(), ar: (v.nameTranslations.ar ?? '').trim() },
+      isTermExamination: v.isTermExamination,
     }),
   });
 
   const openCreate = () => {
     setEditType(null);
-    form.setValues({ nameTranslations: { ...emptyTranslations } });
+    form.setValues({ nameTranslations: { ...emptyTranslations }, isTermExamination: false });
     open();
   };
 
   const openEdit = (t: AssessmentType) => {
     setEditType(t);
-    form.setValues({ nameTranslations: { en: t.name ?? '', ar: t.name ?? '' } });
+    form.setValues({
+      nameTranslations: { en: t.name ?? '', ar: t.name ?? '' },
+      isTermExamination: t.isTermExamination === true,
+    });
     open();
   };
 
@@ -56,7 +60,11 @@ export function AssessmentTypeList() {
 
   const onSubmit = form.onSubmit(async (values) => {
     const name = values.nameTranslations.en || values.nameTranslations.ar || '';
-    const payload = { name, name_translations: values.nameTranslations };
+    const payload = {
+      name,
+      name_translations: values.nameTranslations,
+      isTermExamination: values.isTermExamination,
+    };
     try {
       if (editType) {
         await updateMutation.mutateAsync({ id: editType.id, ...payload });
@@ -117,6 +125,7 @@ export function AssessmentTypeList() {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>{tCommon('name')}</Table.Th>
+                <Table.Th>{tSettings('assessmentTypeColumnTermExamination')}</Table.Th>
                 <Table.Th w={80}>{tCommon('actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -124,6 +133,11 @@ export function AssessmentTypeList() {
               {types.map((t) => (
                 <Table.Tr key={t.id}>
                   <Table.Td>{t.name}</Table.Td>
+                  <Table.Td>
+                    <Badge variant="light" color={t.isTermExamination ? 'teal' : 'gray'} size="sm">
+                      {t.isTermExamination ? tCommon('yes') : tCommon('no')}
+                    </Badge>
+                  </Table.Td>
                   <Table.Td>
                     <ActionIcon variant="subtle" size="sm" aria-label="Edit" onClick={() => openEdit(t)}>
                       <IconPencil size={16} />
@@ -154,6 +168,11 @@ export function AssessmentTypeList() {
                 en: tSettings('assessmentTypeFormNamePlaceholderEn'),
                 ar: tSettings('assessmentTypeFormNamePlaceholderAr'),
               }}
+            />
+            <Switch
+              id="assessment-type-form-term-examination"
+              label={tSettings('assessmentTypeFormTermExaminationLabel')}
+              {...form.getInputProps('isTermExamination', { type: 'checkbox' })}
             />
             <Group justify="flex-end" mt="md">
               <Button id="assessment-type-form-cancel" variant="light" onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>

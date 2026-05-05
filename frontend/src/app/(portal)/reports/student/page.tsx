@@ -22,7 +22,7 @@ function periodFromQuery(param: string | null): ReportPeriodType | null {
 
 export default function StudentReportSelectPage() {
   const searchParams = useSearchParams();
-  const periodParam = searchParams.get('period');
+  const periodParam = searchParams?.get('period') ?? null;
   const t = useTranslations('reports');
   const { user } = useAuth();
   const isStudent = user?.roles?.some((r) => r.roleName.toLowerCase() === 'student');

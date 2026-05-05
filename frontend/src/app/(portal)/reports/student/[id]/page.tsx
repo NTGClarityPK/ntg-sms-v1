@@ -20,7 +20,10 @@ export default function StudentReportByIdPage() {
   const { user } = useAuth();
   const isStudent = user?.roles?.some((r) => r.roleName.toLowerCase() === 'student');
   const myStudentQuery = useMyStudent();
-  const id = typeof params.id === 'string' ? params.id : null;
+  const id =
+    params && typeof (params as Record<string, unknown>).id === 'string'
+      ? ((params as Record<string, unknown>).id as string)
+      : null;
   const [periodType, setPeriodType] = useState<ReportPeriodType | null>(ReportPeriodType.YEAR);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);

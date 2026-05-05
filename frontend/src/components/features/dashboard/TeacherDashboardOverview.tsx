@@ -15,6 +15,7 @@ import {
   Group,
   Card,
 } from '@mantine/core';
+import Link from 'next/link';
 import {
   IconSchool,
   IconClipboardList,
@@ -41,6 +42,18 @@ import { useUnreadCount } from '@/hooks/useNotifications';
 import { useMyEvents } from '@/hooks/api/useEvents';
 import { DashboardStatCard } from './DashboardStatCard';
 import type { User } from '@/types/auth';
+
+const linkPaperStyles = {
+  root: {
+    textDecoration: 'none' as const,
+    color: 'inherit' as const,
+    display: 'block' as const,
+    transition: 'background-color 150ms ease',
+    '&:hover': {
+      backgroundColor: 'var(--mantine-color-default-hover)',
+    },
+  },
+};
 
 function formatRoleName(roleName: string): string {
   return roleName
@@ -136,31 +149,46 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <DashboardStatCard
+            id="dashboard-stat-my-classes"
             title={t('myClasses')}
             value={myClassesCount}
             icon={IconSchool}
+            href="/academic/class-sections"
           />
           <DashboardStatCard
+            id="dashboard-stat-pending-grading"
             title={t('pendingGrading')}
             value={pendingGradingTotal}
             icon={IconClipboardList}
+            href="/assessments"
           />
           <DashboardStatCard
+            id="dashboard-stat-today-slots"
             title={t('todaySlots')}
             value={todaySlotsCount}
             icon={IconCalendar}
+            href="/my-timetable"
           />
           <DashboardStatCard
+            id="dashboard-stat-unread"
             title={t('unread')}
             value={unreadCount}
             icon={IconMessageCircle}
+            href="/notifications"
           />
         </SimpleGrid>
       )}
 
       <Grid>
         <Grid.Col span={{ base: 12, md: 8 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/assessments"
+            id="dashboard-panel-workload"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconTrendingUp size={24} style={{ color: colors.primary }} />
@@ -186,7 +214,15 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 4 }}>
-          <Paper p="md" withBorder h="100%">
+          <Paper
+            component={Link}
+            href="/my-timetable"
+            id="dashboard-panel-today-schedule"
+            p="md"
+            withBorder
+            h="100%"
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendar size={24} style={{ color: colors.primary }} />
@@ -220,7 +256,14 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/my-events"
+            id="dashboard-panel-upcoming-events"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendarEvent size={24} style={{ color: colors.primary }} />
@@ -250,7 +293,14 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/assessments"
+            id="dashboard-panel-pending-grading"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconClipboardList size={24} style={{ color: colors.primary }} />

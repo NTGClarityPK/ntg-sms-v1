@@ -18,6 +18,9 @@ export interface Assessment {
   publishDate?: string;
   isPublished: boolean;
   allowLateSubmission: boolean;
+  roomNumber?: string;
+  /** Term examinations: minutes; end instant = dueDate + duration. */
+  examinationDurationMinutes?: number;
   branchId: string;
   academicYearId: string;
   createdAt: string;
@@ -49,6 +52,8 @@ export interface CreateAssessmentInput {
   classSectionIds?: string[];
   totalMarks: number;
   dueDate?: string;
+  roomNumber?: string;
+  examinationDurationMinutes?: number;
   publishDate?: string;
   isPublished?: boolean;
   allowLateSubmission?: boolean;
@@ -72,6 +77,8 @@ export interface UpdateAssessmentInput {
   classSectionId?: string;
   totalMarks?: number;
   dueDate?: string;
+  roomNumber?: string;
+  examinationDurationMinutes?: number;
   publishDate?: string;
   isPublished?: boolean;
   allowLateSubmission?: boolean;
@@ -88,6 +95,19 @@ export interface QueryAssessmentsInput {
   assessmentTypeId?: string;
   /** Backend expects status: 'all' | 'published' | 'unpublished' */
   status?: 'all' | 'published' | 'unpublished';
+  startDate?: string;
+  endDate?: string;
+}
+
+/** Query for `GET /api/v1/assessments/examination-schedule` and related PDF export. */
+export interface QueryExaminationScheduleInput {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  academicYearId?: string;
+  classSectionId?: string;
+  subjectId?: string;
   startDate?: string;
   endDate?: string;
 }

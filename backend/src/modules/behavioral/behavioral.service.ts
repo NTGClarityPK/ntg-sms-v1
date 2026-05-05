@@ -8,6 +8,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
+import { SystemSettingsService } from '../system-settings/system-settings.service';
 import {
   BehavioralAssessmentDto,
   BehavioralScoreDto,
@@ -55,19 +56,39 @@ export class BehavioralService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly systemSettingsService: SystemSettingsService,
   ) {}
 
-  /** Get allowed attribute names from system_settings (behavioral_assessment.attributes). */
+  private async getBehavioralAssessmentConfig(): Promise<{
+    enabled: boolean;
+    mandatory: boolean;
+    attributes: string[];
+  }> {
+    const { data } = await this.systemSettingsService.getByKey('behavioral_assessment');
+    const v = data.value as { enabled?: boolean; mandatory?: boolean; attributes?: unknown } | undefined;
+    const attrsRaw =
+      v && typeof v === 'object' && Array.isArray((v as { attributes?: unknown }).attributes)
+        ? (v as { attributes: unknown[] }).attributes
+        : [];
+    const attributes = [
+      ...new Set(attrsRaw.map((a) => String(a).trim()).filter((a) => a.length > 0)),
+    ];
+    return {
+      enabled: Boolean(v && typeof v === 'object' && (v as { enabled?: boolean }).enabled),
+      mandatory: Boolean(v && typeof v === 'object' && (v as { mandatory?: boolean }).mandatory),
+      attributes,
+    };
+  }
+
+  private async isBehavioralAssessmentEnabled(): Promise<boolean> {
+    const c = await this.getBehavioralAssessmentConfig();
+    return c.enabled;
+  }
+
+  /** Attribute names configured for this branch (trimmed, unique). */
   private async getAllowedAttributes(): Promise<string[]> {
-    const supabase = this.supabaseConfig.getClient();
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'behavioral_assessment')
-      .maybeSingle();
-    throwIfDbError(error);
-    const value = data?.value as { attributes?: string[] } | null;
-    return Array.isArray(value?.attributes) ? value.attributes : [];
+    const c = await this.getBehavioralAssessmentConfig();
+    return c.attributes;
   }
 
   /**
@@ -80,6 +101,10 @@ export class BehavioralService {
     userId: string,
   ): Promise<{ data: PendingStudentDto[] }> {
     const supabase = this.supabaseConfig.getClient();
+
+    if (!(await this.isBehavioralAssessmentEnabled())) {
+      return { data: [] };
+    }
 
     const monthStr = firstDayOfMonth(new Date());
 
@@ -293,19 +318,27 @@ export class BehavioralService {
   ): Promise<{ data: BehavioralAssessmentDto }> {
     const supabase = this.supabaseConfig.getClient();
 
+    const cfg = await this.getBehavioralAssessmentConfig();
+    if (!cfg.enabled) {
+      throw new BadRequestException('Behavioural assessment is disabled for this branch.');
+    }
+
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) {
       throw new BadRequestException('No active academic year found');
     }
 
     const allowedAttrs = await this.getAllowedAttributes();
-    if (allowedAttrs.length > 0) {
-      for (const item of dto.scores) {
-        if (!allowedAttrs.includes(item.attributeName)) {
-          throw new BadRequestException(
-            `Invalid attribute: ${item.attributeName}. Allowed: ${allowedAttrs.join(', ')}`,
-          );
-        }
+    if (allowedAttrs.length === 0) {
+      throw new BadRequestException(
+        'Add at least one behavioural attribute in Settings before recording assessments.',
+      );
+    }
+    for (const item of dto.scores) {
+      if (!allowedAttrs.includes(item.attributeName)) {
+        throw new BadRequestException(
+          `Invalid attribute: ${item.attributeName}. Allowed: ${allowedAttrs.join(', ')}`,
+        );
       }
     }
 
@@ -396,6 +429,11 @@ export class BehavioralService {
   ): Promise<{ data: BehavioralAssessmentDto }> {
     const supabase = this.supabaseConfig.getClient();
 
+    const cfg = await this.getBehavioralAssessmentConfig();
+    if (!cfg.enabled) {
+      throw new BadRequestException('Behavioural assessment is disabled for this branch.');
+    }
+
     const { data: existing, error: findErr } = await supabase
       .from('behavioral_assessments')
       .select('id, student_id, assessed_by, assessment_month, branch_id, academic_year_id, created_at, updated_at')
@@ -413,13 +451,16 @@ export class BehavioralService {
 
     if (dto.scores && dto.scores.length > 0) {
       const allowedAttrs = await this.getAllowedAttributes();
-      if (allowedAttrs.length > 0) {
-        for (const item of dto.scores) {
-          if (!allowedAttrs.includes(item.attributeName)) {
-            throw new BadRequestException(
-              `Invalid attribute: ${item.attributeName}. Allowed: ${allowedAttrs.join(', ')}`,
-            );
-          }
+      if (allowedAttrs.length === 0) {
+        throw new BadRequestException(
+          'Add at least one behavioural attribute in Settings before recording assessments.',
+        );
+      }
+      for (const item of dto.scores) {
+        if (!allowedAttrs.includes(item.attributeName)) {
+          throw new BadRequestException(
+            `Invalid attribute: ${item.attributeName}. Allowed: ${allowedAttrs.join(', ')}`,
+          );
         }
       }
 
@@ -494,6 +535,17 @@ export class BehavioralService {
     const supabase = this.supabaseConfig.getClient();
 
     const monthStr = assessmentMonth.slice(0, 10);
+
+    if (!(await this.isBehavioralAssessmentEnabled())) {
+      return {
+        data: new BehavioralMatrixResponseDto({
+          attributes: [],
+          rows: [],
+          assessmentMonth: monthStr,
+          classSectionId,
+        }),
+      };
+    }
 
     const [allowedAttrsPromise, csResult] = await Promise.all([
       this.getAllowedAttributes(),

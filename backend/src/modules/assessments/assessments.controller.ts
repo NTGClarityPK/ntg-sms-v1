@@ -11,12 +11,14 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import {
@@ -30,6 +32,7 @@ import {
 import { AssessmentsService } from './assessments.service';
 import { AssessmentDto } from './dto/assessment.dto';
 import { QueryAssessmentsDto } from './dto/query-assessments.dto';
+import { QueryExaminationScheduleDto } from './dto/query-examination-schedule.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
 import { AssessmentStatisticsDto } from './dto/assessment-statistics.dto';
@@ -131,6 +134,59 @@ export class AssessmentsController {
       undefined,
       user.id,
       user.roles,
+    );
+  }
+
+  @Get('examination-schedule/export/pdf')
+  async exportExaminationSchedulePdf(
+    @Query() query: QueryExaminationScheduleDto,
+    @Res() res: Response,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<void> {
+    const lang =
+      query.language && ['en', 'en-GB', 'en-US', 'ar'].includes(query.language)
+        ? query.language
+        : 'en-GB';
+    const buffer = await this.assessmentsService.exportExaminationSchedulePdf(
+      query,
+      branch.branchId,
+      user.id,
+      user.roles,
+      lang,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="examination-schedule.pdf"');
+    res.send(buffer);
+  }
+
+  @Get('examination-schedule')
+  async listExaminationSchedule(
+    @Query() query: QueryExaminationScheduleDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{
+    data: AssessmentDto[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    const listQuery: QueryAssessmentsDto = {
+      page: query.page,
+      limit: query.limit,
+      sortBy: query.sortBy ?? 'due_date',
+      sortOrder: query.sortOrder ?? 'asc',
+      classSectionId: query.classSectionId,
+      subjectId: query.subjectId,
+      startDate: query.startDate,
+      endDate: query.endDate,
+      status: 'published',
+    };
+    return this.assessmentsService.listAssessments(
+      listQuery,
+      branch.branchId,
+      query.academicYearId,
+      user.id,
+      user.roles,
+      true,
     );
   }
 
@@ -282,6 +338,26 @@ export class AssessmentsController {
       body.publishDate,
     );
     return { data: result };
+  }
+
+  /**
+   * Published term examinations for the current student (examination schedule)
+   */
+  @Get('my/examination-schedule')
+  async getMyExaminationSchedule(
+    @Query() query: QueryExaminationScheduleDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{
+    data: AssessmentDto[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    return this.assessmentsService.getMyExaminationSchedule(
+      user.id,
+      branch.branchId,
+      query,
+      user.roles,
+    );
   }
 
   /**

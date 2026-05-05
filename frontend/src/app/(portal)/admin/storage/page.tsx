@@ -27,9 +27,9 @@ export default function StoragePage() {
   const isSuperAdmin =
     user?.roles?.some((r) => r.roleName?.toLowerCase() === 'super_admin') ?? false;
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/';
   const searchParams = useSearchParams();
-  const tabFromUrl = searchParams.get('tab');
+  const tabFromUrl = searchParams?.get('tab');
   const [activeTab, setActiveTab] = useState<string | null>(
     tabFromUrl && VALID_TABS.includes(tabFromUrl as (typeof VALID_TABS)[number])
       ? tabFromUrl
@@ -56,7 +56,7 @@ export default function StoragePage() {
   const handleTabChange = (value: string | null) => {
     setActiveTab(value);
     if (value && value !== 'overview') {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
       params.set('tab', value);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     } else {

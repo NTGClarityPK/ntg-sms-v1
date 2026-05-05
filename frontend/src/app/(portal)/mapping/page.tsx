@@ -26,7 +26,7 @@ export default function MappingPage() {
     return tabs;
   }, [canViewParentStudent, canViewTeacherClass]);
 
-  const requested = (searchParams.get('tab') as MappingTab | null) ?? null;
+  const requested = (searchParams?.get('tab') as MappingTab | null) ?? null;
   const defaultTab: MappingTab | null =
     (requested && availableTabs.includes(requested) ? requested : null) ?? availableTabs[0] ?? null;
 

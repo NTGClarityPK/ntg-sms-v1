@@ -15,6 +15,7 @@ import {
   Group,
   Card,
 } from '@mantine/core';
+import Link from 'next/link';
 import {
   IconUsers,
   IconClock,
@@ -39,6 +40,18 @@ import { useUnreadCount } from '@/hooks/useNotifications';
 import { useMyEvents } from '@/hooks/api/useEvents';
 import { DashboardStatCard } from './DashboardStatCard';
 import type { User } from '@/types/auth';
+
+const linkPaperStyles = {
+  root: {
+    textDecoration: 'none' as const,
+    color: 'inherit' as const,
+    display: 'block' as const,
+    transition: 'background-color 150ms ease',
+    '&:hover': {
+      backgroundColor: 'var(--mantine-color-default-hover)',
+    },
+  },
+};
 
 function formatRoleName(roleName: string): string {
   return roleName
@@ -105,31 +118,46 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
           <DashboardStatCard
+            id="dashboard-stat-children"
             title={t('children')}
             value={childrenCount}
             icon={IconUsers}
+            href="/my-children"
           />
           <DashboardStatCard
+            id="dashboard-stat-pending-tasks"
             title={t('pendingTasks')}
             value={pendingTotal}
             icon={IconClock}
+            href="/leaves"
           />
           <DashboardStatCard
+            id="dashboard-stat-upcoming-events"
             title={t('upcomingEventsList')}
             value={upcomingEvents.length}
             icon={IconCalendarEvent}
+            href="/my-events"
           />
           <DashboardStatCard
+            id="dashboard-stat-unread"
             title={t('unread')}
             value={unreadCount}
             icon={IconMessageCircle}
+            href="/notifications"
           />
         </SimpleGrid>
       )}
 
       <Grid>
         <Grid.Col span={{ base: 12, md: 8 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/leaves"
+            id="dashboard-panel-pending-requests"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconTrendingUp size={24} style={{ color: colors.primary }} />
@@ -196,7 +224,14 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/my-events"
+            id="dashboard-panel-upcoming-events-list"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendarEvent size={24} style={{ color: colors.primary }} />
@@ -231,7 +266,14 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/my-children"
+            id="dashboard-panel-my-children"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconUsers size={24} style={{ color: colors.primary }} />

@@ -18,6 +18,7 @@ export interface Conversation {
   participants: ConversationParticipant[];
   className?: string;
   sectionName?: string;
+  linkedBroadcastConversationIds?: string[];
 }
 
 export interface ConversationListItem {
@@ -58,4 +59,8 @@ export interface CreateConversationInput {
   type: ConversationType;
   recipientUserId?: string;
   classSectionId?: string;
+  /** School admin only. One conversation per target branch. */
+  adminBroadcastScope?: 'tenant' | 'branch';
+  adminBroadcastBranchId?: string;
+  adminBroadcastRoleNames?: string[];
 }

@@ -1,11 +1,12 @@
 'use client';
 
-import { ActionIcon, Alert, Button, Group, Stack, Text, TextInput, NumberInput } from '@mantine/core';
+import { ActionIcon, Alert, Button, Group, Stack, Switch, Text, TextInput, NumberInput } from '@mantine/core';
 import { useState } from 'react';
 import { IconTrash } from '@tabler/icons-react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { AssessmentData } from './types';
 import { useTranslations } from 'next-intl';
+import { wizardAssessmentTypesNeedTermExamBanner } from '@/lib/assessment-term-exam-heuristics';
 
 interface AssessmentStepProps {
   data: AssessmentData;
@@ -66,10 +67,14 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
         ...data,
         assessmentTypes: [
           ...data.assessmentTypes,
-          { ...newAssessmentType, name: newAssessmentType.name.trim() },
+          {
+            ...newAssessmentType,
+            name: newAssessmentType.name.trim(),
+            isTermExamination: false,
+          },
         ],
       });
-      setNewAssessmentType({ name: '', sortOrder: data.assessmentTypes.length });
+      setNewAssessmentType({ name: '', sortOrder: data.assessmentTypes.length + 1 });
     }
   };
 
@@ -178,6 +183,16 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
       </Text>
 
       <Stack gap="lg" mt="md">
+        {wizardAssessmentTypesNeedTermExamBanner(
+          data.assessmentTypes.map((at) => ({
+            name: at.name,
+            isTermExamination: at.isTermExamination === true,
+          })),
+        ) && (
+          <Alert id="assessment-step-term-exam-name-hint" variant="light" color="yellow" title={tSettings('setupWizardTermExamNameHintTitle')}>
+            {tSettings('setupWizardTermExamNameHintBody')}
+          </Alert>
+        )}
         <div>
           <Text size="sm" fw={500} mb="xs">
             Assessment Types ({data.assessmentTypes.length})
@@ -204,10 +219,23 @@ export function AssessmentStep({ data, onChange, onNext, onBack }: AssessmentSte
           {data.assessmentTypes.length > 0 && (
             <Stack gap="xs">
               {data.assessmentTypes.map((at, idx) => (
-                <Group key={idx} justify="space-between" wrap="nowrap" align="center">
+                <Group key={idx} justify="space-between" wrap="nowrap" align="center" gap="sm">
                   <Text size="sm" style={{ flex: 1, minWidth: 0 }}>
                     {at.name}
                   </Text>
+                  <Switch
+                    id={`assessment-step-type-term-${idx}`}
+                    size="sm"
+                    label={tSettings('setupWizardAssessmentTypeTermExaminationLabel')}
+                    checked={at.isTermExamination === true}
+                    onChange={(e) => {
+                      const next = [...data.assessmentTypes];
+                      const cur = next[idx];
+                      if (!cur) return;
+                      next[idx] = { ...cur, isTermExamination: e.currentTarget.checked };
+                      onChange({ ...data, assessmentTypes: next });
+                    }}
+                  />
                   <ActionIcon
                     id={`assessment-step-remove-type-${idx}`}
                     variant="subtle"

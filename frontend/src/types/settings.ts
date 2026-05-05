@@ -121,6 +121,7 @@ export interface AssessmentType {
   id: string;
   name: string;
   nameAr?: string;
+  isTermExamination: boolean;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;

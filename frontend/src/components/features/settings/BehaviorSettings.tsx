@@ -140,6 +140,10 @@ export function BehaviorSettings({ showHeader = true }: { showHeader?: boolean }
           }
         />
 
+        <Text size="sm" c="dimmed">
+          {tSettings('behaviorAttributesHint')}
+        </Text>
+
         <Group align="flex-end">
           <TextInput
             id="behavior-settings-attribute-input"
@@ -147,9 +151,8 @@ export function BehaviorSettings({ showHeader = true }: { showHeader?: boolean }
             placeholder={tSettings('behaviorAddAttributePlaceholder')}
             value={newAttr}
             onChange={(e) => setNewAttr(e.currentTarget.value)}
-            disabled={!value.enabled}
           />
-          <Button id="behavior-settings-add-attribute" variant="light" onClick={addAttr} disabled={!value.enabled}>
+          <Button id="behavior-settings-add-attribute" variant="light" onClick={addAttr}>
             {tCommon('add')}
           </Button>
         </Group>
@@ -165,7 +168,6 @@ export function BehaviorSettings({ showHeader = true }: { showHeader?: boolean }
                   id={`behavior-settings-remove-${a.replace(/\s+/g, '-').toLowerCase()}`}
                   variant="light"
                   onClick={() => removeAttr(a)}
-                  disabled={!value.enabled}
                 >
                   {tCommon('remove')}
                 </Button>

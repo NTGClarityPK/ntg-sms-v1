@@ -2,13 +2,16 @@ import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsPositive,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   IsArray,
   ArrayMinSize,
   ValidateIf,
@@ -60,6 +63,19 @@ export class CreateAssessmentDto {
   @IsOptional()
   @IsDateString()
   dueDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  roomNumber?: string;
+
+  /** Term examinations only: positive minutes; end time = start (`dueDate`) + duration. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(720)
+  examinationDurationMinutes?: number;
 
   @IsOptional()
   @IsDateString()

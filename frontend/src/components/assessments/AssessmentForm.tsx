@@ -7,25 +7,64 @@
 
 import { useTranslations } from 'next-intl';
 import { useForm, zodResolver } from '@mantine/form';
-import { Alert, Button, Stack, Text, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton, Divider, MultiSelect, Checkbox, Progress } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
+import { Alert, Button, Stack, Text, TextInput, Textarea, NumberInput, Select, Switch, Group, Skeleton, Divider, MultiSelect, Checkbox, Progress, Tooltip, Box, ActionIcon, Popover, List, Code } from '@mantine/core';
+import { DatePickerInput, TimeInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconCalendar } from '@tabler/icons-react';
+import { IconBold, IconCalendar, IconHighlight, IconList, IconListNumbers, IconUnderline, IconInfoCircle } from '@tabler/icons-react';
 import { z } from 'zod';
 import type { Assessment, CreateAssessmentInput, StagedDraftFile, UpdateAssessmentInput } from '@/types/assessment';
 import { useAssessmentTypes } from '@/hooks/useAssessmentSettings';
 import { useSubjects, useClasses } from '@/hooks/useCoreLookups';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useTemplatesForClass, useClassesWithTemplates } from '@/hooks/useSubjectTemplates';
+import type { AssessmentType } from '@/types/settings';
 import { useMyStaff } from '@/hooks/useStaff';
 import { useAssignmentsByTeacher } from '@/hooks/useTeacherAssignments';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { FileUpload } from './FileUpload';
 import { FileUploadForCreate } from './FileUploadForCreate';
 
 type CreationMode = 'single' | 'class-template' | 'class-sections';
+
+function combineLocalDateAndTime(
+  date: Date | null | undefined,
+  timeHHmm: string | undefined,
+): string | undefined {
+  if (!date) return undefined;
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const raw = (timeHHmm ?? '09:00').trim() || '09:00';
+  const [hStr, mStr] = raw.split(':');
+  const h = Math.min(23, Math.max(0, parseInt(hStr ?? '0', 10) || 0));
+  const m = Math.min(59, Math.max(0, parseInt(mStr ?? '0', 10) || 0));
+  d.setHours(h, m, 0, 0);
+  return d.toISOString();
+}
+
+function timeFromIso(iso?: string): string {
+  if (!iso) return '09:00';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '09:00';
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getMinutes().toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function startOfLocalCalendarDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/** Publish date strictly after today's calendar date (local) — assessment cannot show as published yet. */
+function isPublishDateStrictlyInFuture(publishDate: Date | null | undefined): boolean {
+  if (!publishDate || Number.isNaN(publishDate.getTime())) return false;
+  const today = startOfLocalCalendarDay(new Date());
+  const pub = startOfLocalCalendarDay(publishDate);
+  return pub.getTime() > today.getTime();
+}
 
 // Optional UUID fields accept '' so validation doesn't fail before refine when user hasn't selected yet
 const optionalUuid = () => z.union([z.string().uuid(), z.literal('')]).optional();
@@ -41,9 +80,12 @@ const createAssessmentSchema = z.object({
   classSectionIds: z.array(z.string().uuid('Invalid class section')).optional(),
   totalMarks: z.number().min(0.01, 'Total marks must be greater than 0'),
   dueDate: z.date().nullable().optional(),
+  dueTime: z.string().optional(),
   publishDate: z.date().nullable().optional(),
   isPublished: z.boolean().optional(),
   allowLateSubmission: z.boolean().optional(),
+  roomNumber: z.string().max(50).optional(),
+  examinationDurationMinutes: z.number().min(1).max(720).optional(),
 }).refine((data) => {
   if (data.mode === 'single') {
     return !!data.classSectionId;
@@ -75,9 +117,12 @@ const updateAssessmentSchema = z.object({
   classSectionId: z.string().uuid('Invalid class section'),
   totalMarks: z.number().min(0.01, 'Total marks must be greater than 0'),
   dueDate: z.date().nullable().optional(),
+  dueTime: z.string().optional(),
   publishDate: z.date().nullable().optional(),
   isPublished: z.boolean().optional(),
   allowLateSubmission: z.boolean().optional(),
+  roomNumber: z.string().max(50).optional(),
+  examinationDurationMinutes: z.number().min(1).max(720).optional(),
 });
 
 type CreateFormValues = {
@@ -92,9 +137,12 @@ type CreateFormValues = {
   classSectionIds?: string[];
   totalMarks: number;
   dueDate?: Date | null;
+  dueTime?: string;
   publishDate?: Date | null;
   isPublished?: boolean;
   allowLateSubmission?: boolean;
+  roomNumber?: string;
+  examinationDurationMinutes?: number;
 };
 
 type UpdateFormValues = {
@@ -105,9 +153,12 @@ type UpdateFormValues = {
   classSectionId: string;
   totalMarks: number;
   dueDate?: Date | null;
+  dueTime?: string;
   publishDate?: Date | null;
   isPublished?: boolean;
   allowLateSubmission?: boolean;
+  roomNumber?: string;
+  examinationDurationMinutes?: number;
 };
 
 interface AssessmentFormProps {
@@ -155,6 +206,11 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
     limit: 100, // Backend max limit is 100
   });
 
+  const assessmentTypesFull: AssessmentType[] = useMemo(
+    () => (Array.isArray(assessmentTypesData?.data) ? assessmentTypesData.data : []),
+    [assessmentTypesData],
+  );
+
   // Use different schemas for create vs update
   const createForm = useForm<CreateFormValues>({
     validate: zodResolver(createAssessmentSchema),
@@ -170,9 +226,12 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
       classSectionIds: [],
       totalMarks: 100,
       dueDate: null,
+      dueTime: '09:00',
       publishDate: null,
       isPublished: false,
       allowLateSubmission: false,
+      roomNumber: '',
+      examinationDurationMinutes: undefined,
     },
   });
 
@@ -186,13 +245,43 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
       classSectionId: assessment?.classSectionId ?? '',
       totalMarks: assessment?.totalMarks ?? 100,
       dueDate: assessment?.dueDate ? new Date(assessment.dueDate) : null,
+      dueTime: timeFromIso(assessment?.dueDate),
       publishDate: assessment?.publishDate ? new Date(assessment.publishDate) : null,
       isPublished: assessment?.isPublished ?? false,
       allowLateSubmission: assessment?.allowLateSubmission ?? false,
+      roomNumber: assessment?.roomNumber ?? '',
+      examinationDurationMinutes: assessment?.examinationDurationMinutes,
     },
   });
 
   const form = isEditMode ? updateForm : createForm;
+
+  const publishDateLocksPublished = useMemo(
+    () => isPublishDateStrictlyInFuture(form.values.publishDate),
+    [form.values.publishDate],
+  );
+
+  useEffect(() => {
+    if (!publishDateLocksPublished) return;
+    if (isEditMode && updateForm.values.isPublished) {
+      updateForm.setFieldValue('isPublished', false);
+    }
+    if (!isEditMode && createForm.values.isPublished) {
+      createForm.setFieldValue('isPublished', false);
+    }
+  }, [
+    publishDateLocksPublished,
+    isEditMode,
+    updateForm.values.isPublished,
+    createForm.values.isPublished,
+  ]);
+
+  const selectedTypeIsTerm = useMemo(() => {
+    const id = form.values.assessmentTypeId;
+    if (!id) return false;
+    const row = assessmentTypesFull.find((x) => x.id === id);
+    return row?.isTermExamination === true;
+  }, [assessmentTypesFull, form.values.assessmentTypeId]);
 
   // Subject IDs the teacher teaches in the selected class section(s) — used to filter subject dropdown (create mode only)
   const subjectIdsForSelectedClassSections = useMemo(() => {
@@ -248,8 +337,26 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
   });
 
   const handleSubmit = (values: CreateFormValues | UpdateFormValues) => {
+    if (selectedTypeIsTerm) {
+      const startIso = combineLocalDateAndTime(values.dueDate, values.dueTime);
+      const dur = values.examinationDurationMinutes;
+      const hasStart = !!startIso;
+      const hasDur =
+        typeof dur === 'number' && !Number.isNaN(dur) && dur >= 1 && dur <= 720;
+      if (hasStart !== hasDur) {
+        const msg = t('termExamStartDurationPair');
+        if (isEditMode) {
+          updateForm.setFieldError('examinationDurationMinutes', msg);
+        } else {
+          createForm.setFieldError('examinationDurationMinutes', msg);
+        }
+        return;
+      }
+    }
+
     if (isEditMode) {
       const updateValues = values as UpdateFormValues;
+      const scheduledFuture = isPublishDateStrictlyInFuture(updateValues.publishDate);
       const payload: UpdateAssessmentInput = {
         title: updateValues.title,
         description: updateValues.description || undefined,
@@ -257,24 +364,35 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         subjectId: updateValues.subjectId,
         classSectionId: updateValues.classSectionId,
         totalMarks: updateValues.totalMarks,
-        dueDate: updateValues.dueDate ? updateValues.dueDate.toISOString().split('T')[0] : undefined,
+        dueDate: combineLocalDateAndTime(updateValues.dueDate, updateValues.dueTime),
         publishDate: updateValues.publishDate ? updateValues.publishDate.toISOString().split('T')[0] : undefined,
-        isPublished: updateValues.isPublished,
-        allowLateSubmission: updateValues.allowLateSubmission,
+        isPublished: scheduledFuture ? false : updateValues.isPublished,
+        allowLateSubmission: selectedTypeIsTerm ? false : updateValues.allowLateSubmission,
+        roomNumber: selectedTypeIsTerm
+          ? updateValues.roomNumber?.trim() || undefined
+          : undefined,
+        examinationDurationMinutes: selectedTypeIsTerm ? updateValues.examinationDurationMinutes : undefined,
       };
       onSubmit(payload);
     } else {
       const createValues = values as CreateFormValues;
+      const scheduledFuture = isPublishDateStrictlyInFuture(createValues.publishDate);
       const payload: CreateAssessmentInput = {
         title: createValues.title,
         description: createValues.description || undefined,
         assessmentTypeId: createValues.assessmentTypeId,
         subjectId: createValues.subjectId,
         totalMarks: createValues.totalMarks,
-        dueDate: createValues.dueDate ? createValues.dueDate.toISOString().split('T')[0] : undefined,
+        dueDate: combineLocalDateAndTime(createValues.dueDate, createValues.dueTime),
         publishDate: createValues.publishDate ? createValues.publishDate.toISOString().split('T')[0] : undefined,
-        isPublished: createValues.isPublished,
-        allowLateSubmission: createValues.allowLateSubmission,
+        isPublished: scheduledFuture ? false : createValues.isPublished,
+        allowLateSubmission: selectedTypeIsTerm ? false : createValues.allowLateSubmission,
+        roomNumber: selectedTypeIsTerm
+          ? createValues.roomNumber?.trim() || undefined
+          : undefined,
+        examinationDurationMinutes: selectedTypeIsTerm
+          ? createValues.examinationDurationMinutes
+          : undefined,
       };
 
       if (createValues.mode === 'single') {
@@ -410,6 +528,10 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
     return [];
   }, [classSectionsForClassData, form.values, isEditMode, isTeacherWithAssignments, allowedClassSectionIds]);
 
+  // Must be declared before any conditional returns (hook order).
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const [syllabusHelpOpened, setSyllabusHelpOpened] = useState(false);
+
   // Only block entire form on initial lookup data; dependent data (templates/sections for selected class) must not replace the form
   const initialDataLoading =
     assessmentTypesLoading ||
@@ -439,6 +561,8 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
     return createForm.getInputProps(field as keyof CreateFormValues);
   };
 
+  const assessmentTypeFieldProps = getInputProps('assessmentTypeId');
+
   const createFormErrors = !isEditMode ? (createForm.errors as Record<string, string>) : {};
   const hasCreateErrors = Object.keys(createFormErrors).length > 0;
   const firstCreateError =
@@ -451,6 +575,82 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
     createFormErrors.classSectionIds ||
     createFormErrors._root ||
     t('pleaseCompleteRequired');
+
+  const insertDescriptionSnippet = (snippet: string) => {
+    const el = descriptionRef.current;
+    const current = (form.values.description ?? '') as string;
+    if (!el) {
+      const nextText = `${current}${current ? '\n' : ''}${snippet}`;
+      if (isEditMode) {
+        updateForm.setFieldValue('description', nextText);
+      } else {
+        createForm.setFieldValue('description', nextText);
+      }
+      return;
+    }
+    const start = el.selectionStart ?? current.length;
+    const end = el.selectionEnd ?? current.length;
+    const next = `${current.slice(0, start)}${snippet}${current.slice(end)}`;
+    if (isEditMode) {
+      updateForm.setFieldValue('description', next);
+    } else {
+      createForm.setFieldValue('description', next);
+    }
+    // Restore cursor after insert
+    requestAnimationFrame(() => {
+      try {
+        el.focus();
+        const pos = start + snippet.length;
+        el.setSelectionRange(pos, pos);
+      } catch {
+        // ignore
+      }
+    });
+  };
+
+  const wrapOrInsertDescription = (open: string, close: string) => {
+    const el = descriptionRef.current;
+    const current = (form.values.description ?? '') as string;
+
+    // Fallback: append a pair if ref missing.
+    if (!el) {
+      const nextText = `${current}${current ? '\n' : ''}${open}${close}`;
+      if (isEditMode) {
+        updateForm.setFieldValue('description', nextText);
+      } else {
+        createForm.setFieldValue('description', nextText);
+      }
+      return;
+    }
+
+    const start = el.selectionStart ?? current.length;
+    const end = el.selectionEnd ?? current.length;
+    const selected = current.slice(start, end);
+    const hasSelection = start !== end;
+
+    const next = `${current.slice(0, start)}${open}${selected}${close}${current.slice(end)}`;
+    if (isEditMode) {
+      updateForm.setFieldValue('description', next);
+    } else {
+      createForm.setFieldValue('description', next);
+    }
+
+    requestAnimationFrame(() => {
+      try {
+        el.focus();
+        if (hasSelection) {
+          // Keep selection, now wrapped.
+          el.setSelectionRange(start + open.length, end + open.length);
+        } else {
+          // Place cursor between the pair.
+          const pos = start + open.length;
+          el.setSelectionRange(pos, pos);
+        }
+      } catch {
+        // ignore
+      }
+    });
+  };
 
   return (
     <form
@@ -470,21 +670,136 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         )}
         <TextInput id="assessment-form-title" label={t('titleColumn')} placeholder={t('titlePlaceholder')} required {...getInputProps('title')} />
 
-        <Textarea
-          id="assessment-form-description"
-          label={t('description')}
-          placeholder={t('descriptionPlaceholder')}
-          minRows={3}
-          {...getInputProps('description')}
-        />
-
         <Select
           id="assessment-form-type"
           label={t('assessmentType')}
           placeholder={t('selectType')}
           data={assessmentTypes}
           required
-          {...getInputProps('assessmentTypeId')}
+          {...assessmentTypeFieldProps}
+          onChange={(value) => {
+            assessmentTypeFieldProps.onChange(value);
+            const v = value ?? '';
+            if (!assessmentTypesFull.find((x) => x.id === v)?.isTermExamination) {
+              if (isEditMode) {
+                updateForm.setFieldValue('roomNumber', '');
+                updateForm.setFieldValue('examinationDurationMinutes', undefined);
+              } else {
+                createForm.setFieldValue('roomNumber', '');
+                createForm.setFieldValue('examinationDurationMinutes', undefined);
+              }
+            }
+          }}
+        />
+
+        <Textarea
+          id="assessment-form-description"
+          label={
+            <Stack gap={6}>
+              <Group gap={6} align="center" wrap="nowrap">
+                <Text size="sm" fw={500}>
+                  {selectedTypeIsTerm ? t('descriptionSyllabusLabel') : t('description')}
+                </Text>
+                <Popover
+                  opened={syllabusHelpOpened}
+                  onChange={setSyllabusHelpOpened}
+                  position="bottom-start"
+                  withArrow
+                  shadow="md"
+                  width={340}
+                >
+                  <Popover.Target>
+                    <ActionIcon
+                      variant="subtle"
+                      type="button"
+                      onClick={() => setSyllabusHelpOpened((o) => !o)}
+                      aria-label={t('syllabusFormattingHelp')}
+                    >
+                      <IconInfoCircle size={18} />
+                    </ActionIcon>
+                  </Popover.Target>
+                  <Popover.Dropdown>
+                    <Stack gap="xs">
+                      <Text fw={600}>{t('syllabusFormattingHelp')}</Text>
+                      <Text size="sm" c="dimmed">
+                        {t('syllabusFormattingHint')}
+                      </Text>
+                      <List spacing={6} size="sm">
+                        <List.Item>
+                          {t('syllabusExampleBullets')}{' '}
+                          <Code>- Topic A{'\n'}- Topic B</Code>
+                        </List.Item>
+                        <List.Item>
+                          {t('syllabusExampleNumbered')}{' '}
+                          <Code>1) Chapter 1{'\n'}2) Chapter 2</Code>
+                        </List.Item>
+                        <List.Item>
+                          <Code>**{t('syllabusExampleBold')}**</Code>
+                          {'  '}
+                          <Code>__{t('syllabusExampleUnderline')}__</Code>
+                          {'  '}
+                          <Code>=={t('syllabusExampleHighlight')}==</Code>
+                        </List.Item>
+                      </List>
+                    </Stack>
+                  </Popover.Dropdown>
+                </Popover>
+              </Group>
+
+              <Group gap={6} wrap="nowrap">
+                  <Tooltip label={t('syllabusToolBullet')}>
+                    <ActionIcon
+                      variant="light"
+                      type="button"
+                      onClick={() => insertDescriptionSnippet('- ')}
+                    >
+                      <IconList size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Tooltip label={t('syllabusToolNumbered')}>
+                    <ActionIcon
+                      variant="light"
+                      type="button"
+                      onClick={() => insertDescriptionSnippet('1) ')}
+                    >
+                      <IconListNumbers size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Tooltip label={t('syllabusToolBold')}>
+                    <ActionIcon
+                      variant="light"
+                      type="button"
+                      onClick={() => wrapOrInsertDescription('**', '**')}
+                    >
+                      <IconBold size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Tooltip label={t('syllabusToolUnderline')}>
+                    <ActionIcon
+                      variant="light"
+                      type="button"
+                      onClick={() => wrapOrInsertDescription('__', '__')}
+                    >
+                      <IconUnderline size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Tooltip label={t('syllabusToolHighlight')}>
+                    <ActionIcon
+                      variant="light"
+                      type="button"
+                      onClick={() => wrapOrInsertDescription('==', '==')}
+                    >
+                      <IconHighlight size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
+            </Stack>
+          }
+          placeholder={t('descriptionPlaceholder')}
+          minRows={selectedTypeIsTerm ? 4 : 3}
+          ref={descriptionRef}
+          autosize={selectedTypeIsTerm}
+          {...getInputProps('description')}
         />
 
         {!isEditMode && (
@@ -663,24 +978,52 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
           </>
         )}
 
-        <Group grow>
-          <NumberInput
-            id="assessment-form-total-marks"
-            label={t('totalMarks')}
-            placeholder={t('enterTotalMarks')}
-            min={0}
-            required
-            {...getInputProps('totalMarks')}
-          />
+        <NumberInput
+          id="assessment-form-total-marks"
+          label={t('totalMarks')}
+          placeholder={t('enterTotalMarks')}
+          min={0}
+          required
+          {...getInputProps('totalMarks')}
+        />
 
+        <Group grow align="flex-start">
           <DatePickerInput
             id="assessment-form-due-date"
-            label={t('dueDate')}
-            placeholder={t('selectDueDate')}
+            label={selectedTypeIsTerm ? t('examStartDate') : t('dueDate')}
+            placeholder={selectedTypeIsTerm ? t('selectExamStartDate') : t('selectDueDate')}
             leftSection={<IconCalendar size={16} />}
             {...getInputProps('dueDate')}
           />
+          <TimeInput
+            id="assessment-form-due-time"
+            label={selectedTypeIsTerm ? t('examStartTime') : t('dueTime')}
+            withSeconds={false}
+            {...getInputProps('dueTime')}
+          />
         </Group>
+
+        {selectedTypeIsTerm ? (
+          <>
+            <NumberInput
+              id="assessment-form-exam-duration"
+              label={t('examinationDurationMinutes')}
+              description={t('examinationDurationHint')}
+              placeholder={t('examinationDurationPlaceholder')}
+              min={1}
+              max={720}
+              step={5}
+              {...getInputProps('examinationDurationMinutes')}
+            />
+            <TextInput
+              id="assessment-form-room"
+              label={t('roomNumber')}
+              placeholder={t('roomNumberPlaceholder')}
+              maxLength={50}
+              {...getInputProps('roomNumber')}
+            />
+          </>
+        ) : null}
 
         <DatePickerInput
           id="assessment-form-publish-date"
@@ -691,13 +1034,30 @@ export function AssessmentForm({ assessment, onSubmit, isLoading, compressionPro
         />
 
         <Group>
-          <Switch id="assessment-form-published" label={t('published')} {...getInputProps('isPublished')} />
+          <Tooltip
+            label={t('publishedDisabledFuturePublishDate')}
+            disabled={!publishDateLocksPublished}
+            position="top"
+            multiline
+            w={280}
+          >
+            <Box component="span" display="inline-block">
+              <Switch
+                id="assessment-form-published"
+                label={t('published')}
+                {...getInputProps('isPublished')}
+                disabled={publishDateLocksPublished}
+              />
+            </Box>
+          </Tooltip>
 
-          <Switch
-            id="assessment-form-allow-late"
-            label={t('allowLateSubmission')}
-            {...getInputProps('allowLateSubmission')}
-          />
+          {!selectedTypeIsTerm ? (
+            <Switch
+              id="assessment-form-allow-late"
+              label={t('allowLateSubmission')}
+              {...getInputProps('allowLateSubmission')}
+            />
+          ) : null}
         </Group>
 
         <Divider my="md" />

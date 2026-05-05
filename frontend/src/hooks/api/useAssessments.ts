@@ -9,12 +9,13 @@ import type {
   CreateAssessmentInput,
   UpdateAssessmentInput,
   QueryAssessmentsInput,
+  QueryExaminationScheduleInput,
   AssessmentStatistics,
   ClassStatistics,
   SubjectStatistics,
   StudentPerformance,
 } from '@/types/assessment';
-import type { ApiResponse, PaginatedApiResponse } from '@/types/api';
+import type { ApiResponse } from '@/types/api';
 
 export interface AssessmentStudentStatus {
   studentId: string;
@@ -34,16 +35,74 @@ export function useAssessments(params: QueryAssessmentsInput = {}) {
   return useQuery({
     queryKey: ['assessments', params],
     queryFn: async () => {
-      // Backend returns { data: AssessmentDto[], meta: {...} }
-      // ResponseInterceptor returns it as-is
-      // apiClient.get() wraps it in ApiResponse, so we get { data: { data: Assessment[], meta: {...} } }
-      const response = await apiClient.get<PaginatedApiResponse<Assessment>>('/api/v1/assessments', {
+      // Backend returns { data: AssessmentDto[], meta: {...} } as ApiResponse payload
+      const response = await apiClient.get<Assessment[]>('/api/v1/assessments', {
         params,
       });
-      // Return the response - structure is { data: { data: Assessment[], meta: {...} } }
       return response;
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+/**
+ * Published term examinations (examination schedule) for staff users with assessment access.
+ */
+export function useExaminationSchedule(
+  params: QueryExaminationScheduleInput = {},
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['assessments', 'examination-schedule', params],
+    queryFn: async () => {
+      const response = await apiClient.get<Assessment[]>('/api/v1/assessments/examination-schedule', {
+        params,
+      });
+      return response;
+    },
+    enabled,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/**
+ * Published term examinations for the signed-in student (parent portal acting as child).
+ */
+export function useMyExaminationSchedule(
+  params: QueryExaminationScheduleInput = {},
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['assessments', 'my', 'examination-schedule', params],
+    queryFn: async () => {
+      const response = await apiClient.get<Assessment[]>('/api/v1/assessments/my/examination-schedule', {
+        params,
+      });
+      return response;
+    },
+    enabled,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+export function useExportExaminationSchedulePdf() {
+  return useMutation({
+    mutationFn: async (params: QueryExaminationScheduleInput & { language?: string }) => {
+      const { language, ...rest } = params;
+      return apiClient.getBlobWithFilename('/api/v1/assessments/examination-schedule/export/pdf', {
+        params: { ...rest, ...(language ? { language } : {}) },
+      });
+    },
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? 'examination-schedule.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
   });
 }
 

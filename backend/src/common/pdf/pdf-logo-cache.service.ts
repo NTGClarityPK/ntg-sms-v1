@@ -50,7 +50,7 @@ export class PdfLogoCacheService {
     const trimmed = baseUrl.trim().replace(/\/$/, '');
     const logoUrl =
       process.env.NTG_ALMA_LOGO_URL?.trim() ||
-      (trimmed ? `${trimmed}/NTGTempLogo.svg` : '');
+      (trimmed ? `${trimmed}/alma-logo-darkgreen.svg` : '');
 
     if (!logoUrl) return this.fallbackNtgLogoDataUrl;
 

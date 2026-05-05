@@ -15,6 +15,7 @@ import {
   Group,
   Card,
 } from '@mantine/core';
+import Link from 'next/link';
 import {
   IconSchool,
   IconUsers,
@@ -47,6 +48,18 @@ import { useAttendanceSummary } from '@/hooks/useReports';
 import { useUpcomingEventsConflictCount } from '@/hooks/api/useEvents';
 import { DashboardStatCard } from './DashboardStatCard';
 import type { User } from '@/types/auth';
+
+const linkPaperStyles = {
+  root: {
+    textDecoration: 'none' as const,
+    color: 'inherit' as const,
+    display: 'block' as const,
+    transition: 'background-color 150ms ease',
+    '&:hover': {
+      backgroundColor: 'var(--mantine-color-default-hover)',
+    },
+  },
+};
 
 function formatRoleName(roleName: string): string {
   return roleName
@@ -134,29 +147,39 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 5 }} spacing="md">
           <DashboardStatCard
+            id="dashboard-stat-students"
             title={t('students')}
             value={studentsTotal}
             icon={IconSchool}
+            href="/students"
           />
           <DashboardStatCard
+            id="dashboard-stat-staff"
             title={t('staff')}
             value={staffTotal}
             icon={IconUsers}
+            href="/users"
           />
           <DashboardStatCard
+            id="dashboard-stat-pending-approvals"
             title={t('pendingApprovals')}
             value={pendingTotal}
             icon={IconClock}
+            href="/leaves"
           />
           <DashboardStatCard
+            id="dashboard-stat-unread"
             title={t('unread')}
             value={unreadCount}
             icon={IconMessageCircle}
+            href="/notifications"
           />
           <DashboardStatCard
+            id="dashboard-stat-conflicts"
             title={t('conflicts')}
             value={conflictCount}
             icon={IconAlertTriangle}
+            href="/conflict-management"
           />
         </SimpleGrid>
       )}
@@ -164,7 +187,14 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
       <Grid>
         {/* Pending requests chart */}
         <Grid.Col span={{ base: 12, md: 8 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/leaves"
+            id="dashboard-panel-pending-requests"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconTrendingUp size={24} style={{ color: colors.primary }} />
@@ -191,7 +221,15 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
 
         {/* Low stock alerts */}
         <Grid.Col span={{ base: 12, md: 4 }}>
-          <Paper p="md" withBorder h="100%">
+          <Paper
+            component={Link}
+            href="/inventory"
+            id="dashboard-panel-low-stock"
+            p="md"
+            withBorder
+            h="100%"
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconAlertTriangle size={24} style={{ color: colors.primary }} />
@@ -227,7 +265,14 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
 
         {/* Upcoming events & conflicts */}
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/events"
+            id="dashboard-panel-upcoming-events"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendarEvent size={24} style={{ color: colors.primary }} />
@@ -269,7 +314,14 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
 
         {/* Storage usage */}
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/admin/storage"
+            id="dashboard-panel-storage"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Title order={3}>{t('storageUsage')}</Title>
               {storageQuery.isLoading ? (
@@ -306,7 +358,14 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
 
         {/* Attendance metrics */}
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/attendance"
+            id="dashboard-panel-attendance"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconUserCheck size={24} style={{ color: colors.primary }} />

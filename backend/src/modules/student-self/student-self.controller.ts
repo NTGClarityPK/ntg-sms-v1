@@ -4,6 +4,7 @@ import { StudentJwtGuard } from '../../common/guards/student-jwt.guard';
 import { CurrentStudent, CurrentStudentPayload } from '../../common/decorators/current-student.decorator';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AssessmentsService } from '../assessments/assessments.service';
+import { AssessmentDto } from '../assessments/dto/assessment.dto';
 import { UpdateStudentAssessmentStatusDto } from '../assessments/dto/update-student-assessment-status.dto';
 
 @ApiTags('Student self-service')
@@ -71,6 +72,13 @@ export class StudentSelfController {
         sectionName: sectionData?.name ?? null,
       },
     };
+  }
+
+  @Get('assessments/examination-schedule')
+  async getMyExaminationSchedule(
+    @CurrentStudent() student: CurrentStudentPayload,
+  ): Promise<{ data: AssessmentDto[] }> {
+    return this.assessmentsService.getExaminationScheduleForStudentById(student.id, student.branchId);
   }
 
   @Get('assessments')

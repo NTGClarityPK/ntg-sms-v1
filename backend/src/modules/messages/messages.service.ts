@@ -7,6 +7,7 @@ import {
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { SystemSettingsService } from '../system-settings/system-settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AcademicYearsService } from '../academic-years/academic-years.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { MessageDto, type MessageType } from './dto/message.dto';
 import {
@@ -59,16 +60,206 @@ const TEACHER_ROLES = [
   'super_admin',
 ];
 
+const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
+
+/** Roles a school admin may include in an organisation / branch broadcast (lowercase names). */
+const BROADCASTABLE_ROLE_NAMES = new Set([
+  'student',
+  'parent',
+  'class_teacher',
+  'subject_teacher',
+  'academic_coordinator',
+  'guidance_counselor',
+  'principal',
+  'school_admin',
+  'admin_assistant',
+  'super_admin',
+]);
+
+const PARTICIPANT_INSERT_CHUNK = 500;
+
 @Injectable()
 export class MessagesService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly systemSettingsService: SystemSettingsService,
     private readonly notificationsService: NotificationsService,
+    private readonly academicYearsService: AcademicYearsService,
   ) {}
 
   private isTeacher(roles: string[]): boolean {
-    return roles.some((r) => TEACHER_ROLES.includes(r));
+    return roles.some((r) => TEACHER_ROLES.includes(String(r).toLowerCase()));
+  }
+
+  private async userHasSchoolAdminOnBranch(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    userId: string,
+    branchId: string,
+  ): Promise<boolean> {
+    return this.userHasRoleOnBranch(supabase, userId, branchId, SCHOOL_ADMIN_ROLE_NAME);
+  }
+
+  private async userHasRoleOnBranch(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    userId: string,
+    branchId: string,
+    roleNameLower: string,
+  ): Promise<boolean> {
+    const target = roleNameLower.toLowerCase();
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('roles(name)')
+      .eq('user_id', userId)
+      .eq('branch_id', branchId);
+    throwIfDbError(error);
+    for (const row of data || []) {
+      const roleData = row.roles as unknown;
+      if (roleData && typeof roleData === 'object' && 'name' in roleData) {
+        const name = String((roleData as { name: string }).name).toLowerCase();
+        if (name === target) return true;
+      }
+    }
+    return false;
+  }
+
+  private async getCommunicationBranchBroadcastDelegation(): Promise<{
+    allowAdminAssistant: boolean;
+    allowPrincipal: boolean;
+  }> {
+    const { data } = await this.systemSettingsService.getByKey('communication_branch_broadcast');
+    const v = data.value;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) {
+      return { allowAdminAssistant: false, allowPrincipal: false };
+    }
+    const obj = v as Record<string, unknown>;
+    return {
+      allowAdminAssistant: Boolean(obj.allow_admin_assistant),
+      allowPrincipal: Boolean(obj.allow_principal),
+    };
+  }
+
+  private async getTenantIdForBranch(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    branchId: string,
+  ): Promise<string> {
+    const { data, error } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+    const tid = (data as { tenant_id: string | null } | null)?.tenant_id;
+    if (!tid) throw new BadRequestException('Branch has no organisation');
+    return tid;
+  }
+
+  private async assertBranchBelongsToTenant(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    branchId: string,
+    tenantId: string,
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('id', branchId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!data) throw new BadRequestException('Target branch is not in your organisation');
+  }
+
+  private async listActiveTenantBranchIds(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    tenantId: string,
+  ): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true);
+    throwIfDbError(error);
+    return (data || []).map((r: { id: string }) => r.id);
+  }
+
+  private normalizeAdminBroadcastRoleNames(input: string[]): string[] {
+    const out = new Set<string>();
+    for (const raw of input) {
+      const r = String(raw).trim().toLowerCase();
+      if (!BROADCASTABLE_ROLE_NAMES.has(r)) {
+        throw new BadRequestException(`Unsupported role for broadcast: ${raw}`);
+      }
+      out.add(r);
+    }
+    return [...out];
+  }
+
+  private async resolveAdminBroadcastUserIds(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    targetBranchId: string,
+    roleNamesLower: string[],
+    academicYearId: string,
+    senderId: string,
+  ): Promise<string[]> {
+    const ids = new Set<string>([senderId]);
+
+    if (roleNamesLower.includes('student')) {
+      const { data: enrolments, error: enrError } = await supabase
+        .from('student_enrolments')
+        .select('student_id')
+        .eq('branch_id', targetBranchId)
+        .eq('academic_year_id', academicYearId)
+        .eq('status', 'active');
+      throwIfDbError(enrError);
+      const studentIds = [...new Set((enrolments || []).map((e: { student_id: string }) => e.student_id))];
+      if (studentIds.length > 0) {
+        const { data: studentRows, error: stuError } = await supabase
+          .from('students')
+          .select('user_id')
+          .in('id', studentIds)
+          .eq('branch_id', targetBranchId)
+          .eq('is_active', true);
+        throwIfDbError(stuError);
+        for (const s of studentRows || []) {
+          const uid = (s as { user_id: string | null }).user_id;
+          if (uid) ids.add(uid);
+        }
+      }
+    }
+
+    const nonStudentRoles = roleNamesLower.filter((r) => r !== 'student');
+    if (nonStudentRoles.length > 0) {
+      const wanted = new Set(nonStudentRoles);
+      const { data: userRoleRows, error: urError } = await supabase
+        .from('user_roles')
+        .select('user_id, roles(name)')
+        .eq('branch_id', targetBranchId);
+      throwIfDbError(urError);
+      for (const row of userRoleRows || []) {
+        const roleData = row.roles as unknown;
+        if (roleData && typeof roleData === 'object' && 'name' in roleData) {
+          const name = String((roleData as { name: string }).name).toLowerCase();
+          if (wanted.has(name)) {
+            ids.add((row as { user_id: string }).user_id);
+          }
+        }
+      }
+    }
+
+    return [...ids];
+  }
+
+  private async insertConversationParticipants(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    conversationId: string,
+    userIds: string[],
+  ): Promise<void> {
+    const unique = [...new Set(userIds)];
+    const rows = unique.map((user_id) => ({ conversation_id: conversationId, user_id }));
+    for (let i = 0; i < rows.length; i += PARTICIPANT_INSERT_CHUNK) {
+      const chunk = rows.slice(i, i + PARTICIPANT_INSERT_CHUNK);
+      const { error } = await supabase.from('conversation_participants').insert(chunk);
+      throwIfDbError(error);
+    }
   }
 
   private async getCommunicationDirection(): Promise<CommunicationDirectionValue> {
@@ -92,15 +283,16 @@ export class MessagesService {
     otherParticipantRole?: 'student' | 'parent',
   ): Promise<void> {
     if (this.isTeacher(senderRoles)) return;
+    const rolesLower = senderRoles.map((r) => String(r).toLowerCase());
     const dir = await this.getCommunicationDirection();
-    if (senderRoles.includes('student')) {
+    if (rolesLower.includes('student')) {
       if (dir.teacher_student === 'teacher_only') {
         throw new ForbiddenException(
           'Students cannot send messages when communication direction is Teacher only.',
         );
       }
     }
-    if (senderRoles.includes('parent')) {
+    if (rolesLower.includes('parent')) {
       if (dir.teacher_parent === 'teacher_only') {
         throw new ForbiddenException(
           'Parents cannot send messages when communication direction is Teacher only.',
@@ -372,7 +564,80 @@ export class MessagesService {
       .select('id, branch_id, type, class_section_id, academic_year_id, created_at')
       .eq('id', conversationId)
       .eq('branch_id', branchId)
-      .single();
+      .maybeSingle();
+    throwIfDbError(convError);
+    if (!conv) throw new NotFoundException('Conversation not found');
+
+    const { data: partRows, error: partError } = await supabase
+      .from('conversation_participants')
+      .select('user_id')
+      .eq('conversation_id', conversationId);
+    throwIfDbError(partError);
+    const participantIds = (partRows || []).map((p: { user_id: string }) => p.user_id);
+    if (!participantIds.includes(userId)) {
+      throw new ForbiddenException('You are not a participant in this conversation');
+    }
+
+    const names = await this.getParticipantNames(supabase, participantIds);
+    const participants: ConversationParticipantDto[] = participantIds.map((id, i) => ({
+      userId: id,
+      fullName: names[i],
+    }));
+
+    let className: string | undefined;
+    let sectionName: string | undefined;
+    if ((conv as ConversationRow).class_section_id) {
+      const namesMap = await this.getClassSectionDisplayNames(
+        supabase,
+        (conv as ConversationRow).class_section_id!,
+      );
+      className = namesMap.className;
+      sectionName = namesMap.sectionName;
+    }
+
+    return new ConversationDto({
+      id: (conv as ConversationRow).id,
+      branchId: (conv as ConversationRow).branch_id,
+      type: (conv as ConversationRow).type as 'one_to_one' | 'broadcast',
+      classSectionId: (conv as ConversationRow).class_section_id ?? undefined,
+      academicYearId: (conv as ConversationRow).academic_year_id ?? undefined,
+      createdAt: (conv as ConversationRow).created_at,
+      participants,
+      className,
+      sectionName,
+    });
+  }
+
+  /** Prefer branch-scoped lookup; fall back when the conversation belongs to another branch but the user is a participant. */
+  async getConversationForRequester(
+    conversationId: string,
+    userId: string,
+    branchId: string,
+  ): Promise<ConversationDto> {
+    try {
+      return await this.getConversation(conversationId, userId, branchId);
+    } catch (e) {
+      if (e instanceof NotFoundException) {
+        return await this.getConversationForParticipant(conversationId, userId);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Same as getConversation but does not filter by request branch — used when the conversation row
+   * may belong to another branch (e.g. organisation-wide admin broadcast) while the caller is still a participant.
+   */
+  private async getConversationForParticipant(
+    conversationId: string,
+    userId: string,
+  ): Promise<ConversationDto> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: conv, error: convError } = await supabase
+      .from('conversations')
+      .select('id, branch_id, type, class_section_id, academic_year_id, created_at')
+      .eq('id', conversationId)
+      .maybeSingle();
     throwIfDbError(convError);
     if (!conv) throw new NotFoundException('Conversation not found');
 
@@ -518,8 +783,10 @@ export class MessagesService {
     dto: CreateConversationDto,
     userId: string,
     branchId: string,
+    requesterRoles: string[],
   ): Promise<ConversationDto> {
     const supabase = this.supabaseConfig.getClient();
+    const creatorRoles = (requesterRoles ?? []).map((r) => String(r).toLowerCase());
 
     if (dto.type === 'one_to_one') {
       if (!dto.recipientUserId) {
@@ -559,6 +826,7 @@ export class MessagesService {
           }
         }
       }
+      await this.enforceCommunicationDirection(userId, creatorRoles, branchId, 'one_to_one');
       const { data: newConv, error: insError } = await supabase
         .from('conversations')
         .insert({
@@ -577,6 +845,113 @@ export class MessagesService {
     }
 
     if (dto.type === 'broadcast') {
+      if (dto.adminBroadcastScope) {
+        if (dto.classSectionId) {
+          throw new BadRequestException('Class broadcast cannot be combined with admin broadcast options');
+        }
+        const isSchoolAdmin = await this.userHasSchoolAdminOnBranch(supabase, userId, branchId);
+        const delegation = await this.getCommunicationBranchBroadcastDelegation();
+        const hasPrincipal = await this.userHasRoleOnBranch(supabase, userId, branchId, 'principal');
+        const hasAdminAssistant = await this.userHasRoleOnBranch(supabase, userId, branchId, 'admin_assistant');
+
+        const canTenantBroadcast = isSchoolAdmin;
+        const canBranchBroadcast =
+          isSchoolAdmin ||
+          (hasPrincipal && delegation.allowPrincipal) ||
+          (hasAdminAssistant && delegation.allowAdminAssistant);
+
+        if (!canBranchBroadcast) {
+          throw new ForbiddenException('You are not allowed to create this broadcast.');
+        }
+        if (dto.adminBroadcastScope === 'tenant' && !canTenantBroadcast) {
+          throw new ForbiddenException(
+            'Only school administrators can broadcast to all branches in the organisation.',
+          );
+        }
+
+        const roleNamesLower = this.normalizeAdminBroadcastRoleNames(dto.adminBroadcastRoleNames ?? []);
+        const tenantId = await this.getTenantIdForBranch(supabase, branchId);
+        let targetBranchIds: string[];
+        if (dto.adminBroadcastScope === 'tenant') {
+          targetBranchIds = await this.listActiveTenantBranchIds(supabase, tenantId);
+        } else {
+          let bid: string;
+          if (isSchoolAdmin) {
+            if (!dto.adminBroadcastBranchId) {
+              throw new BadRequestException('adminBroadcastBranchId is required when adminBroadcastScope is branch');
+            }
+            bid = dto.adminBroadcastBranchId;
+          } else {
+            bid = branchId;
+            if (dto.adminBroadcastBranchId && dto.adminBroadcastBranchId !== branchId) {
+              throw new BadRequestException('You may only broadcast to the current branch.');
+            }
+          }
+          await this.assertBranchBelongsToTenant(supabase, bid, tenantId);
+          targetBranchIds = [bid];
+        }
+        if (targetBranchIds.length === 0) {
+          throw new BadRequestException('No active branches found for this organisation');
+        }
+        targetBranchIds = [...new Set(targetBranchIds)].sort((a, b) => {
+          if (a === branchId) return -1;
+          if (b === branchId) return 1;
+          return a.localeCompare(b);
+        });
+
+        const createdIds: string[] = [];
+        let primaryConversationId: string | null = null;
+        for (const bid of targetBranchIds) {
+          const activeYear = await this.academicYearsService.getActiveForBranch(bid);
+          if (!activeYear) {
+            continue;
+          }
+          const participantIds = await this.resolveAdminBroadcastUserIds(
+            supabase,
+            bid,
+            roleNamesLower,
+            activeYear.id,
+            userId,
+          );
+          const { data: newConv, error: insError } = await supabase
+            .from('conversations')
+            .insert({
+              branch_id: bid,
+              type: 'broadcast',
+              class_section_id: null,
+              academic_year_id: activeYear.id,
+            })
+            .select('id, branch_id, type, class_section_id, academic_year_id, created_at')
+            .single();
+          throwIfDbError(insError);
+          if (!newConv) throw new BadRequestException('Failed to create conversation');
+          const convId = (newConv as ConversationRow).id;
+          createdIds.push(convId);
+          if (bid === branchId) {
+            primaryConversationId = convId;
+          }
+          await this.insertConversationParticipants(supabase, convId, participantIds);
+        }
+
+        if (createdIds.length === 0) {
+          throw new BadRequestException(
+            'No broadcast was created: no active academic year on any target branch.',
+          );
+        }
+
+        const primaryId = primaryConversationId ?? createdIds[0];
+        const dtoOut = await this.getConversationForParticipant(primaryId, userId);
+        const linked = createdIds.filter((id) => id !== primaryId);
+        if (linked.length > 0) {
+          dtoOut.linkedBroadcastConversationIds = linked;
+        }
+        return dtoOut;
+      }
+
+      if (!this.isTeacher(creatorRoles)) {
+        throw new ForbiddenException('Only staff members can broadcast to a class.');
+      }
+
       if (!dto.classSectionId) {
         throw new BadRequestException('classSectionId is required for broadcast conversation');
       }
@@ -622,11 +997,10 @@ export class MessagesService {
         .single();
       throwIfDbError(insError);
       if (!newConv) throw new BadRequestException('Failed to create conversation');
-      await supabase.from('conversation_participants').insert(
-        allParticipantIds.map((uid) => ({
-          conversation_id: (newConv as ConversationRow).id,
-          user_id: uid,
-        })),
+      await this.insertConversationParticipants(
+        supabase,
+        (newConv as ConversationRow).id,
+        allParticipantIds,
       );
       return this.getConversation((newConv as ConversationRow).id, userId, branchId);
     }
@@ -647,10 +1021,11 @@ export class MessagesService {
       .from('conversations')
       .select('id, branch_id, type')
       .eq('id', conversationId)
-      .eq('branch_id', branchId)
       .single();
     throwIfDbError(convError);
     if (!conv) throw new NotFoundException('Conversation not found');
+
+    const convBranchId = (conv as { branch_id: string }).branch_id;
 
     const { data: partRows, error: partError } = await supabase
       .from('conversation_participants')
@@ -662,10 +1037,11 @@ export class MessagesService {
       throw new ForbiddenException('You are not a participant in this conversation');
     }
 
+    const senderRolesNorm = (senderRoles ?? []).map((r) => String(r).toLowerCase());
     await this.enforceCommunicationDirection(
       userId,
-      senderRoles,
-      branchId,
+      senderRolesNorm,
+      convBranchId,
       (conv as { type: string }).type as 'one_to_one' | 'broadcast',
     );
 
@@ -836,9 +1212,6 @@ export class MessagesService {
       .single();
     throwIfDbError(convError);
     if (!conv) throw new NotFoundException('Conversation not found');
-    if ((conv as { branch_id: string }).branch_id !== branchId) {
-      throw new ForbiddenException('Conversation does not belong to current branch');
-    }
 
     const { data: partRows, error: partError } = await supabase
       .from('conversation_participants')

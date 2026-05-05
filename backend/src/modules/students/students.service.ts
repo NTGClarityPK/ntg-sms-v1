@@ -201,6 +201,7 @@ export class StudentsService {
       { type: 'one_to_one', recipientUserId: input.recipientUserId },
       input.adminUser.id,
       input.branchId,
+      roles,
     );
 
     await this.messagesService.sendMessage(

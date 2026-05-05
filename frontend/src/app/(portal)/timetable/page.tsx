@@ -54,7 +54,7 @@ export default function TimetablePage() {
 
   // Allow deep-linking to a pre-selected class section (e.g. from conflict window)
   useEffect(() => {
-    const classSectionIdFromQuery = searchParams.get('classSectionId');
+    const classSectionIdFromQuery = searchParams?.get('classSectionId');
     if (!classSectionIdFromQuery) return;
 
     // Only set if it exists in the loaded options; avoids selecting stale IDs.

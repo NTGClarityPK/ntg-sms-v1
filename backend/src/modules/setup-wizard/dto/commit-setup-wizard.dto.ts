@@ -190,6 +190,10 @@ class AssessmentTypePayloadDto {
 
   @IsInt()
   sortOrder!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isTermExamination?: boolean;
 }
 
 class GradeRangePayloadDto {

@@ -14,12 +14,26 @@ import type {
   MyAssessmentStatus,
   StudentAssessmentStatusValue,
 } from './useMyAssessments';
+import type { Assessment } from '@/types/assessment';
 
 export function useStudentAssessments(enabled = true) {
   return useQuery({
     queryKey: ['student-assessments'],
     queryFn: async (): Promise<MyAssessment[]> => {
       const response = await apiClient.get<MyAssessment[]>('/api/v1/student/assessments');
+      return response.data;
+    },
+    staleTime: 2 * 60 * 1000,
+    enabled,
+  });
+}
+
+/** Published term examinations for the current student session (PIN / switched child). */
+export function useStudentExaminationSchedule(enabled = true) {
+  return useQuery({
+    queryKey: ['student-assessments', 'examination-schedule'],
+    queryFn: async (): Promise<Assessment[]> => {
+      const response = await apiClient.get<Assessment[]>('/api/v1/student/assessments/examination-schedule');
       return response.data;
     },
     staleTime: 2 * 60 * 1000,

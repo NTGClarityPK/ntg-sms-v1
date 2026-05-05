@@ -5,7 +5,7 @@
  * Shows class assessments, attachments, and allows status updates.
  */
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Title,
   Paper,
@@ -22,6 +22,7 @@ import {
   Modal,
   Image,
   useMantineTheme,
+  Tabs,
 } from '@mantine/core';
 import { IconDownload, IconEye, IconRefresh } from '@tabler/icons-react';
 import dayjs from 'dayjs';
@@ -29,13 +30,18 @@ import { useMediaQuery } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMyAssessments, useUpdateMyAssessmentStatus } from '@/hooks/api/useMyAssessments';
-import { useStudentAssessments, useUpdateStudentAssessmentStatus } from '@/hooks/api/useStudentAssessments';
+import { useMyExaminationSchedule } from '@/hooks/api/useAssessments';
+import { useStudentAssessments, useStudentExaminationSchedule, useUpdateStudentAssessmentStatus } from '@/hooks/api/useStudentAssessments';
 import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { MyAssessmentAttachment } from '@/hooks/api/useMyAssessments';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
+import type { Assessment } from '@/types/assessment';
+import { formatExaminationDurationMinutes } from '@/lib/format-examination-duration';
 
 export default function MyAssessmentsPage() {
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+  const locale = useLocale();
   const t = useTranslations('assessment');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
@@ -43,9 +49,26 @@ export default function MyAssessmentsPage() {
   const { studentToken } = useStudentSessionStore();
   const isStudentMode = !!studentToken;
 
-  const parentQuery = useMyAssessments(!isStudentMode);
-  const studentQuery = useStudentAssessments(isStudentMode);
+  const [listTab, setListTab] = useState<'all' | 'exams'>('all');
+
+  const { data: activeYearApi } = useActiveAcademicYear();
+  const activeYearId = activeYearApi?.data?.id;
+
+  const parentQuery = useMyAssessments(!isStudentMode && listTab === 'all');
+  const studentQuery = useStudentAssessments(isStudentMode && listTab === 'all');
   const { data, isLoading, error, isRefetching } = isStudentMode ? studentQuery : parentQuery;
+
+  const parentExamSchedule = useMyExaminationSchedule(
+    {
+      page: 1,
+      limit: 200,
+      sortBy: 'due_date',
+      sortOrder: 'asc',
+      academicYearId: activeYearId,
+    },
+    !isStudentMode && listTab === 'exams',
+  );
+  const studentExamSchedule = useStudentExaminationSchedule(isStudentMode && listTab === 'exams');
 
   const updateParentStatus = useUpdateMyAssessmentStatus();
   const updateStudentStatus = useUpdateStudentAssessmentStatus();
@@ -53,6 +76,20 @@ export default function MyAssessmentsPage() {
 
   const activeQueryKey = isStudentMode ? 'student-assessments' : 'my-assessments';
   const [previewAttachment, setPreviewAttachment] = useState<MyAssessmentAttachment | null>(null);
+
+  const examRows: Assessment[] = isStudentMode
+    ? (studentExamSchedule.data ?? [])
+    : (() => {
+        const rows = parentExamSchedule.data?.data;
+        return Array.isArray(rows) ? rows : [];
+      })();
+
+  const examLoading =
+    isStudentMode
+      ? studentExamSchedule.isLoading || studentExamSchedule.isRefetching
+      : parentExamSchedule.isLoading || parentExamSchedule.isRefetching;
+  const examError = isStudentMode ? studentExamSchedule.error : parentExamSchedule.error;
+  const examFetching = isStudentMode ? studentExamSchedule.isFetching : parentExamSchedule.isFetching;
 
   const previewType = useMemo(() => {
     if (!previewAttachment) return 'none' as const;
@@ -129,6 +166,8 @@ export default function MyAssessmentsPage() {
     });
   };
 
+  const refreshLoading = listTab === 'all' ? isRefetching : examFetching;
+
   return (
     <>
       <div className="page-title-bar">
@@ -141,8 +180,12 @@ export default function MyAssessmentsPage() {
               variant="light"
               size="lg"
               style={{ flexShrink: 0 }}
-              loading={isRefetching}
-              onClick={() => queryClient.invalidateQueries({ queryKey: [activeQueryKey] })}
+              loading={refreshLoading}
+              onClick={() => {
+                void queryClient.invalidateQueries({ queryKey: [activeQueryKey] });
+                void queryClient.invalidateQueries({ queryKey: ['assessments', 'my', 'examination-schedule'] });
+                void queryClient.invalidateQueries({ queryKey: ['student-assessments', 'examination-schedule'] });
+              }}
             >
               <IconRefresh size={18} />
             </ActionIcon>
@@ -160,136 +203,213 @@ export default function MyAssessmentsPage() {
         }}
       >
         <Stack gap="md">
-          <Paper p="md" withBorder>
-            {isLoading || isRefetching ? (
-              <Stack gap="md">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} height={60} />
-                ))}
-              </Stack>
-            ) : error ? (
-              <Text c="red" ta="center" py="xl">
-                {t('failedToLoadYourAssessments')}
-              </Text>
-            ) : data && data.length > 0 ? (
-              <ScrollArea type="auto" scrollbars="x" w="100%">
-                <Table striped highlightOnHover style={{ minWidth: isMobile ? 640 : 560 }}>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>{t('titleColumn')}</Table.Th>
-                      <Table.Th>{t('status')}</Table.Th>
-                      <Table.Th>{t('dueDate')}</Table.Th>
-                      <Table.Th>{t('attachments')}</Table.Th>
-                      <Table.Th style={{ textAlign: 'center', minWidth: isMobile ? 200 : undefined }}>
-                        {tCommon('actions')}
-                      </Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {data.map((item) => {
-                      const a = item.assessment;
-                      const status = item.status;
-                      const isRead = status?.isRead ?? false;
-                      const subjectName = a.subjectName;
-                      const teacherName = a.teacherName;
-                      const statusValue = status?.status;
+          <Tabs
+            value={listTab}
+            onChange={(v) => {
+              setListTab(v === 'exams' ? 'exams' : 'all');
+            }}
+          >
+            <Tabs.List>
+              <Tabs.Tab value="all">{t('myAssessmentsTabAll')}</Tabs.Tab>
+              <Tabs.Tab value="exams">{t('myAssessmentsTabExams')}</Tabs.Tab>
+            </Tabs.List>
 
-                      return (
-                        <Table.Tr key={a.id}>
-                          <Table.Td>
-                            <Stack gap={6}>
-                              <Text fw={600} lh={1.25}>
-                                {a.title}
-                              </Text>
-                              <Group gap="xs" wrap="wrap">
-                                <Badge variant="light" color="blue">
-                                  {t('subject')}: {subjectName ?? '—'}
-                                </Badge>
-                                <Text size="sm" c="dimmed">
-                                  {t('postedBy')}: <Text span fw={500} c="dark">{teacherName ?? '—'}</Text>
-                                </Text>
-                              </Group>
-                              {a.description ? (
-                                <Text size="sm" c="dimmed" lineClamp={2}>
-                                  {a.description}
-                                </Text>
-                              ) : null}
-                            </Stack>
-                          </Table.Td>
-                          <Table.Td>{renderStatusBadge(status?.status, isRead)}</Table.Td>
-                          <Table.Td>
-                            {a.dueDate
-                              ? dayjs(a.dueDate).format('DD MMM YYYY')
-                              : '—'}
-                          </Table.Td>
-                          <Table.Td>
-                            {item.attachments.length > 0 ? (
-                              <Group gap="xs">
-                                {item.attachments.map((att) => (
-                                  <Tooltip key={att.id} label={t('viewFileName', { fileName: att.fileName })}>
-                                    <ActionIcon
-                                      variant="subtle"
-                                      onClick={() => setPreviewAttachment(att)}
-                                    >
-                                      <IconEye size={16} />
-                                    </ActionIcon>
-                                  </Tooltip>
-                                ))}
-                                <Tooltip label={t('downloadAll')}>
-                                  <ActionIcon
-                                    variant="subtle"
-                                    onClick={() => handleDownloadAll(item.attachments)}
-                                  >
-                                    <IconDownload size={16} />
-                                  </ActionIcon>
-                                </Tooltip>
-                              </Group>
-                            ) : (
-                              <Text size="xs" c="dimmed">
-                                {t('noAttachments')}
-                              </Text>
-                            )}
-                          </Table.Td>
-                          <Table.Td style={{ verticalAlign: 'middle' }}>
-                            <Group justify={isMobile ? 'flex-start' : 'center'}>
-                              {statusValue === 'submitted' ? (
-                                <Badge color="green" variant="filled">
-                                  {t('submitted')}
-                                </Badge>
-                              ) : !isRead ? (
-                                <Button
-                                  size="xs"
-                                  variant="light"
-                                  miw={140}
-                                  onClick={() => handleMarkRead(a.id, statusValue, isRead)}
-                                >
-                                  {t('markAsRead')}
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="xs"
-                                  color="green"
-                                  variant="light"
-                                  miw={140}
-                                  onClick={() => handleMarkSubmitted(a.id, statusValue)}
-                                >
-                                  {t('markSubmitted')}
-                                </Button>
-                              )}
-                            </Group>
-                          </Table.Td>
+            <Tabs.Panel value="all" pt="md">
+              <Paper p="md" withBorder>
+                {isLoading || isRefetching ? (
+                  <Stack gap="md">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} height={60} />
+                    ))}
+                  </Stack>
+                ) : error ? (
+                  <Text c="red" ta="center" py="xl">
+                    {t('failedToLoadYourAssessments')}
+                  </Text>
+                ) : data && data.length > 0 ? (
+                  <ScrollArea type="auto" scrollbars="x" w="100%">
+                    <Table striped highlightOnHover style={{ minWidth: isMobile ? 640 : 560 }}>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>{t('titleColumn')}</Table.Th>
+                          <Table.Th>{t('status')}</Table.Th>
+                          <Table.Th>{t('dueDate')}</Table.Th>
+                          <Table.Th>{t('attachments')}</Table.Th>
+                          <Table.Th style={{ textAlign: 'center', minWidth: isMobile ? 200 : undefined }}>
+                            {tCommon('actions')}
+                          </Table.Th>
                         </Table.Tr>
-                      );
-                    })}
-                  </Table.Tbody>
-                </Table>
-              </ScrollArea>
-            ) : (
-              <Text ta="center" c="dimmed" py="xl">
-                {t('noAssessmentsAssigned')}
-              </Text>
-            )}
-          </Paper>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {data.map((item) => {
+                          const a = item.assessment;
+                          const status = item.status;
+                          const isRead = status?.isRead ?? false;
+                          const subjectName = a.subjectName;
+                          const teacherName = a.teacherName;
+                          const statusValue = status?.status;
+
+                          return (
+                            <Table.Tr key={a.id}>
+                              <Table.Td>
+                                <Stack gap={6}>
+                                  <Text fw={600} lh={1.25}>
+                                    {a.title}
+                                  </Text>
+                                  <Group gap="xs" wrap="wrap">
+                                    <Badge variant="light" color="blue">
+                                      {t('subject')}: {subjectName ?? '—'}
+                                    </Badge>
+                                    <Text size="sm" c="dimmed">
+                                      {t('postedBy')}: <Text span fw={500} c="dark">{teacherName ?? '—'}</Text>
+                                    </Text>
+                                  </Group>
+                                  {a.description ? (
+                                    <Text size="sm" c="dimmed" lineClamp={2}>
+                                      {a.description}
+                                    </Text>
+                                  ) : null}
+                                </Stack>
+                              </Table.Td>
+                              <Table.Td>{renderStatusBadge(status?.status, isRead)}</Table.Td>
+                              <Table.Td>
+                                {a.dueDate ? dayjs(a.dueDate).format('DD MMM YYYY HH:mm') : '—'}
+                              </Table.Td>
+                              <Table.Td>
+                                {item.attachments.length > 0 ? (
+                                  <Group gap="xs">
+                                    {item.attachments.map((att) => (
+                                      <Tooltip key={att.id} label={t('viewFileName', { fileName: att.fileName })}>
+                                        <ActionIcon
+                                          variant="subtle"
+                                          onClick={() => setPreviewAttachment(att)}
+                                        >
+                                          <IconEye size={16} />
+                                        </ActionIcon>
+                                      </Tooltip>
+                                    ))}
+                                    <Tooltip label={t('downloadAll')}>
+                                      <ActionIcon
+                                        variant="subtle"
+                                        onClick={() => handleDownloadAll(item.attachments)}
+                                      >
+                                        <IconDownload size={16} />
+                                      </ActionIcon>
+                                    </Tooltip>
+                                  </Group>
+                                ) : (
+                                  <Text size="xs" c="dimmed">
+                                    {t('noAttachments')}
+                                  </Text>
+                                )}
+                              </Table.Td>
+                              <Table.Td style={{ verticalAlign: 'middle' }}>
+                                <Group justify={isMobile ? 'flex-start' : 'center'}>
+                                  {statusValue === 'submitted' ? (
+                                    <Badge color="green" variant="filled">
+                                      {t('submitted')}
+                                    </Badge>
+                                  ) : !isRead ? (
+                                    <Button
+                                      size="xs"
+                                      variant="light"
+                                      miw={140}
+                                      onClick={() => handleMarkRead(a.id, statusValue, isRead)}
+                                    >
+                                      {t('markAsRead')}
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="xs"
+                                      color="green"
+                                      variant="light"
+                                      miw={140}
+                                      onClick={() => handleMarkSubmitted(a.id, statusValue)}
+                                    >
+                                      {t('markSubmitted')}
+                                    </Button>
+                                  )}
+                                </Group>
+                              </Table.Td>
+                            </Table.Tr>
+                          );
+                        })}
+                      </Table.Tbody>
+                    </Table>
+                  </ScrollArea>
+                ) : (
+                  <Text ta="center" c="dimmed" py="xl">
+                    {t('noAssessmentsAssigned')}
+                  </Text>
+                )}
+              </Paper>
+            </Tabs.Panel>
+
+            <Tabs.Panel value="exams" pt="md">
+              <Paper p="md" withBorder>
+                {examLoading ? (
+                  <Stack gap="md">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} height={60} />
+                    ))}
+                  </Stack>
+                ) : examError ? (
+                  <Text c="red" ta="center" py="xl">
+                    {t('failedToLoadYourAssessments')}
+                  </Text>
+                ) : examRows.length > 0 ? (
+                  <ScrollArea type="auto" scrollbars="x" w="100%">
+                    <Table striped highlightOnHover style={{ minWidth: isMobile ? 560 : 520 }}>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>{t('examinationScheduleDate')}</Table.Th>
+                          <Table.Th>{t('examinationScheduleTime')}</Table.Th>
+                          <Table.Th>{t('examinationScheduleDuration')}</Table.Th>
+                          <Table.Th>{t('examinationScheduleSubject')}</Table.Th>
+                          <Table.Th>{t('classSection')}</Table.Th>
+                          <Table.Th>{t('examinationScheduleSyllabus')}</Table.Th>
+                          <Table.Th>{t('examinationScheduleRoom')}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {examRows.map((row) => (
+                          <Table.Tr key={row.id}>
+                            <Table.Td>
+                              {row.dueDate ? dayjs(row.dueDate).format('DD MMM YYYY') : '—'}
+                            </Table.Td>
+                            <Table.Td>
+                              {row.dueDate ? dayjs(row.dueDate).format('HH:mm') : '—'}
+                            </Table.Td>
+                            <Table.Td>
+                              {row.examinationDurationMinutes != null &&
+                              !Number.isNaN(Number(row.examinationDurationMinutes))
+                                ? formatExaminationDurationMinutes(
+                                    Number(row.examinationDurationMinutes),
+                                    locale,
+                                  )
+                                : '—'}
+                            </Table.Td>
+                            <Table.Td>{row.subjectName ?? '—'}</Table.Td>
+                            <Table.Td>{row.classSectionName ?? '—'}</Table.Td>
+                            <Table.Td>
+                              <Text size="sm" lineClamp={3}>
+                                {row.description?.trim() ? row.description : '—'}
+                              </Text>
+                            </Table.Td>
+                            <Table.Td>{row.roomNumber?.trim() ? row.roomNumber : '—'}</Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </ScrollArea>
+                ) : (
+                  <Text ta="center" c="dimmed" py="xl">
+                    {t('examinationScheduleEmpty')}
+                  </Text>
+                )}
+              </Paper>
+            </Tabs.Panel>
+          </Tabs>
         </Stack>
       </div>
 
@@ -350,5 +470,3 @@ export default function MyAssessmentsPage() {
     </>
   );
 }
-
-

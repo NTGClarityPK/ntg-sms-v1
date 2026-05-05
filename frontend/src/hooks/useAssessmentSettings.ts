@@ -39,6 +39,7 @@ export function useCreateAssessmentType() {
       name_translations?: { en?: string; ar?: string };
       sortOrder?: number;
       isActive?: boolean;
+      isTermExamination?: boolean;
     }) => apiClient.post<AssessmentType>('/api/v1/assessment-types', payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: assessmentKeys.types });
@@ -56,6 +57,7 @@ export function useUpdateAssessmentType() {
       name_translations?: { en?: string; ar?: string };
       isActive?: boolean;
       sortOrder?: number;
+      isTermExamination?: boolean;
     }) => {
       const { id, ...body } = payload;
       return apiClient.patch<AssessmentType>(`/api/v1/assessment-types/${id}`, body);

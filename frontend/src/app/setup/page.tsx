@@ -28,7 +28,7 @@ export default function SetupPage() {
   const colors = useThemeColors();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get('token');
+  const token = searchParams?.get('token') ?? null;
 
   const infoQuery = useInvitationInfo(token);
   const setPassword = useSetInvitationPassword(token);

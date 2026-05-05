@@ -25,7 +25,7 @@ export default function InventoryLayout({
   children: React.ReactNode;
 }) {
   const t = useTranslations('inventory');
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/inventory';
   const router = useRouter();
   const { user } = useAuth();
   const { canEdit } = useFeaturePermission('inventory');

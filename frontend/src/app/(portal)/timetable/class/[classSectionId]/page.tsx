@@ -13,11 +13,14 @@ export default function ClassTimetablePage() {
   const t = useTranslations('class');
   const params = useParams();
   const router = useRouter();
-  const classSectionId = params.classSectionId as string;
+  const classSectionId =
+    (params && typeof (params as Record<string, unknown>).classSectionId === 'string'
+      ? ((params as Record<string, unknown>).classSectionId as string)
+      : undefined) ?? '';
   const colors = useThemeColors();
 
   const { data: classSectionData, isLoading: classSectionLoading, error: classSectionError } =
-    useClassSection(classSectionId);
+    useClassSection(classSectionId || null);
   const classSection = classSectionData as ClassSection | null | undefined;
 
   const className = classSection

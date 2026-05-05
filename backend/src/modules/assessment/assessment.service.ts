@@ -21,6 +21,7 @@ type AssessmentTypeRow = {
   name_translations?: Record<string, string> | null;
   is_active: boolean;
   sort_order: number;
+  is_term_examination: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -84,6 +85,7 @@ function mapAssessmentType(row: AssessmentTypeRow, language: string = 'ar'): Ass
     id: row.id,
     name,
     nameAr: row.name_ar ?? undefined,
+    isTermExamination: row.is_term_examination,
     isActive: row.is_active,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
@@ -170,7 +172,10 @@ export class AssessmentService {
 
     let dbQuery = supabase
       .from('assessment_types')
-      .select('*', { count: 'exact' })
+      .select(
+        'id, name, name_ar, name_translations, is_active, is_term_examination, sort_order, created_at, updated_at',
+        { count: 'exact' },
+      )
       .eq('branch_id', branchId)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
@@ -191,7 +196,14 @@ export class AssessmentService {
   }
 
   async createAssessmentType(
-    input: { name: string; nameAr?: string; name_translations?: { en?: string; ar?: string }; isActive?: boolean; sortOrder?: number },
+    input: {
+      name: string;
+      nameAr?: string;
+      name_translations?: { en?: string; ar?: string };
+      isActive?: boolean;
+      sortOrder?: number;
+      isTermExamination?: boolean;
+    },
     branchId: string,
     tenantId: string | null,
     userEmail: string,
@@ -205,11 +217,14 @@ export class AssessmentService {
         name_ar: input.nameAr ?? null,
         name_translations: nameTranslations,
         is_active: input.isActive ?? true,
+        is_term_examination: input.isTermExamination ?? false,
         sort_order: input.sortOrder ?? 0,
         branch_id: branchId,
         tenant_id: tenantId,
       })
-      .select('*')
+      .select(
+        'id, name, name_ar, name_translations, is_active, is_term_examination, sort_order, created_at, updated_at',
+      )
       .single();
     throwIfDbError(error);
     const row = data as AssessmentTypeRow;
@@ -224,7 +239,14 @@ export class AssessmentService {
 
   async updateAssessmentType(
     id: string,
-    input: { name?: string; nameAr?: string; name_translations?: { en?: string; ar?: string }; isActive?: boolean; sortOrder?: number },
+    input: {
+      name?: string;
+      nameAr?: string;
+      name_translations?: { en?: string; ar?: string };
+      isActive?: boolean;
+      sortOrder?: number;
+      isTermExamination?: boolean;
+    },
     branchId: string,
     userEmail: string,
     tenantId?: string | null,
@@ -236,9 +258,12 @@ export class AssessmentService {
     if (input.name_translations !== undefined) updates.name_translations = input.name_translations;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
+    if (input.isTermExamination !== undefined) updates.is_term_examination = input.isTermExamination;
     const { data: oldRow, error: fetchError } = await supabase
       .from('assessment_types')
-      .select('*')
+      .select(
+        'id, name, name_ar, name_translations, is_active, is_term_examination, sort_order, created_at, updated_at',
+      )
       .eq('id', id)
       .eq('branch_id', branchId)
       .maybeSingle();
@@ -252,7 +277,9 @@ export class AssessmentService {
       .update(updates)
       .eq('id', id)
       .eq('branch_id', branchId)
-      .select('*')
+      .select(
+        'id, name, name_ar, name_translations, is_active, is_term_examination, sort_order, created_at, updated_at',
+      )
       .maybeSingle();
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Assessment type not found');

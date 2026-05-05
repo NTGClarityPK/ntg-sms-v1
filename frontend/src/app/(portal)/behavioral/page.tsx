@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
+  Alert,
   Group,
   Title,
   Tabs,
@@ -19,6 +20,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePendingBehavioral } from '@/hooks/useBehavioral';
 import { BehavioralAssessContent } from '@/components/features/behavioral/BehavioralAssessContent';
+import { useSystemSetting } from '@/hooks/useSystemSettings';
 
 export default function BehavioralPage() {
   const theme = useMantineTheme();
@@ -29,6 +31,9 @@ export default function BehavioralPage() {
   const pendingQuery = usePendingBehavioral();
   const pending = pendingQuery.data ?? [];
   const isLoadingPending = pendingQuery.isLoading || pendingQuery.isRefetching || !pendingQuery.data;
+
+  const { data: behaviorSetting } = useSystemSetting<{ enabled?: boolean }>('behavioral_assessment');
+  const behaviourAssessmentEnabled = Boolean(behaviorSetting?.data?.value?.enabled);
 
   return (
     <>
@@ -60,6 +65,12 @@ export default function BehavioralPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
+        {!behaviourAssessmentEnabled ? (
+          <Alert color="gray" title={t('assessmentDisabledTitle')} mb="md">
+            {t('assessmentDisabledMessage')}
+          </Alert>
+        ) : null}
+
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List
             style={{
@@ -77,40 +88,42 @@ export default function BehavioralPage() {
           </Tabs.List>
 
           <Tabs.Panel value="matrix" pt="md" px={isMobile ? 0 : 'md'} pb="md">
-            <BehavioralAssessContent />
+            {behaviourAssessmentEnabled ? <BehavioralAssessContent /> : null}
           </Tabs.Panel>
 
           <Tabs.Panel value="pending" pt="md" px={isMobile ? 0 : 'md'} pb="md">
-            <Stack gap="md">
-              <Paper withBorder p="md">
-                <Text size="sm" fw={500} mb="xs">
-                  {t('pendingDescription')}
-                </Text>
-                {isLoadingPending ? (
-                  <Skeleton height={80} radius="sm" />
-                ) : pending.length === 0 ? (
-                  <Text size="sm" c="dimmed">
-                    {t('noPending')}
+            {behaviourAssessmentEnabled ? (
+              <Stack gap="md">
+                <Paper withBorder p="md">
+                  <Text size="sm" fw={500} mb="xs">
+                    {t('pendingDescription')}
                   </Text>
-                ) : (
-                  <Stack gap="xs">
-                    {pending.slice(0, 50).map((s) => (
-                      <Text key={s.id} size="sm">
-                        {`${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'N/A'}
-                        {s.className || s.sectionName
-                          ? ` (${[s.className, s.sectionName].filter(Boolean).join(' ')})`
-                          : ''}
-                      </Text>
-                    ))}
-                    {pending.length > 50 && (
-                      <Text size="sm" c="dimmed">
-                        {t('moreCount', { count: pending.length - 50 })}
-                      </Text>
-                    )}
-                  </Stack>
-                )}
-              </Paper>
-            </Stack>
+                  {isLoadingPending ? (
+                    <Skeleton height={80} radius="sm" />
+                  ) : pending.length === 0 ? (
+                    <Text size="sm" c="dimmed">
+                      {t('noPending')}
+                    </Text>
+                  ) : (
+                    <Stack gap="xs">
+                      {pending.slice(0, 50).map((s) => (
+                        <Text key={s.id} size="sm">
+                          {`${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'N/A'}
+                          {s.className || s.sectionName
+                            ? ` (${[s.className, s.sectionName].filter(Boolean).join(' ')})`
+                            : ''}
+                        </Text>
+                      ))}
+                      {pending.length > 50 && (
+                        <Text size="sm" c="dimmed">
+                          {t('moreCount', { count: pending.length - 50 })}
+                        </Text>
+                      )}
+                    </Stack>
+                  )}
+                </Paper>
+              </Stack>
+            ) : null}
           </Tabs.Panel>
         </Tabs>
       </div>

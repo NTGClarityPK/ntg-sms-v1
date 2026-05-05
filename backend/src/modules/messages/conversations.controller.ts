@@ -51,6 +51,7 @@ export class ConversationsController {
       dto,
       user.id,
       branch.branchId,
+      user.roles ?? [],
     );
     return { data };
   }
@@ -61,7 +62,7 @@ export class ConversationsController {
     @CurrentUser() user: CurrentUserPayload,
     @CurrentBranch() branch: CurrentBranchContext,
   ) {
-    const data = await this.messagesService.getConversation(
+    const data = await this.messagesService.getConversationForRequester(
       id,
       user.id,
       branch.branchId,

@@ -21,7 +21,10 @@ import { ExportButton } from '@/components/features/reports/ExportButton';
 export default function ClassReportByIdPage() {
   const t = useTranslations('class');
   const params = useParams();
-  const classSectionId = typeof params.classSectionId === 'string' ? params.classSectionId : null;
+  const classSectionId =
+    params && typeof (params as Record<string, unknown>).classSectionId === 'string'
+      ? ((params as Record<string, unknown>).classSectionId as string)
+      : null;
 
   const reportQuery = useClassReport(classSectionId);
   const report = reportQuery.data;

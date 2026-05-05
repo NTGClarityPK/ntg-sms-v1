@@ -22,6 +22,7 @@ import {
   AssessmentPublishStatus,
   QueryAssessmentsDto,
 } from './dto/query-assessments.dto';
+import { QueryExaminationScheduleDto } from './dto/query-examination-schedule.dto';
 import { AssessmentStatisticsDto } from './dto/assessment-statistics.dto';
 import { ClassStatisticsDto } from './dto/class-statistics.dto';
 import { SubjectStatisticsDto } from './dto/subject-statistics.dto';
@@ -31,6 +32,9 @@ import { StudentAssessmentStatusDto } from './dto/student-assessment-status.dto'
 import { UpdateStudentAssessmentStatusDto } from './dto/update-student-assessment-status.dto';
 import { AssessmentAttachmentDto } from './dto/assessment-attachment.dto';
 import { CreateAssessmentAttachmentDto } from './dto/create-assessment-attachment.dto';
+import { PdfLogoCacheService } from '../../common/pdf/pdf-logo-cache.service';
+import { buildPdfFooterTemplate, buildPdfHeaderTemplate } from '../../common/pdf/pdf-templates';
+import puppeteer from 'puppeteer';
 
 type Meta = {
   total: number;
@@ -49,9 +53,11 @@ type AssessmentRow = {
   created_by: string;
   total_marks: string | number;
   due_date: string | null;
+  examination_duration_minutes: number | null;
   publish_date: string | null;
   is_published: boolean;
   allow_late_submission: boolean;
+  room_number: string | null;
   branch_id: string;
   academic_year_id: string;
   created_at: string;
@@ -71,8 +77,129 @@ function throwIfDbError(error: PostgrestError | null): void {
   throw new BadRequestException(error.message);
 }
 
+function getPuppeteerExecutablePath(): string | undefined {
+  return (
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    process.env.CHROME_EXECUTABLE_PATH ||
+    process.env.CHROMIUM_EXECUTABLE_PATH ||
+    undefined
+  );
+}
+
 function toNumber(value: string | number): number {
   return typeof value === 'number' ? value : Number(value);
+}
+
+/** Clamp term-examination duration to a sensible range (minutes). */
+function clampExaminationDurationMinutes(raw: number): number {
+  return Math.max(1, Math.min(720, Math.floor(raw)));
+}
+
+function formatExaminationDurationForPdf(minutes: number, language: string): string {
+  const m = Math.round(minutes);
+  if (m < 60) {
+    return language === 'ar' ? `${m} دقيقة` : `${m} min`;
+  }
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (language === 'ar') {
+    return r === 0 ? `${h} ساعة` : `${h} س ${r} د`;
+  }
+  return r === 0 ? `${h}h` : `${h}h ${r}m`;
+}
+
+function renderSyllabusToHtml(input: string | null | undefined): string {
+  const raw = (input || '').trim();
+  if (!raw) return '—';
+
+  const escape = (t: string) =>
+    (t || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  const applyInline = (line: string): string => {
+    // Escape first, then apply safe inline markup.
+    const e = escape(line);
+    return e
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // **bold**
+      .replace(/__(.+?)__/g, '<u>$1</u>') // __underline__
+      .replace(/==(.+?)==/g, '<mark>$1</mark>'); // ==highlight==
+  };
+
+  const splitInlineOrderedItems = (line: string): string[] => {
+    // Support "1) Item A 2) Item B" written on the same line by splitting it
+    // into separate ordered-list items for PDF rendering.
+    const re = /(^|\s)(\d+[\).\]])\s+/g;
+    const matches: { index: number; markerLen: number }[] = [];
+    let m: RegExpExecArray | null;
+    // eslint-disable-next-line no-cond-assign
+    while ((m = re.exec(line)) !== null) {
+      const idx = (m.index ?? 0) + (m[1]?.length ?? 0); // skip leading whitespace group
+      const marker = m[2] ?? '';
+      matches.push({ index: idx, markerLen: marker.length });
+      // Avoid infinite loops on zero-length matches (shouldn't happen, but safe).
+      if (re.lastIndex === m.index) re.lastIndex++;
+    }
+
+    // Only split if there are at least 2 numbered markers.
+    if (matches.length < 2) return [line];
+
+    const out: string[] = [];
+    for (let i = 0; i < matches.length; i++) {
+      const start = matches[i]!.index + matches[i]!.markerLen;
+      const end = i + 1 < matches.length ? matches[i + 1]!.index : line.length;
+      const item = line.slice(start, end).trim();
+      if (item) out.push(`1) ${item}`);
+    }
+    return out.length > 0 ? out : [line];
+  };
+
+  const lines = raw
+    .split(/\r?\n/)
+    .flatMap((l) => splitInlineOrderedItems(l.trim()))
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return '—';
+
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i]!;
+
+    const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+    if (bulletMatch) {
+      const items: string[] = [];
+      while (i < lines.length) {
+        const m = lines[i]!.match(/^[-*]\s+(.+)$/);
+        if (!m) break;
+        items.push(`<li>${applyInline(m[1]!)}</li>`);
+        i++;
+      }
+      out.push(`<ul style="margin:0; padding-left:16px;">${items.join('')}</ul>`);
+      continue;
+    }
+
+    const orderedMatch = line.match(/^\s*(\d+)[\).\]]\s+(.+)$/);
+    if (orderedMatch) {
+      const items: string[] = [];
+      while (i < lines.length) {
+        const m = lines[i]!.match(/^\s*\d+[\).\]]\s+(.+)$/);
+        if (!m) break;
+        items.push(`<li>${applyInline(m[1]!)}</li>`);
+        i++;
+      }
+      out.push(`<ol style="margin:0; padding-left:18px;">${items.join('')}</ol>`);
+      continue;
+    }
+
+    // Paragraph
+    out.push(`<p style="margin:0 0 6px 0;">${applyInline(line)}</p>`);
+    i++;
+  }
+
+  return out.join('');
 }
 
 function mapAssessment(row: AssessmentRow): AssessmentDto {
@@ -89,6 +216,12 @@ function mapAssessment(row: AssessmentRow): AssessmentDto {
     publishDate: row.publish_date ?? undefined,
     isPublished: row.is_published,
     allowLateSubmission: row.allow_late_submission,
+    roomNumber: row.room_number?.trim() ? row.room_number.trim() : undefined,
+    examinationDurationMinutes:
+      row.examination_duration_minutes != null &&
+      !Number.isNaN(Number(row.examination_duration_minutes))
+        ? Number(row.examination_duration_minutes)
+        : undefined,
     branchId: row.branch_id,
     academicYearId: row.academic_year_id,
     createdAt: row.created_at,
@@ -151,6 +284,7 @@ export class AssessmentsService {
     private readonly notificationsService: NotificationsService,
     private readonly branchesService: BranchesService,
     private readonly storageService: StorageService,
+    private readonly pdfLogoCache: PdfLogoCacheService,
   ) {}
 
   private async notifyAssessmentPublished(params: {
@@ -238,6 +372,7 @@ export class AssessmentsService {
     academicYearId?: string,
     currentUserId?: string,
     currentUserRoles?: string[],
+    examinationScheduleOnly = false,
   ): Promise<{ data: AssessmentDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
 
@@ -245,8 +380,8 @@ export class AssessmentsService {
     const limit = query.limit ?? 20;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-    const sortBy = query.sortBy ?? 'created_at';
-    const sortOrder = query.sortOrder ?? 'desc';
+    const sortBy = query.sortBy ?? (examinationScheduleOnly ? 'due_date' : 'created_at');
+    const sortOrder = query.sortOrder ?? (examinationScheduleOnly ? 'asc' : 'desc');
 
     let yearId = academicYearId;
     if (!yearId) {
@@ -335,10 +470,28 @@ export class AssessmentsService {
       }
     }
 
+    // Special case: Examination schedule is a read-only published view.
+    // If a subject teacher selects a class section they are assigned to, show the full schedule
+    // for that class section (all subjects) rather than only their subject assignments.
+    if (
+      examinationScheduleOnly &&
+      query.classSectionId &&
+      roleScopePairs.length > 0 &&
+      !isAdmin
+    ) {
+      const hasAnyAssignmentForClassSection = roleScopePairs.some(
+        (p) => p.classSectionId === query.classSectionId,
+      );
+      if (hasAnyAssignmentForClassSection) {
+        roleScopePairs = [];
+        roleScopeClassSectionId = query.classSectionId;
+      }
+    }
+
     let dbQuery = supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
         { count: 'exact' },
       )
       .eq('branch_id', branchId)
@@ -356,6 +509,25 @@ export class AssessmentsService {
       dbQuery = dbQuery.or(orParts.join(','));
     }
 
+    if (examinationScheduleOnly) {
+      const { data: termTypes, error: ttErr } = await supabase
+        .from('assessment_types')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('is_term_examination', true);
+      throwIfDbError(ttErr);
+      const termIds = ((termTypes ?? []) as Array<{ id: string }>)
+        .map((r) => r.id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+      if (termIds.length === 0) {
+        return {
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 1 },
+        };
+      }
+      dbQuery = dbQuery.in('assessment_type_id', termIds).eq('is_published', true);
+    }
+
     if (query.classSectionId) {
       dbQuery = dbQuery.eq('class_section_id', query.classSectionId);
     }
@@ -364,7 +536,7 @@ export class AssessmentsService {
       dbQuery = dbQuery.eq('subject_id', query.subjectId);
     }
 
-    if (query.assessmentTypeId) {
+    if (!examinationScheduleOnly && query.assessmentTypeId) {
       dbQuery = dbQuery.eq('assessment_type_id', query.assessmentTypeId);
     }
 
@@ -575,7 +747,7 @@ export class AssessmentsService {
     // Ensure assessment type exists for branch
     const { data: typeRow, error: typeError } = await supabase
       .from('assessment_types')
-      .select('id')
+      .select('id, is_term_examination')
       .eq('id', input.assessmentTypeId)
       .eq('branch_id', branchId)
       .maybeSingle();
@@ -583,6 +755,31 @@ export class AssessmentsService {
     if (!typeRow) {
       throw new BadRequestException('Assessment type not found for branch');
     }
+    const isTermType = !!(typeRow as { is_term_examination?: boolean }).is_term_examination;
+    const roomNumberResolved =
+      isTermType && input.roomNumber?.trim()
+        ? input.roomNumber.trim().slice(0, 50)
+        : null;
+
+    let examinationDurationMinutesResolved: number | null = null;
+    if (isTermType) {
+      const hasStart = !!input.dueDate;
+      const hasDur =
+        input.examinationDurationMinutes != null &&
+        input.examinationDurationMinutes >= 1;
+      if (hasStart !== hasDur) {
+        throw new BadRequestException(
+          'Term examinations require both a start date and time and a duration in minutes, or omit both for drafts.',
+        );
+      }
+      if (hasStart && hasDur) {
+        examinationDurationMinutesResolved = clampExaminationDurationMinutes(
+          input.examinationDurationMinutes as number,
+        );
+      }
+    }
+
+    const allowLateResolved = isTermType ? false : (input.allowLateSubmission ?? false);
 
     // Ensure subject exists (subjects are branch- or tenant-scoped)
     const { data: subjectRow, error: subjectError } = await supabase
@@ -606,9 +803,11 @@ export class AssessmentsService {
       updated_by: createdByUserId,
       total_marks: input.totalMarks,
       due_date: input.dueDate ?? null,
+      examination_duration_minutes: examinationDurationMinutesResolved,
       publish_date: input.publishDate ?? null,
       is_published: input.isPublished ?? false,
-      allow_late_submission: input.allowLateSubmission ?? false,
+      allow_late_submission: allowLateResolved,
+      room_number: roomNumberResolved,
       branch_id: branchId,
       academic_year_id: academicYearId,
     }));
@@ -617,7 +816,7 @@ export class AssessmentsService {
       .from('assessments')
       .insert(assessmentsToInsert)
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
       );
     throwIfDbError(error);
 
@@ -672,7 +871,9 @@ export class AssessmentsService {
 
     const { data: existing, error: existingError } = await supabase
       .from('assessments')
-      .select('*')
+      .select(
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at, updated_by',
+      )
       .eq('id', id)
       .eq('branch_id', branchId)
       .maybeSingle();
@@ -701,9 +902,67 @@ export class AssessmentsService {
       payload.publish_date = input.publishDate ?? null;
     if (input.isPublished !== undefined)
       payload.is_published = input.isPublished;
-    if (input.allowLateSubmission !== undefined)
-      payload.allow_late_submission = input.allowLateSubmission;
     payload.updated_by = updatedByUserId;
+
+    const ex = existing as AssessmentRow;
+    const nextTypeId =
+      input.assessmentTypeId !== undefined ? input.assessmentTypeId : ex.assessment_type_id;
+
+    const { data: typeForTerm, error: trErr } = await supabase
+      .from('assessment_types')
+      .select('is_term_examination')
+      .eq('id', nextTypeId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(trErr);
+    const isTerm = !!(typeForTerm as { is_term_examination?: boolean })?.is_term_examination;
+
+    if (!isTerm) {
+      payload.room_number = null;
+      payload.examination_duration_minutes = null;
+      if (input.allowLateSubmission !== undefined)
+        payload.allow_late_submission = input.allowLateSubmission;
+    } else {
+      payload.allow_late_submission = false;
+      if (input.roomNumber !== undefined) {
+        payload.room_number = input.roomNumber?.trim()
+          ? input.roomNumber.trim().slice(0, 50)
+          : null;
+      }
+      if (input.examinationDurationMinutes !== undefined) {
+        if (
+          input.examinationDurationMinutes !== null &&
+          input.examinationDurationMinutes >= 1
+        ) {
+          payload.examination_duration_minutes = clampExaminationDurationMinutes(
+            input.examinationDurationMinutes,
+          );
+        } else {
+          payload.examination_duration_minutes = null;
+        }
+      }
+    }
+
+    const nextDue =
+      input.dueDate !== undefined ? (input.dueDate ?? null) : ex.due_date;
+    const nextDur =
+      input.examinationDurationMinutes !== undefined
+        ? input.examinationDurationMinutes !== null &&
+          input.examinationDurationMinutes >= 1
+          ? clampExaminationDurationMinutes(input.examinationDurationMinutes)
+          : null
+        : ex.examination_duration_minutes != null
+          ? Number(ex.examination_duration_minutes)
+          : null;
+    if (isTerm) {
+      const hasStart = !!nextDue;
+      const hasDur = nextDur !== null && nextDur >= 1;
+      if (hasStart !== hasDur) {
+        throw new BadRequestException(
+          'Term examinations require both a start date and time and a duration in minutes, or omit both for drafts.',
+        );
+      }
+    }
 
     const { data, error } = await supabase
       .from('assessments')
@@ -711,7 +970,7 @@ export class AssessmentsService {
       .eq('id', id)
       .eq('branch_id', branchId)
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
       )
       .single();
     throwIfDbError(error);
@@ -786,7 +1045,7 @@ export class AssessmentsService {
     const { data, error } = await supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
       )
       .eq('id', id)
       .eq('branch_id', branchId)
@@ -840,7 +1099,7 @@ export class AssessmentsService {
       .eq('id', id)
       .eq('branch_id', branchId)
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
       )
       .maybeSingle();
     throwIfDbError(error);
@@ -1414,7 +1673,7 @@ export class AssessmentsService {
     const { data: assessments, error: assessmentsError } = await supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
       )
       .eq('class_section_id', classSection.id)
       .eq('branch_id', branchId)
@@ -1628,7 +1887,7 @@ export class AssessmentsService {
     const { data: assessments, error: assessmentsError } = await supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, publish_date, is_published, allow_late_submission, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
       )
       .eq('class_section_id', classSection.id)
       .eq('branch_id', branchId)
@@ -1760,6 +2019,31 @@ export class AssessmentsService {
         attachments: attachmentsByAssessment.get(assessment.id) ?? [],
       };
     });
+  }
+
+  async getExaminationScheduleForStudentById(
+    studentId: string,
+    branchId: string,
+  ): Promise<{ data: AssessmentDto[] }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: termTypes, error: ttErr } = await supabase
+      .from('assessment_types')
+      .select('id')
+      .eq('branch_id', branchId)
+      .eq('is_term_examination', true);
+    throwIfDbError(ttErr);
+    const termIds = new Set(
+      ((termTypes ?? []) as Array<{ id: string }>).map((t) => t.id).filter(Boolean),
+    );
+    if (termIds.size === 0) {
+      return { data: [] };
+    }
+    const items = await this.getMyAssessmentsForStudentById(studentId, branchId);
+    return {
+      data: items
+        .filter((item) => termIds.has(item.assessment.assessmentTypeId))
+        .map((item) => item.assessment),
+    };
   }
 
   /**
@@ -2434,6 +2718,207 @@ export class AssessmentsService {
       )
       .catch(() => {});
     return { id: attachmentId };
+  }
+
+  async getMyExaminationSchedule(
+    userId: string,
+    branchId: string,
+    query: QueryExaminationScheduleDto,
+    roles?: string[],
+  ): Promise<{ data: AssessmentDto[]; meta: Meta }> {
+    const listQuery: QueryAssessmentsDto = {
+      page: query.page,
+      limit: query.limit,
+      sortBy: query.sortBy ?? 'due_date',
+      sortOrder: query.sortOrder ?? 'asc',
+      classSectionId: query.classSectionId,
+      subjectId: query.subjectId,
+      startDate: query.startDate,
+      endDate: query.endDate,
+      status: 'published',
+    };
+    return this.listAssessments(
+      listQuery,
+      branchId,
+      query.academicYearId,
+      userId,
+      roles,
+      true,
+    );
+  }
+
+  async exportExaminationSchedulePdf(
+    query: QueryExaminationScheduleDto,
+    branchId: string,
+    userId: string | undefined,
+    roles: string[] | undefined,
+    language: string,
+  ): Promise<Buffer> {
+    const listQuery: QueryAssessmentsDto = {
+      page: 1,
+      limit: 500,
+      sortBy: 'due_date',
+      sortOrder: 'asc',
+      classSectionId: query.classSectionId,
+      subjectId: query.subjectId,
+      startDate: query.startDate,
+      endDate: query.endDate,
+      status: 'published',
+    };
+    const { data } = await this.listAssessments(
+      listQuery,
+      branchId,
+      query.academicYearId,
+      userId,
+      roles,
+      true,
+    );
+
+    const escape = (t: string) =>
+      (t || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    const locale = language === 'ar' ? 'ar' : language === 'en-US' ? 'en-US' : 'en-GB';
+    const rows = [...data].sort((a, b) => {
+      const da = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+      const db = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+      return da - db;
+    });
+    const lbl =
+      locale === 'ar'
+        ? {
+            date: 'تاريخ البدء',
+            time: 'وقت البدء',
+            dur: 'المدة',
+            subj: 'المادة',
+            syl: 'المنهج',
+            room: 'القاعة',
+          }
+        : {
+            date: 'Start date',
+            time: 'Start time',
+            dur: 'Duration',
+            subj: 'Subject',
+            syl: 'Syllabus',
+            room: 'Room',
+          };
+
+    let bodyRows = '';
+    for (const a of rows) {
+      const due = a.dueDate ? new Date(a.dueDate) : null;
+      const dateStr =
+        due && !Number.isNaN(due.getTime())
+          ? due.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' })
+          : '—';
+      const timeStr =
+        due && !Number.isNaN(due.getTime())
+          ? due.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })
+          : '—';
+      const durMinutes =
+        a.examinationDurationMinutes != null &&
+        !Number.isNaN(Number(a.examinationDurationMinutes))
+          ? Number(a.examinationDurationMinutes)
+          : null;
+      const durStr =
+        durMinutes !== null
+          ? formatExaminationDurationForPdf(durMinutes, locale)
+          : '—';
+      const room = a.roomNumber?.trim() ? a.roomNumber.trim() : '—';
+      const syllabusHtml = renderSyllabusToHtml(a.description);
+      bodyRows += `<tr><td>${escape(dateStr)}</td><td>${escape(timeStr)}</td><td>${escape(durStr)}</td><td>${escape(a.subjectName ?? '')}</td><td class="syllabus">${syllabusHtml}</td><td>${escape(room)}</td></tr>`;
+    }
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Examination schedule</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;margin:16px}
+table{border-collapse:collapse;width:100%;table-layout:fixed}
+th,td{border:1px solid #dee2e6;padding:8px;text-align:left;vertical-align:top;word-wrap:break-word}
+th{background:#f1f3f5}
+td.syllabus{width:38%}
+</style></head><body>
+<h2>Examination schedule</h2>
+<table><thead><tr><th>${lbl.date}</th><th>${lbl.time}</th><th>${lbl.dur}</th><th>${lbl.subj}</th><th>${lbl.syl}</th><th>${lbl.room}</th></tr></thead><tbody>${bodyRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
+</body></html>`;
+
+    const branding = await this.getPdfBrandingForExamination(branchId, locale);
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: getPuppeteerExecutablePath(),
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      const pdf = await page.pdf({
+        format: 'A4',
+        displayHeaderFooter: true,
+        headerTemplate: branding.headerTemplate,
+        footerTemplate: branding.footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
+        printBackground: true,
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private resolveBranchDisplayName(
+    row: { name: string; name_translations?: Record<string, string> | null },
+    language: string,
+  ): string {
+    const t = row.name_translations;
+    return (t?.[language] ?? t?.en ?? row.name) || row.name;
+  }
+
+  private async getPdfBrandingForExamination(
+    branchId: string,
+    language: string,
+  ): Promise<{ headerTemplate: string; footerTemplate: string }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch } = await supabase
+      .from('branches')
+      .select('id, name, name_translations, tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    const branchRow = branch as
+      | { id: string; name: string; name_translations?: Record<string, string> | null; tenant_id: string | null }
+      | null;
+
+    const branchName = branchRow ? this.resolveBranchDisplayName(branchRow, language) : '—';
+    const tenantId = branchRow?.tenant_id ?? null;
+
+    let tenantLogoUrl: string | null = null;
+    let tenantName: string | null = null;
+    if (tenantId) {
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('id, name, logo_url')
+        .eq('id', tenantId)
+        .maybeSingle();
+      const tenantRow = tenant as { name?: string | null; logo_url?: string | null } | null;
+      tenantLogoUrl = tenantRow?.logo_url ?? null;
+      tenantName = tenantRow?.name ?? null;
+    }
+
+    const ntgLogoDataUrl = await this.pdfLogoCache.getNtgLogoDataUrl();
+    const tenantLogoDataUrl = tenantId
+      ? await this.pdfLogoCache.getTenantLogoDataUrl(tenantId, tenantLogoUrl)
+      : undefined;
+
+    const schoolAndBranchName =
+      tenantName?.trim() ? `${tenantName.trim()} - ${branchName}` : branchName;
+
+    return {
+      headerTemplate: buildPdfHeaderTemplate({
+        ntgLogoDataUrl,
+        branchName: schoolAndBranchName,
+        tenantLogoDataUrl,
+      }),
+      footerTemplate: buildPdfFooterTemplate(),
+    };
   }
 }
 

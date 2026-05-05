@@ -16,6 +16,10 @@ export class AssessmentDto {
   publishDate?: string;
   isPublished!: boolean;
   allowLateSubmission!: boolean;
+  /** Optional exam venue; used for term examination assessments. */
+  roomNumber?: string;
+  /** Term examinations: duration in minutes (end = `dueDate` start + duration). */
+  examinationDurationMinutes?: number;
   branchId!: string;
   academicYearId!: string;
   createdAt!: string;

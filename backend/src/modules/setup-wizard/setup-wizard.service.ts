@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
+import { DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES } from '../../common/constants/default-behavioral-attributes';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { SystemSettingsService } from '../system-settings/system-settings.service';
 import { CommitSetupWizardDto } from './dto/commit-setup-wizard.dto';
 
 function throwIfDbError(error: PostgrestError | null): void {
@@ -9,7 +11,10 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class SetupWizardService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly systemSettingsService: SystemSettingsService,
+  ) {}
 
   async commitSetupWizard(input: {
     payload: CommitSetupWizardDto;
@@ -27,6 +32,15 @@ export class SetupWizardService {
       permissions: Array.isArray((input.payload as any).permissions) ? (input.payload as any).permissions : [],
     } as CommitSetupWizardDto;
 
+    const termExaminationTypeCount = (payload.assessment?.assessmentTypes ?? []).filter(
+      (t) => t.isTermExamination === true,
+    ).length;
+    if (termExaminationTypeCount < 2) {
+      throw new BadRequestException(
+        'At least two assessment types must be marked as term examinations before completing setup.',
+      );
+    }
+
     const { data, error } = await supabase.rpc('commit_setup_wizard', {
       p_payload: payload,
       p_branch_id: input.branchId,
@@ -40,12 +54,37 @@ export class SetupWizardService {
         ? (data as { success?: boolean; academicYearId?: string | null })
         : undefined;
 
+    if (result?.success === true) {
+      await this.persistBehavioralAssessmentAfterWizard(payload.behavior);
+    }
+
     return {
       data: {
         success: result?.success === true,
         academicYearId: result?.academicYearId ?? null,
       },
     };
+  }
+
+  private async persistBehavioralAssessmentAfterWizard(
+    behavior: CommitSetupWizardDto['behavior'],
+  ): Promise<void> {
+    const defaults = [...DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES];
+    if (!behavior) {
+      await this.systemSettingsService.upsert('behavioral_assessment', {
+        enabled: false,
+        mandatory: false,
+        attributes: defaults,
+      });
+      return;
+    }
+    const rawAttrs = (behavior.attributes ?? []).map((a) => String(a).trim()).filter((a) => a.length > 0);
+    const attributes = rawAttrs.length > 0 ? [...new Set(rawAttrs)] : defaults;
+    await this.systemSettingsService.upsert('behavioral_assessment', {
+      enabled: behavior.enabled,
+      mandatory: behavior.mandatory,
+      attributes,
+    });
   }
 }
 

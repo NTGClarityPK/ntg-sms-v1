@@ -3,8 +3,12 @@ import type { SetupWizardData } from '@/components/features/settings/wizard-step
 /**
  * Validates the full wizard payload before any setup API calls run.
  * Prevents partial persistence when a later step would fail (e.g. missing grade ranges).
+ * @param translate Optional next-intl translator for `settings` keys.
  */
-export function validateSetupWizardDataBeforeSave(data: SetupWizardData): void {
+export function validateSetupWizardDataBeforeSave(
+  data: SetupWizardData,
+  translate?: (key: string) => string,
+): void {
   if (data.academicYear) {
     const y = data.academicYear;
     if (!y.name?.trim()) {
@@ -13,6 +17,18 @@ export function validateSetupWizardDataBeforeSave(data: SetupWizardData): void {
     if (!y.startDate?.trim() || !y.endDate?.trim()) {
       throw new Error('Academic year start and end dates are required.');
     }
+  }
+
+  const termExaminationCount = (data.assessment.assessmentTypes ?? []).filter(
+    (at) => at.isTermExamination === true,
+  ).length;
+  if (termExaminationCount < 2) {
+    const msg = translate?.('setupWizardTermExamMinTwo');
+    throw new Error(
+      msg && !msg.includes('setupWizardTermExamMinTwo')
+        ? msg
+        : 'Mark at least two assessment types as term examinations (e.g. Mid Term and Final Term) before finishing setup.',
+    );
   }
 
   for (const t of data.assessment.gradeTemplates) {

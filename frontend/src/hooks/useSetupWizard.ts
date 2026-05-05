@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
 import type { SetupWizardData } from '@/components/features/settings/wizard-steps/types';
 import { validateSetupWizardDataBeforeSave } from '@/lib/setup-wizard/validate-setup-wizard-data';
@@ -10,10 +10,11 @@ export function useSaveSetupWizard() {
   const qc = useQueryClient();
   const locale = useLocale();
   const notifyColors = useNotificationColors();
+  const tSettings = useTranslations('settings');
 
   return useMutation({
     mutationFn: async (data: SetupWizardData) => {
-      validateSetupWizardDataBeforeSave(data);
+      validateSetupWizardDataBeforeSave(data, (key) => tSettings(key));
       const res = await apiClient.post<{ success: boolean; academicYearId?: string | null }>(
         '/api/v1/setup-wizard/commit',
         data,

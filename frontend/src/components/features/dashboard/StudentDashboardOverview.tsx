@@ -15,6 +15,7 @@ import {
   Group,
   Card,
 } from '@mantine/core';
+import Link from 'next/link';
 import {
   IconClipboardList,
   IconReport,
@@ -38,6 +39,18 @@ import { useStudentTimetable } from '@/hooks/useTimetable';
 import { DashboardStatCard } from './DashboardStatCard';
 import type { User } from '@/types/auth';
 import type { StudentGrade } from '@/types/assessment';
+
+const linkPaperStyles = {
+  root: {
+    textDecoration: 'none' as const,
+    color: 'inherit' as const,
+    display: 'block' as const,
+    transition: 'background-color 150ms ease',
+    '&:hover': {
+      backgroundColor: 'var(--mantine-color-default-hover)',
+    },
+  },
+};
 
 function formatRoleName(roleName: string): string {
   return roleName
@@ -122,26 +135,39 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
           <DashboardStatCard
+            id="dashboard-stat-upcoming-assessments"
             title={t('upcomingAssessments')}
             value={upcomingAssessments.length}
             icon={IconClipboardList}
+            href="/my-assessments"
           />
           <DashboardStatCard
+            id="dashboard-stat-grades-recorded"
             title={t('gradesRecorded')}
             value={grades.length}
             icon={IconReport}
+            href="/results"
           />
           <DashboardStatCard
+            id="dashboard-stat-today-classes"
             title={t('todayClasses')}
             value={todaySlots.length}
             icon={IconCalendar}
+            href="/my-timetable"
           />
         </SimpleGrid>
       )}
 
       <Grid>
         <Grid.Col span={{ base: 12, md: 8 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/my-assessments"
+            id="dashboard-panel-overview"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconTrendingUp size={24} style={{ color: colors.primary }} />
@@ -167,7 +193,15 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 4 }}>
-          <Paper p="md" withBorder h="100%">
+          <Paper
+            component={Link}
+            href="/my-timetable"
+            id="dashboard-panel-today-schedule"
+            p="md"
+            withBorder
+            h="100%"
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconCalendar size={24} style={{ color: colors.primary }} />
@@ -198,7 +232,14 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/my-assessments"
+            id="dashboard-panel-upcoming-assessments"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconClipboardList size={24} style={{ color: colors.primary }} />
@@ -227,7 +268,14 @@ export function StudentDashboardOverview({ user }: StudentDashboardOverviewProps
         </Grid.Col>
 
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Paper p="md" withBorder>
+          <Paper
+            component={Link}
+            href="/results"
+            id="dashboard-panel-recent-grades"
+            p="md"
+            withBorder
+            styles={linkPaperStyles}
+          >
             <Stack gap="md">
               <Group gap="xs">
                 <IconReport size={24} style={{ color: colors.primary }} />

@@ -15,8 +15,11 @@ export default function EditEventPage() {
   const t = useTranslations('event');
   const router = useRouter();
   const params = useParams();
-  const eventId = params.id as string;
-  const { data: eventData, isLoading } = useEvent(eventId);
+  const eventId =
+    (params && typeof (params as Record<string, unknown>).id === 'string'
+      ? ((params as Record<string, unknown>).id as string)
+      : undefined) ?? '';
+  const { data: eventData, isLoading } = useEvent(eventId || undefined);
   const updateEvent = useUpdateEvent(eventId);
 
   const event = eventData?.data;

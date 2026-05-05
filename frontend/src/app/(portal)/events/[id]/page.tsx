@@ -30,10 +30,13 @@ export default function EventDetailPage() {
   const t = useTranslations('event');
   const router = useRouter();
   const params = useParams();
-  const eventId = params.id as string;
+  const eventId =
+    (params && typeof (params as Record<string, unknown>).id === 'string'
+      ? ((params as Record<string, unknown>).id as string)
+      : undefined) ?? '';
   const { user } = useAuth();
-  const { data: eventData, isLoading } = useEvent(eventId);
-  const { data: conflictsData } = useEventConflicts(eventId);
+  const { data: eventData, isLoading } = useEvent(eventId || undefined);
+  const { data: conflictsData } = useEventConflicts(eventId || undefined);
   const canViewConsentStats =
     user?.roles?.some(
       (r) =>
@@ -41,7 +44,7 @@ export default function EventDetailPage() {
         r.roleName === 'academic_coordinator' ||
         r.roleName === 'class_teacher',
     ) ?? false;
-  const { data: consentsData } = useEventConsents(eventId, { enabled: canViewConsentStats });
+  const { data: consentsData } = useEventConsents(eventId || undefined, { enabled: canViewConsentStats && !!eventId });
 
   const event = eventData?.data;
   const conflicts = conflictsData?.data;

@@ -36,6 +36,12 @@ export class SystemSettingsController {
         throw new ForbiddenException('Only school admins can update this setting');
       }
     }
+    if (key === 'communication_branch_broadcast') {
+      const isAdmin = user.roles?.includes('school_admin') || user.roles?.includes('super_admin');
+      if (!isAdmin) {
+        throw new ForbiddenException('Only school administrators can update branch broadcast permissions');
+      }
+    }
     // Body.key is optional; path param is the source of truth.
     const updated = await this.systemSettingsService.upsert(key, body.value);
     return { data: updated.data };

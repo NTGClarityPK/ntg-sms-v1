@@ -27,7 +27,10 @@ export interface PublicStatisticsData {
 
 export default function PublicStatisticsPage() {
   const params = useParams();
-  const branchCode = typeof params.branchCode === 'string' ? params.branchCode : '';
+  const branchCode =
+    params && typeof (params as Record<string, unknown>).branchCode === 'string'
+      ? ((params as Record<string, unknown>).branchCode as string)
+      : '';
   const [token, setToken] = useState<string | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);

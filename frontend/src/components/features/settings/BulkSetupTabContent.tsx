@@ -55,8 +55,9 @@ export function BulkSetupTabContent() {
         acc[col] = col;
         return acc;
       }, {})];
-      const sample = [sheet.sample];
-      const rows = header.concat(sample);
+      const dataRows =
+        Array.isArray(sheet.samples) && sheet.samples.length > 0 ? sheet.samples : [sheet.sample];
+      const rows = header.concat(dataRows);
       const worksheet = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
       XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
     });
@@ -168,6 +169,7 @@ export function BulkSetupTabContent() {
         <List spacing={4} size="sm">
           <List.Item>{t('bulkSetupStep1')}</List.Item>
           <List.Item>{t('bulkSetupStep2')}</List.Item>
+          <List.Item>{t('bulkSetupBehaviorOptionalStep')}</List.Item>
           <List.Item>{t('bulkSetupStep3')}</List.Item>
           <List.Item>{t('bulkSetupStep4')}</List.Item>
         </List>

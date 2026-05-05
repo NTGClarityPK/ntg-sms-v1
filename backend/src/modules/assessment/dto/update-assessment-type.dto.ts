@@ -24,4 +24,8 @@ export class UpdateAssessmentTypeDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isTermExamination?: boolean;
 }

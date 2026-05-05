@@ -45,6 +45,7 @@ export interface MyAssessment {
     publishDate?: string;
     isPublished: boolean;
     allowLateSubmission: boolean;
+    examinationDurationMinutes?: number;
   };
   status?: MyAssessmentStatus;
   attachments: MyAssessmentAttachment[];

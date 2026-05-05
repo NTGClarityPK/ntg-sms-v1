@@ -37,7 +37,7 @@ export default function NotificationsPage() {
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const notifyColors = useThemeColors();
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
-  const initialTab = searchParams.get('tab') === 'settings' ? 'settings' : 'all';
+  const initialTab = searchParams?.get('tab') === 'settings' ? 'settings' : 'all';
   const [activeTab, setActiveTab] = useState<string | null>(initialTab);
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();

@@ -18,8 +18,11 @@ export default function AssessmentGradesPage() {
   const router = useRouter();
   const params = useParams();
   const { canEdit } = useFeaturePermission('assessment');
-  const assessmentId = params.id as string;
-  const { data: assessmentData, isLoading } = useAssessment(assessmentId);
+  const assessmentId =
+    (params && typeof (params as Record<string, unknown>).id === 'string'
+      ? ((params as Record<string, unknown>).id as string)
+      : undefined) ?? '';
+  const { data: assessmentData, isLoading } = useAssessment(assessmentId || undefined);
   const assessment = assessmentData; // Hook already returns response.data, so assessmentData is the Assessment directly
 
   const subjectName = assessment?.subjectName;
