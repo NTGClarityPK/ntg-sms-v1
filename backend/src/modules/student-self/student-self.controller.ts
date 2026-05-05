@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { StudentJwtGuard } from '../../common/guards/student-jwt.guard';
 import { CurrentStudent, CurrentStudentPayload } from '../../common/decorators/current-student.decorator';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AssessmentsService } from '../assessments/assessments.service';
 import { AssessmentDto } from '../assessments/dto/assessment.dto';
+import { QueryExaminationScheduleDto } from '../assessments/dto/query-examination-schedule.dto';
 import { UpdateStudentAssessmentStatusDto } from '../assessments/dto/update-student-assessment-status.dto';
 
 @ApiTags('Student self-service')
@@ -79,6 +81,26 @@ export class StudentSelfController {
     @CurrentStudent() student: CurrentStudentPayload,
   ): Promise<{ data: AssessmentDto[] }> {
     return this.assessmentsService.getExaminationScheduleForStudentById(student.id, student.branchId);
+  }
+
+  @Get('assessments/examination-schedule/export/pdf')
+  async exportMyExaminationSchedulePdf(
+    @CurrentStudent() student: CurrentStudentPayload,
+    @Res() res: Response,
+    @Query() query: QueryExaminationScheduleDto,
+  ): Promise<void> {
+    const lang =
+      query.language && ['en', 'en-GB', 'en-US', 'ar'].includes(query.language)
+        ? query.language
+        : 'en-GB';
+    const buffer = await this.assessmentsService.exportExaminationSchedulePdfForStudent(
+      student.id,
+      student.branchId,
+      lang,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="examination-schedule.pdf"');
+    res.send(buffer);
   }
 
   @Get('assessments')

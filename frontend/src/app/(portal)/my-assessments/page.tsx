@@ -30,8 +30,13 @@ import { useMediaQuery } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMyAssessments, useUpdateMyAssessmentStatus } from '@/hooks/api/useMyAssessments';
-import { useMyExaminationSchedule } from '@/hooks/api/useAssessments';
-import { useStudentAssessments, useStudentExaminationSchedule, useUpdateStudentAssessmentStatus } from '@/hooks/api/useStudentAssessments';
+import { useExportMyExaminationSchedulePdf, useMyExaminationSchedule } from '@/hooks/api/useAssessments';
+import {
+  useExportStudentExaminationSchedulePdf,
+  useStudentAssessments,
+  useStudentExaminationSchedule,
+  useUpdateStudentAssessmentStatus,
+} from '@/hooks/api/useStudentAssessments';
 import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { MyAssessmentAttachment } from '@/hooks/api/useMyAssessments';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
@@ -69,6 +74,8 @@ export default function MyAssessmentsPage() {
     !isStudentMode && listTab === 'exams',
   );
   const studentExamSchedule = useStudentExaminationSchedule(isStudentMode && listTab === 'exams');
+  const exportStudentPdf = useExportStudentExaminationSchedulePdf();
+  const exportMyPdf = useExportMyExaminationSchedulePdf();
 
   const updateParentStatus = useUpdateMyAssessmentStatus();
   const updateStudentStatus = useUpdateStudentAssessmentStatus();
@@ -90,6 +97,7 @@ export default function MyAssessmentsPage() {
       : parentExamSchedule.isLoading || parentExamSchedule.isRefetching;
   const examError = isStudentMode ? studentExamSchedule.error : parentExamSchedule.error;
   const examFetching = isStudentMode ? studentExamSchedule.isFetching : parentExamSchedule.isFetching;
+  const pdfLanguage = locale === 'ar' ? 'ar' : locale === 'en-US' ? 'en-US' : 'en-GB';
 
   const previewType = useMemo(() => {
     if (!previewAttachment) return 'none' as const;
@@ -347,6 +355,26 @@ export default function MyAssessmentsPage() {
 
             <Tabs.Panel value="exams" pt="md">
               <Paper p="md" withBorder>
+                <Group justify="flex-end" mb="sm">
+                  <Button
+                    leftSection={<IconDownload size={16} />}
+                    variant="light"
+                    disabled={examRows.length === 0 || examLoading}
+                    loading={
+                      !(examRows.length === 0 || examLoading) &&
+                      (isStudentMode ? exportStudentPdf.isPending : exportMyPdf.isPending)
+                    }
+                    onClick={() => {
+                      if (isStudentMode) {
+                        exportStudentPdf.mutate({ language: pdfLanguage });
+                      } else {
+                        exportMyPdf.mutate({ academicYearId: activeYearId, language: pdfLanguage });
+                      }
+                    }}
+                  >
+                    {t('examinationScheduleExportPdf')}
+                  </Button>
+                </Group>
                 {examLoading ? (
                   <Stack gap="md">
                     {[...Array(3)].map((_, i) => (

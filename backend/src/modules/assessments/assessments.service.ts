@@ -400,6 +400,7 @@ export class AssessmentsService {
     const isSubjectTeacher = roles.includes('subject_teacher');
     let roleScopeClassSectionId: string | null = null;
     let roleScopePairs: Array<{ classSectionId: string; subjectId: string }> = [];
+    let studentTemplateSubjectIds: string[] | null = null;
 
     if (currentUserId && !isAdmin) {
       if (roles.includes('student')) {
@@ -434,6 +435,34 @@ export class AssessmentsService {
           };
         }
         roleScopeClassSectionId = (classSection as { id: string }).id;
+
+        // Subject-template gating (only when student has an assigned template).
+        // Applied later for examination schedule view.
+        const studentRow = student as { id?: string; academic_year_id?: string };
+        const studentId = studentRow?.id ?? null;
+        const studentYearId = studentRow?.academic_year_id ?? null;
+        if (studentId && studentYearId) {
+          const { data: studentTemplate, error: templateError } = await supabase
+            .from('student_subject_template_assignments')
+            .select('subject_template_id')
+            .eq('student_id', studentId)
+            .eq('academic_year_id', studentYearId)
+            .eq('branch_id', branchId)
+            .maybeSingle();
+          throwIfDbError(templateError);
+          const studentTemplateId = studentTemplate?.subject_template_id || null;
+          if (studentTemplateId) {
+            const { data: templateSubjects, error: tsError } = await supabase
+              .from('subject_template_subjects')
+              .select('subject_id')
+              .eq('subject_template_id', studentTemplateId);
+            throwIfDbError(tsError);
+            const ids = (templateSubjects || [])
+              .map((ts: { subject_id: string }) => ts.subject_id)
+              .filter((id): id is string => typeof id === 'string' && id.length > 0);
+            studentTemplateSubjectIds = ids.length > 0 ? ids : [];
+          }
+        }
       } else if (isSubjectTeacher && !isClassTeacher) {
         // Subject teachers should only see assessments for subjects/class-sections they are assigned to.
         const staff = await this.staffService.getStaffByUserId(
@@ -526,6 +555,18 @@ export class AssessmentsService {
         };
       }
       dbQuery = dbQuery.in('assessment_type_id', termIds).eq('is_published', true);
+    }
+
+    // If a student has an assigned subject template, only show examination schedule
+    // items within that template. Students without template keep seeing full schedule.
+    if (examinationScheduleOnly && studentTemplateSubjectIds !== null) {
+      if (studentTemplateSubjectIds.length === 0) {
+        return {
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 1 },
+        };
+      }
+      dbQuery = dbQuery.in('subject_id', studentTemplateSubjectIds);
     }
 
     if (query.classSectionId) {
@@ -1922,20 +1963,11 @@ export class AssessmentsService {
       const templateSubjectIds = new Set(
         (templateSubjects || []).map((ts: { subject_id: string }) => ts.subject_id),
       );
-
-      const { data: allTemplateSubjects, error: atsError } = await supabase
-        .from('subject_template_subjects')
-        .select('subject_id');
-
-      throwIfDbError(atsError);
-      const allTemplateSubjectIds = new Set(
-        (allTemplateSubjects || []).map((ts: { subject_id: string }) => ts.subject_id),
+      // If the student has an assigned subject template, only show assessments whose subject
+      // is included in that template. Students without a template keep seeing the full class schedule.
+      filteredAssessments = assessmentRows.filter((assessment) =>
+        templateSubjectIds.has(assessment.subject_id),
       );
-
-      filteredAssessments = assessmentRows.filter((assessment) => {
-        const inAnyTemplate = allTemplateSubjectIds.has(assessment.subject_id);
-        return inAnyTemplate ? templateSubjectIds.has(assessment.subject_id) : true;
-      });
     }
 
     const assessmentIds = filteredAssessments.map((a) => a.id);
@@ -2773,7 +2805,23 @@ export class AssessmentsService {
       roles,
       true,
     );
+    return this.buildExaminationSchedulePdfFromRows(data, branchId, language);
+  }
 
+  async exportExaminationSchedulePdfForStudent(
+    studentId: string,
+    branchId: string,
+    language: string,
+  ): Promise<Buffer> {
+    const { data } = await this.getExaminationScheduleForStudentById(studentId, branchId);
+    return this.buildExaminationSchedulePdfFromRows(data, branchId, language);
+  }
+
+  private async buildExaminationSchedulePdfFromRows(
+    rows: AssessmentDto[],
+    branchId: string,
+    language: string,
+  ): Promise<Buffer> {
     const escape = (t: string) =>
       (t || '')
         .replace(/&/g, '&amp;')
@@ -2781,7 +2829,7 @@ export class AssessmentsService {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
     const locale = language === 'ar' ? 'ar' : language === 'en-US' ? 'en-US' : 'en-GB';
-    const rows = [...data].sort((a, b) => {
+    const sorted = [...rows].sort((a, b) => {
       const da = a.dueDate ? new Date(a.dueDate).getTime() : 0;
       const db = b.dueDate ? new Date(b.dueDate).getTime() : 0;
       return da - db;
@@ -2806,15 +2854,23 @@ export class AssessmentsService {
           };
 
     let bodyRows = '';
-    for (const a of rows) {
+    for (const a of sorted) {
       const due = a.dueDate ? new Date(a.dueDate) : null;
       const dateStr =
         due && !Number.isNaN(due.getTime())
-          ? due.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' })
+          ? due.toLocaleDateString(locale, {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            })
           : '—';
       const timeStr =
         due && !Number.isNaN(due.getTime())
-          ? due.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })
+          ? due.toLocaleTimeString(locale, {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            })
           : '—';
       const durMinutes =
         a.examinationDurationMinutes != null &&
@@ -2822,9 +2878,7 @@ export class AssessmentsService {
           ? Number(a.examinationDurationMinutes)
           : null;
       const durStr =
-        durMinutes !== null
-          ? formatExaminationDurationForPdf(durMinutes, locale)
-          : '—';
+        durMinutes !== null ? formatExaminationDurationForPdf(durMinutes, locale) : '—';
       const room = a.roomNumber?.trim() ? a.roomNumber.trim() : '—';
       const syllabusHtml = renderSyllabusToHtml(a.description);
       bodyRows += `<tr><td>${escape(dateStr)}</td><td>${escape(timeStr)}</td><td>${escape(durStr)}</td><td>${escape(a.subjectName ?? '')}</td><td class="syllabus">${syllabusHtml}</td><td>${escape(room)}</td></tr>`;

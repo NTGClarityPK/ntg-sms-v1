@@ -20,12 +20,12 @@ import {
 } from '@mantine/core';
 import { IconAlertCircle, IconBrandGoogle, IconMail, IconLock, IconCheck } from '@tabler/icons-react';
 import { signIn } from '@/lib/auth';
-import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeColor } from '@/lib/hooks/use-theme-color';
 import { generateThemeColors } from '@/lib/utils/themeColors';
 import { apiClient, getEffectiveApiBaseURL } from '@/lib/api-client';
+import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import {
   completeSessionRouting,
   selectBranchAndGoDashboard,
@@ -42,6 +42,8 @@ interface Branch {
   code: string;
   tenantId: string;
 }
+
+const LOGIN_PRIMARY_COLOR = '#4A7C59';
 
 export default function LoginPage() {
   const t = useTranslations('auth');
@@ -451,7 +453,7 @@ export default function LoginPage() {
                 type="button"
                 size="sm"
                 onClick={() => setForgotPasswordOpened(true)}
-                style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}
+                style={{ color: LOGIN_PRIMARY_COLOR, fontWeight: 500 }}
               >
                 {t('forgotPassword')}
               </Anchor>
@@ -464,7 +466,7 @@ export default function LoginPage() {
                 size="lg"
                 radius="md"
                 style={{
-                  backgroundColor: DEFAULT_THEME_COLOR,
+                  backgroundColor: LOGIN_PRIMARY_COLOR,
                   color: 'white',
                 }}
               >
@@ -480,8 +482,8 @@ export default function LoginPage() {
                 size="lg"
                 radius="md"
                 style={{
-                  borderColor: DEFAULT_THEME_COLOR,
-                  color: DEFAULT_THEME_COLOR,
+                  borderColor: LOGIN_PRIMARY_COLOR,
+                  color: LOGIN_PRIMARY_COLOR,
                 }}
               >
                 {t('signInWithGoogle')}
@@ -489,7 +491,7 @@ export default function LoginPage() {
 
               <Text ta="center" size="sm" style={{ color: themeColors.colorTextMedium }}>
                 {t('noAccount')}{' '}
-                <Anchor id="login-signup-link" href="/signup" size="sm" style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500 }}>
+                <Anchor id="login-signup-link" href="/signup" size="sm" style={{ color: LOGIN_PRIMARY_COLOR, fontWeight: 500 }}>
                   {t('signUp')}
                 </Anchor>
               </Text>
@@ -558,7 +560,7 @@ export default function LoginPage() {
                     loading={pinLoading}
                     onClick={handlePinLogin}
                     style={{
-                      backgroundColor: DEFAULT_THEME_COLOR,
+                      backgroundColor: LOGIN_PRIMARY_COLOR,
                       color: 'white',
                     }}
                   >
@@ -593,7 +595,7 @@ export default function LoginPage() {
               onClick={handleCloseForgotPassword}
               fullWidth
               style={{
-                backgroundColor: DEFAULT_THEME_COLOR,
+                backgroundColor: LOGIN_PRIMARY_COLOR,
                 color: 'white',
               }}
             >
@@ -661,7 +663,7 @@ export default function LoginPage() {
                   type="submit"
                   loading={resetLoading}
                   style={{
-                    backgroundColor: DEFAULT_THEME_COLOR,
+                    backgroundColor: LOGIN_PRIMARY_COLOR,
                     color: 'white',
                   }}
                 >
@@ -688,6 +690,7 @@ export default function LoginPage() {
         branches={branches}
         onSelect={handleBranchSelection}
         loading={branchSelectionLoading}
+        continueButtonColor={DEFAULT_THEME_COLOR}
       />
     </>
   );

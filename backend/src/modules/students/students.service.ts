@@ -1561,6 +1561,11 @@ export class StudentsService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
+    // Use the branch's active academic year as the default "operational" context.
+    // This prevents status toggles and placement edits from accidentally mutating a locked historical year
+    // when `students.academic_year_id` is stale.
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+
     const { data: oldRow, error: fetchError } = await supabase
       .from('students')
       .select('*')
@@ -1625,8 +1630,10 @@ export class StudentsService {
     const currentAdmissionDate =
       (oldRow as { admission_date?: string | null } | null)?.admission_date ?? null;
 
+    const defaultAcademicYearId = input.academicYearId ?? activeYear?.id ?? currentAcademicYearId;
+
     const nextAcademicYearId =
-      input.academicYearId !== undefined ? (input.academicYearId ?? null) : currentAcademicYearId;
+      input.academicYearId !== undefined ? (input.academicYearId ?? null) : defaultAcademicYearId;
     const nextClassId =
       input.classId !== undefined ? (input.classId ?? null) : currentClassId;
     const nextSectionId =
@@ -1694,6 +1701,11 @@ export class StudentsService {
     if (input.academicYearId !== undefined) {
       updatePayload.academic_year_id = input.academicYearId ?? null;
     }
+    // If UI didn't send academicYearId, but this request changes year-scoped placement/template fields,
+    // align the student's operational academic_year_id to the branch's active year to avoid drift.
+    if (input.academicYearId === undefined && mutatesAcademicPlacement) {
+      updatePayload.academic_year_id = defaultAcademicYearId ?? null;
+    }
 
     const filteredPayload = Object.fromEntries(
       Object.entries(updatePayload).filter(([, v]) => v !== undefined),
@@ -1710,9 +1722,7 @@ export class StudentsService {
     // Keep student_enrolments in sync for the (possibly updated) academic year.
     // This ensures class-section rosters and attendance reflect current placement.
     const effectiveAcademicYearId =
-      input.academicYearId !== undefined
-        ? (input.academicYearId ?? null)
-        : ((studentData as { academic_year_id?: string | null } | null)?.academic_year_id ?? null);
+      input.academicYearId !== undefined ? (input.academicYearId ?? null) : defaultAcademicYearId;
     if (effectiveAcademicYearId) {
       const effectiveClassId =
         input.classId !== undefined ? (input.classId ?? null) : ((studentData as { class_id?: string | null } | null)?.class_id ?? null);
@@ -1754,7 +1764,7 @@ export class StudentsService {
     // Determine academic year to use for template assignment
     // Priority: input.academicYearId > existing student.academic_year_id
     const academicYearIdForTemplate =
-      input.academicYearId ?? studentData?.academic_year_id ?? null;
+      input.academicYearId ?? defaultAcademicYearId ?? null;
 
     // Auto-clear invalid subject template assignment when class changes to a class with no templates
     // (or when current assignment isn't available for the new class/level).

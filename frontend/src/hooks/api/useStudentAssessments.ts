@@ -41,6 +41,33 @@ export function useStudentExaminationSchedule(enabled = true) {
   });
 }
 
+export function useExportStudentExaminationSchedulePdf() {
+  return useMutation({
+    mutationFn: async (params: { language?: string }) => {
+      const { language } = params;
+      return apiClient.getBlobWithFilename('/api/v1/student/assessments/examination-schedule/export/pdf', {
+        params: { ...(language ? { language } : {}) },
+      });
+    },
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? 'examination-schedule.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+    onError: (error: unknown) => {
+      const msg =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Could not export the PDF. Please try again.';
+      notifications.show({ title: 'Error', message: msg, color: 'red' });
+    },
+  });
+}
+
 export function useUpdateStudentAssessmentStatus() {
   const queryClient = useQueryClient();
 

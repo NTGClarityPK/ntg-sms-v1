@@ -883,6 +883,7 @@ export default function SignupPage() {
         void handleSignupBranchSelection(id);
       }}
       loading={branchSelectionLoading}
+      continueButtonColor={DEFAULT_THEME_COLOR}
     />
     </>
   );

@@ -3,7 +3,12 @@
  * Adapted for Mantine v7
  */
 
-const DEFAULT_PRIMARY_COLOR = '#4caf50'; // Default color
+const DEFAULT_PRIMARY_COLOR = '#4A7C59'; // Alma brand green (default)
+
+const ALMA_BRAND_GREEN = '#4A7C59';
+const ALMA_BRAND_GREEN_LIGHT = '#6FA382';
+const ALMA_BRAND_GREEN_LIGHTER = '#A8C9B3';
+const ALMA_BRAND_GREEN_PALE = '#E0F0E5';
 
 /**
  * Convert hex color to RGB
@@ -73,12 +78,13 @@ export function mixColors(color1: string, color2: string, weight: number = 0.5):
  */
 export function generateThemeColors(primaryColor: string, isDark: boolean = false) {
   const primary = primaryColor || DEFAULT_PRIMARY_COLOR;
+  const isAlmaPrimary = primary.toLowerCase() === ALMA_BRAND_GREEN.toLowerCase();
 
   return {
     primary,
-    primaryLight: lighten(primary, 0.2),
-    primaryLighter: lighten(primary, 0.4),
-    primaryLightest: lighten(primary, 0.6),
+    primaryLight: isAlmaPrimary ? ALMA_BRAND_GREEN_LIGHT : lighten(primary, 0.2),
+    primaryLighter: isAlmaPrimary ? ALMA_BRAND_GREEN_LIGHTER : lighten(primary, 0.4),
+    primaryLightest: isAlmaPrimary ? ALMA_BRAND_GREEN_PALE : lighten(primary, 0.6),
     primaryDark: darken(primary, 0.2),
     primaryDarker: darken(primary, 0.4),
     primaryDarkest: darken(primary, 0.6),

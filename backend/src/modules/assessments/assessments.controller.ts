@@ -360,6 +360,29 @@ export class AssessmentsController {
     );
   }
 
+  @Get('my/examination-schedule/export/pdf')
+  async exportMyExaminationSchedulePdf(
+    @Query() query: QueryExaminationScheduleDto,
+    @Res() res: Response,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<void> {
+    const lang =
+      query.language && ['en', 'en-GB', 'en-US', 'ar'].includes(query.language)
+        ? query.language
+        : 'en-GB';
+    const buffer = await this.assessmentsService.exportExaminationSchedulePdf(
+      query,
+      branch.branchId,
+      user.id,
+      user.roles,
+      lang,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="examination-schedule.pdf"');
+    res.send(buffer);
+  }
+
   /**
    * Get assessments for the current student (My Assessments)
    */

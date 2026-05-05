@@ -21,6 +21,8 @@ interface BranchSelectionModalProps {
   loading?: boolean;
   allowClose?: boolean; // Allow closing modal (for switching, not initial selection)
   onClose?: () => void; // Callback when modal is closed
+  /** Optional explicit colour for the Continue button (e.g. auth flows use DEFAULT_THEME_COLOR) */
+  continueButtonColor?: string;
 }
 
 export function BranchSelectionModal({
@@ -30,6 +32,7 @@ export function BranchSelectionModal({
   loading = false,
   allowClose = false,
   onClose,
+  continueButtonColor,
 }: BranchSelectionModalProps) {
   const colors = useThemeColors();
   const uniqueBranches = deduplicateBranchesById(branches);
@@ -88,7 +91,7 @@ export function BranchSelectionModal({
           loading={loading && !!selectedBranchId}
           size="lg"
           style={{
-            backgroundColor: colors.primary,
+            backgroundColor: continueButtonColor ?? colors.primary,
             color: 'white',
           }}
         >

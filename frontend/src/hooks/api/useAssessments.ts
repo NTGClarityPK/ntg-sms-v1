@@ -106,6 +106,27 @@ export function useExportExaminationSchedulePdf() {
   });
 }
 
+export function useExportMyExaminationSchedulePdf() {
+  return useMutation({
+    mutationFn: async (params: { academicYearId?: string; language?: string }) => {
+      const { language, ...rest } = params;
+      return apiClient.getBlobWithFilename('/api/v1/assessments/my/examination-schedule/export/pdf', {
+        params: { ...rest, ...(language ? { language } : {}) },
+      });
+    },
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? 'examination-schedule.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+  });
+}
+
 /**
  * Hook to get a single assessment by ID
  */

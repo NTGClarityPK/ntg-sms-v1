@@ -7,6 +7,12 @@
 
 import { generateThemeColors, mixColors, darken } from '../utils/themeColors';
 
+// Alma brand palette (single source of truth)
+export const ALMA_BRAND_GREEN = '#4A7C59';
+export const ALMA_BRAND_GREEN_LIGHT = '#6FA382';
+export const ALMA_BRAND_GREEN_LIGHTER = '#A8C9B3';
+export const ALMA_BRAND_GREEN_PALE = '#E0F0E5';
+
 export interface ThemeConfig {
   // Color Settings
   colors: {
@@ -231,6 +237,14 @@ export function generateThemeConfig(
   isDark: boolean = false
 ): ThemeConfig {
   const themeColors = generateThemeColors(primaryColor, isDark);
+
+  // If Alma primary is selected, use the exact Alma palette values
+  if (themeColors.primary.toLowerCase() === ALMA_BRAND_GREEN.toLowerCase()) {
+    themeColors.primary = ALMA_BRAND_GREEN;
+    themeColors.primaryLight = ALMA_BRAND_GREEN_LIGHT;
+    themeColors.primaryLighter = ALMA_BRAND_GREEN_LIGHTER;
+    themeColors.primaryLightest = ALMA_BRAND_GREEN_PALE;
+  }
   
   // No console logging (keep build/runtime output clean)
   

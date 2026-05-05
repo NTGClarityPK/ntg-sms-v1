@@ -336,6 +336,7 @@ export default function AuthCallbackPage() {
         onSelect={handleBranchSelection}
         loading={branchSelectionLoading}
         allowClose={false}
+        continueButtonColor={DEFAULT_THEME_COLOR}
       />
     </Stack>
   );

@@ -1,7 +1,7 @@
 /**
  * Default theme color constant
  */
-export const DEFAULT_THEME_COLOR = '#4caf50';
+export const DEFAULT_THEME_COLOR = '#4A7C59';
 
 /**
  * Get the current theme color from CSS custom properties
