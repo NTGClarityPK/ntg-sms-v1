@@ -7,7 +7,7 @@ import '@/styles/tailwind.css';
 import { Audiowide, Saira, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
-import { DirectionProvider } from '@mantine/core';
+import { ColorSchemeScript, DirectionProvider } from '@mantine/core';
 
 const saira = Saira({
   subsets: ['latin'],
@@ -59,7 +59,10 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} dir={dir} translate="no">
+    <html lang={locale} dir={dir} translate="no" suppressHydrationWarning>
+      <head>
+        <ColorSchemeScript defaultColorScheme="light" />
+      </head>
       <body
         className={`${saira.variable} ${monoFont.variable} ${audiowideFont.variable} font-sans antialiased`}
         style={

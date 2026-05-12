@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challan - Professional Modern</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            padding: 40px 20px;
+        }
+        
+        .challan {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .header-left h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        
+        .header-left p {
+            font-size: 14px;
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+        
+        .qr-code {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .qr-code img {
+            display: block;
+            width: 120px;
+            height: 120px;
+        }
+        
+        .qr-text {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .info-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .info-card {
+            background: #f8f9fc;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            color: #1e293b;
+            font-weight: 600;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            color: #1e293b;
+            margin-bottom: 20px;
+            font-weight: 700;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .fee-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-bottom: 30px;
+        }
+        
+        .fee-table thead {
+            background: #f8f9fc;
+        }
+        
+        .fee-table th {
+            padding: 16px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .fee-table th:last-child {
+            text-align: right;
+        }
+        
+        .fee-table td {
+            padding: 16px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #334155;
+            font-size: 15px;
+        }
+        
+        .fee-table td:last-child {
+            text-align: right;
+            font-weight: 600;
+        }
+        
+        .fee-table tr.discount td {
+            color: #10b981;
+            font-weight: 600;
+        }
+        
+        .summary {
+            background: #f8f9fc;
+            padding: 24px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            font-size: 15px;
+        }
+        
+        .summary-row.total {
+            border-top: 2px solid #cbd5e1;
+            margin-top: 8px;
+            padding-top: 16px;
+        }
+        
+        .summary-row.total .label {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .summary-row.total .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .payment-info {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        
+        .payment-info h3 {
+            color: #92400e;
+            font-size: 16px;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+        
+        .payment-info p {
+            color: #78350f;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        .bank-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .bank-detail {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+        }
+        
+        .bank-detail strong {
+            display: block;
+            font-size: 11px;
+            color: #92400e;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        
+        .bank-detail span {
+            font-size: 14px;
+            color: #78350f;
+            font-weight: 600;
+        }
+        
+        .footer {
+            background: #f8f9fc;
+            padding: 24px 40px;
+            text-align: center;
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .footer strong {
+            display: block;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="challan">
+        <div class="header">
+            <div class="header-left">
+                <h1>Main Branch</h1>
+                <p>NTG Alma School<br>
+                123 Education Street, Karachi<br>
+                Phone: +92 21 1234 5678</p>
+            </div>
+            <div class="qr-code">
+                <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="120" height="120" fill="white"/>
+                    <rect x="10" y="10" width="20" height="20" fill="black"/>
+                    <rect x="35" y="10" width="5" height="5" fill="black"/>
+                    <rect x="45" y="10" width="10" height="10" fill="black"/>
+                    <rect x="60" y="10" width="5" height="5" fill="black"/>
+                    <rect x="70" y="10" width="5" height="5" fill="black"/>
+                    <rect x="90" y="10" width="20" height="20" fill="black"/>
+                    <rect x="10" y="35" width="5" height="5" fill="black"/>
+                    <rect x="25" y="35" width="5" height="5" fill="black"/>
+                    <rect x="40" y="35" width="15" height="5" fill="black"/>
+                    <rect x="65" y="35" width="10" height="5" fill="black"/>
+                    <rect x="85" y="35" width="5" height="5" fill="black"/>
+                    <rect x="90" y="35" width="5" height="5" fill="black"/>
+                    <rect x="105" y="35" width="5" height="5" fill="black"/>
+                    <rect x="10" y="45" width="5" height="5" fill="black"/>
+                    <rect x="25" y="45" width="5" height="5" fill="black"/>
+                    <rect x="35" y="50" width="10" height="10" fill="black"/>
+                    <rect x="50" y="45" width="15" height="5" fill="black"/>
+                    <rect x="70" y="50" width="5" height="5" fill="black"/>
+                    <rect x="85" y="45" width="10" height="10" fill="black"/>
+                    <rect x="105" y="45" width="5" height="5" fill="black"/>
+                    <rect x="10" y="60" width="15" height="15" fill="black"/>
+                    <rect x="35" y="65" width="10" height="5" fill="black"/>
+                    <rect x="50" y="60" width="5" height="5" fill="black"/>
+                    <rect x="60" y="70" width="15" height="5" fill="black"/>
+                    <rect x="85" y="65" width="5" height="5" fill="black"/>
+                    <rect x="95" y="60" width="15" height="15" fill="black"/>
+                    <rect x="10" y="80" width="5" height="5" fill="black"/>
+                    <rect x="25" y="80" width="10" height="10" fill="black"/>
+                    <rect x="45" y="85" width="15" height="5" fill="black"/>
+                    <rect x="70" y="80" width="5" height="5" fill="black"/>
+                    <rect x="85" y="85" width="10" height="5" fill="black"/>
+                    <rect x="105" y="80" width="5" height="5" fill="black"/>
+                    <rect x="10" y="90" width="20" height="20" fill="black"/>
+                    <rect x="40" y="95" width="10" height="10" fill="black"/>
+                    <rect x="55" y="90" width="5" height="5" fill="black"/>
+                    <rect x="65" y="95" width="15" height="5" fill="black"/>
+                    <rect x="85" y="90" width="5" height="5" fill="black"/>
+                    <rect x="90" y="90" width="20" height="20" fill="black"/>
+                    <rect x="15" y="15" width="10" height="10" fill="white"/>
+                    <rect x="95" y="15" width="10" height="10" fill="white"/>
+                    <rect x="15" y="95" width="10" height="10" fill="white"/>
+                    <rect x="95" y="95" width="10" height="10" fill="white"/>
+                </svg>
+                <div class="qr-text">Scan to pay</div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="info-section">
+                <div class="info-card">
+                    <div class="info-label">Challan Number</div>
+                    <div class="info-value">CHL-2026-000001</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Due Date</div>
+                    <div class="info-value">Friday, 15th May 2026</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Student</div>
+                    <div class="info-value">Ali Hassan (0031)</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Month</div>
+                    <div class="info-value">May 2026</div>
+                </div>
+            </div>
+            
+            <h2 class="section-title">Fee Breakdown</h2>
+            
+            <table class="fee-table">
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Description</th>
+                        <th>Amount (PKR)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>2026-05</td>
+                        <td>Tuition Fee (2026-05)</td>
+                        <td>3,000.00</td>
+                    </tr>
+                    <tr class="discount">
+                        <td>2026-05</td>
+                        <td>Discount (10%)</td>
+                        <td>-300.00</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="summary">
+                <div class="summary-row">
+                    <span class="label">Subtotal:</span>
+                    <span class="value">3,000.00 PKR</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Discounts:</span>
+                    <span class="value" style="color: #10b981;">-300.00 PKR</span>
+                </div>
+                <div class="summary-row total">
+                    <span class="label">Total Payable:</span>
+                    <span class="value">2,700.00 PKR</span>
+                </div>
+            </div>
+            
+            <div class="payment-info">
+                <h3>💳 Payment Instructions</h3>
+                <p>Please pay the above amount before the due date to avoid late fees. After payment, upload your receipt through the parent portal.</p>
+                
+                <div class="bank-details">
+                    <div class="bank-detail">
+                        <strong>Bank Name</strong>
+                        <span>HBL Bank</span>
+                    </div>
+                    <div class="bank-detail">
+                        <strong>Account Title</strong>
+                        <span>NTG Alma School</span>
+                    </div>
+                    <div class="bank-detail">
+                        <strong>Account Number</strong>
+                        <span>1234-5678-9012</span>
+                    </div>
+                    <div class="bank-detail">
+                        <strong>Branch Code</strong>
+                        <span>0123</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <strong>Important Note</strong>
+            This is a computer-generated document. For queries, contact admin@ntgalma.edu.pk or call +92 21 1234 5678
+        </div>
+    </div>
+</body>
+</html>

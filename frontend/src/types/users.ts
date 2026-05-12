@@ -43,6 +43,8 @@ export interface UpdateUserInput {
   dateOfBirth?: string;
   gender?: 'male' | 'female';
   isActive?: boolean;
+  /** Stored on profile as invitation_recipient_email; used for password-setup invitations. */
+  invitationRecipientEmail?: string | null;
 }
 
 export interface UpdateUserRolesInput {

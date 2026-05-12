@@ -78,7 +78,7 @@ export class ClassSectionsService {
       .from('class_sections')
       .select(
         '*, classes:class_id(name, display_name, sort_order), sections:section_id(name, sort_order)',
-        { count: 'exact' },
+        { count: query.minimal ? 'planned' : 'exact' },
       )
       .eq('branch_id', branchId)
       .eq('academic_year_id', activeYearId);

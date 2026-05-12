@@ -52,6 +52,7 @@ import { SettingsImportModule } from './modules/settings-import/settings-import.
 import { InvitationsModule } from './modules/invitations/invitations.module';
 import { PromotionPlacementModule } from './modules/promotion-placement/promotion-placement.module';
 import { SetupWizardModule } from './modules/setup-wizard/setup-wizard.module';
+import { FeesModule } from './modules/fees/fees.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { SetupWizardModule } from './modules/setup-wizard/setup-wizard.module';
     InvitationsModule,
     PromotionPlacementModule,
     SetupWizardModule,
+    FeesModule,
   ],
   controllers: [AppController],
   providers: [

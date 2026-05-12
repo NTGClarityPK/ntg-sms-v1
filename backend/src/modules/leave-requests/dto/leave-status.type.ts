@@ -1,5 +1,9 @@
-export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
-
+export type LeaveStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled'
+  | 'absent';
 
 
 

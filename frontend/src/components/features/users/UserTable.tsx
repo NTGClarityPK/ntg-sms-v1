@@ -190,8 +190,8 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
           <Table.Thead>
             <Table.Tr>
               <SortableHeader field="fullName">{t('name')}</SortableHeader>
-              <SortableHeader field="email">{t('email')}</SortableHeader>
-              <Table.Th>{t('roles')}</Table.Th>
+              <SortableHeader field="email">{t('loginEmail')}</SortableHeader>
+              <SortableHeader field="roles">{t('roles')}</SortableHeader>
               <SortableHeader field="isActive">{t('status')}</SortableHeader>
               <Table.Th>{t('actions')}</Table.Th>
             </Table.Tr>

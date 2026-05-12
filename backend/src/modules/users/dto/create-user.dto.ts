@@ -65,8 +65,8 @@ export class CreateUserDto {
    */
   @IsOptional()
   @IsString()
-  @Matches(/^[a-z0-9]+$/i, {
-    message: 'Username must be alphanumeric (no spaces or special characters)',
+  @Matches(/^[a-z0-9._]+$/i, {
+    message: 'Username may only contain letters, numbers, full stops and underscores',
   })
   username?: string;
 

@@ -6,9 +6,14 @@ import {
   ForbiddenException,
   HttpException,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { SupabaseConfig } from '../config/supabase.config';
+import {
+  isSupabaseConnectivityError,
+  SUPABASE_CONNECTIVITY_USER_MESSAGE,
+} from '../utils/supabase-connectivity-error.util';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -34,6 +39,9 @@ export class JwtAuthGuard implements CanActivate {
       } = await supabase.auth.getUser(token);
 
       if (error || !user) {
+        if (isSupabaseConnectivityError(error ?? undefined)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
         throw new UnauthorizedException('Invalid or expired token');
       }
 
@@ -46,6 +54,9 @@ export class JwtAuthGuard implements CanActivate {
         .eq('user_id', user.id);
 
       if (rolesError) {
+        if (isSupabaseConnectivityError(rolesError)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
         this.logger.warn(`Failed to fetch user roles: ${rolesError.message}`);
       }
 
@@ -80,6 +91,9 @@ export class JwtAuthGuard implements CanActivate {
       if (error instanceof HttpException) {
         throw error;
       }
+      if (isSupabaseConnectivityError(error)) {
+        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`JWT validation failed: ${errorMessage}`);
       throw new UnauthorizedException('Invalid or expired token');
@@ -106,6 +120,9 @@ export class JwtAuthGuard implements CanActivate {
       .maybeSingle();
 
     if (profileError && profileError.code !== 'PGRST116') {
+      if (isSupabaseConnectivityError(profileError)) {
+        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+      }
       this.logger.warn(`Failed to fetch profile status: ${profileError.message}`);
       throw new UnauthorizedException('Invalid or expired token');
     }
@@ -126,6 +143,9 @@ export class JwtAuthGuard implements CanActivate {
       .eq('user_id', input.userId);
 
     if (studentRowsError) {
+      if (isSupabaseConnectivityError(studentRowsError)) {
+        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+      }
       this.logger.warn(`Failed to fetch student status: ${studentRowsError.message}`);
       throw new UnauthorizedException('Invalid or expired token');
     }

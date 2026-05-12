@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsBoolean, IsIn } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsString, IsOptional, IsBoolean, IsIn, IsEmail, ValidateIf } from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -28,5 +29,23 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /**
+   * Email where password-setup invitations are sent (may differ from login email for staff).
+   * Empty string clears the stored value.
+   */
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed === '' ? null : trimmed;
+    }
+    return value;
+  })
+  @ValidateIf((o) => o.invitationRecipientEmail !== null && o.invitationRecipientEmail !== undefined)
+  @IsEmail()
+  invitationRecipientEmail?: string | null;
 }
 

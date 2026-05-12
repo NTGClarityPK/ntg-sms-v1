@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Group, Title, Tabs } from '@mantine/core';
 import { IconCalendarCheck, IconHistory, IconUserCheck } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useFeaturePermission } from '@/hooks/usePermissions';
+import { useFeaturePermission, usePermissions } from '@/hooks/usePermissions';
 import type { User } from '@/types/auth';
 import { AttendanceHistoryContent } from '@/components/features/attendance/AttendanceHistoryContent';
 import { MarkAttendanceContent } from '@/components/features/attendance/MarkAttendanceContent';
@@ -13,7 +13,9 @@ import { ChildAttendanceContent } from '@/components/features/attendance/ChildAt
 
 export default function AttendancePage() {
   const t = useTranslations('attendance');
-  const [activeTab, setActiveTab] = useState<string | null>('history');
+  const { isLoading: permissionsLoading } = usePermissions();
+  const [activeTab, setActiveTab] = useState<string>('history');
+  const appliedDefaultRef = useRef(false);
   const { user } = useAuth();
   const { canEdit } = useFeaturePermission('attendance');
   const userTyped = user as User | undefined;
@@ -24,6 +26,14 @@ export default function AttendancePage() {
     },
   );
   const isParent = userTyped?.roles?.some((r) => r.roleName?.toLowerCase() === 'parent');
+
+  useEffect(() => {
+    if (permissionsLoading || appliedDefaultRef.current) return;
+    appliedDefaultRef.current = true;
+    setActiveTab(
+      isTeacher && canEdit ? 'mark' : isParent ? 'child' : 'history',
+    );
+  }, [permissionsLoading, isTeacher, canEdit, isParent]);
 
   return (
     <>
@@ -42,11 +52,8 @@ export default function AttendancePage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs value={activeTab} onChange={setActiveTab}>
+        <Tabs value={activeTab} onChange={(v) => setActiveTab(v ?? 'history')}>
           <Tabs.List>
-            <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>
-              {t('tabHistory')}
-            </Tabs.Tab>
             {isTeacher && canEdit && (
               <Tabs.Tab value="mark" leftSection={<IconCalendarCheck size={16} />}>
                 {t('tabMarkAttendance')}
@@ -57,11 +64,10 @@ export default function AttendancePage() {
                 {t('tabChildAttendance')}
               </Tabs.Tab>
             )}
+            <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>
+              {t('tabHistory')}
+            </Tabs.Tab>
           </Tabs.List>
-
-          <Tabs.Panel value="history" pt="md" px="md" pb="md">
-            <AttendanceHistoryContent />
-          </Tabs.Panel>
 
           {isTeacher && canEdit && (
             <Tabs.Panel value="mark" pt="md" px="md" pb="md">
@@ -74,6 +80,10 @@ export default function AttendancePage() {
               <ChildAttendanceContent />
             </Tabs.Panel>
           )}
+
+          <Tabs.Panel value="history" pt="md" px="md" pb="md">
+            <AttendanceHistoryContent />
+          </Tabs.Panel>
         </Tabs>
       </div>
     </>

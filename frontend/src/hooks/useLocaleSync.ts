@@ -12,8 +12,8 @@ function getUserPreferredLocaleRaw(user: User): string | undefined {
 }
 
 /**
- * Keep the UI cookie aligned with the authenticated user's DB preference.
- * This is intentionally one-way (DB -> cookie) to avoid locale "ping-pong" during navigation.
+ * Initialise the UI cookie from the authenticated user's DB preference.
+ * Important: cookie is the UI source of truth. We only write when cookie is absent.
  */
 export function useLocaleSync(): void {
   const { user } = useAuth();
@@ -21,12 +21,13 @@ export function useLocaleSync(): void {
   useEffect(() => {
     if (!user || typeof window === 'undefined') return;
 
-    const dbNorm = normalizeUiLocale(getUserPreferredLocaleRaw(user) ?? 'en-US');
     const cookieNorm = readResolvedUiLocaleFromBrowser();
 
-    if (cookieNorm !== dbNorm) {
-      setUiLocaleCookieOnDocument(dbNorm);
-    }
+    // If a locale cookie already exists, never override it (prevents login/logout language flips).
+    if (cookieNorm) return;
+
+    const dbNorm = normalizeUiLocale(getUserPreferredLocaleRaw(user) ?? 'en-US');
+    setUiLocaleCookieOnDocument(dbNorm);
   }, [user?.id]);
 }
 

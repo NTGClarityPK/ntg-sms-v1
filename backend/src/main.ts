@@ -84,6 +84,7 @@ async function bootstrap() {
     { name: 'Events', description: 'School events' },
     { name: 'Library', description: 'Library catalogue and circulation' },
     { name: 'Uniforms', description: 'Uniform catalogue, requests, and issuances' },
+    { name: 'Fees', description: 'Fee templates, challans, payments, and automation' },
     { name: 'Messaging', description: 'Direct messages and conversations' },
     { name: 'Notifications', description: 'In-app notifications and preferences' },
     { name: 'Push', description: 'Web push subscription management' },

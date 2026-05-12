@@ -64,18 +64,34 @@ export default function UsersPage() {
 
   const sortedUsers = useMemo(() => {
     const sorted = [...filteredUsers];
-    const key: keyof User =
-      sortBy === 'fullName'
-        ? 'fullName'
-        : sortBy === 'email'
-          ? 'email'
-          : sortBy === 'isActive'
-            ? 'isActive'
-            : sortBy === 'created_at' || sortBy === 'createdAt'
-              ? 'createdAt'
-              : 'createdAt';
     const order = sortOrder === 'asc' ? 1 : -1;
+
+    const roleSortLabel = (u: User) =>
+      (u.roles ?? [])
+        .map((r) => (r.roleName || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+        .join(', ');
+
     sorted.sort((a, b) => {
+      if (sortBy === 'roles') {
+        const cmp = roleSortLabel(a).localeCompare(roleSortLabel(b), undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+        return cmp * order;
+      }
+
+      const key: keyof User =
+        sortBy === 'fullName'
+          ? 'fullName'
+          : sortBy === 'email'
+            ? 'email'
+            : sortBy === 'isActive'
+              ? 'isActive'
+              : sortBy === 'created_at' || sortBy === 'createdAt'
+                ? 'createdAt'
+                : 'createdAt';
       const aVal = a[key];
       const bVal = b[key];
       if (aVal === bVal) return 0;

@@ -18,7 +18,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { useState } from 'react';
-import { IconX } from '@tabler/icons-react';
+import { IconEye, IconX } from '@tabler/icons-react';
 import type { LeaveRequest } from '@/types/leaves';
 import { useUpdateLeaveStatus } from '@/hooks/useLeaveRequests';
 
@@ -46,6 +46,7 @@ const statusColorMap: Record<LeaveRequest['status'], string> = {
   approved: 'green',
   rejected: 'red',
   cancelled: 'gray',
+  absent: 'red',
 };
 
 /** Format date string. Parses YYYY-MM-DD as local date to avoid timezone shift. */
@@ -185,7 +186,9 @@ export function LeaveRequestTable({
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('leave');
   const [reviewModalOpened, { open: openReviewModal, close: closeReviewModal }] = useDisclosure(false);
+  const [detailModalOpened, { open: openDetailModal, close: closeDetailModal }] = useDisclosure(false);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
+  const [detailRequest, setDetailRequest] = useState<LeaveRequest | null>(null);
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const updateStatus = useUpdateLeaveStatus();
@@ -202,6 +205,11 @@ export function LeaveRequestTable({
       id: request.id,
       action: 'cancel',
     });
+  };
+
+  const openDetail = (request: LeaveRequest) => {
+    setDetailRequest(request);
+    openDetailModal();
   };
 
   const handleConfirmReview = () => {
@@ -225,6 +233,14 @@ export function LeaveRequestTable({
   };
 
   const statusBadge = (status: LeaveRequest['status']) => {
+    if (status === 'absent') {
+      return (
+        <Badge variant="filled" color="red" tt="uppercase" size="sm">
+          {t('absent')}
+        </Badge>
+      );
+    }
+
     const badge = (
       <Badge variant="light" color={statusColorMap[status] ?? 'gray'}>
         {t(status)}
@@ -245,7 +261,7 @@ export function LeaveRequestTable({
   return (
     <>
       <ScrollArea type="auto" scrollbars="x" w="100%">
-        <Table striped highlightOnHover style={{ minWidth: 1080 }}>
+        <Table striped highlightOnHover style={{ minWidth: 880 }}>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>{t('dateRequested')}</Table.Th>
@@ -253,18 +269,16 @@ export function LeaveRequestTable({
               <Table.Th>{t('days')}</Table.Th>
               <Table.Th>{t('student')}</Table.Th>
               <Table.Th>{t('quotaUsage')}</Table.Th>
-              <Table.Th>{t('reason')}</Table.Th>
               <Table.Th>{t('status')}</Table.Th>
               <Table.Th>{t('reviewedBy')}</Table.Th>
               <Table.Th>{t('dateReviewed')}</Table.Th>
-              <Table.Th>{t('reviewNotes')}</Table.Th>
               <Table.Th>{t('actions')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {requests.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={11}>
+                <Table.Td colSpan={9}>
                   <Text c="dimmed" ta="center" py="md">
                     {t('noLeaveRequestsFound')}
                   </Text>
@@ -317,11 +331,6 @@ export function LeaveRequestTable({
                         : '–'}
                     </Text>
                   </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" lineClamp={2}>
-                      {request.reason}
-                    </Text>
-                  </Table.Td>
                   <Table.Td>{statusBadge(request.status)}</Table.Td>
                   <Table.Td>
                     {request.reviewerName ? (
@@ -349,18 +358,18 @@ export function LeaveRequestTable({
                     )}
                   </Table.Td>
                   <Table.Td>
-                    {request.reviewNotes ? (
-                      <Text size="sm" c="dimmed" lineClamp={2}>
-                        {request.reviewNotes}
-                      </Text>
-                    ) : (
-                      <Text size="sm" c="dimmed">
-                        -
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
+                    <Group gap="xs" wrap="nowrap">
+                      <Tooltip label={t('detailTooltip')} withArrow>
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          id={`leave-request-detail-${request.id}`}
+                          onClick={() => openDetail(request)}
+                          aria-label={t('detailTooltip')}
+                        >
+                          <IconEye size={18} />
+                        </ActionIcon>
+                      </Tooltip>
                       {canReview && (
                         <>
                           <Button
@@ -407,6 +416,93 @@ export function LeaveRequestTable({
           </Table.Tbody>
         </Table>
       </ScrollArea>
+
+      <Modal
+        opened={detailModalOpened}
+        onClose={() => {
+          closeDetailModal();
+          setDetailRequest(null);
+        }}
+        title={t('detailModalTitle')}
+        centered
+        size="lg"
+      >
+        {detailRequest ? (
+          <Stack gap="md">
+            <div>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>
+                {t('student')}
+              </Text>
+              <Text size="sm">{studentNameMap?.get(detailRequest.studentId) ?? 'N/A'}</Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>
+                {t('dateRequested')}
+              </Text>
+              <Text size="sm">{formatDate(detailRequest.createdAt)}</Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>
+                {t('leavePeriod')}
+              </Text>
+              <Text size="sm">
+                {formatDateRange(detailRequest.startDate, detailRequest.endDate)}
+              </Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>
+                {t('status')}
+              </Text>
+              {statusBadge(detailRequest.status)}
+            </div>
+            <div>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>
+                {t('reason')}
+              </Text>
+              <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                {detailRequest.reason}
+              </Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>
+                {t('reviewedBy')}
+              </Text>
+              <Text size="sm">
+                {detailRequest.reviewerName ? (
+                  <>
+                    {detailRequest.reviewerName}
+                    {detailRequest.reviewerRole ? (
+                      <Text component="span" c="dimmed" size="sm" ml={4}>
+                        ({detailRequest.reviewerRole})
+                      </Text>
+                    ) : null}
+                  </>
+                ) : (
+                  <Text component="span" c="dimmed">
+                    –
+                  </Text>
+                )}
+              </Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>
+                {t('dateReviewed')}
+              </Text>
+              <Text size="sm">
+                {detailRequest.reviewedAt ? formatDate(detailRequest.reviewedAt) : '–'}
+              </Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>
+                {t('reviewNotes')}
+              </Text>
+              <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap' }}>
+                {detailRequest.reviewNotes ?? '–'}
+              </Text>
+            </div>
+          </Stack>
+        ) : null}
+      </Modal>
 
       {meta && meta.totalPages > 1 && (
         <ScrollArea type="auto" scrollbars="x" w="100%" mt="md">

@@ -246,7 +246,7 @@ export class LeaveRequestsService {
       .select('id, start_date, end_date, status')
       .eq('student_id', input.studentId)
       .eq('academic_year_id', activeYear.id)
-      .in('status', ['pending', 'approved']);
+      .in('status', ['pending', 'approved', 'absent']);
 
     throwIfDbError(conflictError);
 
@@ -261,7 +261,7 @@ export class LeaveRequestsService {
     );
     if (overlaps) {
       throw new BadRequestException(
-        'A leave request for this student already exists for the same or overlapping dates (pending or approved). Please cancel or use the existing request.',
+        'A leave request for this student already exists for the same or overlapping dates (pending, approved, or an attendance absence record). Please cancel or use the existing request.',
       );
     }
 
@@ -467,11 +467,49 @@ export class LeaveRequestsService {
       const myStudentId = (meStudent as { id: string }).id;
       dbQuery = dbQuery.eq('student_id', myStudentId);
     } else if (isParent) {
-      // Parents: only show requests they raised (for linked children via UI).
-      dbQuery = dbQuery.eq('requested_by', userId);
+      // Parents: any leave row for their linked children (includes attendance-created rows
+      // where requested_by may be another guardian on the same student).
+      const { data: linkRows, error: linkError } = await supabase
+        .from('parent_students')
+        .select('student_id')
+        .eq('parent_user_id', userId);
+      throwIfDbError(linkError);
+      const linkedIds = Array.from(
+        new Set(
+          (linkRows ?? []).map((r) => (r as { student_id: string }).student_id),
+        ),
+      );
+      if (linkedIds.length === 0) {
+        return { data: [], meta: { total: 0, page, limit, totalPages: 1 } };
+      }
+
+      const { data: branchStudents, error: branchErr } = await supabase
+        .from('students')
+        .select('id')
+        .eq('branch_id', branchId)
+        .in('id', linkedIds);
+      throwIfDbError(branchErr);
+      const allowedStudentIds = new Set(
+        (branchStudents ?? []).map((s) => (s as { id: string }).id),
+      );
+      if (allowedStudentIds.size === 0) {
+        return { data: [], meta: { total: 0, page, limit, totalPages: 1 } };
+      }
+
+      if (query.studentId) {
+        if (!allowedStudentIds.has(query.studentId)) {
+          return { data: [], meta: { total: 0, page, limit, totalPages: 1 } };
+        }
+        dbQuery = dbQuery.eq('student_id', query.studentId);
+      } else {
+        dbQuery = dbQuery.in(
+          'student_id',
+          [...allowedStudentIds],
+        );
+      }
     }
 
-    if (query.studentId) {
+    if (query.studentId && !isParent) {
       dbQuery = dbQuery.eq('student_id', query.studentId);
     }
 
@@ -641,6 +679,8 @@ export class LeaveRequestsService {
       if (!myStudentId || row.student_id !== myStudentId) {
         throw new ForbiddenException('You do not have access to this leave request');
       }
+    } else if (isParent && userId) {
+      await this.ensureParentCanAccessStudent(userId, row.student_id);
     }
 
     return this.mapRowToDto(row);
@@ -828,12 +868,18 @@ export class LeaveRequestsService {
   async getLeaveStats(
     studentId: string,
     branchId: string,
-  ): Promise<{ pending: number; approved: number; rejected: number; cancelled: number }> {
+  ): Promise<{
+    pending: number;
+    approved: number;
+    rejected: number;
+    cancelled: number;
+    absent: number;
+  }> {
     const supabase = this.supabaseConfig.getClient();
 
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) {
-      return { pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+      return { pending: 0, approved: 0, rejected: 0, cancelled: 0, absent: 0 };
     }
 
     // Use raw SQL query for efficient COUNT GROUP BY
@@ -849,7 +895,13 @@ export class LeaveRequestsService {
     }
 
     // Count by status client-side (Supabase doesn't support GROUP BY directly)
-    const counts = { pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+    const counts = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      cancelled: 0,
+      absent: 0,
+    };
     (data || []).forEach((row) => {
       const status = row.status as keyof typeof counts;
       if (status in counts) {
@@ -893,7 +945,7 @@ export class LeaveRequestsService {
       .select('start_date, end_date, reason')
       .eq('student_id', studentId)
       .eq('academic_year_id', activeYear.id)
-      .eq('status', 'approved');
+      .in('status', ['approved', 'absent']);
 
     throwIfDbError(leavesError);
 

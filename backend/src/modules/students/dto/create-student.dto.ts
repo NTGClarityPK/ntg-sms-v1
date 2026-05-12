@@ -8,9 +8,11 @@ import {
 } from 'class-validator';
 
 export class CreateStudentDto {
-  /** School login username (without domain). Alphanumeric only. */
+  /** School login username (without domain). Letters, numbers, full stops and underscores only. */
   @IsString()
-  @Matches(/^[a-z0-9]+$/i, { message: 'Username must be alphanumeric (no spaces or special characters)' })
+  @Matches(/^[a-z0-9._]+$/i, {
+    message: 'Username may only contain letters, numbers, full stops and underscores',
+  })
   username!: string;
 
   @IsString()

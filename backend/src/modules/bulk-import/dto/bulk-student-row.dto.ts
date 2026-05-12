@@ -27,14 +27,13 @@ export class BulkStudentRowDto {
     if (value == null) return value;
     const raw = String(value).trim().toLowerCase();
     if (!raw) return raw;
-    // Accept older/hand-made sheets where username is written like an email local part (e.g. hira.majid)
-    // and normalise to the system requirement (alphanumeric only).
-    return raw.replace(/[^a-z0-9]/g, '');
+    // Normalise to allowed local-part characters (letters, numbers, full stop, underscore).
+    return raw.replace(/[^a-z0-9._]/g, '');
   })
   @IsString()
-  @Matches(/^[a-z0-9]+$/i, {
+  @Matches(/^[a-z0-9._]+$/i, {
     message:
-      'Username must be alphanumeric (no spaces or special characters). Use the portal login username without the school domain.',
+      'Username may only contain letters, numbers, full stops and underscores. Use the portal login username without the school domain.',
   })
   username!: string;
 

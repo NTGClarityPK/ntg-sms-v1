@@ -9,6 +9,14 @@ export class QueryAttendanceDto extends BasePaginationDto {
   date?: string;
 
   @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
   @IsString()
   classSectionId?: string; // Deprecated: use classSectionIds instead
 

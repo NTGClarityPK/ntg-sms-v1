@@ -46,7 +46,6 @@ export function StudentRow({
 
   const handleStatusChange = (value: AttendanceStatus) => {
     onStatusChange(value);
-    // Auto-fill entry time for present/late
     if (value === 'present' || value === 'late') {
       const now = new Date();
       const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -54,7 +53,9 @@ export function StudentRow({
       onTimeChange('entryTime', timeString);
     } else {
       setEntryTime('');
+      setExitTime('');
       onTimeChange('entryTime', '');
+      onTimeChange('exitTime', '');
     }
   };
 
@@ -65,12 +66,13 @@ export function StudentRow({
   ];
 
   const selectedBorderColour = 'var(--mantine-color-yellow-4)';
+  const timesDisabled = attendance.status === 'absent';
 
   return (
     <Table.Tr>
-      <Table.Td>
-        <Group gap="sm" wrap="nowrap">
-          <Avatar size="sm" radius="xl">
+      <Table.Td style={{ verticalAlign: 'middle', overflow: 'hidden' }}>
+        <Group gap="sm" wrap="nowrap" align="center" style={{ minWidth: 0 }}>
+          <Avatar size="sm" radius="xl" style={{ flexShrink: 0 }}>
             {attendance.studentName
               .split(' ')
               .map((n) => n[0])
@@ -78,7 +80,7 @@ export function StudentRow({
               .toUpperCase()
               .slice(0, 2)}
           </Avatar>
-          <div>
+          <div style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
             <Text fw={500} size="sm" lineClamp={1}>
               {attendance.studentName}
             </Text>
@@ -88,46 +90,46 @@ export function StudentRow({
           </div>
         </Group>
       </Table.Td>
-      <Table.Td>
-        <Group gap={4}>
-          {statusButtons.map((btn) => (
-            (() => {
-              const isSelected = attendance.status === btn.value;
-              return (
-            <Button
-              key={btn.value}
-              size="xs"
-              variant="outline"
-              onClick={() => handleStatusChange(btn.value)}
-              title={btn.value.charAt(0).toUpperCase() + btn.value.slice(1)}
-              aria-pressed={isSelected}
-              styles={{
-                root: {
-                  minWidth: '32px',
-                  padding: '0 8px',
-                  borderColor: isSelected ? selectedBorderColour : btn.color,
-                  borderWidth: isSelected ? '3px' : '1px',
-                  boxShadow: isSelected ? `0 0 0 2px ${selectedBorderColour}` : undefined,
-                  ...(isSelected
-                    ? {
-                        backgroundColor: btn.color,
-                        color: 'var(--mantine-color-white)',
-                      }
-                    : {
-                        backgroundColor: 'transparent',
-                        color: btn.color,
-                      }),
-                },
-              }}
-            >
-              {btn.label}
-            </Button>
-              );
-            })()
-          ))}
+      <Table.Td style={{ verticalAlign: 'middle' }}>
+        <Group gap={5} wrap="nowrap" justify="flex-start">
+          {statusButtons.map((btn) => {
+            const isSelected = attendance.status === btn.value;
+            return (
+              <Button
+                key={btn.value}
+                size="xs"
+                variant="outline"
+                onClick={() => handleStatusChange(btn.value)}
+                title={btn.value.charAt(0).toUpperCase() + btn.value.slice(1)}
+                aria-pressed={isSelected}
+                styles={{
+                  root: {
+                    minWidth: 36,
+                    minHeight: 30,
+                    padding: '0 9px',
+                    fontWeight: 600,
+                    borderColor: isSelected ? selectedBorderColour : btn.color,
+                    borderWidth: isSelected ? '3px' : '1px',
+                    boxShadow: isSelected ? `0 0 0 2px ${selectedBorderColour}` : undefined,
+                    ...(isSelected
+                      ? {
+                          backgroundColor: btn.color,
+                          color: 'var(--mantine-color-white)',
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          color: btn.color,
+                        }),
+                  },
+                }}
+              >
+                {btn.label}
+              </Button>
+            );
+          })}
         </Group>
       </Table.Td>
-      <Table.Td>
+      <Table.Td style={{ verticalAlign: 'middle' }}>
         <TextInput
           type="time"
           value={entryTime}
@@ -136,12 +138,15 @@ export function StudentRow({
             setEntryTime(value);
             onTimeChange('entryTime', value);
           }}
-          disabled={attendance.status === 'absent'}
+          disabled={timesDisabled}
           size="xs"
-          style={{ width: '100px' }}
+          styles={{
+            root: { width: 'fit-content', maxWidth: '100%' },
+            input: { width: 96, minWidth: 96, maxWidth: 96, paddingInline: 4 },
+          }}
         />
       </Table.Td>
-      <Table.Td>
+      <Table.Td style={{ verticalAlign: 'middle' }}>
         <TextInput
           type="time"
           value={exitTime}
@@ -150,12 +155,16 @@ export function StudentRow({
             setExitTime(value);
             onTimeChange('exitTime', value);
           }}
+          disabled={timesDisabled}
           size="xs"
-          style={{ width: '100px' }}
+          styles={{
+            root: { width: 'fit-content', maxWidth: '100%' },
+            input: { width: 96, minWidth: 96, maxWidth: 96, paddingInline: 4 },
+          }}
         />
       </Table.Td>
-      <Table.Td>
-        <Group gap="xs" wrap="nowrap">
+      <Table.Td style={{ verticalAlign: 'middle', textAlign: 'center' }}>
+        <Group gap="xs" wrap="nowrap" justify="center">
           <Popover width={300} position="bottom" withArrow shadow="md">
             <Popover.Target>
               <ActionIcon

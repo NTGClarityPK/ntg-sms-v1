@@ -59,6 +59,8 @@ export function useAttendance(params?: QueryAttendanceParams) {
       }
       if (params?.academicYearId)
         queryParams.append('academicYearId', params.academicYearId);
+      if (params?.startDate) queryParams.append('startDate', params.startDate);
+      if (params?.endDate) queryParams.append('endDate', params.endDate);
       if (params?.search) queryParams.append('search', params.search);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);

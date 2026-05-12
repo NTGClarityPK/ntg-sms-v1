@@ -48,7 +48,16 @@ export function MarkAttendanceContent() {
 
   return (
     <Stack gap="md">
-      <Paper withBorder p="md">
+      <Paper
+        withBorder
+        p="md"
+        radius="md"
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+        }}
+      >
         <Stack gap="md">
           <Group grow>
             <Select
@@ -100,10 +109,7 @@ export function MarkAttendanceContent() {
 
       {selectedClassSectionId && dateString && (
         <>
-          <AttendanceStats
-            attendance={attendance}
-            totalStudents={attendance.length}
-          />
+          <AttendanceStats attendance={attendance} totalStudents={attendance.length} />
           <AttendanceSheet
             classSectionId={selectedClassSectionId}
             date={dateString}
@@ -116,28 +122,9 @@ export function MarkAttendanceContent() {
       )}
 
       {!selectedClassSectionId && (
-        <Paper withBorder p="xl">
-          <Stack align="center" gap="sm">
-            <IconCalendar size={48} style={{ opacity: 0.5 }} />
-            <Group justify="center">
-              <Select
-                placeholder={t('selectClassSection')}
-                data={classSections.map((cs) => ({
-                  value: cs.id,
-                  label: `${cs.className || cs.classDisplayName || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
-                }))}
-                value={selectedClassSectionId}
-                onChange={setSelectedClassSectionId}
-                leftSection={<IconCalendar size={16} />}
-                searchable
-                style={{ minWidth: 280 }}
-              />
-            </Group>
-            <Text size="sm" c="dimmed">
-              {t('selectClassSectionAndDateHint')}
-            </Text>
-          </Stack>
-        </Paper>
+        <Text size="sm" c="dimmed" ta="center" py="xl">
+          {t('selectClassSectionAndDateHint')}
+        </Text>
       )}
     </Stack>
   );

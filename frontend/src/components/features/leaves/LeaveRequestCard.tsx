@@ -16,6 +16,7 @@ const statusColorMap: Record<LeaveRequest['status'], string> = {
   approved: 'green',
   rejected: 'red',
   cancelled: 'gray',
+  absent: 'red',
 };
 
 /** Format date string. Parses YYYY-MM-DD as local date to avoid timezone shift. */
@@ -61,14 +62,16 @@ export function LeaveRequestCard({
     });
   };
 
-  const statusBadge = (
-    <Badge
-      variant="light"
-      color={statusColorMap[request.status] ?? 'gray'}
-    >
-      {t(request.status)}
-    </Badge>
-  );
+  const statusBadge =
+    request.status === 'absent' ? (
+      <Badge variant="filled" color="red" tt="uppercase" size="sm">
+        {t('absent')}
+      </Badge>
+    ) : (
+      <Badge variant="light" color={statusColorMap[request.status] ?? 'gray'}>
+        {t(request.status)}
+      </Badge>
+    );
 
   return (
     <Card withBorder p="md">

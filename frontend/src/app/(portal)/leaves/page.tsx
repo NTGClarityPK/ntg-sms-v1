@@ -12,11 +12,8 @@ import {
   Select,
   Paper,
   Skeleton,
-  Table,
-  ScrollArea,
   Badge,
   Alert,
-  Button,
   Tooltip,
   ActionIcon,
 } from '@mantine/core';
@@ -24,11 +21,11 @@ import { IconUser, IconRefresh } from '@tabler/icons-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyStudent, useStudents } from '@/hooks/useStudents';
-import { useLeaveRequests, useStudentLeaveStats, useLeaveQuota } from '@/hooks/useLeaveRequests';
+import { useStudentLeaveStats, useLeaveQuota } from '@/hooks/useLeaveRequests';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useSchoolDays, usePublicHolidays, useVacations } from '@/hooks/useScheduleSettings';
 import { LeaveRequestForm } from '@/components/features/leaves/LeaveRequestForm';
-import { LeaveRequestTable } from '@/components/features/leaves/LeaveRequestTable';
+import { LeaveRequestsHistoryContent } from '@/components/features/leaves/LeaveRequestsHistoryContent';
 import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
 import type { Student } from '@/types/students';
@@ -56,8 +53,9 @@ export default function LeavesPage() {
   const isStudent = user?.roles?.some((r) => r.roleName === 'student');
   const branchId = (user as User | undefined)?.currentBranch?.id ?? null;
   const { canEdit } = useFeaturePermission('leaves');
-  const [page, setPage] = useState(1);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  /** All requests tab only; null = every linked child / self (no studentId query param). */
+  const [historyScopeStudentId, setHistoryScopeStudentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
   // For parents, fetch their children; for staff, fetch all students
@@ -154,11 +152,6 @@ export default function LeavesPage() {
     ? quotaQuery.data.usedDays > quotaQuery.data.totalQuota 
     : false;
 
-  const leaveQuery = useLeaveRequests({
-    page,
-    limit: 20,
-    studentId: isParent || isStudent ? (selectedStudentId ?? undefined) : undefined,
-  });
   const schoolDaysQuery = useSchoolDays();
   const activeSchoolDays = schoolDaysQuery.data?.data ?? [];
 
@@ -189,8 +182,6 @@ export default function LeavesPage() {
         })()
       : undefined;
 
-  const requests = leaveQuery.data?.data ?? [];
-
   // Create a map of studentId -> student name for display in cards
   const studentNameMap = new Map<string, string>();
   availableStudents.forEach((student) => {
@@ -208,7 +199,6 @@ export default function LeavesPage() {
             <ActionIcon
               variant="light"
               size="lg"
-              loading={leaveQuery.isRefetching}
               onClick={() => queryClient.invalidateQueries({ queryKey: ['leaves'] })}
             >
               <IconRefresh size={18} />
@@ -227,12 +217,7 @@ export default function LeavesPage() {
       >
         <Tabs
           value={activeTab ?? ((isParent || isStudent) ? 'my-requests' : 'all-requests')}
-          onChange={(value) => {
-            setActiveTab(value);
-            if (value === 'all-requests') {
-              leaveQuery.refetch();
-            }
-          }}
+          onChange={setActiveTab}
         >
           <Tabs.List>
             {canRaiseRequest && (
@@ -314,6 +299,14 @@ export default function LeavesPage() {
                                         {studentStats.data.rejected}
                                       </Badge>
                                     </Group>
+                                    <Group gap="xs">
+                                      <Text size="sm" c="dimmed">
+                                        {t('absent')}:
+                                      </Text>
+                                      <Badge variant="light" color="red" size="sm">
+                                        {studentStats.data.absent ?? 0}
+                                      </Badge>
+                                    </Group>
                                   </>
                                 ) : null}
                               </Group>
@@ -369,6 +362,14 @@ export default function LeavesPage() {
                                   {studentStats.data.rejected}
                                 </Badge>
                               </Group>
+                              <Group gap="xs">
+                                <Text size="sm" c="dimmed">
+                                  {t('absent')}:
+                                </Text>
+                                <Badge variant="light" color="red" size="sm">
+                                  {studentStats.data.absent ?? 0}
+                                </Badge>
+                              </Group>
                             </Group>
                           ) : null}
                         </Paper>
@@ -413,61 +414,26 @@ export default function LeavesPage() {
           )}
 
           <Tabs.Panel value="all-requests" pt="md">
-            <Stack gap="md">
-              {leaveQuery.isLoading || leaveQuery.isRefetching ? (
-                <ScrollArea type="auto" scrollbars="x" w="100%">
-                  <Table striped highlightOnHover style={{ minWidth: 880 }}>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>{t('dateRequested')}</Table.Th>
-                        <Table.Th>{t('leavePeriod')}</Table.Th>
-                        <Table.Th>{t('student')}</Table.Th>
-                        <Table.Th>{t('reason')}</Table.Th>
-                        <Table.Th>{t('status')}</Table.Th>
-                        <Table.Th>{t('reviewedBy')}</Table.Th>
-                        <Table.Th>{t('dateReviewed')}</Table.Th>
-                        <Table.Th>{t('reviewNotes')}</Table.Th>
-                        <Table.Th>{t('actions')}</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <Table.Tr key={i}>
-                          <Table.Td><Skeleton height={20} /></Table.Td>
-                          <Table.Td><Skeleton height={20} /></Table.Td>
-                          <Table.Td><Skeleton height={20} /></Table.Td>
-                          <Table.Td><Skeleton height={20} /></Table.Td>
-                          <Table.Td><Skeleton height={20} width={60} /></Table.Td>
-                          <Table.Td><Skeleton height={20} /></Table.Td>
-                          <Table.Td><Skeleton height={20} /></Table.Td>
-                          <Table.Td><Skeleton height={20} /></Table.Td>
-                          <Table.Td><Skeleton height={20} width={100} /></Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                </ScrollArea>
-              ) : leaveQuery.isError ? (
-                <Text size="sm" c="red">
-                  {t('errorLoadingLeaveRequests')}
-                </Text>
-              ) : requests.length === 0 ? (
-                <Text size="sm" c="dimmed">
-                  {t('noLeaveRequestsFoundShort')}
-                </Text>
-              ) : (
-                <LeaveRequestTable
-                  requests={requests}
-                  meta={leaveQuery.data?.meta}
-                  onPageChange={setPage}
-                  isStaffView={!(isParent || isStudent)}
-                  canEdit={canEdit}
-                  studentNameMap={studentNameMap}
-                  activeSchoolDays={activeSchoolDays}
-                  excludedDates={excludedDates}
-                />
-              )}
-            </Stack>
+            <LeaveRequestsHistoryContent
+              isParent={!!isParent}
+              isStudent={!!isStudent}
+              canEdit={canEdit}
+              activeSchoolDays={activeSchoolDays}
+              excludedDates={excludedDates}
+              studentNameMap={studentNameMap}
+              scopedStudentId={historyScopeStudentId}
+              onScopedStudentIdChange={
+                isParent || isStudent ? setHistoryScopeStudentId : undefined
+              }
+              scopedStudentSelectData={availableStudents.map((s) => ({
+                value: s.id,
+                label:
+                  `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() ||
+                  s.studentId ||
+                  `Student ${s.id.slice(0, 8)}`,
+              }))}
+              showScopedStudentSelect={(isParent || isStudent) && availableStudents.length > 0}
+            />
           </Tabs.Panel>
         </Tabs>
       </div>

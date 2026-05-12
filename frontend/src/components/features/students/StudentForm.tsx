@@ -16,6 +16,7 @@ import { IconUser } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useTenantMe } from '@/hooks/useTenant';
 import { modals } from '@mantine/modals';
+import { SCHOOL_USERNAME_LOCAL_PART_REGEX } from '@/lib/validation/school-username';
 
 interface StudentFormProps {
   opened: boolean;
@@ -40,7 +41,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       .string()
       .trim()
       .min(1, t('usernameRequired'))
-      .regex(/^[a-z0-9]+$/i, t('usernameInvalid')),
+      .regex(SCHOOL_USERNAME_LOCAL_PART_REGEX, t('usernameInvalid')),
     firstName: z.string().min(1, t('firstNameRequired')),
     lastName: z.string().min(1, t('secondNameRequired')),
     phone: z.string().optional(),

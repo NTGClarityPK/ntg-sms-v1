@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconSchool, IconClock, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconSchool, IconClock, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments, IconCash } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -68,6 +68,7 @@ import { SubjectTemplatesTabContent } from '@/components/features/settings/Subje
 import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettingsPanel';
 import { PublicStatsSettings } from '@/components/features/settings/PublicStatsSettings';
 import { BulkSetupTabContent } from '@/components/features/settings/BulkSetupTabContent';
+import { FeeSettingsTabContent } from '@/components/features/settings/FeeSettingsTabContent';
 
 // Common timezones list with GMT offsets (matching RMS)
 const TIMEZONE_DATA = [
@@ -298,6 +299,9 @@ export default function SettingsPage() {
                 <Tabs.Tab value="inventory-management" leftSection={<IconPackage size={16} />}>
                   {tSettings('tabInventoryManagement')}
                 </Tabs.Tab>
+                <Tabs.Tab value="fees" leftSection={<IconCash size={16} />}>
+                  {tSettings('tabFees')}
+                </Tabs.Tab>
                 <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
                   {tSettings('tabThemeSettings')}
                 </Tabs.Tab>
@@ -345,6 +349,11 @@ export default function SettingsPage() {
               {/* Inventory Management Tab */}
               <Tabs.Panel value="inventory-management" pt="md" px="md" pb="md">
                 <InventoryManagementTabContent />
+              </Tabs.Panel>
+
+              {/* Fee Settings Tab */}
+              <Tabs.Panel value="fees" pt="md" px="md" pb="md">
+                <FeeSettingsTabContent />
               </Tabs.Panel>
 
               {/* Theme Settings Tab - visible to all users with settings access */}

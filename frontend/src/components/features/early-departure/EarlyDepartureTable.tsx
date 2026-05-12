@@ -32,6 +32,8 @@ interface EarlyDepartureTableProps {
   };
   onPageChange?: (page: number) => void;
   isStaffView?: boolean;
+  /** When false, staff cannot approve/reject and parents cannot cancel pending requests. */
+  canEdit?: boolean;
   studentNameMap?: Map<string, string>;
 }
 
@@ -61,6 +63,7 @@ export function EarlyDepartureTable({
   meta,
   onPageChange,
   isStaffView = false,
+  canEdit = true,
   studentNameMap,
 }: EarlyDepartureTableProps) {
   const theme = useMantineTheme();
@@ -182,9 +185,13 @@ export function EarlyDepartureTable({
             ) : (
               requests.map((request) => {
               const studentName = studentNameMap?.get(request.studentId);
-              const canReview = isStaffView && request.status === 'pending';
-              // Can cancel only if: parent view, status is pending, and not yet reviewed
-              const canCancel = !isStaffView && request.status === 'pending' && !request.reviewedBy;
+              const canReview =
+                isStaffView && canEdit && request.status === 'pending';
+              const canCancel =
+                canEdit &&
+                !isStaffView &&
+                request.status === 'pending' &&
+                !request.reviewedBy;
 
               return (
                 <Table.Tr key={request.id}>

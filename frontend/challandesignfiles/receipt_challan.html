@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Receipt - Compact</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background: white;
+            padding: 0;
+        }
+        
+        .receipt {
+            max-width: 210mm;
+            margin: 0 auto;
+            background: white;
+        }
+        
+        .perforated-edge {
+            height: 8px;
+            background: repeating-linear-gradient(
+                90deg,
+                #e0e0e0 0px,
+                #e0e0e0 8px,
+                white 8px,
+                white 16px
+            );
+        }
+        
+        .header {
+            padding: 20px 30px 16px;
+            background: #fff;
+            border-bottom: 2px dashed #999;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .company-info {
+            flex: 1;
+        }
+        
+        .company-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 3px;
+            letter-spacing: 1px;
+        }
+        
+        .company-tagline {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .company-address {
+            font-size: 9px;
+            line-height: 1.4;
+            color: #333;
+        }
+        
+        .receipt-badge {
+            border: 2px double #2d862d;
+            padding: 10px 16px;
+            text-align: center;
+            min-width: 140px;
+            background: #f0fdf4;
+        }
+        
+        .receipt-title {
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            color: #2d862d;
+        }
+        
+        .receipt-number {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+        
+        .receipt-date {
+            font-size: 9px;
+            color: #2d862d;
+            font-weight: bold;
+        }
+        
+        .details-section {
+            padding: 16px 30px;
+            background: #fafafa;
+        }
+        
+        .details-table {
+            width: 100%;
+        }
+        
+        .details-table td {
+            padding: 4px 0;
+            font-size: 10px;
+        }
+        
+        .details-table td:first-child {
+            font-weight: bold;
+            width: 120px;
+            color: #000;
+        }
+        
+        .details-table td:last-child {
+            color: #333;
+        }
+        
+        .items-section {
+            padding: 16px 30px;
+            position: relative;
+        }
+        
+        .items-header {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #000;
+            letter-spacing: 0.5px;
+        }
+        
+        .items-table {
+            width: 100%;
+            margin-bottom: 12px;
+        }
+        
+        .items-table thead {
+            border-bottom: 1px solid #000;
+        }
+        
+        .items-table th {
+            text-align: left;
+            padding: 6px 4px;
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        
+        .items-table th:last-child {
+            text-align: right;
+        }
+        
+        .items-table td {
+            padding: 8px 4px;
+            font-size: 10px;
+            border-bottom: 1px dotted #ccc;
+        }
+        
+        .items-table td:last-child {
+            text-align: right;
+            font-weight: bold;
+        }
+        
+        .items-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .items-table tr.discount td {
+            font-style: italic;
+            color: #2d862d;
+        }
+        
+        .summary-section {
+            padding: 0 30px 16px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .summary-box {
+            width: 240px;
+            border: 2px solid #000;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            font-size: 10px;
+            border-bottom: 1px dotted #ccc;
+        }
+        
+        .summary-row:last-child {
+            border-bottom: none;
+        }
+        
+        .summary-row.paid {
+            background: #2d862d;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 10px 12px;
+            border-bottom: none;
+        }
+        
+        .summary-row.paid .amount {
+            font-size: 14px;
+        }
+        
+        .footer-section {
+            padding: 12px 30px;
+            background: #f5f5f5;
+            text-align: center;
+            border-top: 1px solid #ddd;
+        }
+        
+        .footer-text {
+            font-size: 8px;
+            line-height: 1.6;
+            color: #666;
+        }
+        
+        .watermark {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .watermark::before {
+            content: 'PAID';
+            position: absolute;
+            top: 40%;
+            left: 55%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 80px;
+            font-weight: bold;
+            color: rgba(45, 134, 45, 0.06);
+            letter-spacing: 20px;
+            pointer-events: none;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .receipt {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <div class="perforated-edge"></div>
+        
+        <div class="header">
+            <div class="company-info">
+                <div class="company-name">NTG ALMA SCHOOL</div>
+                <div class="company-tagline">MAIN BRANCH</div>
+                <div class="company-address">
+                    123 EDUCATION STREET, KARACHI<br>
+                    PAKISTAN<br>
+                    TEL: +92 21 1234 5678<br>
+                    EMAIL: ADMIN@NTGALMA.EDU.PK
+                </div>
+            </div>
+            <div class="receipt-badge">
+                <div class="receipt-title">RECEIPT</div>
+                <div class="receipt-number">REC-CHL-2026-000001</div>
+                <div class="receipt-date">✓ VERIFIED</div>
+            </div>
+        </div>
+        
+        <div class="details-section">
+            <table class="details-table">
+                <tr>
+                    <td>RECEIPT NO:</td>
+                    <td>REC-CHL-2026-000001</td>
+                </tr>
+                <tr>
+                    <td>CHALLAN NO:</td>
+                    <td>CHL-2026-000001</td>
+                </tr>
+                <tr>
+                    <td>STUDENT:</td>
+                    <td>ALI HASSAN</td>
+                </tr>
+                <tr>
+                    <td>VERIFIED:</td>
+                    <td>2026-05-08 AT 16:53:39</td>
+                </tr>
+                <tr>
+                    <td>PAYMENT:</td>
+                    <td>BANK TRANSFER ON 2026-05-08</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="items-section watermark">
+            <div class="items-header">PAYMENT BREAKDOWN</div>
+            
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>MONTH</th>
+                        <th>DESCRIPTION</th>
+                        <th>AMOUNT (PKR)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>2026-05</td>
+                        <td>TUITION FEE (2026-05)</td>
+                        <td>12,000.00</td>
+                    </tr>
+                    <tr>
+                        <td>2026-05</td>
+                        <td>ART FEE (2026-05)</td>
+                        <td>2,000.00</td>
+                    </tr>
+                    <tr class="discount">
+                        <td>2026-05</td>
+                        <td>DISCOUNT (10%)</td>
+                        <td>-1,400.00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="summary-section">
+            <div class="summary-box">
+                <div class="summary-row">
+                    <span>AMOUNT PAID:</span>
+                    <span>PKR 12,600.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>TOTAL PAYABLE:</span>
+                    <span>PKR 12,600.00</span>
+                </div>
+                <div class="summary-row paid">
+                    <span>STATUS:</span>
+                    <span class="amount">PAID IN FULL</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer-section">
+            <div class="footer-text">
+                THIS IS AN OFFICIAL RECEIPT. PAYMENT VERIFIED AND CONFIRMED.<br>
+                FOR QUERIES: ADMIN@NTGALMA.EDU.PK | +92 21 1234 5678 | THANK YOU
+            </div>
+        </div>
+        
+        <div class="perforated-edge"></div>
+    </div>
+</body>
+</html>

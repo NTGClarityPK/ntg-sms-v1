@@ -13,6 +13,9 @@ import {
   Table,
   ScrollArea,
   TextInput,
+  Checkbox,
+  Divider,
+  SimpleGrid,
 } from '@mantine/core';
 import { IconAlertCircle, IconDeviceFloppy, IconSearch } from '@tabler/icons-react';
 import { useDebouncedValue } from '@mantine/hooks';
@@ -42,8 +45,33 @@ export function AttendanceSheet({
   const [localAttendance, setLocalAttendance] = useState<Attendance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch] = useDebouncedValue(searchQuery, 300);
+  const [bulkEntryTime, setBulkEntryTime] = useState('');
+  const [bulkExitTime, setBulkExitTime] = useState('');
+  const [applyEntryToAll, setApplyEntryToAll] = useState(true);
+  const [applyExitToAll, setApplyExitToAll] = useState(true);
   const bulkMarkMutation = useBulkMarkAttendance();
   const notifyColors = useThemeColors();
+
+  const markingDateLabel = useMemo(() => {
+    const parts = date.split('-').map((p) => Number(p));
+    if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return date;
+    const [y, m, d] = parts;
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }, [date]);
+
+  const markingClassSectionLabel = useMemo(() => {
+    const left = (className || '').trim();
+    const right = (sectionName || '').trim();
+    if (!left && !right) return '—';
+    if (!left) return right;
+    if (!right) return left;
+    return `${left} — ${right}`;
+  }, [className, sectionName]);
 
   // Sync local state with prop changes
   useEffect(() => {
@@ -66,11 +94,51 @@ export function AttendanceSheet({
 
   const handleStatusChange = (studentId: string, status: Attendance['status']) => {
     setLocalAttendance((prev) =>
-      prev.map((a) =>
-        a.studentId === studentId
-          ? { ...a, status, entryTime: status === 'present' || status === 'late' ? new Date().toTimeString().slice(0, 5) : undefined }
-          : a,
-      ),
+      prev.map((a) => {
+        if (a.studentId !== studentId) return a;
+        if (status === 'present' || status === 'late') {
+          return {
+            ...a,
+            status,
+            entryTime: new Date().toTimeString().slice(0, 5),
+          };
+        }
+        return { ...a, status, entryTime: undefined, exitTime: undefined };
+      }),
+    );
+  };
+
+  const applyBulkEntry = () => {
+    if (!bulkEntryTime.trim()) return;
+    const targetIds = new Set(
+      applyEntryToAll
+        ? localAttendance
+            .filter((a) => a.status === 'present' || a.status === 'late')
+            .map((a) => a.studentId)
+        : filteredAttendance
+            .filter((a) => a.status === 'present' || a.status === 'late')
+            .map((a) => a.studentId),
+    );
+    if (targetIds.size === 0) return;
+    setLocalAttendance((prev) =>
+      prev.map((a) => (targetIds.has(a.studentId) ? { ...a, entryTime: bulkEntryTime } : a)),
+    );
+  };
+
+  const applyBulkExit = () => {
+    if (!bulkExitTime.trim()) return;
+    const targetIds = new Set(
+      applyExitToAll
+        ? localAttendance
+            .filter((a) => a.status === 'present' || a.status === 'late')
+            .map((a) => a.studentId)
+        : filteredAttendance
+            .filter((a) => a.status === 'present' || a.status === 'late')
+            .map((a) => a.studentId),
+    );
+    if (targetIds.size === 0) return;
+    setLocalAttendance((prev) =>
+      prev.map((a) => (targetIds.has(a.studentId) ? { ...a, exitTime: bulkExitTime } : a)),
     );
   };
 
@@ -150,23 +218,93 @@ export function AttendanceSheet({
           </Button>
         </Group>
 
+        <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-default-hover)">
+          <Stack gap="sm">
+            <div>
+              <Text fw={600} size="sm">
+                {t('bulkTimeEntryTitle')}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {t('bulkTimeEntryHint')}
+              </Text>
+            </div>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <Stack gap="xs">
+                <TextInput
+                  type="time"
+                  label={t('entryTime')}
+                  value={bulkEntryTime}
+                  onChange={(e) => setBulkEntryTime(e.currentTarget.value)}
+                  styles={{
+                    input: { minWidth: 96 },
+                  }}
+                />
+                <Group gap="sm" wrap="nowrap" align="center">
+                  <Checkbox
+                    checked={applyEntryToAll}
+                    onChange={(e) => setApplyEntryToAll(e.currentTarget.checked)}
+                    label={t('bulkApplyToAll')}
+                  />
+                  <Button size="xs" variant="light" onClick={applyBulkEntry}>
+                    {t('bulkApplyEntry')}
+                  </Button>
+                </Group>
+              </Stack>
+              <Stack gap="xs">
+                <TextInput
+                  type="time"
+                  label={t('exitTime')}
+                  value={bulkExitTime}
+                  onChange={(e) => setBulkExitTime(e.currentTarget.value)}
+                  styles={{
+                    input: { minWidth: 96 },
+                  }}
+                />
+                <Group gap="sm" wrap="nowrap" align="center">
+                  <Checkbox
+                    checked={applyExitToAll}
+                    onChange={(e) => setApplyExitToAll(e.currentTarget.checked)}
+                    label={t('bulkApplyToAll')}
+                  />
+                  <Button size="xs" variant="light" onClick={applyBulkExit}>
+                    {t('bulkApplyExit')}
+                  </Button>
+                </Group>
+              </Stack>
+            </SimpleGrid>
+          </Stack>
+        </Paper>
+
+        <Divider />
+
         <TextInput
           placeholder={t('searchByStudentNameOrId')}
           leftSection={<IconSearch size={16} />}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.currentTarget.value)}
-          mb="md"
         />
+        <Text size="sm" c="dimmed" mb="md">
+          {t('markingForLabel', {
+            classSection: markingClassSectionLabel,
+            date: markingDateLabel,
+          })}
+        </Text>
 
         <ScrollArea>
-          <Table striped highlightOnHover>
+          <Table
+            striped
+            highlightOnHover
+            style={{ tableLayout: 'fixed', width: '100%' }}
+          >
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>{t('student')}</Table.Th>
-                <Table.Th>{t('status')}</Table.Th>
-                <Table.Th>{t('entryTime')}</Table.Th>
-                <Table.Th>{t('exitTime')}</Table.Th>
-                <Table.Th>{t('notes')}</Table.Th>
+                <Table.Th style={{ width: '26%', verticalAlign: 'middle' }}>{t('student')}</Table.Th>
+                <Table.Th style={{ width: '22%', verticalAlign: 'middle' }}>{t('status')}</Table.Th>
+                <Table.Th style={{ width: '18%', verticalAlign: 'middle' }}>{t('entryTime')}</Table.Th>
+                <Table.Th style={{ width: '18%', verticalAlign: 'middle' }}>{t('exitTime')}</Table.Th>
+                <Table.Th style={{ width: '16%', verticalAlign: 'middle', textAlign: 'center' }}>
+                  {t('notes')}
+                </Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>

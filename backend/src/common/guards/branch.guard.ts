@@ -1,6 +1,17 @@
-import { BadRequestException, CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { SupabaseConfig } from '../config/supabase.config';
+import {
+  isSupabaseConnectivityError,
+  SUPABASE_CONNECTIVITY_USER_MESSAGE,
+} from '../utils/supabase-connectivity-error.util';
 
 type BranchRow = {
   id: string;
@@ -50,6 +61,9 @@ export class BranchGuard implements CanActivate {
         .eq('user_id', userId);
 
       if (userBranchesError) {
+        if (isSupabaseConnectivityError(userBranchesError)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
         throw new BadRequestException(userBranchesError.message);
       }
 
@@ -62,6 +76,9 @@ export class BranchGuard implements CanActivate {
         .in('id', branchIds);
 
       if (branchesError) {
+        if (isSupabaseConnectivityError(branchesError)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
         throw new BadRequestException(branchesError.message);
       }
 
@@ -75,6 +92,9 @@ export class BranchGuard implements CanActivate {
         .in('id', tenantIds);
 
       if (tenantsError) {
+        if (isSupabaseConnectivityError(tenantsError)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
         throw new BadRequestException(tenantsError.message);
       }
 
@@ -104,6 +124,9 @@ export class BranchGuard implements CanActivate {
         .maybeSingle();
 
       if (profileError && profileError.code !== 'PGRST116') {
+        if (isSupabaseConnectivityError(profileError)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
         throw new BadRequestException(profileError.message);
       }
 
@@ -133,6 +156,9 @@ export class BranchGuard implements CanActivate {
       .maybeSingle();
 
     if (userBranchError) {
+      if (isSupabaseConnectivityError(userBranchError)) {
+        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+      }
       throw new BadRequestException(userBranchError.message);
     }
 
@@ -156,6 +182,9 @@ export class BranchGuard implements CanActivate {
       .maybeSingle();
 
     if (branchError) {
+      if (isSupabaseConnectivityError(branchError)) {
+        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+      }
       throw new BadRequestException(branchError.message);
     }
 
@@ -193,6 +222,9 @@ export class BranchGuard implements CanActivate {
         .maybeSingle();
 
       if (tenantError) {
+        if (isSupabaseConnectivityError(tenantError)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
         throw new BadRequestException(tenantError.message);
       }
 

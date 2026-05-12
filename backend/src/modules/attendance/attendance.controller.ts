@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   ForbiddenException,
+  Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
@@ -23,6 +24,7 @@ import { BulkMarkAttendanceDto } from './dto/bulk-mark-attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import type { Response } from 'express';
 
 @ApiTags('Attendance')
 @Controller('api/v1/attendance')
@@ -242,6 +244,36 @@ export class AttendanceController {
       user,
     );
     return { data };
+  }
+
+  @Get('export')
+  async exportAttendance(
+    @Res() res: Response,
+    @Query() query: QueryAttendanceDto,
+    @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<void> {
+    const activeYear = await this.academicYearsService.getActiveForBranch(branch.branchId);
+    if (!activeYear) {
+      throw new Error('No active academic year found');
+    }
+
+    const buffer = await this.attendanceService.exportAttendanceExcel(
+      query,
+      branch.branchId,
+      query.academicYearId || activeYear.id,
+      user,
+    );
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="attendance-history.xlsx"`,
+    );
+    res.send(buffer);
   }
 }
 

@@ -68,13 +68,13 @@ export class AttendanceService {
       return false;
     }
 
-    // Check for pending or approved leave requests (not rejected or cancelled)
+    // Pending / approved leave, or attendance-record absence row for this date
     const { data, error } = await supabase
       .from('leave_requests')
       .select('id')
       .eq('student_id', studentId)
       .eq('academic_year_id', activeYear.id)
-      .in('status', ['pending', 'approved'])
+      .in('status', ['pending', 'approved', 'absent'])
       .lte('start_date', date)
       .gte('end_date', date)
       .limit(1);
@@ -132,7 +132,7 @@ export class AttendanceService {
     }
     await this.academicYearsService.assertNotLockedForBranch(branchId, activeYear.id);
 
-    // Create unrequested leave request with status 'approved' (since it's already happened)
+    // Absence record linked to leaves list (status absent — not the same as approved leave)
     const { error } = await supabase
       .from('leave_requests')
       .insert({
@@ -142,9 +142,9 @@ export class AttendanceService {
         end_date: date, // Single day absence
         reason: 'Unrequested absence - automatically created from attendance record',
         attachment_url: null,
-        status: 'approved', // Auto-approved since it's already happened
-        reviewed_by: null, // System-created, no reviewer
-        reviewed_at: new Date().toISOString(), // Set reviewed_at to current time
+        status: 'absent',
+        reviewed_by: null,
+        reviewed_at: null,
         review_notes: 'Automatically created from attendance marking',
         branch_id: branchId,
         academic_year_id: activeYear.id,
@@ -167,6 +167,10 @@ export class AttendanceService {
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
     const supabase = this.supabaseConfig.getClient();
+
+    if (query.startDate && query.endDate && query.startDate > query.endDate) {
+      throw new BadRequestException('startDate must be before or equal to endDate');
+    }
 
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;
@@ -240,6 +244,13 @@ export class AttendanceService {
 
       if (query.date) {
         next = next.eq('date', query.date);
+      } else {
+        if (query.startDate) {
+          next = next.gte('date', query.startDate);
+        }
+        if (query.endDate) {
+          next = next.lte('date', query.endDate);
+        }
       }
 
       // Support both single and multiple filters
@@ -1757,6 +1768,71 @@ export class AttendanceService {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     });
+  }
+
+  async exportAttendanceExcel(
+    query: QueryAttendanceDto,
+    branchId: string,
+    academicYearId: string,
+    user: CurrentUserPayload,
+  ): Promise<Buffer> {
+    const EXPORT_MAX = 5000;
+    const PAGE_LIMIT = 500; // listAttendance caps at 500
+
+    const allRows: AttendanceDto[] = [];
+    for (let page = 1; page <= Math.ceil(EXPORT_MAX / PAGE_LIMIT); page++) {
+      const res = await this.listAttendance(
+        {
+          ...query,
+          page,
+          limit: PAGE_LIMIT,
+          sortBy: query.sortBy ?? 'date',
+          sortOrder: query.sortOrder ?? 'desc',
+        },
+        branchId,
+        academicYearId,
+        user,
+      );
+      allRows.push(...res.data);
+      if (res.data.length < PAGE_LIMIT) break;
+      if (allRows.length >= EXPORT_MAX) break;
+    }
+
+    const trimmed = allRows.slice(0, EXPORT_MAX);
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'NTG SMS';
+    const ws = workbook.addWorksheet('Attendance');
+    ws.columns = [
+      { header: 'Date', key: 'date', width: 14 },
+      { header: 'Student', key: 'studentName', width: 26 },
+      { header: 'Student ID', key: 'studentId', width: 14 },
+      { header: 'Class', key: 'className', width: 18 },
+      { header: 'Section', key: 'sectionName', width: 12 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Marked by', key: 'markedByName', width: 22 },
+      { header: 'Entry time', key: 'entryTime', width: 12 },
+      { header: 'Exit time', key: 'exitTime', width: 12 },
+      { header: 'Notes', key: 'notes', width: 32 },
+    ];
+
+    trimmed.forEach((r) => {
+      ws.addRow({
+        date: r.date,
+        studentName: r.studentName ?? '—',
+        studentId: r.studentIdNumber ?? r.studentId ?? '',
+        className: r.className ?? '',
+        sectionName: r.sectionName ?? '',
+        status: r.status,
+        markedByName: r.markedByName ?? '',
+        entryTime: r.entryTime ?? '',
+        exitTime: r.exitTime ?? '',
+        notes: r.notes ?? '',
+      });
+    });
+
+    return (await workbook.xlsx.writeBuffer()) as Buffer;
   }
 }
 

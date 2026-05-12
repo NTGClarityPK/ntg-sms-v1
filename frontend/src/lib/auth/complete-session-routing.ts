@@ -1,7 +1,11 @@
 import { apiClient } from '@/lib/api-client';
 import type { Tenant } from '@/types/tenant';
 import { clearLocalSupabaseSession } from '@/lib/auth';
-import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
+import {
+  normalizeUiLocale,
+  readResolvedUiLocaleFromBrowser,
+  setUiLocaleCookieOnDocument,
+} from '@/lib/ui-locale';
 import { queryClient } from '@/lib/query-client';
 import { useAuthStore } from '@/lib/store/auth-store';
 import type { User } from '@/types/auth';
@@ -80,13 +84,17 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
     // Persist immediately so guards/dashboard can render without waiting for React Query refetch.
     useAuthStore.getState().setUser(userData);
 
-    // DB is the single source of truth: align NEXT_LOCALE cookie before any navigation/refresh.
+    // Cookie is the source of truth for UI locale.
+    // Only use DB preference as an initial default when the cookie is absent (first-time device / cleared cookies).
     if (typeof window !== 'undefined') {
-      const rawPreferred =
-        userData.preferredLocale ??
-        (userData as { preferred_locale?: string }).preferred_locale ??
-        'en-US';
-      setUiLocaleCookieOnDocument(normalizeUiLocale(rawPreferred));
+      const existing = readResolvedUiLocaleFromBrowser();
+      if (!existing) {
+        const rawPreferred =
+          userData.preferredLocale ??
+          (userData as { preferred_locale?: string }).preferred_locale ??
+          'en-US';
+        setUiLocaleCookieOnDocument(normalizeUiLocale(rawPreferred));
+      }
     }
 
     const roles = userData.roles ?? [];

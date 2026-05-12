@@ -3,8 +3,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import {
+  isSupabaseConnectivityError,
+  SUPABASE_CONNECTIVITY_USER_MESSAGE,
+} from '../../common/utils/supabase-connectivity-error.util';
 import { UserResponseDto } from './dto/user-response.dto';
 import { BranchSummaryDto } from './dto/branch-summary.dto';
 import { StudentTokenService } from '../../common/modules/student-token/student-token.service';
@@ -116,8 +121,23 @@ export class AuthService {
     // Fallback: some internal code paths may call `getCurrentUser()` without going through JwtAuthGuard.
     // In that case, we still need the email for privileged checks and the response payload.
     if (!resolvedEmail) {
-      const { data, error } = await supabase.auth.admin.getUserById(userId);
-      if (error || !data?.user) {
+      let adminResult;
+      try {
+        adminResult = await supabase.auth.admin.getUserById(userId);
+      } catch (e: unknown) {
+        if (isSupabaseConnectivityError(e)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
+        throw e;
+      }
+      const { data, error } = adminResult;
+      if (error) {
+        if (isSupabaseConnectivityError(error)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
+        throw new NotFoundException('User not found');
+      }
+      if (!data?.user) {
         throw new NotFoundException('User not found');
       }
       resolvedEmail = data.user.email ?? '';
@@ -147,6 +167,9 @@ export class AuthService {
 
     const { data: profile, error: profileError } = profileResult;
     if (profileError && profileError.code !== 'PGRST116') {
+      if (isSupabaseConnectivityError(profileError)) {
+        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+      }
       throw new NotFoundException('Profile not found');
     }
 
@@ -159,6 +182,9 @@ export class AuthService {
 
     const { data: userBranchesData, error: userBranchesError } = userBranchesResult;
     if (userBranchesError) {
+      if (isSupabaseConnectivityError(userBranchesError)) {
+        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+      }
       throw new BadRequestException(`Failed to fetch user branches: ${userBranchesError.message}`);
     }
 
@@ -182,6 +208,9 @@ export class AuthService {
 
     const { data: branchesData, error: branchesError } = branchesResult;
     if (branchesError) {
+      if (isSupabaseConnectivityError(branchesError)) {
+        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+      }
       throw new BadRequestException(`Failed to fetch branches: ${branchesError.message}`);
     }
 

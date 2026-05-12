@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group, Text, Alert, CopyButton } from '@mantine/core';
+import { Modal, TextInput, Select, Button, Stack, MultiSelect, Group, Text, Alert } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { useCreateUser, useUpdateUserWithRoles } from '@/hooks/useUsers';
 import type { User, CreateUserInput, UpdateUserInput } from '@/types/users';
 import type { Role } from '@/types/permissions';
 import { useTenantMe } from '@/hooks/useTenant';
+import { isValidSchoolUsernameLocalPart } from '@/lib/validation/school-username';
 
 interface UserFormProps {
   opened: boolean;
@@ -76,11 +77,11 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
 
           // staff
           const username = (values.username ?? '').trim();
-          if (!username || !/^[a-z0-9]+$/i.test(username)) {
+          if (!isValidSchoolUsernameLocalPart(username)) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ['username'],
-              message: 'Username must be alphanumeric.',
+              message: t('usernameInvalid'),
             });
           }
           const inv = (values.invitationEmail ?? '').trim();
@@ -97,14 +98,27 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
   );
   const updateUserSchema = useMemo(
     () =>
-      z.object({
-        fullName: z.string().min(1, t('fullNameRequired')),
-        phone: z.string().optional(),
-        address: z.string().optional(),
-        dateOfBirth: z.string().optional(),
-        gender: z.enum(['male', 'female']).optional(),
-        isActive: z.boolean().optional(),
-      }),
+      z
+        .object({
+          fullName: z.string().min(1, t('fullNameRequired')),
+          invitationRecipientEmail: z.string().optional(),
+          phone: z.string().optional(),
+          address: z.string().optional(),
+          dateOfBirth: z.string().optional(),
+          gender: z.enum(['male', 'female']).optional(),
+          isActive: z.boolean().optional(),
+        })
+        .superRefine((values, ctx) => {
+          const raw = (values.invitationRecipientEmail ?? '').trim();
+          if (!raw) return;
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['invitationRecipientEmail'],
+              message: t('invalidEmail'),
+            });
+          }
+        }),
     [t],
   );
   const isEdit = !!user;
@@ -116,6 +130,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
       email: '',
       username: '',
       invitationEmail: '',
+      invitationRecipientEmail: '',
       fullName: '',
       phone: '',
       address: '',
@@ -134,6 +149,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
         email: user.email || '',
         username: '',
         invitationEmail: '',
+        invitationRecipientEmail: user.invitationRecipientEmail || '',
         fullName: user.fullName || '',
         phone: user.phone || '',
         address: user.address || '',
@@ -152,6 +168,10 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
       if (isEdit && user) {
         const updateData: UpdateUserInput = {
           fullName: values.fullName,
+          invitationRecipientEmail:
+            (values.invitationRecipientEmail ?? '').trim() === ''
+              ? null
+              : (values.invitationRecipientEmail ?? '').trim(),
           phone: values.phone || undefined,
           address: values.address || undefined,
           dateOfBirth: values.dateOfBirth || undefined,
@@ -199,50 +219,6 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
     >
       <form id="user-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
-          {isEdit && user?.invitationRecipientEmail && (
-            <Alert
-              variant="light"
-              title={t('invitationDetailsTitle')}
-              styles={{
-                root: {
-                  borderColor: 'var(--theme-primary)',
-                  backgroundColor: 'var(--theme-surface-variant)',
-                },
-                title: { color: 'var(--theme-text)' },
-              }}
-            >
-              <Stack gap={6}>
-                <Group justify="space-between" align="flex-end" wrap="nowrap">
-                  <TextInput
-                    id="user-form-invitation-recipient-email"
-                    label={t('invitationRecipientEmail')}
-                    value={user.invitationRecipientEmail}
-                    readOnly
-                    style={{ flex: 1 }}
-                  />
-                  <CopyButton value={user.invitationRecipientEmail}>
-                    {({ copy }) => (
-                      <Button
-                        id="user-form-invitation-copy-email"
-                        size="xs"
-                        variant="light"
-                        onClick={copy}
-                      >
-                        {tCommon('copy')}
-                      </Button>
-                    )}
-                  </CopyButton>
-                </Group>
-                {user.invitationSentAt && (
-                  <Text size="sm" c="dimmed">
-                    {t('invitationSentAt', {
-                      date: new Date(user.invitationSentAt).toLocaleString(),
-                    })}
-                  </Text>
-                )}
-              </Stack>
-            </Alert>
-          )}
           {!isEdit && (
             <>
               <MultiSelect
@@ -262,7 +238,7 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
               {classifyUserType(form.values.roleIds) === 'parent' && (
                 <TextInput
                   id="user-form-parent-email"
-                  label={t('email')}
+                  label={t('loginEmail')}
                   placeholder={t('emailPlaceholder')}
                   required
                   {...form.getInputProps('email')}
@@ -292,8 +268,8 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
                   </Text>
                   <TextInput
                     id="user-form-invitation-email"
-                    label="Invitation email"
-                    placeholder="name@example.com"
+                    label={t('invitationEmailForCorrespondence')}
+                    placeholder={t('emailPlaceholder')}
                     required
                     {...form.getInputProps('invitationEmail')}
                   />
@@ -309,6 +285,24 @@ export function UserForm({ opened, onClose, user, roles }: UserFormProps) {
             required
             {...form.getInputProps('fullName')}
           />
+
+          {isEdit && (
+            <>
+              <TextInput
+                id="user-form-correspondence-email"
+                label={t('correspondenceEmail')}
+                placeholder={t('emailPlaceholder')}
+                {...form.getInputProps('invitationRecipientEmail')}
+              />
+              {user?.invitationSentAt ? (
+                <Text size="sm" c="dimmed">
+                  {t('invitationSentAt', {
+                    date: new Date(user.invitationSentAt).toLocaleString(),
+                  })}
+                </Text>
+              ) : null}
+            </>
+          )}
 
           <TextInput
             id="user-form-phone"

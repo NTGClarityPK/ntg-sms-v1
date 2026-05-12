@@ -49,9 +49,7 @@ coverage/
 
 # Reference files (if needed)
 rmsreference/*
-# Environment files with secrets
-
-.env.prod
+# Environment files with secrets.env.prod
 .env.staging
 .env.local# Docker
 docker-compose.override.yml# Cursor IDE
@@ -62,9 +60,7 @@ docker-compose.override.yml# Cursor IDE
 developmentguide/
 documentations/
 myfiles/
-scripts/
-
-# Documentation files (not to be committed)
+scripts/# Documentation files (not to be committed)
 arabicdict.md
 mistakes.md
 overallcontext.md

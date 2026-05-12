@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
@@ -12,6 +13,7 @@ import {
   Text,
   Divider,
   useMantineTheme,
+  Accordion,
 } from '@mantine/core';
 import {
   IconHome,
@@ -21,6 +23,7 @@ import {
   IconSettings,
   IconChevronLeft,
   IconChevronRight,
+  IconChevronDown,
   IconBook,
   IconSchool,
   IconClock,
@@ -39,6 +42,7 @@ import {
   IconDatabase,
   IconKey,
   IconMedal,
+  IconCash,
   IconArrowsShuffle,
   IconArrowUpRight,
   type IconProps,
@@ -58,6 +62,32 @@ interface NavItem {
 }
 
 const NAV_ICON_SIZE = 22;
+
+/** Same idea as the sidebar rail toggle: swap icons by open state — no CSS rotation fights. */
+const NAV_ACCORDION_CHEVRON_SIZE = 18;
+
+/** Single source of truth for “School” / “Management” rail headings so typography cannot drift. */
+const SIDEBAR_SECTION_LABEL_PROPS = {
+  size: 'xs',
+  c: 'dimmed',
+  tt: 'uppercase',
+  fw: 700,
+  mb: 'xs',
+} as const;
+
+const navAccordionStyles = {
+  control: {
+    padding: 'var(--mantine-spacing-xs)',
+  },
+  label: { fontWeight: 600, fontSize: 'var(--mantine-font-size-sm)' },
+  item: { border: 'none' },
+  /** Mantine defaults pad `.accordion-content` with `spacing-md`, indenting links past Dashboard — flush so icons/labels align. */
+  panel: { padding: 0 },
+  content: {
+    padding: 0,
+    paddingTop: 'calc(var(--mantine-spacing-xs) / 2)',
+  },
+} as const;
 
 // All navigation items (key used for next-intl navigation namespace)
 const allNavItems: NavItem[] = [
@@ -107,6 +137,7 @@ const allNavItems: NavItem[] = [
   { key: 'library', label: 'Library', href: '/library', icon: IconBook },
   { key: 'inventory', label: 'Inventory', href: '/inventory', icon: IconPackage },
   { key: 'uniformRequest', label: 'Request uniform', href: '/uniform-request', icon: IconClipboardList },
+  { key: 'fees', label: 'Fees', href: '/fees', icon: IconCash },
   {
     key: 'myEvents',
     label: 'My Event',
@@ -182,6 +213,59 @@ const allNavItems: NavItem[] = [
   },
   { key: 'settings', label: 'Settings', href: '/settings', icon: IconSettings },
 ];
+
+/** Grouped nav (expanded sidebar). Order within each group matches product spec. */
+const SCHOOL_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[] = [
+  {
+    i18nKey: 'sidebarGroupStudentsAttendance',
+    hrefs: [
+      '/students',
+      '/attendance',
+      '/leaves',
+      '/early-departure',
+      '/behavioral',
+      '/my-children',
+      '/parent/pin-management',
+    ],
+  },
+  {
+    i18nKey: 'sidebarGroupAcademics',
+    hrefs: [
+      '/assessments',
+      '/my-assessments',
+      '/timetable',
+      '/my-timetable',
+      '/my-schedule',
+      '/children-timetable',
+      '/results',
+    ],
+  },
+  {
+    i18nKey: 'sidebarGroupCommunication',
+    hrefs: ['/messages', '/notifications', '/events', '/my-events'],
+  },
+];
+
+const MANAGEMENT_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[] = [
+  {
+    i18nKey: 'sidebarGroupSetup',
+    hrefs: ['/academic/class-sections', '/promotion-placement', '/mapping', '/users', '/fees'],
+  },
+  {
+    i18nKey: 'sidebarGroupResources',
+    hrefs: ['/library', '/inventory', '/uniform-request', '/admin/storage'],
+  },
+  {
+    i18nKey: 'sidebarGroupSystem',
+    hrefs: ['/reports', '/conflict-management', '/settings'],
+  },
+];
+
+function navItemsInHrefOrder(navItems: NavItem[], hrefs: readonly string[]): NavItem[] {
+  return hrefs
+    .map((href) => navItems.find((item) => item.href === href))
+    .filter((item): item is NavItem => Boolean(item));
+}
 
 interface SidebarProps {
   onMobileClose?: () => void;
@@ -372,50 +456,44 @@ export function Sidebar({
     return true;
   });
 
-  // Group items into two sections: School and Management
-  const schoolHrefsOrdered = [
-    '/dashboard',
-    '/students',
-    '/attendance',
-    '/leaves',
-    '/early-departure',
-    '/assessments',
-    '/my-assessments',
-    '/behavioral',
-    '/timetable',
-    '/my-timetable',
-    '/my-schedule',
-    '/children-timetable',
-    '/my-children',
-    '/parent/pin-management',
-    '/messages',
-    '/notifications',
-    '/events',
-    '/my-events',
-    '/results',
+  const dashboardItem = navItems.find((item) => item.href === '/dashboard');
+
+  const schoolAccordionGroups = SCHOOL_NAV_GROUPS.map((def) => ({
+    i18nKey: def.i18nKey,
+    items: navItemsInHrefOrder(navItems, def.hrefs),
+  })).filter((g) => g.items.length > 0);
+
+  const managementAccordionGroups = MANAGEMENT_NAV_GROUPS.map((def) => ({
+    i18nKey: def.i18nKey,
+    items: navItemsInHrefOrder(navItems, def.hrefs),
+  })).filter((g) => g.items.length > 0);
+
+  const schoolAccordionKeysSig = schoolAccordionGroups.map((g) => g.i18nKey).join('|');
+  const managementAccordionKeysSig = managementAccordionGroups.map((g) => g.i18nKey).join('|');
+
+  const [schoolAccordionValue, setSchoolAccordionValue] = useState<string[]>(() =>
+    schoolAccordionGroups.map((g) => g.i18nKey),
+  );
+  const [managementAccordionValue, setManagementAccordionValue] = useState<string[]>(() =>
+    managementAccordionGroups.map((g) => g.i18nKey),
+  );
+
+  useEffect(() => {
+    setSchoolAccordionValue(schoolAccordionGroups.map((g) => g.i18nKey));
+  }, [schoolAccordionKeysSig]);
+
+  useEffect(() => {
+    setManagementAccordionValue(managementAccordionGroups.map((g) => g.i18nKey));
+  }, [managementAccordionKeysSig]);
+
+  const schoolFlatOrdered: NavItem[] = [
+    ...(dashboardItem ? [dashboardItem] : []),
+    ...SCHOOL_NAV_GROUPS.flatMap((def) => navItemsInHrefOrder(navItems, def.hrefs)),
   ];
 
-  const managementHrefsOrdered = [
-    '/academic/class-sections',
-    '/promotion-placement',
-    '/mapping',
-    '/users',
-    '/library',
-    '/inventory',
-    '/uniform-request',
-    '/reports',
-    '/conflict-management',
-    '/admin/storage',
-    '/settings',
-  ];
-
-  const schoolItems: NavItem[] = schoolHrefsOrdered
-    .map((href) => navItems.find((item) => item.href === href))
-    .filter((item): item is NavItem => Boolean(item));
-
-  const managementItems: NavItem[] = managementHrefsOrdered
-    .map((href) => navItems.find((item) => item.href === href))
-    .filter((item): item is NavItem => Boolean(item));
+  const managementFlatOrdered: NavItem[] = MANAGEMENT_NAV_GROUPS.flatMap((def) =>
+    navItemsInHrefOrder(navItems, def.hrefs),
+  );
 
   const isActive = (href: string) =>
     pathname === href || pathname?.startsWith(`${href}/`);
@@ -492,29 +570,92 @@ export function Sidebar({
         type="hover"
         scrollHideDelay={400}
       >
-        <Stack gap="xs" p={effectiveCollapsed ? 'xs' : 'md'}>
-          {/* School Section */}
-          {schoolItems.length > 0 && (
+        <Stack gap={effectiveCollapsed ? 4 : 'xs'} p={effectiveCollapsed ? 'xs' : 'md'}>
+          {schoolFlatOrdered.length > 0 && (
             <>
               {!effectiveCollapsed && (
-                <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                  {tCommon('sidebarSchool')}
-                </Text>
+                <Text {...SIDEBAR_SECTION_LABEL_PROPS}>{tCommon('sidebarSchool')}</Text>
               )}
-              {schoolItems.map(renderNavItem)}
+              {effectiveCollapsed ? (
+                schoolFlatOrdered.map(renderNavItem)
+              ) : (
+                <>
+                  {dashboardItem ? renderNavItem(dashboardItem) : null}
+                  {schoolAccordionGroups.length > 0 ? (
+                    <Accordion
+                      multiple
+                      value={schoolAccordionValue}
+                      onChange={setSchoolAccordionValue}
+                      variant="default"
+                      chevronPosition="right"
+                      disableChevronRotation
+                      styles={navAccordionStyles}
+                    >
+                      {schoolAccordionGroups.map((group) => (
+                        <Accordion.Item key={group.i18nKey} value={group.i18nKey}>
+                          <Accordion.Control
+                            id={`nav-accordion-school-${group.i18nKey}`}
+                            chevron={
+                              schoolAccordionValue.includes(group.i18nKey) ? (
+                                <IconChevronDown size={NAV_ACCORDION_CHEVRON_SIZE} stroke={1.5} />
+                              ) : (
+                                <IconChevronRight size={NAV_ACCORDION_CHEVRON_SIZE} stroke={1.5} />
+                              )
+                            }
+                          >
+                            {tCommon(group.i18nKey)}
+                          </Accordion.Control>
+                          <Accordion.Panel>
+                            <Stack gap={4}>{group.items.map(renderNavItem)}</Stack>
+                          </Accordion.Panel>
+                        </Accordion.Item>
+                      ))}
+                    </Accordion>
+                  ) : null}
+                </>
+              )}
             </>
           )}
 
-          {/* Management Section */}
-          {managementItems.length > 0 && (
+          {managementFlatOrdered.length > 0 && (
             <>
-              {!effectiveCollapsed && <Divider my="sm" />}
+              {!effectiveCollapsed && schoolFlatOrdered.length > 0 && <Divider my="sm" />}
               {!effectiveCollapsed && (
-                <Text size="xs" c="dimmed" tt="uppercase" fw={700} mb="xs">
-                  {tCommon('sidebarManagement')}
-                </Text>
+                <Text {...SIDEBAR_SECTION_LABEL_PROPS}>{tCommon('sidebarManagement')}</Text>
               )}
-              {managementItems.map(renderNavItem)}
+              {effectiveCollapsed ? (
+                managementFlatOrdered.map(renderNavItem)
+              ) : (
+                <Accordion
+                  multiple
+                  value={managementAccordionValue}
+                  onChange={setManagementAccordionValue}
+                  variant="default"
+                  chevronPosition="right"
+                  disableChevronRotation
+                  styles={navAccordionStyles}
+                >
+                  {managementAccordionGroups.map((group) => (
+                    <Accordion.Item key={group.i18nKey} value={group.i18nKey}>
+                      <Accordion.Control
+                        id={`nav-accordion-management-${group.i18nKey}`}
+                        chevron={
+                          managementAccordionValue.includes(group.i18nKey) ? (
+                            <IconChevronDown size={NAV_ACCORDION_CHEVRON_SIZE} stroke={1.5} />
+                          ) : (
+                            <IconChevronRight size={NAV_ACCORDION_CHEVRON_SIZE} stroke={1.5} />
+                          )
+                        }
+                      >
+                        {tCommon(group.i18nKey)}
+                      </Accordion.Control>
+                      <Accordion.Panel>
+                        <Stack gap={4}>{group.items.map(renderNavItem)}</Stack>
+                      </Accordion.Panel>
+                    </Accordion.Item>
+                  ))}
+                </Accordion>
+              )}
             </>
           )}
         </Stack>

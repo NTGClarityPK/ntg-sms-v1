@@ -171,6 +171,7 @@ export function useStudentLeaveStats(studentId: string | null) {
         approved: number;
         rejected: number;
         cancelled: number;
+        absent: number;
       }>(`/api/v1/leave-requests/stats/${studentId}`);
 
       return response.data;

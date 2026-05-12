@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Box, Stack, Text, Loader, Stepper, Button, Alert, Group, useMantineTheme } from '@mantine/core';
-import { IconAlertCircle, IconCheck, IconBrandGoogle, IconLayoutDashboard } from '@tabler/icons-react';
+import { Alert, Box, Button, Group, Loader, Stack, Stepper, Text, useMantineTheme } from '@mantine/core';
+import { IconAlertCircle, IconBrandGoogle, IconCheck, IconLayoutDashboard } from '@tabler/icons-react';
 import { supabase } from '@/lib/supabase/client';
 import { apiClient } from '@/lib/api-client';
 import { clearLocalSupabaseSession } from '@/lib/auth';
-import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
+import { normalizeUiLocale, readResolvedUiLocaleFromBrowser, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 import { selectBranchAndGoDashboard } from '@/lib/auth/complete-session-routing';
@@ -151,9 +151,13 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        const rawPreferred =
-          userData.preferredLocale ?? userData.preferred_locale ?? 'en-US';
-        setUiLocaleCookieOnDocument(normalizeUiLocale(rawPreferred));
+        // Cookie is the source of truth for UI locale.
+        // Only initialise from DB when cookie is absent (first-time device / cleared cookies).
+        const existing = readResolvedUiLocaleFromBrowser();
+        if (!existing) {
+          const rawPreferred = userData.preferredLocale ?? userData.preferred_locale ?? 'en-US';
+          setUiLocaleCookieOnDocument(normalizeUiLocale(rawPreferred));
+        }
 
         if (roleNames.includes('super_admin')) {
           setStepMsg(2, 'Taking you to admin portal...');
@@ -193,9 +197,7 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        setBranches(
-          Array.from(new Map(userBranches.map((b) => [b.id, b])).values()),
-        );
+        setBranches(Array.from(new Map(userBranches.map((b) => [b.id, b])).values()));
         setShowBranchSelection(true);
         setStepMsg(2, 'Select a branch to continue');
       } catch (err) {
@@ -241,7 +243,7 @@ export default function AuthCallbackPage() {
       setShowBranchSelection(false);
       setMessage('Taking you to dashboard...');
       await selectBranchAndGoDashboard(branchId, router);
-    } catch (err) {
+    } catch {
       setError('Failed to select branch. Please try again.');
     } finally {
       setBranchSelectionLoading(false);
@@ -341,3 +343,4 @@ export default function AuthCallbackPage() {
     </Stack>
   );
 }
+

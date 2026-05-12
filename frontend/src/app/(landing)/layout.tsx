@@ -296,6 +296,24 @@ export default function LandingLayout({
       if (observer) {
         observer.disconnect();
       }
+
+      // IMPORTANT: landing pages apply global overrides; remove them when leaving
+      // so auth/portal pages use their own Mantine theme deterministically.
+      try {
+        const style = document.getElementById('cta-white-text-styles');
+        if (style) style.remove();
+
+        const root = document.documentElement;
+        root.style.removeProperty('--marketing-primary-color');
+        root.style.removeProperty('--marketing-primary-dark');
+        root.style.removeProperty('--marketing-text-on-primary');
+
+        for (let i = 0; i <= 9; i++) {
+          root.style.removeProperty(`--mantine-color-blue-${i}`);
+        }
+      } catch {
+        // non-blocking
+      }
     };
   }, [pathname]); // Re-run on pathname change
 

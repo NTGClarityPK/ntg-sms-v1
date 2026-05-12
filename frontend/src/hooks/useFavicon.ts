@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
 import { useThemeStore } from '@/lib/store/theme-store';
 
-const DEFAULT_FAVICON_HREF = '/NTGTempLogo.svg';
+const DEFAULT_FAVICON_HREF = '/alma-logo-darkgreen.svg';
 
 const APPLE_TOUCH_ATTR = 'data-tenant-apple-touch';
 

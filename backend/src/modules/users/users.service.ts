@@ -765,18 +765,24 @@ export class UsersService {
     throwIfDbError(fetchError);
     if (!oldRow) throw new NotFoundException('User not found');
 
+    const profilePatch: Record<string, unknown> = {
+      full_name: input.fullName,
+      avatar_url: input.avatarUrl,
+      phone: input.phone,
+      address: input.address,
+      date_of_birth: input.dateOfBirth,
+      gender: input.gender,
+      is_active: input.isActive,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.invitationRecipientEmail !== undefined) {
+      profilePatch.invitation_recipient_email = input.invitationRecipientEmail;
+    }
+
     const { data: updated, error } = await supabase
       .from('profiles')
-      .update({
-        full_name: input.fullName,
-        avatar_url: input.avatarUrl,
-        phone: input.phone,
-        address: input.address,
-        date_of_birth: input.dateOfBirth,
-        gender: input.gender,
-        is_active: input.isActive,
-        updated_at: new Date().toISOString(),
-      })
+      .update(profilePatch)
       .eq('id', id)
       .select('*')
       .single();
