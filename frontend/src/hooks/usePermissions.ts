@@ -60,6 +60,8 @@ export function usePermissions() {
         return ['timetable_personal', 'my_timetable', 'my_schedule', 'timetable'];
       case 'user_management':
         return ['user_management', 'staff'];
+      case 'results':
+        return ['results', 'reports', 'assessment'];
       default:
         return [featureCode];
     }

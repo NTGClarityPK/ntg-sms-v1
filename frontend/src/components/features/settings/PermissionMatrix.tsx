@@ -113,9 +113,11 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
       case 'my_events':
         return tNav('myEvents');
 
-      // Reports / settings
+      // Reports / results / settings
       case 'reports':
         return tNav('reports');
+      case 'results':
+        return tNav('results');
       case 'settings':
         return tNav('settings');
 

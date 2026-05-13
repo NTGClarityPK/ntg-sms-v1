@@ -31,6 +31,9 @@ export interface ThemeConfig {
     textMuted: string;
     border: string;
     borderLight: string;
+    /** Absolute black/white — used where scheme-independent contrast is required */
+    pureWhite: string;
+    pureBlack: string;
   };
   
   // Component-Specific Colors (override defaults if needed)
@@ -258,7 +261,8 @@ export function generateThemeConfig(
         borderColor: 'transparent',
         textColor: themeColors.colorTextDark,
         hoverBackground: themeColors.primaryDarker, // Subtle surface variant
-        hoverTextColor: themeColors.colorDark, // Primary color on hover
+        /** Readable on dark green hover (`primaryDarker`) in light and dark mode */
+        hoverTextColor: themeColors.pureWhite,
         // Theme-aware active state: darker background in dark mode, lighter in light mode
         activeBackground: isDark 
           ? themeColors.primaryDark // Darker shade for dark mode (better contrast)

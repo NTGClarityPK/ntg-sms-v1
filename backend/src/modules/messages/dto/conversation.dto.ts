@@ -38,6 +38,8 @@ export class ConversationListDto {
   academicYearId?: string;
   createdAt!: string;
   lastMessagePreview?: string;
+  /** True when the latest message in the thread was soft-deleted */
+  lastMessageDeleted?: boolean;
   lastMessageAt?: string;
   lastMessageType?: MessageType;
   unreadCount!: number;

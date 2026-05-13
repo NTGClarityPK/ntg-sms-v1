@@ -10,6 +10,16 @@ import { Request, Response } from 'express';
 
 type MulterLikeError = Error & { code?: string };
 
+/** Path without query string (Express sets `path`; fallback for odd adapters). */
+function requestPath(request: Request): string {
+  if (request.path && request.path.length > 0) {
+    return request.path;
+  }
+  const raw = request.url ?? '';
+  const q = raw.indexOf('?');
+  return q === -1 ? raw : raw.slice(0, q);
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -52,12 +62,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
       code = exception.name;
     }
 
-    // Log the error
-    this.logger.error(
-      `HTTP ${status} Error: ${message}`,
-      exception instanceof Error ? exception.stack : undefined,
-      `${request.method} ${request.url}`,
-    );
+    const path = requestPath(request);
+    const isLogoutStyleAuthMe =
+      status === HttpStatus.UNAUTHORIZED &&
+      request.method === 'GET' &&
+      path === '/api/v1/auth/me' &&
+      message === 'No token provided';
+
+    // Session checks without a bearer token are normal after logout / before login — avoid ERROR + stack noise
+    if (isLogoutStyleAuthMe) {
+      this.logger.log(
+        `Logout happened — GET /api/v1/auth/me with no bearer token (expected 401).`,
+      );
+    } else {
+      this.logger.error(
+        `HTTP ${status} Error: ${message}`,
+        exception instanceof Error ? exception.stack : undefined,
+        `${request.method} ${request.url}`,
+      );
+    }
 
     // Return consistent error format
     response.status(status).json({

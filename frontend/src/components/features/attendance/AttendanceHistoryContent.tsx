@@ -8,7 +8,6 @@ import {
   Stack,
   Paper,
   MultiSelect,
-  SegmentedControl,
   Box,
   Select,
   Pagination,
@@ -18,7 +17,6 @@ import { IconCalendar, IconDownload, IconFilter } from '@tabler/icons-react';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useClassSections } from '@/hooks/useClassSections';
-import { AttendanceCalendar } from '@/components/features/attendance/AttendanceCalendar';
 import { AttendanceReport } from '@/components/features/attendance/AttendanceReport';
 import { useMyStaff } from '@/hooks/useStaff';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,12 +35,11 @@ function studentToSelectOption(s: Student): { value: string; label: string } {
 }
 
 /**
- * Attendance history filters + calendar/table views.
+ * Attendance history filters and table report.
  * Used in the main Attendance page (History tab) and on the standalone /attendance/history page.
  */
 export function AttendanceHistoryContent() {
   const t = useTranslations('attendance');
-  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('table');
   const [showAllFilters, setShowAllFilters] = useState(false);
   const [tablePage, setTablePage] = useState(1);
   const [selectedClassSectionIds, setSelectedClassSectionIds] = useState<string[]>([]);
@@ -133,11 +130,6 @@ export function AttendanceHistoryContent() {
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
   }, [studentsFromQuery, selectedStudentDetail]);
 
-  // Calendar needs enough rows to cover multiple days (rows scale with student count).
-  // Backend caps `limit` at 500, so fetch a few pages when in calendar view.
-  const calendarLimit = 500;
-  const calendarPages = 3; // 3×500 = 1500 rows (~11+ days @ 129 students/day)
-
   const commonParams = {
     classSectionIds:
       selectedClassSectionIds.length > 0 ? selectedClassSectionIds : undefined,
@@ -150,45 +142,13 @@ export function AttendanceHistoryContent() {
     endDate: dateRange[0] && dateRange[1] ? dateRange[1].toISOString().split('T')[0] : undefined,
   };
 
-  const { data: tableData, isLoading: isTableLoading } = useAttendance({
+  const { data: tableData, isLoading } = useAttendance({
     ...commonParams,
     page: tablePage,
     limit: 100,
   });
 
-  const { data: calData1, isLoading: isCalLoading1 } = useAttendance({
-    ...commonParams,
-    page: 1,
-    limit: calendarLimit,
-  });
-  const { data: calData2, isLoading: isCalLoading2 } = useAttendance({
-    ...commonParams,
-    page: viewMode === 'calendar' ? 2 : 999999, // keep hook stable, avoid loading extra pages in table mode
-    limit: calendarLimit,
-  });
-  const { data: calData3, isLoading: isCalLoading3 } = useAttendance({
-    ...commonParams,
-    page: viewMode === 'calendar' ? 3 : 999999,
-    limit: calendarLimit,
-  });
-
-  const isLoading =
-    viewMode === 'calendar'
-      ? isCalLoading1 || isCalLoading2 || isCalLoading3
-      : isTableLoading;
-
-  const attendanceData =
-    viewMode === 'calendar'
-      ? {
-          data: [
-            ...(calData1?.data ?? []),
-            ...(calData2?.data ?? []),
-            ...(calData3?.data ?? []),
-          ],
-        }
-      : tableData;
-
-  const attendance = attendanceData?.data || [];
+  const attendance = tableData?.data || [];
   const tableMeta = tableData?.meta;
 
   const classSectionOptions = classSections
@@ -352,43 +312,19 @@ export function AttendanceHistoryContent() {
         </Stack>
       </Paper>
 
-      <SegmentedControl
-        value={viewMode}
-        onChange={(value) => setViewMode(value as 'calendar' | 'table')}
-        data={[
-          { label: t('calendarView'), value: 'calendar' },
-          { label: t('tableView'), value: 'table' },
-        ]}
-        fullWidth
-        size="sm"
-      />
-
-      {viewMode === 'calendar' && (
-        <Box pt="md">
-          <AttendanceCalendar
-            attendance={attendance}
-            isLoading={isLoading}
-            startDate={dateRange[0]}
-            endDate={dateRange[1]}
-          />
-        </Box>
-      )}
-
-      {viewMode === 'table' && (
-        <Box pt="md">
-          <AttendanceReport
-            attendance={attendance}
-            isLoading={isLoading}
-            startDate={commonParams.startDate}
-            endDate={commonParams.endDate}
-          />
-          {tableMeta && tableMeta.totalPages > 1 ? (
-            <Group justify="flex-end" mt="sm">
-              <Pagination value={tablePage} onChange={setTablePage} total={tableMeta.totalPages} />
-            </Group>
-          ) : null}
-        </Box>
-      )}
+      <Box pt="md">
+        <AttendanceReport
+          attendance={attendance}
+          isLoading={isLoading}
+          startDate={commonParams.startDate}
+          endDate={commonParams.endDate}
+        />
+        {tableMeta && tableMeta.totalPages > 1 ? (
+          <Group justify="flex-end" mt="sm">
+            <Pagination value={tablePage} onChange={setTablePage} total={tableMeta.totalPages} />
+          </Group>
+        ) : null}
+      </Box>
     </Stack>
   );
 }

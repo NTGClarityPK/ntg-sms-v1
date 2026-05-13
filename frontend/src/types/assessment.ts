@@ -93,6 +93,8 @@ export interface QueryAssessmentsInput {
   classSectionId?: string;
   subjectId?: string;
   assessmentTypeId?: string;
+  /** Profile UUID of the teacher who posted the assessment (`created_by`). */
+  teacherUserId?: string;
   /** Backend expects status: 'all' | 'published' | 'unpublished' */
   status?: 'all' | 'published' | 'unpublished';
   startDate?: string;

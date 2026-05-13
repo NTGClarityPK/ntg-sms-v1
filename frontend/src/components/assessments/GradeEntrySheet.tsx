@@ -5,7 +5,7 @@
  * Bulk grade entry interface for all students in an assessment
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Stack,
@@ -17,13 +17,12 @@ import {
   Group,
   Text,
   Skeleton,
-  Box,
   ScrollArea,
   Alert,
   Badge,
   Divider,
 } from '@mantine/core';
-import { IconAlertCircle } from '@tabler/icons-react';
+import { IconAlertCircle, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useAssessmentGrades, useBulkCreateGrades } from '@/hooks/api/useGrades';
 import { useClassSection, useClassSectionStudents } from '@/hooks/useClassSections';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -38,6 +37,8 @@ interface GradeRow extends CreateStudentGradeInput {
   studentName: string;
 }
 
+type SortColumn = 'studentName' | 'marksObtained' | 'isAbsent' | 'isExcused';
+
 export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntrySheetProps) {
   const t = useTranslations('assessment');
   const colors = useThemeColors();
@@ -48,6 +49,8 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
   );
   const bulkCreateGrades = useBulkCreateGrades();
   const [grades, setGrades] = useState<GradeRow[]>([]);
+  const [sortBy, setSortBy] = useState<SortColumn>('studentName');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Load students and pre-fill with existing grades
   useEffect(() => {
@@ -75,19 +78,94 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
     setGrades(gradeRows);
   }, [assessment.id, existingGrades, classSectionStudentsData, studentsLoading, classSectionLoading]);
 
-  const updateGrade = (index: number, field: keyof GradeRow, value: any) => {
-    setGrades((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
+  const updateGrade = (studentId: string, field: keyof GradeRow, value: string | number | boolean) => {
+    setGrades((prev) =>
+      prev.map((g) => (g.studentId === studentId ? { ...g, [field]: value } : g)),
+    );
+  };
+
+  const setAbsent = (studentId: string, checked: boolean) => {
+    setGrades((prev) =>
+      prev.map((g) =>
+        g.studentId === studentId
+          ? { ...g, isAbsent: checked, marksObtained: checked ? 0 : g.marksObtained }
+          : g,
+      ),
+    );
+  };
+
+  const setExcused = (studentId: string, checked: boolean) => {
+    setGrades((prev) =>
+      prev.map((g) =>
+        g.studentId === studentId
+          ? { ...g, isExcused: checked, marksObtained: checked ? 0 : g.marksObtained }
+          : g,
+      ),
+    );
   };
 
   const handleSubmit = () => {
     bulkCreateGrades.mutate({
       assessmentId: assessment.id,
-      grades: grades.map(({ studentName, ...grade }) => grade),
+      grades: grades.map(({ studentName: _name, ...grade }) => grade),
     });
+  };
+
+  const handleSort = (column: SortColumn) => {
+    if (sortBy === column) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const sortedGrades = useMemo(() => {
+    const mult = sortOrder === 'asc' ? 1 : -1;
+    const arr = [...grades];
+    arr.sort((a, b) => {
+      let cmp = 0;
+      switch (sortBy) {
+        case 'studentName':
+          cmp = a.studentName.localeCompare(b.studentName, undefined, { sensitivity: 'base' });
+          break;
+        case 'marksObtained':
+          cmp = (a.marksObtained ?? 0) - (b.marksObtained ?? 0);
+          break;
+        case 'isAbsent':
+          cmp = Number(a.isAbsent) - Number(b.isAbsent);
+          break;
+        case 'isExcused':
+          cmp = Number(a.isExcused) - Number(b.isExcused);
+          break;
+        default:
+          cmp = 0;
+      }
+      return cmp * mult;
+    });
+    return arr;
+  }, [grades, sortBy, sortOrder]);
+
+  const skipNonMarksTab = !readOnly;
+
+  const SortableHeader = ({ column, children }: { column: SortColumn; children: ReactNode }) => {
+    const isSorted = sortBy === column;
+    const isAsc = isSorted && sortOrder === 'asc';
+
+    return (
+      <Table.Th
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => handleSort(column)}
+        aria-sort={
+          isSorted ? (isAsc ? 'ascending' : 'descending') : 'none'
+        }
+      >
+        <Group gap="xs" wrap="nowrap">
+          <Text fw={500}>{children}</Text>
+          {isSorted && (isAsc ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+        </Group>
+      </Table.Th>
+    );
   };
 
   const isLoading = gradesLoading || classSectionLoading || studentsLoading;
@@ -118,16 +196,22 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
     );
   }
 
+  const saveTabIndex = !readOnly && sortedGrades.length > 0 ? sortedGrades.length + 1 : undefined;
+
   return (
     <Stack gap="md">
-      <Group justify="space-between">
+      <Group justify="space-between" wrap="wrap" align="flex-start">
         <Text fw={500}>{t('studentGrades')}</Text>
-        <Group gap="md">
+        <Group gap="md" wrap="wrap" justify="flex-end">
           <Badge variant="light" color={colors.info} size="lg">
             {t('totalMarksLabel')}: {assessment.totalMarks}
           </Badge>
           {!readOnly && (
-            <Button onClick={handleSubmit} loading={bulkCreateGrades.isPending}>
+            <Button
+              onClick={handleSubmit}
+              loading={bulkCreateGrades.isPending}
+              tabIndex={saveTabIndex}
+            >
               {t('saveAllGrades')}
             </Button>
           )}
@@ -143,65 +227,91 @@ export function GradeEntrySheet({ assessment, readOnly = false }: GradeEntryShee
         </>
       )}
 
+      <Group gap="xs" wrap="wrap">
+        <Badge variant="light" color="blue">
+          {t('subject')}: {assessment.subjectName ?? '—'}
+        </Badge>
+        <Badge variant="light" color="teal">
+          {t('postedBy')}: {assessment.teacherName ?? '—'}
+        </Badge>
+      </Group>
+
       <ScrollArea>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>{t('studentName')}</Table.Th>
-              <Table.Th>{t('marksObtained')}</Table.Th>
-              <Table.Th>{t('absent')}</Table.Th>
-              <Table.Th>{t('excused')}</Table.Th>
-              <Table.Th>{t('remarks')}</Table.Th>
+              <SortableHeader column="studentName">{t('studentName')}</SortableHeader>
+              <SortableHeader column="marksObtained">{t('marksObtained')}</SortableHeader>
+              <SortableHeader column="isAbsent">{t('absent')}</SortableHeader>
+              <SortableHeader column="isExcused">{t('excused')}</SortableHeader>
+              <Table.Th>
+                <Text fw={500}>{t('remarks')}</Text>
+              </Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {grades.map((grade, index) => (
-              <Table.Tr key={grade.studentId}>
-                <Table.Td>
-                  <Text>{grade.studentName}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <NumberInput
-                    value={grade.marksObtained}
-                    onChange={(value) => updateGrade(index, 'marksObtained', value ?? 0)}
-                    min={0}
-                    max={assessment.totalMarks}
-                    disabled={readOnly || grade.isAbsent || grade.isExcused}
-                    size="sm"
-                    w={100}
-                  />
-                </Table.Td>
-                <Table.Td>
-                  <Switch
-                    checked={grade.isAbsent}
-                    onChange={(e) => updateGrade(index, 'isAbsent', e.currentTarget.checked)}
-                    size="sm"
-                    disabled={readOnly}
-                  />
-                </Table.Td>
-                <Table.Td>
-                  <Switch
-                    checked={grade.isExcused}
-                    onChange={(e) => updateGrade(index, 'isExcused', e.currentTarget.checked)}
-                    size="sm"
-                    disabled={readOnly}
-                  />
-                </Table.Td>
-                <Table.Td>
-                  <TextInput
-                    value={grade.remarks}
-                    onChange={(e) => updateGrade(index, 'remarks', e.currentTarget.value)}
-                    placeholder={t('optionalRemarks')}
-                    size="sm"
-                    disabled={readOnly}
-                  />
-                </Table.Td>
-              </Table.Tr>
-            ))}
+            {sortedGrades.map((grade, sortedIndex) => {
+              const marksTabIndex = !readOnly ? sortedIndex + 1 : undefined;
+              return (
+                <Table.Tr key={grade.studentId}>
+                  <Table.Td>
+                    <Text>{grade.studentName}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <NumberInput
+                      id={`grade-entry-marks-${grade.studentId}`}
+                      value={grade.marksObtained}
+                      onChange={(value) => {
+                        const n = typeof value === 'number' ? value : Number(value);
+                        updateGrade(
+                          grade.studentId,
+                          'marksObtained',
+                          Number.isFinite(n) ? n : 0,
+                        );
+                      }}
+                      min={0}
+                      max={assessment.totalMarks}
+                      disabled={readOnly || grade.isAbsent || grade.isExcused}
+                      size="sm"
+                      w={100}
+                      tabIndex={marksTabIndex}
+                    />
+                  </Table.Td>
+                  <Table.Td>
+                    <Switch
+                      checked={grade.isAbsent}
+                      onChange={(e) => setAbsent(grade.studentId, e.currentTarget.checked)}
+                      size="sm"
+                      disabled={readOnly}
+                      tabIndex={skipNonMarksTab ? -1 : undefined}
+                    />
+                  </Table.Td>
+                  <Table.Td>
+                    <Switch
+                      checked={grade.isExcused}
+                      onChange={(e) => setExcused(grade.studentId, e.currentTarget.checked)}
+                      size="sm"
+                      disabled={readOnly}
+                      tabIndex={skipNonMarksTab ? -1 : undefined}
+                    />
+                  </Table.Td>
+                  <Table.Td>
+                    <TextInput
+                      id={`grade-entry-remarks-${grade.studentId}`}
+                      value={grade.remarks}
+                      onChange={(e) => updateGrade(grade.studentId, 'remarks', e.currentTarget.value)}
+                      placeholder={t('optionalRemarks')}
+                      size="sm"
+                      disabled={readOnly}
+                      tabIndex={skipNonMarksTab ? -1 : undefined}
+                    />
+                  </Table.Td>
+                </Table.Tr>
+              );
+            })}
           </Table.Tbody>
         </Table>
       </ScrollArea>
     </Stack>
   );
 }
-

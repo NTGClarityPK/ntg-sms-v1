@@ -22,12 +22,24 @@ import {
   ActionIcon,
   Checkbox,
   SegmentedControl,
+  Menu,
+  alpha,
+  useComputedColorScheme,
+  rem,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMediaQuery } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';
-import { IconMessage, IconPlus, IconSend, IconArrowLeft, IconTrash, IconEraser } from '@tabler/icons-react';
-import { useConversations, useConversation, useConversationMessages, useSendMessage, useMarkConversationRead, useCreateConversation, useDeleteConversation, useClearConversationMessages } from '@/hooks/api/useMessages';
+import {
+  IconMessage,
+  IconPlus,
+  IconSend,
+  IconArrowLeft,
+  IconTrash,
+  IconEraser,
+  IconChevronDown,
+} from '@tabler/icons-react';
+import { useConversations, useConversation, useConversationMessages, useSendMessage, useMarkConversationRead, useCreateConversation, useDeleteConversation, useClearConversationMessages, useDeleteMessage } from '@/hooks/api/useMessages';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { useUsers } from '@/hooks/useUsers';
@@ -37,7 +49,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { supabase } from '@/lib/supabase/client';
 import type { MessageType, ConversationListItem, Message } from '@/types/messages';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
-import { useTheme } from '@/lib/hooks/use-theme';
 import { ADMIN_BROADCAST_ROLE_NAMES } from '@/constants/admin-broadcast-roles';
 
 type NewConversationMode = 'one_to_one' | 'broadcast_class' | 'broadcast_school';
@@ -49,7 +60,9 @@ export default function MessagesPage() {
   const theme = useMantineTheme();
   const colors = useThemeColors();
   const themeConfig = (theme.other as any) as ThemeConfig | undefined;
-  const { isDark } = useTheme();
+  /** Must match MantineProvider — `useTheme()` state can desync per-component and break bubble colours */
+  const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
+  const isDarkUi = computedColorScheme === 'dark';
   const { user } = useAuth();
   const conversationIdFromUrl = searchParams?.get('conversation') ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(conversationIdFromUrl);
@@ -63,7 +76,12 @@ export default function MessagesPage() {
   const [adminBroadcastBranchId, setAdminBroadcastBranchId] = useState<string | null>(null);
   const [adminBroadcastRoles, setAdminBroadcastRoles] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteMessageId, setDeleteMessageId] = useState<string | null>(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [hoveredConversationId, setHoveredConversationId] = useState<string | null>(null);
+  /** Own-message bubble hover / open menu — keeps chevron visible while dropdown is open (portal) */
+  const [hoveredOwnBubbleId, setHoveredOwnBubbleId] = useState<string | null>(null);
+  const [ownMessageMenuOpenId, setOwnMessageMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     if (conversationIdFromUrl) setSelectedId(conversationIdFromUrl);
@@ -88,6 +106,7 @@ export default function MessagesPage() {
   const createConversation = useCreateConversation();
   const deleteConversation = useDeleteConversation();
   const clearMessages = useClearConversationMessages(selectedId);
+  const deleteOwnMessage = useDeleteMessage(selectedId);
 
   // Auto-mark conversation as read when user is viewing it
   useEffect(() => {
@@ -186,6 +205,7 @@ export default function MessagesPage() {
               subject: (row.subject as string) ?? '',
               body: (row.body as string) ?? '',
               createdAt: (row.created_at as string) ?? new Date().toISOString(),
+              isDeleted: Boolean(row.deleted_at),
               isRead: false,
               senderName: undefined,
             };
@@ -250,6 +270,45 @@ export default function MessagesPage() {
                 return next;
               },
             );
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${selectedId}`,
+          },
+          (payload) => {
+            const row = payload.new as Record<string, unknown>;
+            if (!row.deleted_at) return;
+            const messageId = row.id as string;
+            queryClient.setQueriesData(
+              {
+                predicate: (query) => {
+                  const key = query.queryKey;
+                  return (
+                    Array.isArray(key) &&
+                    key.length >= 2 &&
+                    key[0] === 'conversation-messages' &&
+                    key[1] === selectedId
+                  );
+                },
+              },
+              (prev: { data?: Message[]; meta?: unknown } | null | undefined) => {
+                if (!prev?.data) return prev;
+                return {
+                  ...prev,
+                  data: prev.data.map((msg) =>
+                    msg.id === messageId
+                      ? { ...msg, isDeleted: true, body: '', subject: '' }
+                      : msg,
+                  ),
+                };
+              },
+            );
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
           },
         )
         .on(
@@ -637,16 +696,44 @@ export default function MessagesPage() {
   const conversationRowStyles = useMemo(() => {
     const selectedBg =
       themeConfig?.components?.navbar?.activeBackground ??
-      (isDark ? theme.colors.dark[6] : theme.colors.blue[0]);
+      (isDarkUi ? theme.colors.dark[6] : theme.colors.blue[0]);
     const hoverBg =
       themeConfig?.components?.navbar?.hoverBackground ??
-      (isDark ? theme.colors.dark[5] : theme.colors.gray[0]);
+      (isDarkUi ? theme.colors.dark[5] : theme.colors.gray[0]);
     const selectedText =
       themeConfig?.components?.navbar?.activeTextColor ??
-      (isDark ? theme.white : theme.black);
+      (isDarkUi ? theme.white : theme.black);
+    const hoverText =
+      themeConfig?.components?.navbar?.hoverTextColor ?? theme.white;
 
-    return { selectedBg, hoverBg, selectedText };
-  }, [themeConfig, isDark, theme.colors.dark, theme.colors.blue, theme.colors.gray, theme.black, theme.white]);
+    return { selectedBg, hoverBg, selectedText, hoverText };
+  }, [
+    themeConfig,
+    isDarkUi,
+    theme.colors.dark,
+    theme.colors.blue,
+    theme.colors.gray,
+    theme.black,
+    theme.white,
+  ]);
+
+  /** Outgoing bubbles: theme greens — black body copy reads clearly on pale green (primaryDark looked dull in light UI) */
+  const ownBubblePalette = useMemo(() => {
+    const cfg = themeConfig?.colors;
+    const ink = cfg?.pureBlack ?? theme.black;
+    if (cfg) {
+      return {
+        background: isDarkUi ? cfg.primaryLight : cfg.primaryLightest,
+        foreground: ink,
+        foregroundMuted: alpha(ink, isDarkUi ? 0.72 : 0.58),
+      };
+    }
+    return {
+      background: isDarkUi ? theme.colors.primary[5] : theme.colors.primary[1],
+      foreground: theme.black,
+      foregroundMuted: alpha(theme.black, isDarkUi ? 0.72 : 0.58),
+    };
+  }, [themeConfig?.colors, isDarkUi, theme.colors.primary, theme.black]);
 
   return (
     <>
@@ -732,40 +819,68 @@ export default function MessagesPage() {
                   </Stack>
                 ) : (
                   <Stack gap={0}>
-                    {conversations.map((c) => (
+                    {conversations.map((c) => {
+                      const isRowSelected = selectedId === c.id;
+                      const isRowHovered = hoveredConversationId === c.id && !isRowSelected;
+                      const cfgColors = themeConfig?.colors;
+                      const selectedLightInk = cfgColors?.pureBlack ?? cfgColors?.text ?? theme.black;
+                      const rowTitleColor = isRowSelected
+                        ? isDarkUi
+                          ? conversationRowStyles.selectedText
+                          : selectedLightInk
+                        : isRowHovered
+                          ? conversationRowStyles.hoverText
+                          : (cfgColors?.text ?? theme.black);
+                      const rowPreviewColor = isRowSelected
+                        ? isDarkUi
+                          ? (cfgColors?.textMuted ?? theme.colors.gray[6])
+                          : alpha(selectedLightInk, 0.82)
+                        : isRowHovered
+                          ? alpha(conversationRowStyles.hoverText, 0.88)
+                          : (cfgColors?.textMuted ?? theme.colors.gray[6]);
+                      return (
                       <Box
                         key={c.id}
                         p="sm"
                         style={{
                           cursor: 'pointer',
-                          backgroundColor:
-                            selectedId === c.id ? conversationRowStyles.selectedBg : undefined,
-                          color: selectedId === c.id ? conversationRowStyles.selectedText : undefined,
+                          backgroundColor: isRowSelected
+                            ? conversationRowStyles.selectedBg
+                            : isRowHovered
+                              ? conversationRowStyles.hoverBg
+                              : undefined,
                         }}
                         onClick={() => {
                           setSelectedId(c.id);
                           window.history.replaceState(null, '', `/messages?conversation=${c.id}`);
                         }}
-                        onMouseEnter={(e) => {
-                          if (selectedId === c.id) return;
-                          e.currentTarget.style.backgroundColor = conversationRowStyles.hoverBg;
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedId === c.id) return;
-                          e.currentTarget.style.backgroundColor = '';
-                        }}
+                        onMouseEnter={() => setHoveredConversationId(c.id)}
+                        onMouseLeave={() => setHoveredConversationId(null)}
                       >
                         <Group justify="space-between" wrap="nowrap" gap="xs">
-                          <Text fw={selectedId === c.id ? 600 : 400} size="sm" lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
+                          {/* Box not Text — DynamicThemeProvider sets .mantine-Text-root { color: … !important } */}
+                          <Box
+                            component="span"
+                            fz="sm"
+                            fw={isRowSelected ? 600 : 400}
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              color: rowTitleColor,
+                            }}
+                          >
                             {c.type === 'broadcast'
                               ? !c.classSectionId
                                 ? t('broadcastWholeSchool')
                                 : `${c.className ?? ''} ${c.sectionName ?? ''}`.trim() || t('broadcast')
                               : c.participantNames?.join(', ') || t('conversation')}
-                          </Text>
+                          </Box>
                           <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
                             {c.unreadCount > 0 && (
-                              <Badge size="sm" color="blue" variant="filled">
+                              <Badge size="sm" color="primary" variant="filled">
                                 {c.unreadCount}
                               </Badge>
                             )}
@@ -780,13 +895,24 @@ export default function MessagesPage() {
                             </ActionIcon>
                           </Group>
                         </Group>
-                        {c.lastMessagePreview && (
-                          <Text size="xs" c="dimmed" lineClamp={1} mt={4}>
-                            {c.lastMessagePreview}
-                          </Text>
+                        {(c.lastMessagePreview || c.lastMessageDeleted) && (
+                          <Box
+                            fz="xs"
+                            mt={4}
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              color: rowPreviewColor,
+                              fontStyle: c.lastMessageDeleted ? 'italic' : undefined,
+                            }}
+                          >
+                            {c.lastMessageDeleted ? t('messageDeleted') : c.lastMessagePreview}
+                          </Box>
                         )}
                       </Box>
-                    ))}
+                      );
+                    })}
                   </Stack>
                 )}
               </ScrollArea>
@@ -842,33 +968,165 @@ export default function MessagesPage() {
                                 alignSelf: own ? 'flex-end' : 'flex-start',
                                 maxWidth: '85%',
                               }}
+                              onMouseEnter={() => {
+                                if (own && !m.isDeleted) setHoveredOwnBubbleId(m.id);
+                              }}
+                              onMouseLeave={() => setHoveredOwnBubbleId(null)}
                             >
                               <Paper
                                 p="xs"
                                 px="sm"
                                 radius="lg"
-                                withBorder={!own}
+                                withBorder={!own || Boolean(m.isDeleted)}
                                 style={{
-                                  backgroundColor: own ? theme.colors.blue[6] : undefined,
+                                  position: 'relative',
+                                  backgroundColor: m.isDeleted
+                                    ? isDarkUi
+                                      ? theme.colors.dark[6]
+                                      : theme.colors.gray[1]
+                                    : own
+                                      ? ownBubblePalette.background
+                                      : undefined,
+                                  color:
+                                    m.isDeleted || !own ? undefined : ownBubblePalette.foreground,
                                   borderBottomRightRadius: own ? 4 : theme.radius.lg,
                                   borderBottomLeftRadius: own ? theme.radius.lg : 4,
+                                  ...(own && !m.isDeleted
+                                    ? {
+                                        display: 'grid',
+                                        gridTemplateColumns: 'minmax(0, 1fr) auto',
+                                        alignItems: 'start',
+                                        /** Tight gutter: enough for descenders, not a second margin like sm */
+                                        columnGap: rem(4),
+                                      }
+                                    : {}),
                                 }}
                               >
-                                {!own && (
-                                  <Text size="xs" fw={500} c={own ? 'white' : 'dimmed'} mb={2}>
+                                {!m.isDeleted && !own && (
+                                  <Text size="xs" fw={500} c="dimmed" mb={2}>
                                     {m.senderName ?? t('userFallback')}
                                   </Text>
                                 )}
-                                <Text
-                                  size="sm"
-                                  c={own ? 'white' : undefined}
-                                  style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                                >
-                                  {m.body || '-'}
-                                </Text>
-                                <Text size="xs" c={own ? 'white' : 'dimmed'} style={{ opacity: 0.85 }} mt={4}>
-                                  {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </Text>
+                                {m.isDeleted ? (
+                                  <>
+                                    <Box
+                                      component="p"
+                                      fz="sm"
+                                      m={0}
+                                      style={{
+                                        fontStyle: 'italic',
+                                        color: theme.colors.gray[isDarkUi ? 5 : 6],
+                                      }}
+                                    >
+                                      {t('messageDeleted')}
+                                    </Box>
+                                    <Box
+                                      component="p"
+                                      fz="xs"
+                                      mt={4}
+                                      m={0}
+                                      style={{ color: theme.colors.gray[isDarkUi ? 6 : 7] }}
+                                    >
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </Box>
+                                  </>
+                                ) : own ? (
+                                  <>
+                                    <Box style={{ minWidth: 0 }}>
+                                      <Box
+                                        component="p"
+                                        fz="sm"
+                                        m={0}
+                                        style={{
+                                          whiteSpace: 'pre-wrap',
+                                          wordBreak: 'break-word',
+                                          color: ownBubblePalette.foreground,
+                                        }}
+                                      >
+                                        {m.body || '-'}
+                                      </Box>
+                                      <Box
+                                        component="p"
+                                        fz="xs"
+                                        mt={4}
+                                        m={0}
+                                        style={{ color: ownBubblePalette.foregroundMuted }}
+                                      >
+                                        {new Date(m.createdAt).toLocaleTimeString([], {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })}
+                                      </Box>
+                                    </Box>
+                                    <Box style={{ flexShrink: 0, lineHeight: 1, marginTop: rem(2) }}>
+                                      <Menu
+                                        shadow="md"
+                                        position="bottom-end"
+                                        withinPortal
+                                        onOpen={() => setOwnMessageMenuOpenId(m.id)}
+                                        onClose={() => setOwnMessageMenuOpenId(null)}
+                                      >
+                                        <Menu.Target>
+                                          <ActionIcon
+                                            id={`messages-own-msg-menu-trigger-${m.id}`}
+                                            variant="subtle"
+                                            color="gray"
+                                            size="xs"
+                                            aria-label={t('messageActionsAria')}
+                                            aria-haspopup="menu"
+                                            aria-expanded={ownMessageMenuOpenId === m.id}
+                                            style={{
+                                              opacity:
+                                                hoveredOwnBubbleId === m.id ||
+                                                ownMessageMenuOpenId === m.id
+                                                  ? 1
+                                                  : 0,
+                                              transition: 'opacity 120ms ease',
+                                              pointerEvents:
+                                                hoveredOwnBubbleId === m.id ||
+                                                ownMessageMenuOpenId === m.id
+                                                  ? 'auto'
+                                                  : 'none',
+                                            }}
+                                          >
+                                            <IconChevronDown size={14} stroke={2} />
+                                          </ActionIcon>
+                                        </Menu.Target>
+                                        <Menu.Dropdown id={`messages-own-msg-menu-${m.id}`}>
+                                          <Menu.Item
+                                            id={`messages-own-msg-delete-${m.id}`}
+                                            leftSection={<IconTrash size={14} />}
+                                            color="red"
+                                            onClick={() => setDeleteMessageId(m.id)}
+                                          >
+                                            {t('deleteOwnMessage')}
+                                          </Menu.Item>
+                                        </Menu.Dropdown>
+                                      </Menu>
+                                    </Box>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Text
+                                      size="sm"
+                                      style={{
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                      }}
+                                    >
+                                      {m.body || '-'}
+                                    </Text>
+                                    <Text size="xs" c="dimmed" mt={4}>
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </Text>
+                                  </>
+                                )}
                               </Paper>
                             </Box>
                           );
@@ -899,7 +1157,7 @@ export default function MessagesPage() {
                         <ActionIcon
                           size="lg"
                           variant="filled"
-                          color="blue"
+                          color="primary"
                           onClick={handleSend}
                           loading={sendMessage.isPending}
                           disabled={!body.trim()}
@@ -1095,6 +1353,39 @@ export default function MessagesPage() {
             }}
           >
             {t('delete')}
+          </Button>
+        </Group>
+      </Modal>
+
+      <Modal
+        opened={deleteMessageId !== null}
+        onClose={() => setDeleteMessageId(null)}
+        title={t('deleteOwnMessageTitle')}
+      >
+        <Text size="sm" c="dimmed" mb="md">
+          {t('deleteOwnMessageConfirm')}
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button
+            id="messages-delete-msg-cancel"
+            variant="default"
+            onClick={() => setDeleteMessageId(null)}
+          >
+            {t('cancel')}
+          </Button>
+          <Button
+            id="messages-delete-msg-confirm"
+            color="red"
+            loading={deleteOwnMessage.isPending}
+            onClick={() => {
+              if (deleteMessageId) {
+                deleteOwnMessage.mutate(deleteMessageId, {
+                  onSuccess: () => setDeleteMessageId(null),
+                });
+              }
+            }}
+          >
+            {t('deleteOwnMessage')}
           </Button>
         </Group>
       </Modal>

@@ -8,6 +8,8 @@ export class MessageDto {
   subject!: string;
   body!: string;
   createdAt!: string;
+  /** When true, body/subject are cleared server-side; UI shows deleted placeholder for everyone */
+  isDeleted?: boolean;
   isRead?: boolean;
   senderName?: string;
 

@@ -36,7 +36,8 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/conflict-management': 'conflict_management',
   '/promotion-placement': 'students',
   '/reports': 'reports',
-  '/results': 'reports',
+  /** Class result cards: staff often have `assessment` without a separate `reports` matrix row. */
+  '/results': 'results',
   '/reports/public': 'reports',
   '/reports/administrative': 'reports',
   '/settings': 'settings',

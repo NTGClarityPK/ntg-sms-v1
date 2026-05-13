@@ -18,7 +18,6 @@ import { useAttendanceByStudent, useAttendanceSummaryByStudent } from '@/hooks/u
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { AttendanceCalendar } from '@/components/features/attendance/AttendanceCalendar';
 import { AttendanceReport } from '@/components/features/attendance/AttendanceReport';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { User } from '@/types/auth';
@@ -37,7 +36,7 @@ interface Child {
 }
 
 /**
- * Child attendance: select child, summary, calendar and report.
+ * Child attendance: select child, summary, and report.
  * Used in the main Attendance page (Child Attendance tab) and on the standalone /attendance/child page.
  */
 export function ChildAttendanceContent() {
@@ -179,26 +178,16 @@ export function ChildAttendanceContent() {
 
           {(isLoadingAttendance || isLoadingSummary) ? (
             <Stack gap="md" py="xl">
-              <Skeleton height={200} />
-              <Skeleton height={300} />
+              <Skeleton height={280} />
               <Skeleton height={400} />
             </Stack>
           ) : (
-            <>
-              <AttendanceCalendar
-                attendance={attendance}
-                isLoading={false}
-                startDate={null}
-                endDate={null}
-                isSingleStudent={true}
-              />
-              <AttendanceReport
-                attendance={attendance}
-                isLoading={false}
-                startDate={undefined}
-                endDate={undefined}
-              />
-            </>
+            <AttendanceReport
+              attendance={attendance}
+              isLoading={false}
+              startDate={undefined}
+              endDate={undefined}
+            />
           )}
         </>
       )}

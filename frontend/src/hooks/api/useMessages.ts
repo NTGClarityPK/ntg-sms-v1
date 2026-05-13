@@ -120,6 +120,7 @@ export function useSendMessage(conversationId: string | null) {
         subject: input.subject ?? '',
         body: input.body ?? '',
         createdAt: new Date().toISOString(),
+        isDeleted: false,
         isRead: true,
         senderName: user.fullName,
       };
@@ -320,6 +321,28 @@ export function useDeleteConversation() {
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to delete conversation';
+      notifications.show({ title: 'Error', message, color: notifyColors.error });
+    },
+  });
+}
+
+/** Soft-delete one message for all participants (sender only). */
+export function useDeleteMessage(conversationId: string | null) {
+  const queryClient = useQueryClient();
+  const notifyColors = useThemeColors();
+
+  return useMutation({
+    mutationFn: async (messageId: string) => {
+      await apiClient.delete(`/api/v1/messages/${messageId}`);
+    },
+    onSuccess: () => {
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversationId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to delete message';
       notifications.show({ title: 'Error', message, color: notifyColors.error });
     },
   });

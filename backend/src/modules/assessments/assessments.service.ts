@@ -581,6 +581,10 @@ export class AssessmentsService {
       dbQuery = dbQuery.eq('assessment_type_id', query.assessmentTypeId);
     }
 
+    if (!examinationScheduleOnly && query.teacherUserId) {
+      dbQuery = dbQuery.eq('created_by', query.teacherUserId);
+    }
+
     if (query.status && query.status !== 'all') {
       const isPublished = query.status === 'published';
       dbQuery = dbQuery.eq('is_published', isPublished);

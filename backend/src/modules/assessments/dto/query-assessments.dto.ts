@@ -16,6 +16,11 @@ export class QueryAssessmentsDto extends BasePaginationDto {
   @IsUUID('4')
   assessmentTypeId?: string;
 
+  /** Profile/user UUID of the teacher who created the assessment (`assessments.created_by`). */
+  @IsOptional()
+  @IsUUID('4')
+  teacherUserId?: string;
+
   @IsOptional()
   @IsEnum(['all', 'published', 'unpublished'])
   status?: AssessmentPublishStatus;

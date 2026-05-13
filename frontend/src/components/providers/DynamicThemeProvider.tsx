@@ -230,11 +230,11 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       /* Adjust for collapsed navbar (desktop) */
       @media (min-width: 768px) {
         body[data-navbar-collapsed="true"] .page-title-bar {
-          left: 100px !important;
+          left: 60px !important;
         }
         
         body[data-navbar-collapsed="true"] .page-sub-title-bar {
-          left: 100px !important;
+          left: 60px !important;
         }
       }
       
@@ -280,14 +280,14 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       @media (min-width: 768px) {
         html[dir="rtl"] body[data-navbar-collapsed="true"] .page-title-bar,
         [dir="rtl"] body[data-navbar-collapsed="true"] .page-title-bar {
-          right: 100px !important;
-          width: calc(100% - 100px) !important;
+          right: 60px !important;
+          width: calc(100% - 60px) !important;
         }
         
         html[dir="rtl"] body[data-navbar-collapsed="true"] .page-sub-title-bar,
         [dir="rtl"] body[data-navbar-collapsed="true"] .page-sub-title-bar {
-          right: 100px !important;
-          width: calc(100% - 100px) !important;
+          right: 60px !important;
+          width: calc(100% - 60px) !important;
         }
       }
       
@@ -382,6 +382,20 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         padding: 0.75rem !important;
         margin: 0 auto !important;
       }
+
+      /*
+       * Collapsed rail (navbar only): lock row size so global padding + active border/shadow
+       * do not make the active group taller than neighbours (uneven vertical gaps).
+       */
+      .mantine-AppShell-navbar .nav-item-button[data-collapsed="true"] {
+        box-sizing: border-box !important;
+        height: 48px !important;
+        min-height: 48px !important;
+        max-height: 48px !important;
+        width: 48px !important;
+        min-width: 48px !important;
+        padding: 0 !important;
+      }
       
       /* Ensure button inner content is centered when collapsed */
       .nav-item-button[data-collapsed="true"] .mantine-Button-inner {
@@ -402,27 +416,31 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         padding: 0.5rem 1rem !important;
       }
       
-      /* Active state */
-      .nav-item-button[data-active="true"] {
+      /*
+       * Active / hover tints must apply only inside the AppShell navbar.
+       * Collapsed-group flyouts render in a portal (not under .mantine-AppShell-navbar); if these
+       * rules stay global, important overrides inline styles on flyout rows and every option looks tinted.
+       */
+      .mantine-AppShell-navbar .nav-item-button[data-active="true"] {
         background-color: ${config.components.navbar.activeBackground} !important;
         color: ${config.components.navbar.activeTextColor} !important;
         font-weight: 600 !important;
       }
       
       /* Hover state - only apply if not active */
-      .nav-item-button:hover:not([data-active="true"]) {
+      .mantine-AppShell-navbar .nav-item-button:hover:not([data-active="true"]) {
         background-color: ${config.components.navbar.hoverBackground} !important;
         color: ${config.components.navbar.hoverTextColor} !important;
       }
       
       /* Active state hover - keep active colors */
-      .nav-item-button[data-active="true"]:hover {
+      .mantine-AppShell-navbar .nav-item-button[data-active="true"]:hover {
         background-color: ${config.components.navbar.activeBackground} !important;
         color: ${config.components.navbar.activeTextColor} !important;
       }
       
       /* Active state in collapsed mode - border on inline-start (flips in RTL) */
-      .nav-item-button[data-active="true"][data-collapsed="true"] {
+      .mantine-AppShell-navbar .nav-item-button[data-active="true"][data-collapsed="true"] {
         background-color: ${config.components.navbar.activeBackground} !important;
         border-inline-start: 4px solid ${config.components.navbar.activeTextColor} !important;
         border-start-end-radius: 8px !important;
@@ -430,13 +448,13 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         border-end-start-radius: 8px !important;
         border-start-start-radius: 0 !important;
         position: relative !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
         font-weight: 700 !important;
       }
       
       /* Make active icon stand out more in collapsed mode */
-      .nav-item-button[data-active="true"][data-collapsed="true"] svg {
-        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) !important;
+      .mantine-AppShell-navbar .nav-item-button[data-active="true"][data-collapsed="true"] svg {
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12)) !important;
       }
       
       /* Navbar Toggle Button */
@@ -498,7 +516,8 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         font-family: ${config.typography.fontFamily.primary} !important;
       }
       
-      /* Global Text Color */
+      /* Global Text Color: color uses !important, so it overrides parent colour and inline styles on
+         Mantine Text. For contrasting text on a tinted row or bubble, use Box (see Messages module). */
       .mantine-Text-root {
         color: ${config.colors.text} !important;
         font-family: ${config.typography.fontFamily.primary} !important;

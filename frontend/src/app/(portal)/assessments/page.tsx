@@ -55,6 +55,7 @@ import { useAssessmentTypes } from '@/hooks/useAssessmentSettings';
 import { useSubjects } from '@/hooks/useCoreLookups';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useFeaturePermission } from '@/hooks/usePermissions';
+import { useStaff } from '@/hooks/useStaff';
 import { modals } from '@mantine/modals';
 import dayjs from 'dayjs';
 import type { Assessment } from '@/types/assessment';
@@ -81,6 +82,7 @@ export default function AssessmentsPage() {
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState<string | null>(null);
   const [assessmentTypeIdFilter, setAssessmentTypeIdFilter] = useState<string | null>(null);
+  const [teacherUserId, setTeacherUserId] = useState<string | null>(null);
 
   const { data: activeYearResponse } = useActiveAcademicYear();
   const activeYearId = activeYearResponse?.data?.id;
@@ -110,6 +112,23 @@ export default function AssessmentsPage() {
   const { data: assessmentTypesData } = useAssessmentTypes();
   const assessmentTypes = Array.isArray(assessmentTypesData?.data) ? assessmentTypesData.data : [];
 
+  const { data: staffListResponse } = useStaff({
+    page: 1,
+    limit: 500,
+    isActive: true,
+  });
+  const teacherSelectData = useMemo(() => {
+    const list = staffListResponse?.data;
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((s) => typeof s.userId === 'string' && s.userId.length > 0)
+      .map((s) => ({
+        value: s.userId,
+        label: [s.fullName, s.email].find((x) => typeof x === 'string' && x.trim().length > 0)?.trim() ?? s.userId,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [staffListResponse?.data]);
+
   const { data, isLoading, error, isRefetching } = useAssessments({
     page,
     limit: 20,
@@ -117,6 +136,7 @@ export default function AssessmentsPage() {
     classSectionId: classSectionId || undefined,
     subjectId: subjectId || undefined,
     assessmentTypeId: assessmentTypeIdFilter ?? undefined,
+    teacherUserId: teacherUserId ?? undefined,
     status:
       isPublished === 'true' ? 'published' : isPublished === 'false' ? 'unpublished' : undefined,
   });
@@ -277,37 +297,73 @@ export default function AssessmentsPage() {
                           onChange={setIsPublished}
                           clearable
                         />
+                        <Select
+                          id="assessments-filter-teacher"
+                          placeholder={t('filterByTeacher')}
+                          data={teacherSelectData}
+                          value={teacherUserId}
+                          onChange={(v) => {
+                            setTeacherUserId(v ?? null);
+                            setPage(1);
+                          }}
+                          clearable
+                          searchable
+                          nothingFoundMessage={tCommon('noData')}
+                        />
                       </Stack>
                     ) : (
-                      <Group grow>
-                        <TextInput
-                          id="assessments-search"
-                          placeholder={t('searchPlaceholder')}
-                          leftSection={<IconSearch size={16} />}
-                          value={search}
-                          onChange={(e) => setSearch(e.currentTarget.value)}
-                        />
-                        <Select
-                          id="assessments-filter-class-section"
-                          placeholder={t('filterByClassSection')}
-                          data={classSectionOptions}
-                          value={classSectionId ?? null}
-                          onChange={(v) => setClassSectionId(v ?? null)}
-                          clearable
-                        />
-                        <Select
-                          id="assessments-filter-status"
-                          placeholder={t('filterByStatus')}
-                          data={[
-                            { value: 'all', label: t('all') },
-                            { value: 'true', label: t('published') },
-                            { value: 'false', label: t('draft') },
-                          ]}
-                          value={isPublished}
-                          onChange={setIsPublished}
-                          clearable
-                        />
-                      </Group>
+                      <ScrollArea type="auto" scrollbars="x" w="100%">
+                        <Group wrap="nowrap" gap="sm" align="flex-end" style={{ minWidth: 'min-content' }}>
+                          <Box style={{ minWidth: 200, flex: '2 1 220px' }}>
+                            <TextInput
+                              id="assessments-search"
+                              placeholder={t('searchPlaceholder')}
+                              leftSection={<IconSearch size={16} />}
+                              value={search}
+                              onChange={(e) => setSearch(e.currentTarget.value)}
+                            />
+                          </Box>
+                          <Box style={{ minWidth: 140, flex: '1 1 160px' }}>
+                            <Select
+                              id="assessments-filter-class-section"
+                              placeholder={t('filterByClassSection')}
+                              data={classSectionOptions}
+                              value={classSectionId ?? null}
+                              onChange={(v) => setClassSectionId(v ?? null)}
+                              clearable
+                            />
+                          </Box>
+                          <Box style={{ minWidth: 130, flex: '1 1 150px' }}>
+                            <Select
+                              id="assessments-filter-status"
+                              placeholder={t('filterByStatus')}
+                              data={[
+                                { value: 'all', label: t('all') },
+                                { value: 'true', label: t('published') },
+                                { value: 'false', label: t('draft') },
+                              ]}
+                              value={isPublished}
+                              onChange={setIsPublished}
+                              clearable
+                            />
+                          </Box>
+                          <Box style={{ minWidth: 160, flex: '1 1 180px' }}>
+                            <Select
+                              id="assessments-filter-teacher"
+                              placeholder={t('filterByTeacher')}
+                              data={teacherSelectData}
+                              value={teacherUserId}
+                              onChange={(v) => {
+                                setTeacherUserId(v ?? null);
+                                setPage(1);
+                              }}
+                              clearable
+                              searchable
+                              nothingFoundMessage={tCommon('noData')}
+                            />
+                          </Box>
+                        </Group>
+                      </ScrollArea>
                     )}
 
                     {isMobile ? (

@@ -29,6 +29,7 @@ export interface ConversationListItem {
   academicYearId?: string;
   createdAt: string;
   lastMessagePreview?: string;
+  lastMessageDeleted?: boolean;
   lastMessageAt?: string;
   lastMessageType?: MessageType;
   unreadCount: number;
@@ -45,6 +46,8 @@ export interface Message {
   subject: string;
   body: string;
   createdAt: string;
+  /** Sender deleted for everyone — body/subject empty from API */
+  isDeleted?: boolean;
   isRead?: boolean;
   senderName?: string;
 }

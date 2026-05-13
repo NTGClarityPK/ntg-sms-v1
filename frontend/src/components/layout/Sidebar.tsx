@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
@@ -12,9 +12,11 @@ import {
   ActionIcon,
   Text,
   Divider,
+  alpha,
   useMantineTheme,
   Accordion,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import {
   IconHome,
   IconUsers,
@@ -52,14 +54,11 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { getFeatureCodeForPath } from '@/lib/permission/navFeatureMap';
-
-interface NavItem {
-  key: string;
-  label: string;
-  href: string;
-  icon: React.ComponentType<IconProps>;
-  showCondition?: () => boolean;
-}
+import type { NavItem } from './nav-types';
+import {
+  CollapsedNavDashboardButton,
+  CollapsedNavGroupPopover,
+} from './CollapsedNavGroupPopover';
 
 const NAV_ICON_SIZE = 22;
 
@@ -214,7 +213,10 @@ const allNavItems: NavItem[] = [
   { key: 'settings', label: 'Settings', href: '/settings', icon: IconSettings },
 ];
 
-/** Grouped nav (expanded sidebar). Order within each group matches product spec. */
+/** Only this School accordion stays open on load / refresh (all others collapsed). */
+const SCHOOL_ACCORDION_DEFAULT_OPEN_KEY = 'sidebarGroupAcademics';
+
+/** Grouped nav (expanded sidebar). Students & Attendance before Academics per product layout. */
 const SCHOOL_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[] = [
   {
     i18nKey: 'sidebarGroupStudentsAttendance',
@@ -246,6 +248,16 @@ const SCHOOL_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[
   },
 ];
 
+/** One icon per accordion group for the collapsed rail + flyout (Tabler). */
+const COLLAPSED_GROUP_ICONS: Record<string, ComponentType<IconProps>> = {
+  sidebarGroupStudentsAttendance: IconUsers,
+  sidebarGroupAcademics: IconBook,
+  sidebarGroupCommunication: IconMessage,
+  sidebarGroupSetup: IconSettings,
+  sidebarGroupResources: IconPackage,
+  sidebarGroupSystem: IconChartBar,
+};
+
 const MANAGEMENT_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[] = [
   {
     i18nKey: 'sidebarGroupSetup',
@@ -253,11 +265,11 @@ const MANAGEMENT_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[
   },
   {
     i18nKey: 'sidebarGroupResources',
-    hrefs: ['/library', '/inventory', '/uniform-request', '/admin/storage'],
+    hrefs: ['/library', '/inventory', '/uniform-request', '/reports'],
   },
   {
     i18nKey: 'sidebarGroupSystem',
-    hrefs: ['/reports', '/conflict-management', '/settings'],
+    hrefs: ['/conflict-management', '/settings', '/admin/storage'],
   },
 ];
 
@@ -283,6 +295,9 @@ export function Sidebar({
 }: SidebarProps = {}) {
   // On mobile drawer always show full nav with labels; on desktop use collapsed state
   const effectiveCollapsed = collapsed && !isMobile;
+  /** Desktop fine pointer: hover + delay flyouts. Touch / coarse: tap to open popover. */
+  const pointerFine = useMediaQuery('(pointer: fine)');
+  const useHoverFlyouts = Boolean(pointerFine) && isMobile !== true;
   const router = useRouter();
   const pathname = usePathname();
   const theme = useMantineTheme();
@@ -472,19 +487,29 @@ export function Sidebar({
   const managementAccordionKeysSig = managementAccordionGroups.map((g) => g.i18nKey).join('|');
 
   const [schoolAccordionValue, setSchoolAccordionValue] = useState<string[]>(() =>
-    schoolAccordionGroups.map((g) => g.i18nKey),
+    schoolAccordionGroups.some((g) => g.i18nKey === SCHOOL_ACCORDION_DEFAULT_OPEN_KEY)
+      ? [SCHOOL_ACCORDION_DEFAULT_OPEN_KEY]
+      : [],
   );
-  const [managementAccordionValue, setManagementAccordionValue] = useState<string[]>(() =>
-    managementAccordionGroups.map((g) => g.i18nKey),
-  );
+  const [managementAccordionValue, setManagementAccordionValue] = useState<string[]>([]);
+  /** Which collapsed group flyout is open (only one at a time). */
+  const [collapsedFlyoutId, setCollapsedFlyoutId] = useState<string | null>(null);
 
   useEffect(() => {
-    setSchoolAccordionValue(schoolAccordionGroups.map((g) => g.i18nKey));
+    setSchoolAccordionValue(
+      schoolAccordionGroups.some((g) => g.i18nKey === SCHOOL_ACCORDION_DEFAULT_OPEN_KEY)
+        ? [SCHOOL_ACCORDION_DEFAULT_OPEN_KEY]
+        : [],
+    );
   }, [schoolAccordionKeysSig]);
 
   useEffect(() => {
-    setManagementAccordionValue(managementAccordionGroups.map((g) => g.i18nKey));
+    setManagementAccordionValue([]);
   }, [managementAccordionKeysSig]);
+
+  useEffect(() => {
+    if (!effectiveCollapsed) setCollapsedFlyoutId(null);
+  }, [effectiveCollapsed]);
 
   const schoolFlatOrdered: NavItem[] = [
     ...(dashboardItem ? [dashboardItem] : []),
@@ -570,14 +595,53 @@ export function Sidebar({
         type="hover"
         scrollHideDelay={400}
       >
-        <Stack gap={effectiveCollapsed ? 4 : 'xs'} p={effectiveCollapsed ? 'xs' : 'md'}>
+        <Stack
+          gap={effectiveCollapsed ? 0 : 'xs'}
+          p={effectiveCollapsed ? { py: 'md', px: 0 } : 'md'}
+        >
           {schoolFlatOrdered.length > 0 && (
             <>
               {!effectiveCollapsed && (
                 <Text {...SIDEBAR_SECTION_LABEL_PROPS}>{tCommon('sidebarSchool')}</Text>
               )}
               {effectiveCollapsed ? (
-                schoolFlatOrdered.map(renderNavItem)
+                <Stack gap={2} align="stretch" w="100%">
+                  {dashboardItem ? (
+                    <CollapsedNavDashboardButton
+                      item={dashboardItem}
+                      label={tNav('dashboard')}
+                      onNavigate={onMobileClose}
+                    />
+                  ) : null}
+                  {schoolAccordionGroups.map((group) => {
+                    const GroupIcon = COLLAPSED_GROUP_ICONS[group.i18nKey];
+                    if (!GroupIcon || group.items.length === 0) return null;
+                    return (
+                      <CollapsedNavGroupPopover
+                        key={group.i18nKey}
+                        groupId={group.i18nKey}
+                        groupLabel={tCommon(group.i18nKey)}
+                        GroupIcon={GroupIcon}
+                        items={group.items}
+                        opened={collapsedFlyoutId === group.i18nKey}
+                        onOpenChange={(open) => {
+                          setCollapsedFlyoutId((prev) => {
+                            if (open) return group.i18nKey;
+                            return prev === group.i18nKey ? null : prev;
+                          });
+                        }}
+                        useHoverInteraction={useHoverFlyouts}
+                        getItemLabel={(key) => tNav(key)}
+                        onNavigate={onMobileClose}
+                        navHoverBackground={navbarConfig?.hoverBackground}
+                        navHoverColor={navbarConfig?.hoverTextColor}
+                        navActiveBackground={navbarConfig?.activeBackground}
+                        navActiveTextColor={navbarConfig?.activeTextColor}
+                        navDefaultTextColor={navbarConfig?.textColor}
+                      />
+                    );
+                  })}
+                </Stack>
               ) : (
                 <>
                   {dashboardItem ? renderNavItem(dashboardItem) : null}
@@ -624,7 +688,49 @@ export function Sidebar({
                 <Text {...SIDEBAR_SECTION_LABEL_PROPS}>{tCommon('sidebarManagement')}</Text>
               )}
               {effectiveCollapsed ? (
-                managementFlatOrdered.map(renderNavItem)
+                <>
+                  {schoolFlatOrdered.length > 0 && managementFlatOrdered.length > 0 && (
+                    <Box
+                      style={{
+                        height: 2,
+                        backgroundColor: alpha(theme.white, 0.1),
+                        marginTop: 4,
+                        marginBottom: 2,
+                        borderRadius: 1,
+                      }}
+                    />
+                  )}
+                  <Stack gap={2} align="stretch" w="100%">
+                    {managementAccordionGroups.map((group) => {
+                      const GroupIcon = COLLAPSED_GROUP_ICONS[group.i18nKey];
+                      if (!GroupIcon || group.items.length === 0) return null;
+                      return (
+                        <CollapsedNavGroupPopover
+                          key={group.i18nKey}
+                          groupId={group.i18nKey}
+                          groupLabel={tCommon(group.i18nKey)}
+                          GroupIcon={GroupIcon}
+                          items={group.items}
+                          opened={collapsedFlyoutId === group.i18nKey}
+                          onOpenChange={(open) => {
+                            setCollapsedFlyoutId((prev) => {
+                              if (open) return group.i18nKey;
+                              return prev === group.i18nKey ? null : prev;
+                            });
+                          }}
+                          useHoverInteraction={useHoverFlyouts}
+                          getItemLabel={(key) => tNav(key)}
+                          onNavigate={onMobileClose}
+                          navHoverBackground={navbarConfig?.hoverBackground}
+                          navHoverColor={navbarConfig?.hoverTextColor}
+                          navActiveBackground={navbarConfig?.activeBackground}
+                          navActiveTextColor={navbarConfig?.activeTextColor}
+                          navDefaultTextColor={navbarConfig?.textColor}
+                        />
+                      );
+                    })}
+                  </Stack>
+                </>
               ) : (
                 <Accordion
                   multiple

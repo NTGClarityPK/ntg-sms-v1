@@ -33,7 +33,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [navbarCollapsed]);
 
   // On mobile use full drawer width; on desktop use collapsed/expanded width
-  const navbarWidth = isMobile ? 280 : (navbarCollapsed ? 100 : 270);
+  const navbarWidth = isMobile ? 280 : (navbarCollapsed ? 60 : 270);
   const cornerOffset = navbarWidth;
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function AppShell({ children }: AppShellProps) {
         </Group>
       </MantineAppShell.Header>
 
-      <MantineAppShell.Navbar p={navbarCollapsed && !isMobile ? 'xs' : 'md'}>
+      <MantineAppShell.Navbar p={navbarCollapsed && !isMobile ? { py: 'md', px: 0 } : 'md'}>
         <Sidebar
           collapsed={navbarCollapsed}
           onCollapseChange={setNavbarCollapsed}

@@ -1009,7 +1009,7 @@ export class ResultsService {
         studentId,
         classSectionId,
         branchId,
-        academicYearId,
+        yearId,
         resultType,
         comment,
       );
@@ -1204,7 +1204,8 @@ export class ResultsService {
     });
     try {
       const page = await browser.newPage();
-      await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+      page.setDefaultNavigationTimeout(0);
+      await page.setContent(fullHtml, { waitUntil: 'load', timeout: 0 });
       const pdf = await page.pdf({
         format: 'A4',
         displayHeaderFooter: true,
@@ -1320,7 +1321,8 @@ export class ResultsService {
     });
     try {
       const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      page.setDefaultNavigationTimeout(0);
+      await page.setContent(htmlContent, { waitUntil: 'load', timeout: 0 });
       const pdf = await page.pdf({
         format: 'A4',
         displayHeaderFooter: true,

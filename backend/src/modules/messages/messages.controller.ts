@@ -1,4 +1,4 @@
-import { Controller, Param, Put, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Param, Put, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
@@ -21,5 +21,14 @@ export class MessagesController {
   ) {
     const data = await this.messagesService.markMessageRead(id, user.id);
     return { data };
+  }
+
+  @Delete(':id')
+  async deleteOwnMessage(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.messagesService.softDeleteMessage(id, user.id);
+    return { data: null };
   }
 }

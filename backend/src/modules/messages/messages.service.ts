@@ -42,6 +42,7 @@ type MessageRow = {
   subject: string;
   body: string;
   created_at: string;
+  deleted_at: string | null;
 };
 
 function throwIfDbError(error: PostgrestError | null): void {
@@ -430,6 +431,7 @@ export class MessagesService {
       body: string;
       created_at: string;
       message_type: string;
+      is_deleted: boolean;
     };
     const lastMap = new Map<string, LastPreviewRow>();
     for (const r of (lastRows || []) as LastPreviewRow[]) {
@@ -451,11 +453,16 @@ export class MessagesService {
 
       const last = lastMap.get(row.id);
       let lastMessagePreview: string | undefined;
+      let lastMessageDeleted: boolean | undefined;
       let lastMessageAt: string | undefined;
       let lastMessageType: MessageType | undefined;
       if (last) {
-        const preview = last.subject || last.body?.slice(0, 50) || '';
-        lastMessagePreview = preview.length > 60 ? preview.slice(0, 57) + '...' : preview;
+        const deleted = Boolean(last.is_deleted);
+        lastMessageDeleted = deleted;
+        if (!deleted) {
+          const preview = last.subject || last.body?.slice(0, 50) || '';
+          lastMessagePreview = preview.length > 60 ? preview.slice(0, 57) + '...' : preview;
+        }
         lastMessageAt = last.created_at;
         lastMessageType = last.message_type as MessageType;
       }
@@ -477,6 +484,7 @@ export class MessagesService {
         academicYearId: row.academic_year_id ?? undefined,
         createdAt: row.created_at,
         lastMessagePreview,
+        lastMessageDeleted,
         lastMessageAt,
         lastMessageType,
         unreadCount,
@@ -718,9 +726,12 @@ export class MessagesService {
 
     let msgQuery = supabase
       .from('messages')
-      .select('id, conversation_id, sender_id, message_type, subject, body, created_at', {
-        count: 'exact',
-      })
+      .select(
+        'id, conversation_id, sender_id, message_type, subject, body, created_at, deleted_at',
+        {
+          count: 'exact',
+        },
+      )
       .eq('conversation_id', conversationId);
     if (clearedAt) {
       msgQuery = msgQuery.gt('created_at', clearedAt);
@@ -753,20 +764,21 @@ export class MessagesService {
       .not('read_at', 'is', null);
     const readSet = new Set((readRows || []).map((r: { message_id: string }) => r.message_id));
 
-    const data = rows.map(
-      (row) =>
-        new MessageDto({
-          id: row.id,
-          conversationId: row.conversation_id,
-          senderId: row.sender_id,
-          messageType: row.message_type as MessageType,
-          subject: row.subject,
-          body: row.body,
-          createdAt: row.created_at,
-          isRead: readSet.has(row.id),
-          senderName: senderNameMap.get(row.sender_id),
-        }),
-    );
+    const data = rows.map((row) => {
+      const deleted = Boolean(row.deleted_at);
+      return new MessageDto({
+        id: row.id,
+        conversationId: row.conversation_id,
+        senderId: row.sender_id,
+        messageType: row.message_type as MessageType,
+        subject: deleted ? '' : row.subject,
+        body: deleted ? '' : row.body,
+        createdAt: row.created_at,
+        isDeleted: deleted,
+        isRead: readSet.has(row.id),
+        senderName: senderNameMap.get(row.sender_id),
+      });
+    });
 
     return {
       data,
@@ -1054,7 +1066,9 @@ export class MessagesService {
         subject: dto.subject ?? '',
         body: dto.body ?? '',
       })
-      .select('id, conversation_id, sender_id, message_type, subject, body, created_at')
+      .select(
+        'id, conversation_id, sender_id, message_type, subject, body, created_at, deleted_at',
+      )
       .single();
     throwIfDbError(msgError);
     if (!msg) throw new BadRequestException('Failed to create message');
@@ -1113,14 +1127,16 @@ export class MessagesService {
       // non-fatal
     }
 
+    const deletedSend = Boolean(msgRow.deleted_at);
     return new MessageDto({
       id: msgRow.id,
       conversationId: msgRow.conversation_id,
       senderId: msgRow.sender_id,
       messageType: msgRow.message_type as MessageType,
-      subject: msgRow.subject,
-      body: msgRow.body,
+      subject: deletedSend ? '' : msgRow.subject,
+      body: deletedSend ? '' : msgRow.body,
       createdAt: msgRow.created_at,
+      isDeleted: deletedSend,
       isRead: true,
       senderName,
     });
@@ -1131,7 +1147,9 @@ export class MessagesService {
 
     const { data: msg, error: msgError } = await supabase
       .from('messages')
-      .select('id, conversation_id, sender_id, message_type, subject, body, created_at')
+      .select(
+        'id, conversation_id, sender_id, message_type, subject, body, created_at, deleted_at',
+      )
       .eq('id', messageId)
       .single();
     throwIfDbError(msgError);
@@ -1163,17 +1181,59 @@ export class MessagesService {
       .single();
     const senderName = (profile as { full_name: string | null } | null)?.full_name ?? undefined;
 
+    const deletedRead = Boolean(msgRow.deleted_at);
     return new MessageDto({
       id: msgRow.id,
       conversationId: msgRow.conversation_id,
       senderId: msgRow.sender_id,
       messageType: msgRow.message_type as MessageType,
-      subject: msgRow.subject,
-      body: msgRow.body,
+      subject: deletedRead ? '' : msgRow.subject,
+      body: deletedRead ? '' : msgRow.body,
       createdAt: msgRow.created_at,
+      isDeleted: deletedRead,
       isRead: true,
       senderName,
     });
+  }
+
+  /** Soft-delete a single message for all participants (sender only). */
+  async softDeleteMessage(messageId: string, userId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: msg, error: msgError } = await supabase
+      .from('messages')
+      .select('id, conversation_id, sender_id, deleted_at')
+      .eq('id', messageId)
+      .maybeSingle();
+    throwIfDbError(msgError);
+    if (!msg) throw new NotFoundException('Message not found');
+
+    const msgRow = msg as Pick<MessageRow, 'conversation_id' | 'sender_id' | 'deleted_at'>;
+    if (msgRow.deleted_at) {
+      return;
+    }
+    if (msgRow.sender_id !== userId) {
+      throw new ForbiddenException('You can only delete your own messages');
+    }
+
+    const { data: partRows, error: partError } = await supabase
+      .from('conversation_participants')
+      .select('user_id')
+      .eq('conversation_id', msgRow.conversation_id)
+      .eq('user_id', userId);
+    throwIfDbError(partError);
+    if (!partRows || partRows.length === 0) {
+      throw new ForbiddenException('You are not a participant in this conversation');
+    }
+
+    const now = new Date().toISOString();
+    const { error: upError } = await supabase
+      .from('messages')
+      .update({ deleted_at: now })
+      .eq('id', messageId)
+      .eq('sender_id', userId)
+      .is('deleted_at', null);
+    throwIfDbError(upError);
   }
 
   /** Mark all messages in a conversation as read for the current user (e.g. when viewing the thread). */
