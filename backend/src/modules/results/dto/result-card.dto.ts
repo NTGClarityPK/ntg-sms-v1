@@ -5,6 +5,9 @@ export class ResultCardDto {
   academicYearId!: string;
   branchId!: string;
   resultType!: string;
+  reportKind!: string;
+  termPhase?: string;
+  progressSequence?: number;
   generatedAt!: string;
   generatedBy?: string;
   resultData!: Record<string, unknown>;

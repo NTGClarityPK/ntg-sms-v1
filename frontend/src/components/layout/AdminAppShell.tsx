@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useLocale } from 'next-intl';
 import { AppShell as MantineAppShell, Box, Burger, Group } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { AdminSidebar } from './AdminSidebar';
@@ -12,8 +13,9 @@ interface AdminAppShellProps {
 }
 
 export function AdminAppShell({ children }: AdminAppShellProps) {
+  const locale = useLocale();
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
-  const [isRtl, setIsRtl] = useState(false);
+  const isRtl = locale === 'ar';
 
   // Desktop navbar collapsed state (persisted to localStorage)
   const [navbarCollapsed, setNavbarCollapsed] = useState<boolean>(() => {
@@ -32,11 +34,6 @@ export function AdminAppShell({ children }: AdminAppShellProps) {
   // Calculate navbar width based on collapsed state
   const navbarWidth = navbarCollapsed ? 100 : 270;
   const cornerOffset = navbarWidth;
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    setIsRtl(document.documentElement.getAttribute('dir') === 'rtl');
-  }, []);
 
   return (
     <MantineAppShell

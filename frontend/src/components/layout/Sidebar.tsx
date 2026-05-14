@@ -595,10 +595,25 @@ export function Sidebar({
         type="hover"
         scrollHideDelay={400}
       >
-        <Stack
-          gap={effectiveCollapsed ? 0 : 'xs'}
-          p={effectiveCollapsed ? { py: 'md', px: 0 } : 'md'}
+        <Box
+          style={
+            effectiveCollapsed
+              ? {
+                  /**
+                   * Align first rail control with page title text: `.page-title-bar` uses
+                   * `padding-top: 14px` (DynamicThemeProvider). Navbar `pt` is 0 when collapsed
+                   * so this offset is the single source for that visual line.
+                   */
+                  paddingTop: 14,
+                  paddingBottom: theme.spacing.sm,
+                }
+              : undefined
+          }
         >
+          <Stack
+            gap={effectiveCollapsed ? 0 : 'xs'}
+            p={effectiveCollapsed ? { px: 0 } : 'md'}
+          >
           {schoolFlatOrdered.length > 0 && (
             <>
               {!effectiveCollapsed && (
@@ -765,6 +780,7 @@ export function Sidebar({
             </>
           )}
         </Stack>
+        </Box>
       </ScrollArea>
 
       {/* Bottom collapse toggle - desktop only (mobile drawer closes via overlay) */}

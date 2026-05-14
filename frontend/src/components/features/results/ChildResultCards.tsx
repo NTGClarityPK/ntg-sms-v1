@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Button, Group, Skeleton, Stack, Text } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Button, Group, SegmentedControl, Skeleton, Stack, Text, Tooltip } from '@mantine/core';
 import { IconFileDownload } from '@tabler/icons-react';
-import { useResultCardsByStudent } from '@/hooks/useResults';
+import { useTranslations } from 'next-intl';
+import { useResultCardsByStudent, useResultReportSettings } from '@/hooks/useResults';
 import { apiClient } from '@/lib/api-client';
 import type { ResultCard } from '@/types/results';
 
@@ -18,16 +19,39 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-function resultTypeLabel(resultType: string): string {
-  if (resultType === 'interim') return 'Interim';
-  if (resultType === 'mid_term') return 'Mid-term';
-  if (resultType === 'final') return 'Final';
-  return resultType;
-}
-
 export function ChildResultCards({ studentId }: { studentId: string }) {
+  const t = useTranslations('results');
   const { data: cards, isLoading } = useResultCardsByStudent(studentId, { publishedOnly: true });
+  const settingsQuery = useResultReportSettings(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadPdfVariant, setDownloadPdfVariant] = useState<'minimal' | 'modern'>('modern');
+
+  useEffect(() => {
+    const v = settingsQuery.data?.pdfVariant;
+    if (v === 'minimal' || v === 'modern') setDownloadPdfVariant(v);
+  }, [settingsQuery.data?.pdfVariant]);
+
+  const phaseLabel = (card: ResultCard): string => {
+    const phase = card.termPhase ?? card.resultType;
+    if (phase === 'interim') return t('resultTypeInterim');
+    if (phase === 'mid_term') return t('resultTypeMidTerm');
+    if (phase === 'final') return t('resultTypeFinal');
+    return phase;
+  };
+
+  const formatDate = (iso?: string): string => {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString();
+  };
+
+  const lineLabel = (card: ResultCard): string => {
+    const date = formatDate(card.generatedAt);
+    if (card.reportKind === 'annual_report') return t('childCardMetaAnnual', { date });
+    if (card.reportKind === 'progress_report') {
+      return t('childCardMetaProgress', { seq: card.progressSequence ?? 0, date });
+    }
+    return t('childCardMetaTerm', { phase: phaseLabel(card), date });
+  };
 
   const handleDownload = async (card: ResultCard) => {
     setDownloadingId(card.id);
@@ -35,11 +59,15 @@ export function ChildResultCards({ studentId }: { studentId: string }) {
       const params = new URLSearchParams();
       params.set('classSectionId', card.classSectionId);
       params.set('academicYearId', card.academicYearId);
-      params.set('resultType', card.resultType);
+      params.set('resultType', card.termPhase ?? card.resultType);
+      if (card.reportKind && card.reportKind !== 'term_report') {
+        params.set('reportKind', card.reportKind);
+      }
+      params.set('pdfVariant', downloadPdfVariant);
       const { blob, filename } = await apiClient.getBlobWithFilename(
         `/api/v1/results/student/${studentId}/result-card/pdf?${params.toString()}`,
       );
-      triggerDownload(blob, filename || `result-card-${studentId}-${card.resultType}.pdf`);
+      triggerDownload(blob, filename || `result-card-${studentId}.pdf`);
     } catch {
       // Error handled by api client
     } finally {
@@ -53,7 +81,7 @@ export function ChildResultCards({ studentId }: { studentId: string }) {
   if (!cards?.length) {
     return (
       <Text size="sm" c="dimmed">
-        No published result cards yet.
+        {t('childNoCards')}
       </Text>
     );
   }
@@ -61,23 +89,44 @@ export function ChildResultCards({ studentId }: { studentId: string }) {
   return (
     <Stack gap="xs">
       <Text size="sm" fw={500}>
-        Published result cards
+        {t('childPublishedTitle')}
       </Text>
+      <Stack gap={4}>
+        <Text size="xs" fw={500}>
+          {t('downloadPdfVariantLabel')}
+        </Text>
+        <Text size="xs" c="dimmed">
+          {t('childDownloadPdfVariantHint')}
+        </Text>
+        <Tooltip label={t('tooltipPdfLayoutChoice')} withArrow position="top">
+          <div>
+            <SegmentedControl
+              value={downloadPdfVariant}
+              onChange={(v) => setDownloadPdfVariant(v as 'minimal' | 'modern')}
+              data={[
+                { value: 'minimal', label: t('pdfVariantMinimal') },
+                { value: 'modern', label: t('pdfVariantModern') },
+              ]}
+            />
+          </div>
+        </Tooltip>
+      </Stack>
       {cards.map((card) => (
         <Group key={card.id} justify="space-between" wrap="nowrap">
-          <Text size="sm">
-            {resultTypeLabel(card.resultType)} —{' '}
-            {card.generatedAt ? new Date(card.generatedAt).toLocaleDateString() : '—'}
-          </Text>
-          <Button
-            size="xs"
-            variant="light"
-            leftSection={<IconFileDownload size={14} />}
-            loading={downloadingId === card.id}
-            onClick={() => handleDownload(card)}
-          >
-            Download PDF
-          </Button>
+          <Text size="sm">{lineLabel(card)}</Text>
+          <Tooltip label={t('tooltipChildDownload')} withArrow>
+            <span style={{ display: 'inline-block' }}>
+              <Button
+                size="xs"
+                variant="light"
+                leftSection={<IconFileDownload size={14} />}
+                loading={downloadingId === card.id}
+                onClick={() => void handleDownload(card)}
+              >
+                {t('childDownload')}
+              </Button>
+            </span>
+          </Tooltip>
         </Group>
       ))}
     </Stack>

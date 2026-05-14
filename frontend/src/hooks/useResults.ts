@@ -2,24 +2,44 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import type { ClassSectionResults, ResultCard } from '@/types/results';
+import type {
+  ClassSectionResults,
+  MarksReadinessRow,
+  ResultCard,
+  ResultReportSettings,
+} from '@/types/results';
 import { useAuth } from './useAuth';
 
 /** GET result cards for a student (no meta). Parents get only published when enforced by backend. */
 export function useResultCardsByStudent(
   studentId: string | null,
-  options?: { academicYearId?: string; resultType?: string; publishedOnly?: boolean },
+  options?: {
+    academicYearId?: string;
+    resultType?: string;
+    publishedOnly?: boolean;
+    reportKind?: string;
+  },
 ) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
 
   return useQuery({
-    queryKey: ['results', 'student-cards', studentId, options?.academicYearId, options?.resultType, options?.publishedOnly, branchId],
+    queryKey: [
+      'results',
+      'student-cards',
+      studentId,
+      options?.academicYearId,
+      options?.resultType,
+      options?.publishedOnly,
+      options?.reportKind,
+      branchId,
+    ],
     queryFn: async (): Promise<ResultCard[]> => {
       if (!studentId || !branchId) return [];
       const params = new URLSearchParams();
       if (options?.academicYearId) params.set('academicYearId', options.academicYearId);
       if (options?.resultType) params.set('resultType', options.resultType);
+      if (options?.reportKind) params.set('reportKind', options.reportKind);
       if (options?.publishedOnly === true) params.set('publishedOnly', 'true');
       const response = await apiClient.get<ResultCard[]>(
         `/api/v1/results/student/${studentId}/cards?${params.toString()}`,
@@ -63,18 +83,20 @@ export function useResultCardsByClassSection(
   classSectionId: string | null,
   academicYearId: string | undefined,
   resultType: string,
+  reportKind: string = 'term_report',
 ) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const type = resultType === 'interim' || resultType === 'mid_term' || resultType === 'final' ? resultType : 'final';
 
   return useQuery({
-    queryKey: ['results', 'class-section-cards', classSectionId, academicYearId, type, branchId],
+    queryKey: ['results', 'class-section-cards', classSectionId, academicYearId, type, reportKind, branchId],
     queryFn: async (): Promise<ResultCard[]> => {
       if (!classSectionId || !academicYearId || !branchId) return [];
       const params = new URLSearchParams();
       params.set('academicYearId', academicYearId);
       params.set('resultType', type);
+      params.set('reportKind', reportKind);
       const response = await apiClient.get<ResultCard[]>(
         `/api/v1/results/class-section/${classSectionId}/cards?${params.toString()}`,
       );
@@ -93,9 +115,19 @@ export function useGenerateResultCard() {
       studentId: string;
       classSectionId: string;
       academicYearId?: string;
-      resultType: string;
+      resultType?: string;
+      reportKind?: string;
+      progressSequence?: number;
     }) => {
-      const response = await apiClient.post<ResultCard>('/api/v1/results/generate', input);
+      const body: Record<string, unknown> = {
+        studentId: input.studentId,
+        classSectionId: input.classSectionId,
+      };
+      if (input.academicYearId) body.academicYearId = input.academicYearId;
+      if (input.reportKind) body.reportKind = input.reportKind;
+      if (input.progressSequence != null) body.progressSequence = input.progressSequence;
+      if (input.resultType) body.resultType = input.resultType;
+      const response = await apiClient.post<ResultCard>('/api/v1/results/generate', body);
       return response.data;
     },
     onSuccess: () => {
@@ -131,6 +163,73 @@ export function useUpdateResultCardStatus() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['results'] });
+    },
+  });
+}
+
+/** GET marks readiness (assessments in scope vs recorded grades). */
+export function useClassSectionMarksReadiness(
+  classSectionId: string | null,
+  academicYearId: string | undefined,
+  resultType: string,
+  enabled: boolean,
+) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+  const type = resultType === 'interim' || resultType === 'mid_term' || resultType === 'final' ? resultType : 'final';
+
+  return useQuery({
+    queryKey: ['results', 'marks-readiness', classSectionId, academicYearId, type, branchId],
+    queryFn: async (): Promise<MarksReadinessRow[]> => {
+      if (!classSectionId || !branchId) return [];
+      const params = new URLSearchParams();
+      params.set('resultType', type);
+      if (academicYearId) params.set('academicYearId', academicYearId);
+      const response = await apiClient.get<MarksReadinessRow[]>(
+        `/api/v1/results/class-section/${classSectionId}/marks-readiness?${params.toString()}`,
+      );
+      return Array.isArray(response.data) ? response.data : [];
+    },
+    enabled: enabled && !!classSectionId && !!branchId,
+    staleTime: 60 * 1000,
+  });
+}
+
+/** GET branch result report PDF settings (admin / principal). */
+export function useResultReportSettings(enabled: boolean) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: ['results', 'report-settings', branchId],
+    queryFn: async (): Promise<ResultReportSettings | null> => {
+      if (!branchId) return null;
+      const response = await apiClient.get<ResultReportSettings>(
+        '/api/v1/results/report-settings',
+      );
+      return response.data ?? null;
+    },
+    enabled: !!branchId && enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpsertResultReportSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      pdfVariant?: 'minimal' | 'modern';
+      progressMaxAssessments?: number;
+      progressWindowDays?: number;
+    }) => {
+      const response = await apiClient.put<ResultReportSettings>(
+        '/api/v1/results/report-settings',
+        input,
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['results', 'report-settings'] });
     },
   });
 }

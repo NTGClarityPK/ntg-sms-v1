@@ -1,5 +1,7 @@
 export type ResultType = 'interim' | 'mid_term' | 'final';
 
+export type ReportKind = 'term_report' | 'annual_report' | 'progress_report';
+
 export interface ResultSubject {
   subjectId: string;
   subjectName: string;
@@ -34,6 +36,9 @@ export interface ResultCard {
   academicYearId: string;
   branchId: string;
   resultType: string;
+  reportKind: ReportKind;
+  termPhase?: string;
+  progressSequence?: number;
   generatedAt: string;
   generatedBy?: string;
   resultData: Record<string, unknown>;
@@ -42,6 +47,21 @@ export interface ResultCard {
   approvedBy?: string;
   approvedAt?: string;
   classTeacherComment?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarksReadinessRow {
+  studentId: string;
+  missingAssessmentTitles: string[];
+}
+
+export interface ResultReportSettings {
+  id: string;
+  branchId: string;
+  pdfVariant: 'minimal' | 'modern';
+  progressMaxAssessments?: number | null;
+  progressWindowDays?: number | null;
   createdAt: string;
   updatedAt: string;
 }

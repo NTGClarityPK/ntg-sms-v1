@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconSchool, IconClock, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments, IconCash } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconSchool, IconClock, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments, IconCash, IconFileText } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -69,6 +69,7 @@ import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettings
 import { PublicStatsSettings } from '@/components/features/settings/PublicStatsSettings';
 import { BulkSetupTabContent } from '@/components/features/settings/BulkSetupTabContent';
 import { FeeSettingsTabContent } from '@/components/features/settings/FeeSettingsTabContent';
+import { ResultReportsSettingsTabContent } from '@/components/features/settings/ResultReportsSettingsTabContent';
 
 // Common timezones list with GMT offsets (matching RMS)
 const TIMEZONE_DATA = [
@@ -181,6 +182,10 @@ export default function SettingsPage() {
 
   const hasCurrentBranch = !!user?.currentBranch?.id;
   const isSchoolAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
+  const canManageResultReports =
+    user?.roles?.some((r) =>
+      ['school_admin', 'super_admin', 'principal'].includes((r.roleName ?? '').toLowerCase()),
+    ) || false;
   const settingsStatusData = statusQuery.data?.data;
   const isInitialized = settingsStatusData?.isInitialized ?? false;
   const tabbedScreenReady = settingsStatusData?.tabbedScreenReady ?? isInitialized;
@@ -302,6 +307,11 @@ export default function SettingsPage() {
                 <Tabs.Tab value="fees" leftSection={<IconCash size={16} />}>
                   {tSettings('tabFees')}
                 </Tabs.Tab>
+                {canManageResultReports && (
+                  <Tabs.Tab value="result-reports" leftSection={<IconFileText size={16} />}>
+                    {tSettings('tabResultReports')}
+                  </Tabs.Tab>
+                )}
                 <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
                   {tSettings('tabThemeSettings')}
                 </Tabs.Tab>
@@ -355,6 +365,12 @@ export default function SettingsPage() {
               <Tabs.Panel value="fees" pt="md" px="md" pb="md">
                 <FeeSettingsTabContent />
               </Tabs.Panel>
+
+              {canManageResultReports && (
+                <Tabs.Panel value="result-reports" pt="md" px="md" pb="md">
+                  <ResultReportsSettingsTabContent />
+                </Tabs.Panel>
+              )}
 
               {/* Theme Settings Tab - visible to all users with settings access */}
               <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">

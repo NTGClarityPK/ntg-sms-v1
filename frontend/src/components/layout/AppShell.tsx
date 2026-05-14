@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AppShell as MantineAppShell, Box, Burger, Group } from '@mantine/core';
+import { useLocale } from 'next-intl';
+import {
+  AppShell as MantineAppShell,
+  Box,
+  Burger,
+  Group,
+  useMantineTheme,
+} from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
@@ -14,9 +21,11 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const theme = useMantineTheme();
+  const locale = useLocale();
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
   const isMobile = useMediaQuery('(max-width: 767px)');
-  const [isRtl, setIsRtl] = useState(false);
+  const isRtl = locale === 'ar';
 
   // Desktop navbar collapsed state (persisted to localStorage, like RMS)
   const [navbarCollapsed, setNavbarCollapsed] = useState<boolean>(() => {
@@ -35,11 +44,6 @@ export function AppShell({ children }: AppShellProps) {
   // On mobile use full drawer width; on desktop use collapsed/expanded width
   const navbarWidth = isMobile ? 280 : (navbarCollapsed ? 60 : 270);
   const cornerOffset = navbarWidth;
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    setIsRtl(document.documentElement.getAttribute('dir') === 'rtl');
-  }, []);
 
   return (
     <MantineAppShell
@@ -68,7 +72,13 @@ export function AppShell({ children }: AppShellProps) {
         </Group>
       </MantineAppShell.Header>
 
-      <MantineAppShell.Navbar p={navbarCollapsed && !isMobile ? { py: 'md', px: 0 } : 'md'}>
+      <MantineAppShell.Navbar
+        p={
+          navbarCollapsed && !isMobile
+            ? { pt: 0, pb: theme.spacing.md, px: 0 }
+            : 'md'
+        }
+      >
         <Sidebar
           collapsed={navbarCollapsed}
           onCollapseChange={setNavbarCollapsed}

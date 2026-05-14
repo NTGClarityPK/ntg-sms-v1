@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocale } from 'next-intl';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   alpha,
@@ -170,11 +171,7 @@ export function CollapsedNavGroupPopover({
   const palette = useCollapsedRailPalette();
   const router = useRouter();
   const pathname = usePathname();
-  const [isRtl, setIsRtl] = useState(false);
-
-  useEffect(() => {
-    setIsRtl(document.documentElement.getAttribute('dir') === 'rtl');
-  }, []);
+  const isRtl = useLocale() === 'ar';
 
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -397,11 +394,7 @@ export function CollapsedNavDashboardButton({
   const pathname = usePathname();
   const theme = useMantineTheme();
   const palette = useCollapsedRailPalette();
-  const [isRtl, setIsRtl] = useState(false);
-
-  useEffect(() => {
-    setIsRtl(document.documentElement.getAttribute('dir') === 'rtl');
-  }, []);
+  const isRtl = useLocale() === 'ar';
 
   const active = pathMatchesRoute(pathname, item.href);
   const tooltipSide = isRtl ? 'left' : 'right';

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Term Report Card - Minimal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+        
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background: white;
+            color: #000;
+            line-height: 1.4;
+        }
+        
+        .report-card {
+            max-width: 210mm;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px double #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .header .subtitle {
+            font-size: 14px;
+            margin-bottom: 3px;
+        }
+        
+        .header .report-type {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 10px;
+            text-decoration: underline;
+        }
+        
+        .student-info {
+            border: 2px solid #000;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .student-info table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .student-info td {
+            padding: 6px;
+            font-size: 13px;
+        }
+        
+        .student-info td:first-child {
+            font-weight: bold;
+            width: 150px;
+        }
+        
+        .section-heading {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 25px 0 15px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #000;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .performance-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+            margin-bottom: 20px;
+        }
+        
+        .performance-table th {
+            background: #f0f0f0;
+            border: 1px solid #000;
+            padding: 10px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .performance-table th:last-child,
+        .performance-table td:last-child {
+            text-align: center;
+        }
+        
+        .performance-table td {
+            border: 1px solid #000;
+            padding: 10px;
+            font-size: 13px;
+        }
+        
+        .performance-table tbody tr.total-row {
+            background: #e8e8e8;
+            font-weight: bold;
+        }
+        
+        .performance-table .subject-name {
+            font-weight: bold;
+        }
+        
+        .assessment-details {
+            font-size: 11px;
+            color: #333;
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+        
+        .summary-section {
+            border: 2px solid #000;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .summary-item {
+            text-align: center;
+            padding: 10px;
+            border: 1px solid #000;
+        }
+        
+        .summary-item .label {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .summary-item .value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .remarks-box {
+            border: 2px solid #000;
+            padding: 15px;
+            margin-bottom: 15px;
+            min-height: 80px;
+        }
+        
+        .remarks-box .title {
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+        
+        .remarks-box p {
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        
+        .signatures {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        
+        .signature-block {
+            text-align: center;
+        }
+        
+        .signature-line {
+            border-top: 2px solid #000;
+            margin-top: 60px;
+            margin-bottom: 8px;
+        }
+        
+        .signature-label {
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #000;
+            text-align: center;
+            font-size: 11px;
+        }
+        
+        .footer p {
+            margin: 3px 0;
+        }
+        
+        @media print {
+            body {
+                padding: 0;
+            }
+            .report-card {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-card">
+        <!-- Header -->
+        <div class="header">
+            <h1>Al Ahmar School</h1>
+            <div class="subtitle">Main Branch, Karachi</div>
+            <div class="subtitle">Tel: +92 21 1234 5678 | Email: admin@alahmar.edu.pk</div>
+            <div class="report-type">FINAL TERM REPORT CARD</div>
+            <div class="subtitle">Academic Year 2028-2029</div>
+        </div>
+        
+        <!-- Student Information -->
+        <div class="student-info">
+            <table>
+                <tr>
+                    <td>Student Name:</td>
+                    <td>Ayesha Tarar</td>
+                    <td>Roll Number:</td>
+                    <td>2028-001</td>
+                </tr>
+                <tr>
+                    <td>Class:</td>
+                    <td>Class II - C</td>
+                    <td>Class Position:</td>
+                    <td>4th out of 30</td>
+                </tr>
+                <tr>
+                    <td>Term:</td>
+                    <td>Final Term</td>
+                    <td>Report Date:</td>
+                    <td>December 20, 2028</td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Academic Performance -->
+        <div class="section-heading">Academic Performance</div>
+        
+        <table class="performance-table">
+            <thead>
+                <tr>
+                    <th>Subject</th>
+                    <th>Marks Obtained</th>
+                    <th>Total Marks</th>
+                    <th>Percentage</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="subject-name">English</td>
+                    <td>85</td>
+                    <td>100</td>
+                    <td>85%</td>
+                    <td>A</td>
+                </tr>
+                <tr>
+                    <td colspan="5" style="padding: 8px 10px; border-top: 1px dashed #999;">
+                        <div class="assessment-details">
+                            Assessment Breakdown: Quizzes (25/30) | Assignments (18/20) | Final Exam (42/50)
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="subject-name">Mathematics</td>
+                    <td>92</td>
+                    <td>100</td>
+                    <td>92%</td>
+                    <td>A+</td>
+                </tr>
+                <tr>
+                    <td class="subject-name">Science</td>
+                    <td>78</td>
+                    <td>100</td>
+                    <td>78%</td>
+                    <td>B</td>
+                </tr>
+                <tr>
+                    <td class="subject-name">Urdu</td>
+                    <td>88</td>
+                    <td>100</td>
+                    <td>88%</td>
+                    <td>A</td>
+                </tr>
+                <tr>
+                    <td class="subject-name">Islamiyat</td>
+                    <td>95</td>
+                    <td>100</td>
+                    <td>95%</td>
+                    <td>A+</td>
+                </tr>
+                <tr class="total-row">
+                    <td>TOTAL / OVERALL</td>
+                    <td>438</td>
+                    <td>500</td>
+                    <td>87.6%</td>
+                    <td>A+</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <!-- Summary Section -->
+        <div class="section-heading">Term Summary</div>
+        
+        <div class="summary-section">
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="label">Overall Grade</div>
+                    <div class="value">A+</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Attendance</div>
+                    <div class="value">95%</div>
+                    <div style="font-size: 11px; margin-top: 5px;">142/150 days</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Conduct</div>
+                    <div class="value">A</div>
+                    <div style="font-size: 11px; margin-top: 5px;">Excellent</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Remarks -->
+        <div class="section-heading">Remarks</div>
+        
+        <div class="remarks-box">
+            <div class="title">Class Teacher's Remarks:</div>
+            <p>Ayesha has shown excellent academic performance this term. She is particularly strong in Mathematics and Islamiyat. Her participation in class discussions is commendable. She should focus more on Science practical work to improve further. Overall, a very dedicated and hardworking student.</p>
+        </div>
+        
+        <div class="remarks-box">
+            <div class="title">Principal's Message:</div>
+            <p>Congratulations on achieving excellent grades this term. Keep up the good work and continue to strive for excellence. We are proud of your achievements.</p>
+        </div>
+        
+        <!-- Signatures -->
+        <div class="signatures">
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Class Teacher</div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Parent's Signature</div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Principal</div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Next Term Begins: January 15, 2029</strong></p>
+            <p>This is a computer-generated document. No signature required.</p>
+            <p>For queries, please contact the school administration.</p>
+        </div>
+    </div>
+</body>
+</html>

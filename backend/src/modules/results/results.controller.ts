@@ -8,6 +8,7 @@ import {
   Param,
   Res,
   UseGuards,
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -28,6 +29,13 @@ import { GenerateResultDto } from './dto/generate-result.dto';
 import { UpdateResultStatusDto } from './dto/update-result-status.dto';
 import { UpdateResultCommentDto } from './dto/update-result-comment.dto';
 import type { ResultType } from './dto/result-type.enum';
+import type { ReportKind } from './dto/report-kind.enum';
+import { RecordResultCardDeliveryDto } from './dto/record-result-card-delivery.dto';
+
+function parseReportKindParam(value: string | undefined): ReportKind {
+  if (value === 'annual_report' || value === 'progress_report') return value;
+  return 'term_report';
+}
 
 @ApiTags('Results')
 @UseGuards(JwtAuthGuard, BranchGuard)
@@ -71,6 +79,8 @@ export class ResultsController {
     @Query('academicYearId') academicYearId: string | undefined,
     @Query('resultType') resultType: string,
     @Query('reportType') reportTypeParam: string | undefined,
+    @Query('pdfVariant') pdfVariantParam: string | undefined,
+    @Query('reportKind') reportKindParam: string | undefined,
     @Res() res: Response,
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
@@ -88,13 +98,16 @@ export class ResultsController {
       : 'final') as ResultType;
     const reportType =
       reportTypeParam === 'detailed' ? ('detailed' as const) : ('basic' as const);
+    const pdfVariant =
+      pdfVariantParam === 'minimal' || pdfVariantParam === 'modern' ? pdfVariantParam : undefined;
+    const reportKind = parseReportKindParam(reportKindParam);
     const buffer = await this.resultsService.generateResultCardPdf(
       studentId,
       classSectionId,
       branch.branchId,
       academicYearId,
       type,
-      { reportType },
+      { reportType, pdfVariant, reportKind },
     );
     const filename = await this.resultsService.buildResultCardFilename(
       studentId,
@@ -158,13 +171,22 @@ export class ResultsController {
       user.roles,
       branch.branchId,
     );
+    const reportKind = body.reportKind ?? 'term_report';
+    if (reportKind !== 'annual_report' && !body.resultType) {
+      throw new BadRequestException('resultType is required unless reportKind is annual_report');
+    }
+    const type = (body.resultType ?? 'final') as ResultType;
     const data = await this.resultsService.generateResultCard(
       body.studentId,
       body.classSectionId,
       branch.branchId,
       body.academicYearId,
-      body.resultType,
+      type,
       user.id,
+      {
+        reportKind,
+        progressSequence: body.progressSequence,
+      },
     );
     return { data };
   }
@@ -221,6 +243,7 @@ export class ResultsController {
     @Param('studentId') studentId: string,
     @Query('academicYearId') academicYearId: string | undefined,
     @Query('resultType') resultType: string | undefined,
+    @Query('reportKind') reportKindParam: string | undefined,
     @Query('publishedOnly') publishedOnlyParam: string | undefined,
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
@@ -234,12 +257,14 @@ export class ResultsController {
     const isParent = roles.some((r) => ['parent', 'guardian'].includes(r));
     const publishedOnly =
       publishedOnlyParam === 'true' || publishedOnlyParam === '1' || isParent;
+    const reportKindFilter = reportKindParam ? parseReportKindParam(reportKindParam) : undefined;
     const data = await this.resultsService.listResultCardsByStudent(
       studentId,
       branch.branchId,
       academicYearId,
       resultType,
       publishedOnly,
+      reportKindFilter,
     );
     return { data };
   }
@@ -249,6 +274,7 @@ export class ResultsController {
     @Param('classSectionId') classSectionId: string,
     @Query('academicYearId') academicYearId: string | undefined,
     @Query('resultType') resultType: string,
+    @Query('reportKind') reportKindParam: string | undefined,
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: ResultCardDto[] }> {
@@ -264,11 +290,89 @@ export class ResultsController {
     const type = (resultType === 'interim' || resultType === 'mid_term' || resultType === 'final'
       ? resultType
       : 'final') as ResultType;
+    const reportKind =
+      reportKindParam === 'annual_report' || reportKindParam === 'progress_report'
+        ? reportKindParam
+        : 'term_report';
     const data = await this.resultsService.listResultCardsByClassSection(
       classSectionId,
       branch.branchId,
       academicYearId,
       type,
+      reportKind,
+    );
+    return { data };
+  }
+
+  @Get('class-section/:classSectionId/marks-readiness')
+  async getMarksReadinessForClassSection(
+    @Param('classSectionId') classSectionId: string,
+    @Query('academicYearId') academicYearId: string | undefined,
+    @Query('resultType') resultType: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: { studentId: string; missingAssessmentTitles: string[] }[] }> {
+    await this.reportsService.ensureTeacherCanAccessClassSection(
+      classSectionId,
+      user.id,
+      user.roles,
+      branch.branchId,
+    );
+    const type = (resultType === 'interim' || resultType === 'mid_term' || resultType === 'final'
+      ? resultType
+      : 'final') as ResultType;
+    const data = await this.resultsService.getMarksReadinessForClassSection(
+      classSectionId,
+      branch.branchId,
+      academicYearId,
+      type,
+    );
+    return { data };
+  }
+
+  @Get('cards/:resultCardId/deliveries')
+  async listResultCardDeliveries(
+    @Param('resultCardId') resultCardId: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: Record<string, unknown>[] }> {
+    const card = await this.resultsService.getResultCardById(resultCardId, branch.branchId);
+    if (!card) throw new NotFoundException('Result card not found');
+    await this.reportsService.ensureTeacherCanAccessClassSection(
+      card.classSectionId,
+      user.id,
+      user.roles,
+      branch.branchId,
+    );
+    const data = await this.resultsService.listResultCardDeliveries(resultCardId, branch.branchId);
+    return { data };
+  }
+
+  @Post('cards/:resultCardId/deliveries')
+  async recordResultCardDelivery(
+    @Param('resultCardId') resultCardId: string,
+    @Body() body: RecordResultCardDeliveryDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: Record<string, unknown> }> {
+    const card = await this.resultsService.getResultCardById(resultCardId, branch.branchId);
+    if (!card) throw new NotFoundException('Result card not found');
+    await this.reportsService.ensureTeacherCanAccessClassSection(
+      card.classSectionId,
+      user.id,
+      user.roles,
+      branch.branchId,
+    );
+    const data = await this.resultsService.recordResultCardDelivery(
+      resultCardId,
+      branch.branchId,
+      user.id,
+      {
+        deliveryMethod: body.deliveryMethod,
+        recipientContact: body.recipientContact,
+        deliveryStatus: body.deliveryStatus,
+        metadata: body.metadata,
+      },
     );
     return { data };
   }
@@ -278,6 +382,7 @@ export class ResultsController {
     @Param('classSectionId') classSectionId: string,
     @Query('academicYearId') academicYearId: string | undefined,
     @Query('resultType') resultType: string,
+    @Query('pdfVariant') pdfVariantParam: string | undefined,
     @Res() res: Response,
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
@@ -291,11 +396,14 @@ export class ResultsController {
     const type = (resultType === 'interim' || resultType === 'mid_term' || resultType === 'final'
       ? resultType
       : 'final') as ResultType;
+    const pdfVariant =
+      pdfVariantParam === 'minimal' || pdfVariantParam === 'modern' ? pdfVariantParam : undefined;
     const stream = await this.resultsService.getBulkResultCardPdfStream(
       classSectionId,
       branch.branchId,
       academicYearId,
       type,
+      pdfVariant,
     );
     const label = type === 'interim' ? 'interim' : type === 'mid_term' ? 'mid-term' : 'final';
     res.setHeader('Content-Type', 'application/zip');

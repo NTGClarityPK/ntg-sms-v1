@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import archiver from 'archiver';
 import puppeteer from 'puppeteer';
@@ -14,6 +14,20 @@ import { ResultCardDto } from './dto/result-card.dto';
 import { DetailedStudentResultDto } from './dto/detailed-student-result.dto';
 import { AssessmentWiseEntryDto } from './dto/assessment-wise-entry.dto';
 import type { ResultType } from './dto/result-type.enum';
+import type { ReportKind } from './dto/report-kind.enum';
+import { ResultReportSettingsService } from './result-report-settings.service';
+import {
+  buildDetailedMinimalPageInner,
+  buildMinimalProgressInner,
+  buildMinimalTermAnnualReportInner,
+  buildModernDetailedPageInner,
+  buildModernProgressInner,
+  buildModernTermAnnualReportInner,
+  composeDesignPdfHtml,
+  composeDesignPdfHtmlMultiCard,
+  readDesignTemplateStyleBlock,
+} from './result-report-pdf-html';
+import { buildPdfThemeVariablesCss } from './pdf-theme';
 
 type GradeRangeRow = { letter: string; min_percentage: number; max_percentage: number };
 
@@ -40,6 +54,7 @@ export class ResultsService {
     private readonly academicYearsService: AcademicYearsService,
     private readonly behavioralService: BehavioralService,
     private readonly pdfLogoCache: PdfLogoCacheService,
+    private readonly resultReportSettingsService: ResultReportSettingsService,
   ) {}
 
   private resolveBranchName(
@@ -98,6 +113,65 @@ export class ResultsService {
       }),
       footerTemplate: buildPdfFooterTemplate(),
     };
+  }
+
+  /** School / branch lines for report card HTML (matches PDF header branding). */
+  private async getReportSchoolLines(branchId: string): Promise<{ line1: string; line2: string }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch } = await supabase
+      .from('branches')
+      .select('name, name_translations, tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    const branchRow = branch as {
+      name: string;
+      name_translations?: Record<string, string> | null;
+      tenant_id: string | null;
+    } | null;
+    if (!branchRow) return { line1: 'School', line2: '' };
+    const branchName = this.resolveBranchName(branchRow, 'en');
+    const tenantId = branchRow.tenant_id;
+    if (!tenantId) return { line1: branchName, line2: '' };
+    const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).maybeSingle();
+    const tenantName = (tenant as { name?: string } | null)?.name?.trim();
+    if (tenantName) return { line1: `${tenantName} — ${branchName}`, line2: '' };
+    return { line1: branchName, line2: '' };
+  }
+
+  /** Tenant theme primary for PDF accent (`#RRGGBB`), from system_settings. */
+  private async getTenantPdfPrimaryHex(branchId: string): Promise<string | null> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch } = await supabase.from('branches').select('tenant_id').eq('id', branchId).maybeSingle();
+    const tenantId = (branch as { tenant_id: string | null } | null)?.tenant_id;
+    if (!tenantId) return null;
+    const key = `tenant_theme_primary_color:${tenantId}`;
+    const { data: row } = await supabase.from('system_settings').select('value').eq('key', key).maybeSingle();
+    const v = (row as { value?: unknown } | null)?.value;
+    return typeof v === 'string' && /^#[0-9A-Fa-f]{6}$/.test(v.trim()) ? v.trim() : null;
+  }
+
+  /** Design templates include school branding; do not add Puppeteer header/footer. */
+  private async printResultCardHtmlToPdf(html: string): Promise<Buffer> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: getPuppeteerExecutablePath(),
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      page.setDefaultNavigationTimeout(0);
+      await page.emulateMediaType('print');
+      await page.setContent(html, { waitUntil: 'load', timeout: 0 });
+      const pdf = await page.pdf({
+        format: 'A4',
+        displayHeaderFooter: false,
+        margin: { top: '14px', right: '14px', bottom: '14px', left: '14px' },
+        printBackground: true,
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
   }
 
   private async getLetterGradeRanges(classId: string): Promise<GradeRangeRow[] | null> {
@@ -707,60 +781,114 @@ export class ResultsService {
     classSectionId: string,
     branchId: string,
     academicYearId: string | undefined,
-    resultType: ResultType,
+    resultType: ResultType | undefined,
     generatedBy: string,
+    options?: { reportKind?: ReportKind; progressSequence?: number },
   ): Promise<ResultCardDto> {
-    const result = await this.getResultForStudent(
-      studentId,
-      classSectionId,
-      branchId,
-      academicYearId,
-      resultType,
-    );
+    const reportKind: ReportKind = options?.reportKind ?? 'term_report';
+    if (reportKind !== 'annual_report' && !resultType) {
+      throw new BadRequestException('resultType is required for this report kind');
+    }
+    const termPhase = reportKind === 'term_report' ? ((resultType ?? 'final') as ResultType) : null;
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) throw new BadRequestException('No active academic year found');
     const yearId = academicYearId ?? activeYear.id;
 
-    const resultData = {
-      studentId: result.studentId,
-      studentName: result.studentName,
-      studentStudentId: result.studentStudentId,
-      subjects: result.subjects,
-      overallPercentage: result.overallPercentage,
-      overallLetterGrade: result.overallLetterGrade,
-    };
+    let resultData: Record<string, unknown>;
+    let legacyResultType: ResultType;
+
+    if (reportKind === 'annual_report') {
+      const [mid, fin] = await Promise.all([
+        this.getResultForStudent(studentId, classSectionId, branchId, academicYearId, 'mid_term'),
+        this.getResultForStudent(studentId, classSectionId, branchId, academicYearId, 'final'),
+      ]);
+      resultData = {
+        schemaVersion: 1,
+        reportKind: 'annual_report',
+        midTerm: {
+          subjects: mid.subjects,
+          overallPercentage: mid.overallPercentage,
+          overallLetterGrade: mid.overallLetterGrade,
+        },
+        finalTerm: {
+          subjects: fin.subjects,
+          overallPercentage: fin.overallPercentage,
+          overallLetterGrade: fin.overallLetterGrade,
+        },
+      };
+      legacyResultType = 'final';
+    } else {
+      const type = (resultType ?? 'final') as ResultType;
+      legacyResultType = type;
+      const result = await this.getResultForStudent(
+        studentId,
+        classSectionId,
+        branchId,
+        academicYearId,
+        type,
+      );
+      resultData = {
+        studentId: result.studentId,
+        studentName: result.studentName,
+        studentStudentId: result.studentStudentId,
+        subjects: result.subjects,
+        overallPercentage: result.overallPercentage,
+        overallLetterGrade: result.overallLetterGrade,
+        reportKind,
+      };
+    }
 
     const supabase = this.supabaseConfig.getClient();
-    const row = {
+    let progressSequence: number | null =
+      reportKind === 'progress_report'
+        ? (options?.progressSequence ?? (await this.getNextProgressSequence(supabase, studentId, classSectionId, yearId)))
+        : null;
+
+    const rowBase = {
       student_id: studentId,
       class_section_id: classSectionId,
       academic_year_id: yearId,
       branch_id: branchId,
-      result_type: resultType,
+      result_type: legacyResultType!,
+      report_kind: reportKind,
+      term_phase: termPhase,
+      progress_sequence: progressSequence,
       generated_by: generatedBy,
       result_data: resultData,
       status: 'draft',
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabase
+    let existingQuery = supabase
       .from('result_cards')
       .select('id')
       .eq('student_id', studentId)
       .eq('class_section_id', classSectionId)
       .eq('academic_year_id', yearId)
-      .eq('result_type', resultType)
-      .maybeSingle();
+      .eq('report_kind', reportKind);
+    if (reportKind === 'term_report') {
+      existingQuery = existingQuery.eq('term_phase', termPhase!);
+    } else if (reportKind === 'annual_report') {
+      /* unique on year+student+section */
+    } else if (reportKind === 'progress_report') {
+      existingQuery = existingQuery.eq('progress_sequence', progressSequence!);
+    }
+    const { data: existing } = await existingQuery.maybeSingle();
 
     let out: { id: string; created_at: string; updated_at: string; [k: string]: unknown };
     if (existing) {
       const { data: updated, error } = await supabase
         .from('result_cards')
         .update({
-          result_data: row.result_data,
+          result_data: rowBase.result_data,
           generated_at: new Date().toISOString(),
-          generated_by: row.generated_by,
-          updated_at: row.updated_at,
+          generated_by: rowBase.generated_by,
+          updated_at: rowBase.updated_at,
+          status: 'draft',
+          result_type: rowBase.result_type,
+          report_kind: rowBase.report_kind,
+          term_phase: rowBase.term_phase,
+          progress_sequence: rowBase.progress_sequence,
         })
         .eq('id', (existing as { id: string }).id)
         .select()
@@ -771,14 +899,17 @@ export class ResultsService {
       const { data: inserted, error } = await supabase
         .from('result_cards')
         .insert({
-          student_id: row.student_id,
-          class_section_id: row.class_section_id,
-          academic_year_id: row.academic_year_id,
-          branch_id: row.branch_id,
-          result_type: row.result_type,
-          generated_by: row.generated_by,
-          result_data: row.result_data,
-          status: row.status,
+          student_id: rowBase.student_id,
+          class_section_id: rowBase.class_section_id,
+          academic_year_id: rowBase.academic_year_id,
+          branch_id: rowBase.branch_id,
+          result_type: rowBase.result_type,
+          report_kind: rowBase.report_kind,
+          term_phase: rowBase.term_phase,
+          progress_sequence: rowBase.progress_sequence,
+          generated_by: rowBase.generated_by,
+          result_data: rowBase.result_data,
+          status: rowBase.status,
         })
         .select()
         .single();
@@ -787,6 +918,27 @@ export class ResultsService {
     }
 
     return this.mapResultCardRow(out);
+  }
+
+  private async getNextProgressSequence(
+    supabase: import('@supabase/supabase-js').SupabaseClient,
+    studentId: string,
+    classSectionId: string,
+    academicYearId: string,
+  ): Promise<number> {
+    const { data, error } = await supabase
+      .from('result_cards')
+      .select('progress_sequence')
+      .eq('student_id', studentId)
+      .eq('class_section_id', classSectionId)
+      .eq('academic_year_id', academicYearId)
+      .eq('report_kind', 'progress_report')
+      .order('progress_sequence', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    throwIfDbError(error);
+    const last = (data as { progress_sequence: number | null } | null)?.progress_sequence;
+    return (typeof last === 'number' ? last : 0) + 1;
   }
 
   async updateResultCardStatus(
@@ -822,6 +974,7 @@ export class ResultsService {
     academicYearId?: string,
     resultType?: string,
     publishedOnly = false,
+    reportKindFilter?: ReportKind,
   ): Promise<ResultCardDto[]> {
     const supabase = this.supabaseConfig.getClient();
     let query = supabase
@@ -831,7 +984,14 @@ export class ResultsService {
       .eq('branch_id', branchId)
       .order('generated_at', { ascending: false });
     if (academicYearId) query = query.eq('academic_year_id', academicYearId);
-    if (resultType) query = query.eq('result_type', resultType);
+    if (reportKindFilter) {
+      query = query.eq('report_kind', reportKindFilter);
+      if (reportKindFilter === 'term_report' && resultType) {
+        query = query.eq('term_phase', resultType);
+      }
+    } else if (resultType) {
+      query = query.eq('report_kind', 'term_report').eq('term_phase', resultType);
+    }
     if (publishedOnly) query = query.eq('status', 'published');
     const { data, error } = await query;
     throwIfDbError(error);
@@ -844,17 +1004,20 @@ export class ResultsService {
     branchId: string,
     academicYearId: string,
     resultType: string,
+    reportKind: ReportKind = 'term_report',
   ): Promise<ResultCardDto[]> {
     const supabase = this.supabaseConfig.getClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from('result_cards')
       .select('*')
       .eq('class_section_id', classSectionId)
       .eq('branch_id', branchId)
       .eq('academic_year_id', academicYearId)
-      .eq('result_type', resultType)
-      .order('student_id')
-      .order('generated_at', { ascending: false });
+      .eq('report_kind', reportKind);
+    if (reportKind === 'term_report') {
+      query = query.eq('term_phase', resultType);
+    }
+    const { data, error } = await query.order('student_id').order('generated_at', { ascending: false });
     throwIfDbError(error);
     return ((data || []) as Record<string, unknown>[]).map((row) => this.mapResultCardRow(row));
   }
@@ -880,6 +1043,10 @@ export class ResultsService {
       academicYearId: row.academic_year_id as string,
       branchId: row.branch_id as string,
       resultType: row.result_type as string,
+      reportKind: (row.report_kind as string) || 'term_report',
+      termPhase: (row.term_phase as string) || undefined,
+      progressSequence:
+        row.progress_sequence != null ? Number(row.progress_sequence) : undefined,
       generatedAt: row.generated_at as string | undefined,
       generatedBy: row.generated_by as string | undefined,
       resultData: (row.result_data as Record<string, unknown>) || {},
@@ -898,6 +1065,11 @@ export class ResultsService {
     classTeacherComment: string | undefined,
     branchId: string,
   ): Promise<ResultCardDto> {
+    const existing = await this.getResultCardById(id, branchId);
+    if (!existing) throw new NotFoundException('Result card not found');
+    if (existing.status === 'published') {
+      throw new ForbiddenException('Cannot edit remarks on a published report card');
+    }
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('result_cards')
@@ -932,20 +1104,29 @@ export class ResultsService {
     branchId: string,
     academicYearId: string,
     resultType: string,
+    cardReportKind: ReportKind = 'term_report',
   ): Promise<string | undefined> {
     const cards = await this.listResultCardsByStudent(
       studentId,
       branchId,
       academicYearId,
-      resultType,
+      cardReportKind === 'term_report' ? resultType : undefined,
       false,
+      cardReportKind !== 'term_report' ? cardReportKind : undefined,
     );
-    const card = cards.find(
-      (c) =>
-        c.classSectionId === classSectionId &&
-        c.academicYearId === academicYearId &&
-        c.resultType === resultType,
+    const scoped = cards.filter(
+      (c) => c.classSectionId === classSectionId && c.academicYearId === academicYearId,
     );
+    if (cardReportKind === 'annual_report') {
+      return scoped.find((c) => c.reportKind === 'annual_report')?.classTeacherComment;
+    }
+    if (cardReportKind === 'progress_report') {
+      const sorted = [...scoped].sort(
+        (a, b) => (b.progressSequence ?? 0) - (a.progressSequence ?? 0),
+      );
+      return sorted[0]?.classTeacherComment;
+    }
+    const card = scoped.find((c) => (c.termPhase ?? c.resultType) === resultType);
     return card?.classTeacherComment;
   }
 
@@ -955,28 +1136,40 @@ export class ResultsService {
     branchId: string,
     academicYearId: string | undefined,
     resultType: ResultType,
-    options?: { reportType?: 'basic' | 'detailed' },
+    options?: {
+      reportType?: 'basic' | 'detailed';
+      pdfVariant?: 'minimal' | 'modern';
+      reportKind?: ReportKind;
+    },
   ): Promise<Buffer> {
     const reportType = options?.reportType ?? 'basic';
+    const reportKind: ReportKind = options?.reportKind ?? 'term_report';
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) throw new BadRequestException('No active academic year found');
     const yearId = academicYearId ?? activeYear.id;
 
+    const settingsPdf = (await this.resultReportSettingsService.get(branchId)).data.pdfVariant;
+    const effectiveVariant: 'minimal' | 'modern' =
+      options?.pdfVariant === 'minimal' || options?.pdfVariant === 'modern'
+        ? options.pdfVariant
+        : settingsPdf === 'minimal' || settingsPdf === 'modern'
+          ? settingsPdf
+          : 'modern';
+
+    const pdfPrimaryHex = await this.getTenantPdfPrimaryHex(branchId);
+    const pdfThemeCss = buildPdfThemeVariablesCss(pdfPrimaryHex);
+
     if (reportType === 'detailed') {
-      const comment = await this.getResultCardComment(
-        studentId,
-        classSectionId,
-        branchId,
-        yearId,
-        resultType,
-      );
-      if (resultType === 'final') {
+      const useTwoTermPages =
+        reportKind === 'annual_report' || (reportKind === 'term_report' && resultType === 'final');
+      if (useTwoTermPages) {
         const midComment = await this.getResultCardComment(
           studentId,
           classSectionId,
           branchId,
           yearId,
           'mid_term',
+          'term_report',
         );
         const finalComment = await this.getResultCardComment(
           studentId,
@@ -984,6 +1177,7 @@ export class ResultsService {
           branchId,
           yearId,
           'final',
+          'term_report',
         );
         const [midDetail, finalDetail] = await Promise.all([
           this.getDetailedResultForStudent(
@@ -1003,8 +1197,26 @@ export class ResultsService {
             finalComment,
           ),
         ]);
-        return this.renderDetailedPdfTwoPages(midDetail, finalDetail, classSectionId, branchId);
+        return this.renderDetailedPdfTwoPages(
+          midDetail,
+          finalDetail,
+          classSectionId,
+          branchId,
+          effectiveVariant,
+          yearId,
+          pdfThemeCss,
+        );
       }
+      const commentKind: ReportKind =
+        reportKind === 'progress_report' ? 'progress_report' : 'term_report';
+      const comment = await this.getResultCardComment(
+        studentId,
+        classSectionId,
+        branchId,
+        yearId,
+        resultType,
+        commentKind,
+      );
       const detailed = await this.getDetailedResultForStudent(
         studentId,
         classSectionId,
@@ -1024,6 +1236,9 @@ export class ResultsService {
         resultTypeLabel,
         classSectionId,
         branchId,
+        effectiveVariant,
+        yearId,
+        pdfThemeCss,
       );
     }
 
@@ -1052,26 +1267,120 @@ export class ResultsService {
       : { data: null };
     const className = (classRow as { display_name?: string } | null)?.display_name ?? '';
     const sectionName = (sectionRow as { name?: string } | null)?.name ?? '';
+    const classLabel = `${className} - ${sectionName}`.trim() || '—';
+    const commentKind: ReportKind =
+      reportKind === 'progress_report'
+        ? 'progress_report'
+        : reportKind === 'annual_report'
+          ? 'annual_report'
+          : 'term_report';
+    const [{ line1: schoolLine1, line2: schoolLine2 }, ayRow, classTeacherComment] = await Promise.all([
+      this.getReportSchoolLines(branchId),
+      supabase.from('academic_years').select('name').eq('id', yearId).maybeSingle().then((r) => r.data),
+      this.getResultCardComment(
+        studentId,
+        classSectionId,
+        branchId,
+        yearId,
+        resultType,
+        commentKind,
+      ),
+    ]);
+    const academicYearName = (ayRow as { name?: string } | null)?.name?.trim() || '—';
+    const reportDate = new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    const templatePrefix =
+      reportKind === 'progress_report'
+        ? 'progress-report'
+        : reportKind === 'annual_report'
+          ? 'annual-report'
+          : 'term-report';
+    const templateFile = `${templatePrefix}-${effectiveVariant}.html`;
+    const styles = readDesignTemplateStyleBlock(templateFile);
+
     const resultTypeLabel =
       resultType === 'interim' ? 'Interim Result' : resultType === 'mid_term' ? 'Mid-term Result' : 'Final Result';
 
-    let rows = '';
-    for (const s of result.subjects) {
-      rows += `<tr><td>${this.escapeHtml(s.subjectName)}</td><td>${s.marksObtained}</td><td>${s.totalMarks}</td><td>${s.percentage}%</td><td>${this.escapeHtml(s.letterGrade ?? '—')}</td></tr>`;
-    }
-    if (result.subjects.length === 0) {
-      rows = '<tr><td colspan="5">No grades recorded</td></tr>';
-    }
-    const overallRow =
-      result.overallPercentage != null
-        ? `<tr><td colspan="3"><strong>Overall</strong></td><td><strong>${result.overallPercentage}%</strong></td><td><strong>${this.escapeHtml(result.overallLetterGrade ?? '—')}</strong></td></tr>`
-        : '';
-    const classRankLine =
-      classRank != null
-        ? `<p class="sub">Class position: ${classRank}</p>`
-        : '';
-
-    const htmlContent = `
+    let htmlForPdf: string;
+    if (styles) {
+      const bodyInner =
+        reportKind === 'progress_report'
+          ? effectiveVariant === 'modern'
+            ? buildModernProgressInner({
+                schoolLine1,
+                schoolLine2,
+                academicYearName,
+                studentName: result.studentName,
+                rollNumber: result.studentStudentId ?? '—',
+                classLabel,
+                reportDate,
+                result,
+                classTeacherComment,
+              })
+            : buildMinimalProgressInner({
+                schoolLine1,
+                schoolLine2,
+                academicYearName,
+                studentName: result.studentName,
+                rollNumber: result.studentStudentId ?? '—',
+                classLabel,
+                reportDate,
+                result,
+                classTeacherComment,
+              })
+          : effectiveVariant === 'modern'
+            ? buildModernTermAnnualReportInner({
+                reportKind,
+                resultType,
+                schoolLine1,
+                schoolLine2,
+                academicYearName,
+                studentName: result.studentName,
+                rollNumber: result.studentStudentId ?? '—',
+                classLabel,
+                classRank: classRank ?? null,
+                reportDate,
+                result,
+                classTeacherComment,
+              })
+            : buildMinimalTermAnnualReportInner({
+                reportKind,
+                resultType,
+                schoolLine1,
+                schoolLine2,
+                academicYearName,
+                studentName: result.studentName,
+                rollNumber: result.studentStudentId ?? '—',
+                classLabel,
+                classRank: classRank ?? null,
+                reportDate,
+                result,
+                classTeacherComment,
+              });
+      htmlForPdf = composeDesignPdfHtml(
+        styles,
+        bodyInner,
+        reportKind === 'progress_report' ? 'progress-report' : 'report-card',
+        pdfThemeCss,
+      );
+    } else {
+      let rows = '';
+      for (const s of result.subjects) {
+        rows += `<tr><td>${this.escapeHtml(s.subjectName)}</td><td>${s.marksObtained}</td><td>${s.totalMarks}</td><td>${s.percentage}%</td><td>${this.escapeHtml(s.letterGrade ?? '—')}</td></tr>`;
+      }
+      if (result.subjects.length === 0) {
+        rows = '<tr><td colspan="5">No grades recorded</td></tr>';
+      }
+      const overallRow =
+        result.overallPercentage != null
+          ? `<tr><td colspan="3"><strong>Overall</strong></td><td><strong>${result.overallPercentage}%</strong></td><td><strong>${this.escapeHtml(result.overallLetterGrade ?? '—')}</strong></td></tr>`
+          : '';
+      const classRankLine =
+        classRank != null ? `<p class="sub">Class position: ${classRank}</p>` : '';
+      htmlForPdf = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8">
@@ -1099,29 +1408,9 @@ export class ResultsService {
   </table>
 </body>
 </html>`;
-
-    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: getPuppeteerExecutablePath(),
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    try {
-      const page = await browser.newPage();
-      page.setDefaultNavigationTimeout(0);
-      await page.setContent(htmlContent, { waitUntil: 'load', timeout: 0 });
-      const pdf = await page.pdf({
-        format: 'A4',
-        displayHeaderFooter: true,
-        headerTemplate,
-        footerTemplate,
-        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
-        printBackground: true,
-      });
-      return Buffer.from(pdf);
-    } finally {
-      await browser.close();
     }
+
+    return this.printResultCardHtmlToPdf(htmlForPdf);
   }
 
   private async getClassSectionLabels(
@@ -1152,8 +1441,11 @@ export class ResultsService {
     resultTypeLabel: string,
     classSectionId: string,
     branchId: string,
+    pdfVariant: 'minimal' | 'modern',
+    academicYearId: string,
+    pdfThemeCss: string,
   ): Promise<Buffer> {
-    return this.buildDetailedPdf(d, resultTypeLabel, classSectionId, branchId);
+    return this.buildDetailedPdf(d, resultTypeLabel, classSectionId, branchId, pdfVariant, academicYearId, pdfThemeCss);
   }
 
   private async renderDetailedPdfTwoPages(
@@ -1161,20 +1453,86 @@ export class ResultsService {
     finalDetail: DetailedStudentResultDto,
     classSectionId: string,
     branchId: string,
+    pdfVariant: 'minimal' | 'modern',
+    academicYearId: string,
+    pdfThemeCss: string,
   ): Promise<Buffer> {
-    const htmlPage1 = await this.buildDetailedHtmlInner(
-      midDetail,
-      'Final Report — Mid-term Session',
-      classSectionId,
-      branchId,
-    );
-    const htmlPage2 = await this.buildDetailedHtmlInner(
-      finalDetail,
-      'Final Report — Full Year',
-      classSectionId,
-      branchId,
-    );
-    const fullHtml = `
+    const templateFile = `term-report-${pdfVariant}.html`;
+    const styles = readDesignTemplateStyleBlock(templateFile);
+    const labels = await this.getClassSectionLabels(classSectionId, branchId);
+    const classLabel = `${labels.className} - ${labels.sectionName}`.trim() || '—';
+    const school = await this.getReportSchoolLines(branchId);
+    const supabase = this.supabaseConfig.getClient();
+    const { data: ayRow } = await supabase
+      .from('academic_years')
+      .select('name')
+      .eq('id', academicYearId)
+      .maybeSingle();
+    const academicYearName = (ayRow as { name?: string } | null)?.name?.trim() || '—';
+    const reportDate = new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    let fullHtml: string;
+    if (styles) {
+      const inner1 =
+        pdfVariant === 'modern'
+          ? buildModernDetailedPageInner(
+              midDetail,
+              'Final report — Mid-term session',
+              classLabel,
+              school.line1,
+              school.line2,
+              academicYearName,
+              reportDate,
+            )
+          : buildDetailedMinimalPageInner(
+              midDetail,
+              'Final report — Mid-term session',
+              classLabel,
+              school.line1,
+              school.line2,
+              academicYearName,
+              reportDate,
+            );
+      const inner2 =
+        pdfVariant === 'modern'
+          ? buildModernDetailedPageInner(
+              finalDetail,
+              'Final report — Full year',
+              classLabel,
+              school.line1,
+              school.line2,
+              academicYearName,
+              reportDate,
+              { headerMode: 'continuation' },
+            )
+          : buildDetailedMinimalPageInner(
+              finalDetail,
+              'Final report — Full year',
+              classLabel,
+              school.line1,
+              school.line2,
+              academicYearName,
+              reportDate,
+            );
+      fullHtml = composeDesignPdfHtmlMultiCard(styles, [inner1, inner2], pdfThemeCss);
+    } else {
+      const htmlPage1 = await this.buildDetailedHtmlInner(
+        midDetail,
+        'Final Report — Mid-term Session',
+        classSectionId,
+        branchId,
+      );
+      const htmlPage2 = await this.buildDetailedHtmlInner(
+        finalDetail,
+        'Final Report — Full Year',
+        classSectionId,
+        branchId,
+      );
+      fullHtml = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8">
@@ -1196,28 +1554,8 @@ export class ResultsService {
   ${htmlPage2}
 </body>
 </html>`;
-    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: getPuppeteerExecutablePath(),
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    try {
-      const page = await browser.newPage();
-      page.setDefaultNavigationTimeout(0);
-      await page.setContent(fullHtml, { waitUntil: 'load', timeout: 0 });
-      const pdf = await page.pdf({
-        format: 'A4',
-        displayHeaderFooter: true,
-        headerTemplate,
-        footerTemplate,
-        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
-        printBackground: true,
-      });
-      return Buffer.from(pdf);
-    } finally {
-      await browser.close();
     }
+    return this.printResultCardHtmlToPdf(fullHtml);
   }
 
   private async buildDetailedHtmlInner(
@@ -1288,14 +1626,54 @@ export class ResultsService {
     resultTypeLabel: string,
     classSectionId: string,
     branchId: string,
+    pdfVariant: 'minimal' | 'modern',
+    academicYearId: string,
+    pdfThemeCss: string,
   ): Promise<Buffer> {
-    const inner = await this.buildDetailedHtmlInner(
-      d,
-      resultTypeLabel,
-      classSectionId,
-      branchId,
-    );
-    const htmlContent = `<!DOCTYPE html>
+    const templateFile = `term-report-${pdfVariant}.html`;
+    const styles = readDesignTemplateStyleBlock(templateFile);
+    const labels = await this.getClassSectionLabels(classSectionId, branchId);
+    const classLabel = `${labels.className} - ${labels.sectionName}`.trim() || '—';
+    const school = await this.getReportSchoolLines(branchId);
+    const supabase = this.supabaseConfig.getClient();
+    const { data: ayRow } = await supabase
+      .from('academic_years')
+      .select('name')
+      .eq('id', academicYearId)
+      .maybeSingle();
+    const academicYearName = (ayRow as { name?: string } | null)?.name?.trim() || '—';
+    const reportDate = new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    let htmlContent: string;
+    if (styles) {
+      const inner =
+        pdfVariant === 'modern'
+          ? buildModernDetailedPageInner(
+              d,
+              resultTypeLabel,
+              classLabel,
+              school.line1,
+              school.line2,
+              academicYearName,
+              reportDate,
+            )
+          : buildDetailedMinimalPageInner(
+              d,
+              resultTypeLabel,
+              classLabel,
+              school.line1,
+              school.line2,
+              academicYearName,
+              reportDate,
+            );
+      htmlContent = composeDesignPdfHtml(styles, inner, 'report-card', pdfThemeCss);
+    } else {
+      const inner = await this.buildDetailedHtmlInner(d, resultTypeLabel, classSectionId, branchId);
+      htmlContent = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8">
 <style>
@@ -1313,28 +1691,8 @@ export class ResultsService {
 <body>${inner}
 </body>
 </html>`;
-    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: getPuppeteerExecutablePath(),
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    try {
-      const page = await browser.newPage();
-      page.setDefaultNavigationTimeout(0);
-      await page.setContent(htmlContent, { waitUntil: 'load', timeout: 0 });
-      const pdf = await page.pdf({
-        format: 'A4',
-        displayHeaderFooter: true,
-        headerTemplate,
-        footerTemplate,
-        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
-        printBackground: true,
-      });
-      return Buffer.from(pdf);
-    } finally {
-      await browser.close();
     }
+    return this.printResultCardHtmlToPdf(htmlContent);
   }
 
   /**
@@ -1459,6 +1817,7 @@ export class ResultsService {
     });
     try {
       const page = await browser.newPage();
+      await page.emulateMediaType('print');
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({
         format: 'A4',
@@ -1549,6 +1908,116 @@ export class ResultsService {
     return `${parts.join('-')}.pdf`;
   }
 
+  async getMarksReadinessForClassSection(
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string | undefined,
+    resultType: ResultType,
+  ): Promise<{ studentId: string; missingAssessmentTitles: string[] }[]> {
+    const batch = await this.getResultsForClassSection(
+      classSectionId,
+      branchId,
+      academicYearId,
+      resultType,
+    );
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+    const assessmentMap = await this.getAssessmentsInScope(
+      classSectionId,
+      branchId,
+      yearId,
+      resultType,
+    );
+    const titlesById = new Map<string, string>();
+    for (const [id, info] of assessmentMap) {
+      titlesById.set(id, info.title ?? 'Assessment');
+    }
+    const assessmentIds = [...assessmentMap.keys()];
+    if (assessmentIds.length === 0) {
+      return batch.students.map((s) => ({ studentId: s.studentId, missingAssessmentTitles: [] }));
+    }
+    const studentIds = batch.students.map((s) => s.studentId);
+    const supabase = this.supabaseConfig.getClient();
+    const { data: grades, error } = await supabase
+      .from('student_grades')
+      .select('student_id, assessment_id')
+      .in('student_id', studentIds)
+      .in('assessment_id', assessmentIds)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', yearId);
+    throwIfDbError(error);
+    const have = new Set<string>();
+    for (const g of grades || []) {
+      const r = g as { student_id: string; assessment_id: string };
+      have.add(`${r.student_id}:${r.assessment_id}`);
+    }
+    return batch.students.map((s) => {
+      const missing: string[] = [];
+      for (const aid of assessmentIds) {
+        if (!have.has(`${s.studentId}:${aid}`)) {
+          missing.push(titlesById.get(aid) ?? aid);
+        }
+      }
+      return { studentId: s.studentId, missingAssessmentTitles: missing };
+    });
+  }
+
+  async listResultCardDeliveries(
+    resultCardId: string,
+    branchId: string,
+  ): Promise<Record<string, unknown>[]> {
+    const card = await this.getResultCardById(resultCardId, branchId);
+    if (!card) throw new NotFoundException('Result card not found');
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('result_card_deliveries')
+      .select(
+        'id, result_card_id, recipient_type, recipient_id, recipient_contact, delivery_method, delivery_status, delivered_at, delivered_by, opened_at, metadata, created_at',
+      )
+      .eq('result_card_id', resultCardId)
+      .order('created_at', { ascending: false });
+    throwIfDbError(error);
+    return (data || []) as Record<string, unknown>[];
+  }
+
+  async recordResultCardDelivery(
+    resultCardId: string,
+    branchId: string,
+    userId: string,
+    input: {
+      deliveryMethod: string;
+      recipientContact?: string;
+      deliveryStatus?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<Record<string, unknown>> {
+    const card = await this.getResultCardById(resultCardId, branchId);
+    if (!card) throw new NotFoundException('Result card not found');
+    if (card.status !== 'published') {
+      throw new BadRequestException('Only published report cards can receive delivery records');
+    }
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('result_card_deliveries')
+      .insert({
+        result_card_id: resultCardId,
+        delivery_method: input.deliveryMethod,
+        recipient_contact: input.recipientContact ?? null,
+        delivery_status: input.deliveryStatus ?? 'sent',
+        delivered_at: new Date().toISOString(),
+        delivered_by: userId,
+        metadata: input.metadata ?? null,
+      })
+      .select(
+        'id, result_card_id, recipient_type, recipient_id, recipient_contact, delivery_method, delivery_status, delivered_at, delivered_by, opened_at, metadata, created_at',
+      )
+      .single();
+    throwIfDbError(error);
+    if (!data) throw new BadRequestException('Failed to record delivery');
+    return data as Record<string, unknown>;
+  }
+
   private static readonly BULK_MAX_STUDENTS = 60;
   private static readonly BULK_PDF_CHUNK = 3;
 
@@ -1561,6 +2030,7 @@ export class ResultsService {
     branchId: string,
     academicYearId: string | undefined,
     resultType: ResultType,
+    pdfVariant?: 'minimal' | 'modern',
   ): Promise<archiver.Archiver> {
     const batch = await this.getResultsForClassSection(
       classSectionId,
@@ -1579,13 +2049,9 @@ export class ResultsService {
       const chunk = batch.students.slice(i, i + CHUNK);
       const buffers = await Promise.all(
         chunk.map((s) =>
-          this.generateResultCardPdf(
-            s.studentId,
-            classSectionId,
-            branchId,
-            academicYearId,
-            resultType,
-          ),
+          this.generateResultCardPdf(s.studentId, classSectionId, branchId, academicYearId, resultType, {
+            pdfVariant,
+          }),
         ),
       );
       chunk.forEach((s, j) => {
