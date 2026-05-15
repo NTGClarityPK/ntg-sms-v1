@@ -1,5 +1,5 @@
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
-import type { FeeProRateType, FeeTemplateScope, FeeTemplateType } from './fee-template.dto';
+import type { FeeTemplateScope, FeeTemplateType } from './fee-template.dto';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsNumber, ValidateNested } from 'class-validator';
 
@@ -64,11 +64,6 @@ export class UpdateFeeTemplateDto {
   @Min(1)
   @Max(365)
   daysUntilDue?: number;
-
-  @IsOptional()
-  @IsString()
-  @IsIn(['Full_Month', 'Half_Month', 'Daily_Pro_Rate'])
-  proRateType?: FeeProRateType;
 
   @IsOptional()
   @IsBoolean()

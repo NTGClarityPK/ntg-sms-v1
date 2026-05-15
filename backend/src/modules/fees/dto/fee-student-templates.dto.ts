@@ -17,7 +17,6 @@ export class FeeStudentTemplateDto {
   name!: string;
   type!: 'Fee' | 'Discount';
   scope!: 'Levels' | 'Class' | 'Class-Section' | 'Individual';
-  proRateType!: 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate';
   daysUntilDue!: number;
   autoApply!: boolean;
   autoApplyCondition?: Record<string, unknown> | null;

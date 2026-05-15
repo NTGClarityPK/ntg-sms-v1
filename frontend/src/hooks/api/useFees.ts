@@ -45,7 +45,6 @@ export function useCreateFeeTemplate() {
       autoApply?: boolean;
       autoApplyCondition?: Record<string, unknown> | null;
       daysUntilDue?: number;
-      proRateType?: 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate';
       metrics: Array<{ name: string; amountType: 'Absolute' | 'Percentage'; amount: number; perDay?: boolean; displayOrder?: number }>;
     }) => {
       const response = await apiClient.post<ApiResponse<FeeTemplate>>('/api/v1/fees/templates', input);

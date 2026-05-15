@@ -70,11 +70,6 @@ export class CreateFeeTemplateDto {
   @Max(365)
   daysUntilDue?: number;
 
-  @IsOptional()
-  @IsString()
-  @IsIn(['Full_Month', 'Half_Month', 'Daily_Pro_Rate'])
-  proRateType?: 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate';
-
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

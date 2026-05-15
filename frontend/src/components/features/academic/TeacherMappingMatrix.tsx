@@ -252,12 +252,22 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
           </Text>
         </Group>
         <Stack gap="sm">
-          <Switch
-            label={t('onlyShowAssignedLabel')}
-            description={t('onlyShowAssignedDescription')}
-            checked={onlyShowAssigned}
-            onChange={(e) => setOnlyShowAssigned(e.currentTarget.checked)}
-          />
+          <Group gap="sm" align="flex-start" wrap="nowrap">
+            <Switch
+              id="teacher-mapping-filter-only-assigned"
+              checked={onlyShowAssigned}
+              onChange={(e) => setOnlyShowAssigned(e.currentTarget.checked)}
+              styles={{ root: { flexShrink: 0 } }}
+            />
+            <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
+              <Text component="span" size="sm" fw={600}>
+                {t('onlyShowAssignedLabel')}
+              </Text>
+              <Text component="span" size="xs" c="dimmed">
+                {t('onlyShowAssignedDescription')}
+              </Text>
+            </Stack>
+          </Group>
           <Group grow align="flex-start" wrap="wrap">
             <MultiSelect
               label={t('showClassSectionsLabel')}
@@ -307,22 +317,24 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
           {t('noRowsOrColumnsMatch')}
         </Text>
       ) : (
-        <ScrollArea type="hover" scrollbarSize={8} mt="md">
-          <Table striped highlightOnHover>
+        <ScrollArea type="hover" scrollbarSize={8} scrollbars="xy" offsetScrollbars style={{ width: '100%' }} mt="md">
+          <Table striped highlightOnHover style={{ minWidth: 'max-content', tableLayout: 'auto' }}>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th style={stickyHeaderStyle}>
+                <Table.Th style={{ ...stickyHeaderStyle, whiteSpace: 'nowrap' }}>
                   {t('classSection')}
                 </Table.Th>
                 {visibleSubjects.map((subject) => (
-                  <Table.Th key={subject.id}>{subject.name}</Table.Th>
+                  <Table.Th key={subject.id} style={{ whiteSpace: 'nowrap' }}>
+                    {subject.name}
+                  </Table.Th>
                 ))}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {visibleClassSections.map((classSection, rowIndex) => (
                 <Table.Tr key={classSection.id}>
-                  <Table.Td style={stickyCellStyle(rowIndex % 2 === 1)}>
+                  <Table.Td style={{ ...stickyCellStyle(rowIndex % 2 === 1), whiteSpace: 'nowrap' }}>
                     {classSection.classDisplayName || classSection.className || t('unknown')} –{' '}
                     {classSection.sectionName || t('unknown')}
                   </Table.Td>
@@ -330,7 +342,7 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
                     const key = `${classSection.id}-${subject.id}`;
                     const cellAssignments = assignmentMap.get(key) || [];
                     return (
-                      <Table.Td key={subject.id}>
+                      <Table.Td key={subject.id} style={{ whiteSpace: 'nowrap', verticalAlign: 'top' }}>
                         <MatrixCell
                           assignments={cellAssignments}
                           classSectionId={classSection.id}

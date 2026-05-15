@@ -30,7 +30,6 @@ type MetricForm = {
   name: string;
   amountType: 'Absolute' | 'Percentage';
   amount: number;
-  perDay: boolean;
 };
 
 export default function FeeSettingsPage() {
@@ -75,10 +74,9 @@ export default function FeeSettingsPage() {
       name: '',
       type: 'Fee' as 'Fee' | 'Discount',
       scope: 'Levels' as 'Levels' | 'Class' | 'Class-Section' | 'Individual',
-      proRateType: 'Full_Month' as 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate',
       daysUntilDue: 30,
       autoApply: false,
-      metrics: [{ name: '', amountType: 'Absolute' as const, amount: 0, perDay: false }] as MetricForm[],
+      metrics: [{ name: '', amountType: 'Absolute' as const, amount: 0 }] as MetricForm[],
     },
     validate: {
       name: (v) => (!v.trim() ? t('validation.nameRequired') : null),
@@ -252,14 +250,12 @@ export default function FeeSettingsPage() {
               name: values.name,
               type: values.type,
               scope: values.scope,
-              proRateType: values.proRateType,
               autoApply: values.scope === 'Individual' ? values.autoApply : false,
               autoApplyCondition: values.scope === 'Individual' && values.autoApply ? { parent_has_role: 'staff' } : null,
               metrics: values.metrics.map((m, i) => ({
                 name: m.name,
                 amountType: m.amountType,
                 amount: m.amount,
-                perDay: values.proRateType === 'Daily_Pro_Rate' ? m.perDay : false,
                 displayOrder: i,
               })),
             });
@@ -295,20 +291,6 @@ export default function FeeSettingsPage() {
               />
             </Group>
 
-            <Group grow>
-              <Select
-                id="fee-template-pro-rate"
-                label={t('form.proRateType')}
-                data={[
-                  { value: 'Full_Month', label: t('form.proRateFull') },
-                  { value: 'Daily_Pro_Rate', label: t('form.proRateDaily') },
-                ]}
-                required
-                {...form.getInputProps('proRateType')}
-                disabled={form.values.scope !== 'Individual'}
-              />
-            </Group>
-
             {form.values.scope === 'Individual' ? (
               <Checkbox
                 id="fee-template-auto-apply"
@@ -323,7 +305,7 @@ export default function FeeSettingsPage() {
                 <Button
                   id="fee-template-add-metric"
                   variant="light"
-                  onClick={() => form.insertListItem('metrics', { name: '', amountType: 'Absolute', amount: 0, perDay: false })}
+                  onClick={() => form.insertListItem('metrics', { name: '', amountType: 'Absolute', amount: 0 })}
                 >
                   {t('form.addMetric')}
                 </Button>
@@ -357,14 +339,6 @@ export default function FeeSettingsPage() {
                     required
                     {...form.getInputProps(`metrics.${i}.amount`)}
                   />
-                  {form.values.proRateType === 'Daily_Pro_Rate' ? (
-                    <Checkbox
-                      id={`fee-template-metric-${i}-per-day`}
-                      label={t('form.perDay')}
-                      mt={28}
-                      {...form.getInputProps(`metrics.${i}.perDay`, { type: 'checkbox' })}
-                    />
-                  ) : null}
                   <ActionIcon
                     id={`fee-template-metric-${i}-remove`}
                     color="red"

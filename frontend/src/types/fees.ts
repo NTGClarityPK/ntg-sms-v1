@@ -1,6 +1,5 @@
 export type FeeTemplateType = 'Fee' | 'Discount';
 export type FeeTemplateScope = 'Levels' | 'Class' | 'Class-Section' | 'Individual';
-export type FeeProRateType = 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate';
 export type FeeMetricAmountType = 'Absolute' | 'Percentage';
 export type FeeCurrencyCode = 'PKR' | 'IQD' | 'SAR' | 'USD';
 
@@ -25,7 +24,6 @@ export interface FeeTemplate {
   autoApply: boolean;
   autoApplyCondition?: Record<string, unknown> | null;
   daysUntilDue: number;
-  proRateType: FeeProRateType;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -93,7 +91,6 @@ export interface FeeStudentTemplate {
   name: string;
   type: FeeTemplateType;
   scope: FeeTemplateScope;
-  proRateType: FeeProRateType;
   daysUntilDue: number;
   autoApply: boolean;
   autoApplyCondition?: Record<string, unknown> | null;

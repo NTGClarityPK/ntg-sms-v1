@@ -31,6 +31,8 @@ interface QueryUsersParams {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  /** When `false`, the query does not run (e.g. modal closed). Defaults to true. */
+  enabled?: boolean;
 }
 
 export function useUsers(params?: QueryUsersParams) {
@@ -66,7 +68,7 @@ export function useUsers(params?: QueryUsersParams) {
       // But the actual HTTP response is { data: UserDto[], meta: {...} }, so response = { data: UserDto[], meta: {...} }
       return response;
     },
-    enabled: !!branchId,
+    enabled: !!branchId && params?.enabled !== false,
   });
 }
 

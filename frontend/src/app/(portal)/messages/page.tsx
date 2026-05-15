@@ -26,9 +26,12 @@ import {
   alpha,
   useComputedColorScheme,
   rem,
+  Loader,
+  TextInput,
+  UnstyledButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useMediaQuery } from '@mantine/hooks';
+import { useDebouncedValue, useMediaQuery } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';
 import {
   IconMessage,
@@ -52,6 +55,8 @@ import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { ADMIN_BROADCAST_ROLE_NAMES } from '@/constants/admin-broadcast-roles';
 
 type NewConversationMode = 'one_to_one' | 'broadcast_class' | 'broadcast_school';
+
+type ConversationReadFilter = 'all' | 'unread' | 'read';
 
 export default function MessagesPage() {
   const t = useTranslations('messages');
@@ -82,6 +87,11 @@ export default function MessagesPage() {
   /** Own-message bubble hover / open menu — keeps chevron visible while dropdown is open (portal) */
   const [hoveredOwnBubbleId, setHoveredOwnBubbleId] = useState<string | null>(null);
   const [ownMessageMenuOpenId, setOwnMessageMenuOpenId] = useState<string | null>(null);
+  const [conversationListSearch, setConversationListSearch] = useState('');
+  const [conversationReadFilter, setConversationReadFilter] =
+    useState<ConversationReadFilter>('all');
+  const [recipientPickerSearch, setRecipientPickerSearch] = useState('');
+  const [debouncedRecipientSearch] = useDebouncedValue(recipientPickerSearch, 300);
 
   useEffect(() => {
     if (conversationIdFromUrl) setSelectedId(conversationIdFromUrl);
@@ -460,8 +470,74 @@ export default function MessagesPage() {
 
   const { data: classSectionsResponse } = useClassSections({ limit: 200, minimal: true });
   const classSectionsList = (classSectionsResponse as { data?: Array<{ id: string; className?: string; sectionName?: string }> })?.data ?? [];
-  const { data: usersResponse } = useUsers({ limit: 200 });
-  const usersList = (usersResponse as { data?: Array<{ id: string; email?: string; fullName?: string }> })?.data ?? [];
+  const recipientUsersQueryParams = useMemo(
+    () => ({
+      limit: 100 as const,
+      search: debouncedRecipientSearch.trim() || undefined,
+      enabled: newConversationOpen && newConvMode === 'one_to_one',
+    }),
+    [debouncedRecipientSearch, newConversationOpen, newConvMode],
+  );
+  const { data: usersResponse, isFetching: loadingRecipientUsers } = useUsers(recipientUsersQueryParams);
+  const usersList =
+    (usersResponse as { data?: Array<{ id: string; email?: string; fullName?: string }> })?.data ??
+    [];
+
+  const recipientSelectData = useMemo(() => {
+    return usersList
+      .filter((u) => u.id !== user?.id)
+      .map((u) => ({
+        value: u.id,
+        label: u.fullName ?? u.email ?? u.id,
+      }));
+  }, [usersList, user?.id]);
+
+  const conversationRowTitle = useCallback(
+    (c: ConversationListItem) => {
+      if (c.type === 'broadcast' && !c.classSectionId) return t('broadcastWholeSchool');
+      if (c.type === 'broadcast') {
+        const label = `${c.className ?? ''} ${c.sectionName ?? ''}`.trim();
+        return label || t('broadcast');
+      }
+      return c.participantNames?.join(', ') || t('conversation');
+    },
+    [t],
+  );
+
+  const filteredConversations = useMemo(() => {
+    let list = conversations;
+    const q = conversationListSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((c) => {
+        const title = conversationRowTitle(c).toLowerCase();
+        const previewText = c.lastMessageDeleted
+          ? t('messageDeleted')
+          : (c.lastMessagePreview ?? '');
+        const preview = previewText.toLowerCase();
+        return title.includes(q) || preview.includes(q);
+      });
+    }
+    if (conversationReadFilter === 'unread') {
+      list = list.filter((c) => c.unreadCount > 0);
+    } else if (conversationReadFilter === 'read') {
+      list = list.filter((c) => c.unreadCount === 0);
+    }
+    return list;
+  }, [
+    conversations,
+    conversationListSearch,
+    conversationReadFilter,
+    conversationRowTitle,
+    t,
+  ]);
+  const readFilterSegments = useMemo(
+    () => [
+      { value: 'all', label: t('filterAll') },
+      { value: 'unread', label: t('filterUnread') },
+      { value: 'read', label: t('filterRead') },
+    ],
+    [t],
+  );
   const { data: tenantBranchesPayload } = useTenantBranches();
   const tenantBranches = tenantBranchesPayload?.data ?? [];
   const canTenantWideBroadcast = useMemo(() => {
@@ -797,10 +873,42 @@ export default function MessagesPage() {
             <Box
               style={{
                 borderRight: isMobile ? 'none' : '1px solid var(--mantine-color-default-border)',
-                display: isMobile && selectedId ? 'none' : undefined,
+                display: isMobile && selectedId ? 'none' : 'flex',
+                flexDirection: 'column',
+                height: isMobile && !selectedId ? listHeight : 480,
+                minHeight: 0,
               }}
             >
-              <ScrollArea h={isMobile && !selectedId ? listHeight : 480} type="auto">
+              {!loadingList && conversations.length > 0 ? (
+                <Stack
+                  gap="xs"
+                  p="sm"
+                  style={{
+                    flexShrink: 0,
+                    borderBottom: '1px solid var(--mantine-color-default-border)',
+                  }}
+                >
+                  <TextInput
+                    placeholder={t('searchConversationsPlaceholder')}
+                    value={conversationListSearch}
+                    onChange={(e) => setConversationListSearch(e.currentTarget.value)}
+                    aria-label={t('searchConversationsAria')}
+                  />
+                  <SegmentedControl
+                    fullWidth
+                    size="xs"
+                    data={readFilterSegments}
+                    value={conversationReadFilter}
+                    onChange={(v) => {
+                      if (v === 'all' || v === 'unread' || v === 'read') {
+                        setConversationReadFilter(v);
+                      }
+                    }}
+                    aria-label={t('conversationReadFilterAria')}
+                  />
+                </Stack>
+              ) : null}
+              <ScrollArea type="auto" style={{ flex: 1, minHeight: 0 }}>
                 {loadingList ? (
                   <Stack p="md" gap="sm">
                     {[1, 2, 3, 4].map((i) => (
@@ -817,9 +925,15 @@ export default function MessagesPage() {
                       </Button>
                     ) : null}
                   </Stack>
+                ) : filteredConversations.length === 0 ? (
+                  <Stack align="center" justify="center" p="xl" h={320}>
+                    <Text c="dimmed" ta="center">
+                      {t('noConversationsMatch')}
+                    </Text>
+                  </Stack>
                 ) : (
                   <Stack gap={0}>
-                    {conversations.map((c) => {
+                    {filteredConversations.map((c) => {
                       const isRowSelected = selectedId === c.id;
                       const isRowHovered = hoveredConversationId === c.id && !isRowSelected;
                       const cfgColors = themeConfig?.colors;
@@ -872,11 +986,7 @@ export default function MessagesPage() {
                               color: rowTitleColor,
                             }}
                           >
-                            {c.type === 'broadcast'
-                              ? !c.classSectionId
-                                ? t('broadcastWholeSchool')
-                                : `${c.className ?? ''} ${c.sectionName ?? ''}`.trim() || t('broadcast')
-                              : c.participantNames?.join(', ') || t('conversation')}
+                            {conversationRowTitle(c)}
                           </Box>
                           <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
                             {c.unreadCount > 0 && (
@@ -884,15 +994,48 @@ export default function MessagesPage() {
                                 {c.unreadCount}
                               </Badge>
                             )}
-                            <ActionIcon
-                              variant="subtle"
-                              color="red"
-                              size="sm"
+                            <UnstyledButton
+                              type="button"
                               aria-label={t('deleteConversationAria')}
-                              onClick={() => setDeleteConfirmId(c.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirmId(c.id);
+                              }}
+                              styles={{
+                                root: {
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: rem(28),
+                                  height: rem(28),
+                                  borderRadius: theme.radius.sm,
+                                  flexShrink: 0,
+                                  color: isRowHovered
+                                    ? alpha(conversationRowStyles.hoverText, 0.78)
+                                    : isDarkUi
+                                      ? theme.colors.gray[4]
+                                      : theme.colors.gray[6],
+                                  '&:hover': {
+                                    color: isRowHovered
+                                      ? alpha(conversationRowStyles.hoverText, 0.95)
+                                      : isDarkUi
+                                        ? theme.colors.gray[2]
+                                        : theme.colors.gray[8],
+                                    backgroundColor: isRowHovered
+                                      ? alpha(conversationRowStyles.hoverText, 0.1)
+                                      : isDarkUi
+                                        ? alpha(theme.white, 0.06)
+                                        : alpha(theme.black, 0.04),
+                                  },
+                                  '&:focus-visible': {
+                                    outline: `2px solid ${theme.colors.primary[6]}`,
+                                    outlineOffset: 2,
+                                  },
+                                },
+                              }}
                             >
                               <IconTrash size={16} />
-                            </ActionIcon>
+                            </UnstyledButton>
                           </Group>
                         </Group>
                         {(c.lastMessagePreview || c.lastMessageDeleted) && (
@@ -1185,6 +1328,7 @@ export default function MessagesPage() {
           setAdminBroadcastScope('tenant');
           setAdminBroadcastBranchId(null);
           setAdminBroadcastRoles([]);
+          setRecipientPickerSearch('');
         }}
         title={t('newConversation')}
       >
@@ -1212,12 +1356,14 @@ export default function MessagesPage() {
               label={t('selectUser')}
               placeholder={t('chooseUser')}
               searchable
-              data={usersList.map((u) => ({
-                value: u.id,
-                label: u.fullName ?? u.email ?? u.id,
-              }))}
+              searchValue={recipientPickerSearch}
+              onSearchChange={setRecipientPickerSearch}
+              filter={({ options }) => options}
+              data={recipientSelectData}
               value={newRecipientUserId}
               onChange={setNewRecipientUserId}
+              nothingFoundMessage={t('recipientPickerNothingFound')}
+              rightSection={loadingRecipientUsers ? <Loader size="xs" /> : undefined}
             />
           )}
           {newConvMode === 'broadcast_class' && (
@@ -1299,6 +1445,7 @@ export default function MessagesPage() {
                 setAdminBroadcastScope('tenant');
                 setAdminBroadcastBranchId(null);
                 setAdminBroadcastRoles([]);
+                setRecipientPickerSearch('');
               }}
             >
               {t('cancel')}

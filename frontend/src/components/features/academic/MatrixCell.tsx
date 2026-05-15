@@ -60,7 +60,7 @@ function TeacherBadge({
       gap={2}
       wrap="nowrap"
       align="center"
-      style={{ cursor: 'default' }}
+      style={{ cursor: 'default', flexShrink: 0 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -70,6 +70,15 @@ function TeacherBadge({
         style={{
           backgroundColor: 'var(--theme-matrix-teacher-badge-bg, var(--mantine-color-blue-1))',
           color: 'var(--theme-matrix-teacher-badge-text, var(--mantine-color-blue-8))',
+          maxWidth: 'none',
+          whiteSpace: 'nowrap',
+        }}
+        styles={{
+          label: {
+            overflow: 'visible',
+            textOverflow: 'clip',
+            whiteSpace: 'nowrap',
+          },
         }}
       >
         {assignment.staffName || t('unknown')}

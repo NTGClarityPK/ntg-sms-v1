@@ -1,6 +1,5 @@
 export type FeeTemplateType = 'Fee' | 'Discount';
 export type FeeTemplateScope = 'Levels' | 'Class' | 'Class-Section' | 'Individual';
-export type FeeProRateType = 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate';
 
 export type FeeMetricAmountType = 'Absolute' | 'Percentage';
 export type FeeCurrencyCode = 'PKR' | 'IQD' | 'SAR' | 'USD';
@@ -41,7 +40,6 @@ export class FeeTemplateDto {
   autoApply!: boolean;
   autoApplyCondition?: Record<string, unknown> | null;
   daysUntilDue!: number;
-  proRateType!: FeeProRateType;
   isActive!: boolean;
   createdAt!: string;
   updatedAt!: string;

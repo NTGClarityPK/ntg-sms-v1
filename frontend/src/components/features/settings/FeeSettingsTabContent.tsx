@@ -41,7 +41,6 @@ type MetricForm = {
   name: string;
   amountType: 'Absolute' | 'Percentage';
   amount: number;
-  perDay: boolean;
 };
 
 export function FeeSettingsTabContent() {
@@ -106,10 +105,9 @@ export function FeeSettingsTabContent() {
       type: 'Fee' as 'Fee' | 'Discount',
       scope: 'Levels' as 'Levels' | 'Class' | 'Class-Section' | 'Individual',
       currencyCode: 'PKR' as 'PKR' | 'IQD' | 'SAR' | 'USD',
-      proRateType: 'Full_Month' as 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate',
       daysUntilDue: 30,
       autoApply: false,
-      metrics: [{ name: '', amountType: 'Absolute' as const, amount: 0, perDay: false }] as MetricForm[],
+      metrics: [{ name: '', amountType: 'Absolute' as const, amount: 0 }] as MetricForm[],
     },
     validate: {
       name: (v) => (!v.trim() ? tFees('validation.nameRequired') : null),
@@ -553,14 +551,12 @@ export function FeeSettingsTabContent() {
               type: values.type,
               scope: values.scope,
               currencyCode: values.currencyCode,
-              proRateType: values.proRateType,
               autoApply: values.scope === 'Individual' ? values.autoApply : false,
               autoApplyCondition: values.scope === 'Individual' && values.autoApply ? { parent_has_role: 'staff' } : null,
               metrics: values.metrics.map((m, i) => ({
                 name: m.name,
                 amountType: m.amountType,
                 amount: m.amount,
-                perDay: values.proRateType === 'Daily_Pro_Rate' ? m.perDay : false,
                 displayOrder: i,
               })),
             });
@@ -610,20 +606,6 @@ export function FeeSettingsTabContent() {
               {...form.getInputProps('currencyCode')}
             />
 
-            <Group grow>
-              <Select
-                id="settings-fees-template-pro-rate"
-                label={tFees('form.proRateType')}
-                data={[
-                  { value: 'Full_Month', label: tFees('form.proRateFull') },
-                  { value: 'Daily_Pro_Rate', label: tFees('form.proRateDaily') },
-                ]}
-                required
-                {...form.getInputProps('proRateType')}
-                disabled={form.values.scope !== 'Individual'}
-              />
-            </Group>
-
             {form.values.scope === 'Individual' ? (
               <Checkbox
                 id="settings-fees-template-auto-apply"
@@ -643,7 +625,6 @@ export function FeeSettingsTabContent() {
                       name: '',
                       amountType: 'Absolute',
                       amount: 0,
-                      perDay: false,
                     })
                   }
                 >
@@ -686,14 +667,6 @@ export function FeeSettingsTabContent() {
                     rightSectionWidth={form.values.metrics[i]?.amountType === 'Percentage' ? 22 : undefined}
                     {...form.getInputProps(`metrics.${i}.amount`)}
                   />
-                  {form.values.proRateType === 'Daily_Pro_Rate' ? (
-                    <Checkbox
-                      id={`settings-fees-template-metric-${i}-per-day`}
-                      label={tFees('form.perDay')}
-                      mt={28}
-                      {...form.getInputProps(`metrics.${i}.perDay`, { type: 'checkbox' })}
-                    />
-                  ) : null}
                   <ActionIcon
                     id={`settings-fees-template-metric-${i}-remove`}
                     color="red"

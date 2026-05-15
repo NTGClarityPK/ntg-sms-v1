@@ -17,8 +17,6 @@ import {
   Text,
   TextInput,
 } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
-import '@mantine/dates/styles.css';
 import { IconAlertCircle, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStudents } from '@/hooks/useStudents';
@@ -34,15 +32,6 @@ import type { FeeStudentTemplate, FeeTemplate } from '@/types/fees';
 
 function isValidMonth(m: string) {
   return /^[0-9]{4}-[0-9]{2}$/.test(m);
-}
-
-function daysInclusive(start: Date, end: Date) {
-  const s = new Date(start);
-  const e = new Date(end);
-  s.setHours(0, 0, 0, 0);
-  e.setHours(0, 0, 0, 0);
-  const diff = e.getTime() - s.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
 }
 
 export function AssignmentsTab() {
@@ -237,22 +226,10 @@ function StudentFeeDetailsModal(props: {
 
   const [linkOpened, setLinkOpened] = useState(false);
   const [linkTemplateId, setLinkTemplateId] = useState<string | null>(null);
-  const [linkStart, setLinkStart] = useState<Date | null>(null);
-  const [linkEnd, setLinkEnd] = useState<Date | null>(null);
 
   const templates: FeeStudentTemplate[] = props.data?.templates ?? [];
   const inherited = templates.filter((x) => x.source === 'Inherited');
   const individual = templates.filter((x) => x.source === 'Individual' || x.source === 'Auto');
-
-  const selectedTemplate = linkTemplateId ? props.individualTemplates.find((x) => x.id === linkTemplateId) ?? null : null;
-  const showDates = !!selectedTemplate && selectedTemplate.proRateType === 'Daily_Pro_Rate';
-  const days = showDates && linkStart && linkEnd && linkEnd >= linkStart ? daysInclusive(linkStart, linkEnd) : null;
-  const estimatedAmount =
-    showDates && selectedTemplate && days
-      ? selectedTemplate.metrics
-          .filter((m) => m.perDay)
-          .reduce((s, m) => s + Number(m.amount || 0) * days, 0)
-      : null;
 
   return (
     <>
@@ -400,17 +377,6 @@ function StudentFeeDetailsModal(props: {
             searchable
           />
 
-          {showDates ? (
-            <Group grow>
-              <DatePickerInput id="fees-assignments-link-start" label={t('assignments.startDate')} value={linkStart} onChange={setLinkStart} />
-              <DatePickerInput id="fees-assignments-link-end" label={t('assignments.endDate')} value={linkEnd} onChange={setLinkEnd} />
-            </Group>
-          ) : null}
-
-          {days && estimatedAmount !== null ? (
-            <Text>{t('assignments.proRateEstimate', { days, total: estimatedAmount.toLocaleString() })}</Text>
-          ) : null}
-
           <Group justify="flex-end">
             <Button variant="subtle" onClick={() => setLinkOpened(false)}>
               {t('common.cancel')}
@@ -418,19 +384,12 @@ function StudentFeeDetailsModal(props: {
             <Button
               id="fees-assignments-link-confirm"
               loading={props.mutations.linking}
-              disabled={!studentId || !linkTemplateId || (showDates && (!linkStart || !linkEnd || (linkStart && linkEnd && linkEnd < linkStart)))}
+              disabled={!studentId || !linkTemplateId}
               onClick={async () => {
                 if (!studentId || !linkTemplateId) return;
-                await props.onLinkTemplate(
-                  studentId,
-                  linkTemplateId,
-                  showDates && linkStart ? linkStart.toISOString().slice(0, 10) : undefined,
-                  showDates && linkEnd ? linkEnd.toISOString().slice(0, 10) : undefined,
-                );
+                await props.onLinkTemplate(studentId, linkTemplateId);
                 setLinkOpened(false);
                 setLinkTemplateId(null);
-                setLinkStart(null);
-                setLinkEnd(null);
               }}
             >
               {t('assignments.link')}

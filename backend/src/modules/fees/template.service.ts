@@ -21,7 +21,6 @@ type FeeTemplateRow = {
   auto_apply: boolean;
   auto_apply_condition: Record<string, unknown> | null;
   days_until_due: number;
-  pro_rate_type: 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -77,7 +76,6 @@ function mapTemplate(row: FeeTemplateRow, metrics: FeeTemplateMetricDto[]): FeeT
     autoApply: row.auto_apply,
     autoApplyCondition: row.auto_apply_condition,
     daysUntilDue: Number(row.days_until_due),
-    proRateType: row.pro_rate_type,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -111,7 +109,6 @@ export class TemplateService {
       auto_apply: input.autoApply ?? false,
       auto_apply_condition: input.autoApplyCondition ?? null,
       days_until_due: input.daysUntilDue ?? 30,
-      pro_rate_type: input.proRateType ?? 'Full_Month',
       is_active: true,
     };
 
@@ -122,7 +119,7 @@ export class TemplateService {
       .from('fee_templates')
       .insert({ ...insertBase, currency_code: input.currencyCode ?? 'PKR' })
       .select(
-        'id, branch_id, name, type, scope, currency_code, auto_apply, auto_apply_condition, days_until_due, pro_rate_type, is_active, created_at, updated_at',
+        'id, branch_id, name, type, scope, currency_code, auto_apply, auto_apply_condition, days_until_due, is_active, created_at, updated_at',
       )
       .single());
 
@@ -132,7 +129,7 @@ export class TemplateService {
         .from('fee_templates')
         .insert(insertBase)
         .select(
-          'id, branch_id, name, type, scope, auto_apply, auto_apply_condition, days_until_due, pro_rate_type, is_active, created_at, updated_at',
+          'id, branch_id, name, type, scope, auto_apply, auto_apply_condition, days_until_due, is_active, created_at, updated_at',
         )
         .single());
     }
@@ -177,7 +174,7 @@ export class TemplateService {
     let dbQuery = supabase
       .from('fee_templates')
       .select(
-        'id, branch_id, name, type, scope, currency_code, auto_apply, auto_apply_condition, days_until_due, pro_rate_type, is_active, created_at, updated_at, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order, created_at), fee_template_assignments(id, scope_type, scope_id, created_at)',
+        'id, branch_id, name, type, scope, currency_code, auto_apply, auto_apply_condition, days_until_due, is_active, created_at, updated_at, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order, created_at), fee_template_assignments(id, scope_type, scope_id, created_at)',
       )
       .eq('branch_id', branchId)
       .order('created_at', { ascending: false });
@@ -198,7 +195,7 @@ export class TemplateService {
       let fallbackQuery = supabase
         .from('fee_templates')
         .select(
-          'id, branch_id, name, type, scope, auto_apply, auto_apply_condition, days_until_due, pro_rate_type, is_active, created_at, updated_at, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order, created_at), fee_template_assignments(id, scope_type, scope_id, created_at)',
+          'id, branch_id, name, type, scope, auto_apply, auto_apply_condition, days_until_due, is_active, created_at, updated_at, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order, created_at), fee_template_assignments(id, scope_type, scope_id, created_at)',
         )
         .eq('branch_id', branchId)
         .order('created_at', { ascending: false });
@@ -248,7 +245,7 @@ export class TemplateService {
     ({ data, error } = await supabase
       .from('fee_templates')
       .select(
-        'id, branch_id, name, type, scope, currency_code, auto_apply, auto_apply_condition, days_until_due, pro_rate_type, is_active, created_at, updated_at, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order, created_at), fee_template_assignments(id, scope_type, scope_id, created_at)',
+        'id, branch_id, name, type, scope, currency_code, auto_apply, auto_apply_condition, days_until_due, is_active, created_at, updated_at, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order, created_at), fee_template_assignments(id, scope_type, scope_id, created_at)',
       )
       .eq('id', id)
       .eq('branch_id', branchId)
@@ -259,7 +256,7 @@ export class TemplateService {
       ({ data, error } = await supabase
         .from('fee_templates')
         .select(
-          'id, branch_id, name, type, scope, auto_apply, auto_apply_condition, days_until_due, pro_rate_type, is_active, created_at, updated_at, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order, created_at), fee_template_assignments(id, scope_type, scope_id, created_at)',
+          'id, branch_id, name, type, scope, auto_apply, auto_apply_condition, days_until_due, is_active, created_at, updated_at, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order, created_at), fee_template_assignments(id, scope_type, scope_id, created_at)',
         )
         .eq('id', id)
         .eq('branch_id', branchId)
@@ -307,7 +304,6 @@ export class TemplateService {
       auto_apply: input.autoApply,
       auto_apply_condition: input.autoApplyCondition,
       days_until_due: input.daysUntilDue,
-      pro_rate_type: input.proRateType,
       is_active: input.isActive,
     };
 
@@ -317,7 +313,7 @@ export class TemplateService {
       .eq('id', id)
       .eq('branch_id', branchId)
       .select(
-        'id, branch_id, name, type, scope, currency_code, auto_apply, auto_apply_condition, days_until_due, pro_rate_type, is_active, created_at, updated_at',
+        'id, branch_id, name, type, scope, currency_code, auto_apply, auto_apply_condition, days_until_due, is_active, created_at, updated_at',
       )
       .single();
 

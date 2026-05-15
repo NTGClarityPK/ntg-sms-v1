@@ -24,7 +24,6 @@ type FeeTemplateRow = {
   name: string;
   type: 'Fee' | 'Discount';
   scope: 'Levels' | 'Class' | 'Class-Section' | 'Individual';
-  pro_rate_type: 'Full_Month' | 'Half_Month' | 'Daily_Pro_Rate';
   days_until_due: number;
   auto_apply: boolean;
   auto_apply_condition: Record<string, unknown> | null;
@@ -89,17 +88,6 @@ function parseMonth(month: string): { year: number; monthIndex: number } {
   const monthIndex = Number(match[2]) - 1;
   if (monthIndex < 0 || monthIndex > 11) throw new BadRequestException('Invalid month value');
   return { year, monthIndex };
-}
-
-function daysInMonth(year: number, monthIndex: number): number {
-  return new Date(year, monthIndex + 1, 0).getDate();
-}
-
-function daysInclusive(start: Date, end: Date): number {
-  const startUtc = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
-  const endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
-  const diffDays = Math.floor((endUtc - startUtc) / (1000 * 60 * 60 * 24));
-  return diffDays + 1;
 }
 
 @Injectable()
@@ -334,7 +322,7 @@ export class FeeCalculationService {
     const { data, error } = await supabase
       .from('fee_templates')
       .select(
-        'id, name, type, scope, pro_rate_type, days_until_due, auto_apply, auto_apply_condition, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order)',
+        'id, name, type, scope, days_until_due, auto_apply, auto_apply_condition, fee_template_metrics(id, template_id, name, amount_type, amount, per_day, display_order)',
       )
       .eq('branch_id', branchId)
       .eq('is_active', true)
@@ -421,7 +409,6 @@ export class FeeCalculationService {
         name: t.name,
         type: t.type,
         scope: t.scope,
-        proRateType: t.pro_rate_type,
         daysUntilDue: Number(t.days_until_due),
         autoApply: !!t.auto_apply,
         autoApplyCondition: t.auto_apply_condition,
@@ -489,8 +476,7 @@ export class FeeCalculationService {
     },
     overrides?: PreviewOverrides,
   ): Promise<FeeCalculationPreviewDto> {
-    const { year, monthIndex } = parseMonth(month);
-    const dim = daysInMonth(year, monthIndex);
+    parseMonth(month); // validates YYYY-MM
 
     const placement = preloaded?.placement ?? (await this.getStudentPlacement(studentId, branchId));
     const resolved = preloaded
@@ -553,52 +539,17 @@ export class FeeCalculationService {
       }
     }
 
-    // Pro-rate date window: if an Individual template link has dates, we apply those dates only to that template.
-    const supabase = this.supabaseConfig.getClient();
-    const { data: links, error: linkErr } = await supabase
-      .from('fee_student_template_links')
-      .select('template_id, start_date, end_date, is_active')
-      .eq('branch_id', branchId)
-      .eq('student_id', studentId)
-      .eq('is_active', true);
-    throwIfDbError(linkErr);
-
-    const linkByTemplateId = new Map<string, { startDate?: string | null; endDate?: string | null }>();
-    for (const l of (links ?? []) as StudentTemplateLinkRow[]) {
-      linkByTemplateId.set(l.template_id, { startDate: l.start_date, endDate: l.end_date });
-    }
-
     const items: FeeCalculationLineItemDto[] = [];
     let subtotal = 0;
     let baseForDiscountPercent = 0;
 
-    // Fees first
+    // Fees first (full-month amounts per metric)
     for (const t of templates.filter(
       (x) =>
         x.type === 'Fee' &&
         !overrideExcludedTemplateIds.has(x.id) &&
         (allowedFeeTemplateIds ? allowedFeeTemplateIds.has(x.id) : true),
     )) {
-      const link = linkByTemplateId.get(t.id);
-      const proRateType = t.pro_rate_type;
-      let multiplier = 1;
-
-      if (proRateType === 'Half_Month') multiplier = 0.5;
-
-      if (proRateType === 'Daily_Pro_Rate') {
-        // If link dates exist, compute enrolled days within that range; otherwise default full month.
-        if (link?.startDate && link?.endDate) {
-          const start = new Date(link.startDate);
-          const end = new Date(link.endDate);
-          if (end < start) throw new BadRequestException('Invalid pro-rate dates (end before start)');
-          const days = daysInclusive(start, end);
-          // Daily templates expect per_day metrics; still guard for non-per_day by dividing by days-in-month.
-          multiplier = days; // applied per metric below
-        } else {
-          multiplier = dim;
-        }
-      }
-
       for (const m of t.metrics) {
         if (excludedMetricIds.has(m.id) || overrideExcludedMetricIds.has(m.id)) continue;
         if (m.amount_type === 'Percentage') {
@@ -606,17 +557,7 @@ export class FeeCalculationService {
           continue;
         }
         const overrideAmount = overrideAmountByMetricId.get(m.id);
-        let amount = Number(overrideAmount ?? m.amount);
-        if (proRateType === 'Half_Month') {
-          amount = amount * 0.5;
-        } else if (proRateType === 'Daily_Pro_Rate') {
-          if (m.per_day) {
-            amount = amount * multiplier;
-          } else {
-            amount = (amount / dim) * multiplier;
-          }
-        }
-        amount = Math.round(amount * 100) / 100;
+        const amount = Math.round(Number(overrideAmount ?? m.amount) * 100) / 100;
         subtotal += amount;
         baseForDiscountPercent += amount;
         items.push(

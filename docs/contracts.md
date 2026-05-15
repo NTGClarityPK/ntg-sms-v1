@@ -24,7 +24,7 @@ Create/update assessment payloads accept optional `roomNumber` (max length per D
 
 ### Data fields (DB → API)
 
-- **Fee templates** (`fee_templates`): `type` (`Fee` | `Discount`), `scope` (`Levels` | `Class` | `Class-Section` | `Individual`), `autoApply` (DB `auto_apply`), `autoApplyCondition` (DB `auto_apply_condition`), `daysUntilDue` (DB `days_until_due`), `proRateType` (DB `pro_rate_type`), `isActive` (DB `is_active`).
+- **Fee templates** (`fee_templates`): `type` (`Fee` | `Discount`), `scope` (`Levels` | `Class` | `Class-Section` | `Individual`), `autoApply` (DB `auto_apply`), `autoApplyCondition` (DB `auto_apply_condition`), `daysUntilDue` (DB `days_until_due`), `isActive` (DB `is_active`). Billing uses **full-month** metric amounts only (no pro-rate modes).
 - **Template metrics** (`fee_template_metrics`): `amountType` (`Absolute` | `Percentage`), `perDay` (DB `per_day`), `displayOrder` (DB `display_order`).
 - **Assignments** (`fee_template_assignments`): `scopeType` (`Level` | `Class` | `Section`), `scopeId` (UUID).
 - **Student template links** (`fee_student_template_links`): `startDate`, `endDate`, `isActive`.

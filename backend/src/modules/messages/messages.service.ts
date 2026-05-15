@@ -975,6 +975,34 @@ export class MessagesService {
         .single();
       if (!cs) throw new NotFoundException('Class section not found');
       const csRow = cs as { class_id: string; section_id: string; academic_year_id: string };
+
+      const { data: existingClassBroadcast } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('type', 'broadcast')
+        .eq('class_section_id', dto.classSectionId)
+        .limit(1)
+        .maybeSingle();
+      if (existingClassBroadcast) {
+        const existingId = (existingClassBroadcast as { id: string }).id;
+        const { data: creatorPart } = await supabase
+          .from('conversation_participants')
+          .select('user_id')
+          .eq('conversation_id', existingId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (creatorPart) {
+          const { error: unhideSelfError } = await supabase
+            .from('conversation_hidden')
+            .delete()
+            .eq('conversation_id', existingId)
+            .eq('user_id', userId);
+          throwIfDbError(unhideSelfError);
+          return this.getConversation(existingId, userId, branchId);
+        }
+      }
+
       const { data: enrolments } = await supabase
         .from('student_enrolments')
         .select('student_id')

@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Paper,
   Table,
   Group,
   Text,
-  Badge,
   ActionIcon,
   Pagination,
   MultiSelect,
@@ -17,7 +16,6 @@ import { modals } from '@mantine/modals';
 import { useTranslations } from 'next-intl';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
 import { useDeleteTeacherAssignment, useUpdateTeacherAssignment } from '@/hooks/useTeacherAssignments';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useDisclosure } from '@mantine/hooks';
 import { CreateAssignmentModal } from './CreateAssignmentModal';
 import { useClassSections } from '@/hooks/useClassSections';
@@ -45,12 +43,15 @@ export function TeacherMappingList({
   const updateAssignment = useUpdateTeacherAssignment();
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
   const [selectedAssignment, setSelectedAssignment] = useState<TeacherAssignment | null>(null);
-  const [classFilter, setClassFilter] = useState<string[]>([]);
-  const [sectionFilter, setSectionFilter] = useState<string[]>([]);
-  const [subjectFilter, setSubjectFilter] = useState<string[]>([]);
-  const [teacherFilter, setTeacherFilter] = useState<string[]>([]);
+  const [selectedClassSectionIds, setSelectedClassSectionIds] = useState<string[]>([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
 
-  const { data: classSectionsData } = useClassSections();
+  const { data: classSectionsData } = useClassSections({
+    limit: 500,
+    minimal: true,
+    isActive: true,
+  });
   const { data: subjectsData } = useSubjects();
   const { data: staffData } = useStaff();
 
@@ -63,39 +64,65 @@ export function TeacherMappingList({
           fullName?: string | null;
           employeeId?: string | null;
           isActive: boolean;
+          roles?: Array<{ roleName: string }>;
         }>;
       }
     | null
     | undefined;
   const staff = staffResponse?.data || [];
 
-  // Get unique values for filters
-  const classOptions = Array.from(
-    new Set(classSections.map((cs) => cs.classDisplayName || cs.className || '').filter(Boolean)),
-  ).map((name) => ({ value: name, label: name }));
+  const classSectionOptions = useMemo(() => {
+    const unique = classSections.filter((cs, i, arr) => arr.findIndex((x) => x.id === cs.id) === i);
+    return unique
+      .sort((a, b) => {
+        const classOrderA = a.classSortOrder ?? 999;
+        const classOrderB = b.classSortOrder ?? 999;
+        if (classOrderA !== classOrderB) return classOrderA - classOrderB;
+        const sectionOrderA = a.sectionSortOrder ?? 999;
+        const sectionOrderB = b.sectionSortOrder ?? 999;
+        if (sectionOrderA !== sectionOrderB) return sectionOrderA - sectionOrderB;
+        const sectionA = (a.sectionName || '').toLowerCase();
+        const sectionB = (b.sectionName || '').toLowerCase();
+        return sectionA.localeCompare(sectionB);
+      })
+      .map((cs) => ({
+        value: cs.id,
+        label: `${cs.classDisplayName ?? cs.className ?? t('unknown')} - ${cs.sectionName ?? t('unknown')}`,
+      }));
+  }, [classSections, t]);
 
-  const sectionOptions = Array.from(
-    new Set(classSections.map((cs) => cs.sectionName || '').filter(Boolean)),
-  ).map((name) => ({ value: name, label: name }));
+  const subjectOptions = useMemo(
+    () =>
+      [...subjects]
+        .sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()))
+        .map((s) => ({ value: s.id, label: s.name })),
+    [subjects],
+  );
 
-  const subjectOptions = subjects.map((s) => ({ value: s.id, label: s.name }));
+  const teacherOptions = useMemo(() => {
+    return staff
+      .filter((s) => {
+        if (!s.isActive) return false;
+        return s.roles?.some(
+          (r) => r.roleName === 'class_teacher' || r.roleName === 'subject_teacher',
+        );
+      })
+      .sort((a, b) => {
+        const nameA = (a.fullName || a.employeeId || '').toLowerCase();
+        const nameB = (b.fullName || b.employeeId || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      })
+      .map((s) => ({ value: s.id, label: s.fullName || s.employeeId || t('unknown') }));
+  }, [staff, t]);
 
-  const teacherOptions = staff
-    .filter((s) => s.isActive)
-    .map((s) => ({ value: s.id, label: s.fullName || s.employeeId || t('unknown') }));
-
-  // Filter assignments
   const filteredAssignments = assignments.filter((assignment) => {
-    if (classFilter.length > 0 && !classFilter.includes(assignment.className || '')) {
+    if (selectedClassSectionIds.length > 0 && !selectedClassSectionIds.includes(assignment.classSectionId)) {
       return false;
     }
-    if (sectionFilter.length > 0 && !sectionFilter.includes(assignment.sectionName || '')) {
+    if (selectedSubjectIds.length > 0 && !selectedSubjectIds.includes(assignment.subjectId)) {
       return false;
     }
-    if (subjectFilter.length > 0 && !subjectFilter.includes(assignment.subjectId)) {
-      return false;
-    }
-    if (teacherFilter.length > 0 && !teacherFilter.includes(assignment.staffId)) {
+    if (selectedTeacherIds.length > 0 && !selectedTeacherIds.includes(assignment.staffId)) {
       return false;
     }
     return true;
@@ -130,42 +157,51 @@ export function TeacherMappingList({
       <Stack gap="md">
         <Paper p="md" withBorder>
           <Stack gap="md">
-            <Group>
+            <Group grow align="flex-start" wrap="wrap">
               <MultiSelect
-                label={t('filterByClass')}
-                placeholder={t('selectClasses')}
-                data={classOptions}
-                value={classFilter}
-                onChange={setClassFilter}
+                label={t('filterByClassSectionLabel')}
+                placeholder={
+                  selectedClassSectionIds.length === 0
+                    ? t('allClassSections')
+                    : t('classSectionsSelected', { count: selectedClassSectionIds.length })
+                }
+                description={t('filterByClassSectionListDescription')}
+                data={classSectionOptions}
+                value={selectedClassSectionIds}
+                onChange={setSelectedClassSectionIds}
                 clearable
-                style={{ flex: 1 }}
+                searchable
+                style={{ minWidth: 220 }}
               />
               <MultiSelect
-                label={t('filterBySection')}
-                placeholder={t('selectSections')}
-                data={sectionOptions}
-                value={sectionFilter}
-                onChange={setSectionFilter}
-                clearable
-                style={{ flex: 1 }}
-              />
-              <MultiSelect
-                label={t('filterBySubject')}
-                placeholder={t('selectSubjects')}
+                label={t('showSubjectsLabel')}
+                placeholder={
+                  selectedSubjectIds.length === 0
+                    ? t('allSubjects')
+                    : t('subjectsSelected', { count: selectedSubjectIds.length })
+                }
+                description={t('showSubjectsDescription')}
                 data={subjectOptions}
-                value={subjectFilter}
-                onChange={setSubjectFilter}
+                value={selectedSubjectIds}
+                onChange={setSelectedSubjectIds}
                 clearable
-                style={{ flex: 1 }}
+                searchable
+                style={{ minWidth: 220 }}
               />
               <MultiSelect
-                label={t('filterByTeacher')}
-                placeholder={t('selectTeachers')}
+                label={t('filterByTeacherLabel')}
+                placeholder={
+                  selectedTeacherIds.length === 0
+                    ? t('allTeachers')
+                    : t('teachersFilterSelected', { count: selectedTeacherIds.length })
+                }
+                description={t('filterByTeachersListDescription')}
                 data={teacherOptions}
-                value={teacherFilter}
-                onChange={setTeacherFilter}
+                value={selectedTeacherIds}
+                onChange={setSelectedTeacherIds}
                 clearable
-                style={{ flex: 1 }}
+                searchable
+                style={{ minWidth: 220 }}
               />
             </Group>
           </Stack>
