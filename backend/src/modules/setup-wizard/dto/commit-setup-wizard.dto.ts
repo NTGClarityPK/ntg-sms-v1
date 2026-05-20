@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -147,8 +148,10 @@ class TimingTemplatePayloadDto {
   @IsNotEmpty()
   endTime!: string;
 
+  @IsOptional()
   @IsInt()
-  periodDurationMinutes!: number;
+  @Min(1)
+  periodDurationMinutes?: number;
 
   @IsArray()
   @ValidateNested({ each: true })

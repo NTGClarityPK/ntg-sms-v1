@@ -1,90 +1,119 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Group, Text, Stack, Badge } from '@mantine/core';
 import { IconClock, IconCalendar, IconInfoCircle } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import type { TimingTemplateInfo } from '@/types/timetable';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 interface TemplateInfoBannerProps {
   templateInfo: TimingTemplateInfo | null;
+  branchId?: string | null;
 }
 
-export function TemplateInfoBanner({ templateInfo }: TemplateInfoBannerProps) {
+function dismissStorageKey(branchId: string, templateId: string): string {
+  return `timetable-timing-banner-dismissed:${branchId}:${templateId}`;
+}
+
+export function TemplateInfoBanner({ templateInfo, branchId }: TemplateInfoBannerProps) {
   const colors = useThemeColors();
-  
-  if (!templateInfo) {
-    return (
-      <Alert icon={<IconInfoCircle size={16} />} color={colors.warning} title="No Timing Template">
-        <Text size="sm">
-          No timing template is assigned to this class. Please assign one in Settings to ensure
-          proper time validation.
-        </Text>
-      </Alert>
-    );
+  const t = useTranslations('timetable');
+
+  const templateId = templateInfo?.templateId;
+  const storageKey = useMemo(() => {
+    if (!branchId || !templateId) return null;
+    return dismissStorageKey(branchId, templateId);
+  }, [branchId, templateId]);
+
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!storageKey || typeof window === 'undefined') {
+      setDismissed(false);
+      return;
+    }
+    setDismissed(window.localStorage.getItem(storageKey) === '1');
+  }, [storageKey]);
+
+  const handleDismiss = () => {
+    if (storageKey && typeof window !== 'undefined') {
+      window.localStorage.setItem(storageKey, '1');
+    }
+    setDismissed(true);
+  };
+
+  if (dismissed) {
+    return null;
   }
 
   const formatTime = (time: string) => {
-    // Convert HH:MM:SS to HH:MM AM/PM
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours || '0', 10);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
+    return `${displayHour}:${minutes || '00'} ${ampm}`;
   };
+
+  if (!templateInfo) {
+    return (
+      <Alert icon={<IconInfoCircle size={16} />} color={colors.warning} title={t('timingTemplateNoTemplateTitle')}>
+        <Text size="sm">{t('timingTemplateNoTemplateMessage')}</Text>
+      </Alert>
+    );
+  }
 
   return (
     <Alert
       icon={<IconCalendar size={16} />}
       color={colors.info}
-      title={`Timing Template: ${templateInfo.templateName}`}
+      title={t('timingTemplateBannerTitle', { name: templateInfo.templateName })}
+      withCloseButton
+      onClose={handleDismiss}
+      closeButtonLabel={t('timingTemplateDismiss')}
     >
       <Stack gap="xs" mt="xs">
-        <Group gap="md">
-          <Group gap={4}>
-            <IconClock size={14} />
-            <Text size="sm" fw={500}>
-              School Hours:
-            </Text>
-            <Text size="sm">
-              {formatTime(templateInfo.startTime)} - {formatTime(templateInfo.endTime)}
-            </Text>
-          </Group>
-          <Group gap={4}>
-            <Text size="sm" fw={500}>
-              Period Duration:
-            </Text>
-            <Text size="sm">{templateInfo.periodDurationMinutes} minutes</Text>
-          </Group>
+        <Group gap={4}>
+          <IconClock size={14} />
+          <Text size="sm" fw={500}>
+            {t('timingTemplateSchoolHours')}
+          </Text>
+          <Text size="sm">
+            {formatTime(templateInfo.startTime)} – {formatTime(templateInfo.endTime)}
+          </Text>
         </Group>
 
         {templateInfo.slots.length > 0 && (
-          <Group gap="xs" mt={4}>
+          <Stack gap={4}>
             <Text size="sm" fw={500}>
-              Template Slots:
+              {t('timingTemplateFixedBlocks')}
             </Text>
-            {templateInfo.slots.map((slot, index) => (
-              <Badge key={index} variant="light" size="sm">
-                {slot.name}
-                {slot.startTime && slot.endTime && (
-                  <span style={{ marginLeft: 4 }}>
-                    ({formatTime(slot.startTime)} - {formatTime(slot.endTime)})
-                  </span>
-                )}
-              </Badge>
-            ))}
-          </Group>
+            <Text size="xs" c="dimmed">
+              {t('timingTemplateFixedBlocksHint')}
+            </Text>
+            <Group gap="xs">
+              {templateInfo.slots.map((slot, index) => (
+                <Badge key={`${slot.name}-${index}`} variant="light" size="sm">
+                  {slot.startTime && slot.endTime
+                    ? t('timingTemplateFixedBlockBadge', {
+                        name: slot.name,
+                        start: formatTime(slot.startTime),
+                        end: formatTime(slot.endTime),
+                      })
+                    : slot.name}
+                </Badge>
+              ))}
+            </Group>
+          </Stack>
         )}
 
-        <Text size="xs" c="dimmed" mt={4}>
-          ⚠️ All periods must be within {formatTime(templateInfo.startTime)} -{' '}
-          {formatTime(templateInfo.endTime)}
+        <Text size="xs" c="dimmed">
+          {t('timingTemplateWithinHours', {
+            start: formatTime(templateInfo.startTime),
+            end: formatTime(templateInfo.endTime),
+          })}
         </Text>
       </Stack>
     </Alert>
   );
 }
-
-
-
-
-

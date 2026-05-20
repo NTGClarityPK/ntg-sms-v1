@@ -249,8 +249,8 @@ const SCHOOL_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[
       '/assessments',
       '/my-assessments',
       '/timetable',
-      '/my-timetable',
       '/my-schedule',
+      '/my-timetable',
       '/children-timetable',
       '/results',
     ],
@@ -432,11 +432,9 @@ export function Sidebar({
       if (item.href === '/my-schedule') {
         return isTeacher;
       }
-      // For "My Timetable", show only if user is a student
+      // For "My Timetable": students only (class view). Teachers use My Schedule (`/my-schedule`).
       if (item.href === '/my-timetable') {
-        // Students see their timetable; teachers may also have a personal timetable view on this route.
-        // Permission gating is handled above via `getFeatureCodeForPath` + `canView`.
-        return isStudent || isTeacher;
+        return isStudent;
       }
       // For "Timetable Management", show only if user has admin/coordinator role
       if (item.href === '/timetable') {

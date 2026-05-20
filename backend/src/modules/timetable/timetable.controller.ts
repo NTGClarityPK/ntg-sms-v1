@@ -114,6 +114,7 @@ export class TimetableController {
     @Query('classSectionId') classSectionId?: string,
     @Query('staffId') staffId?: string,
     @Query('academicYearId') academicYearId?: string,
+    @Query('subjectTemplateId') subjectTemplateId?: string,
   ) {
     const data = await this.timetableService.checkConflicts(
       branch.branchId,
@@ -121,6 +122,7 @@ export class TimetableController {
       {
         classSectionId,
         staffId,
+        subjectTemplateId,
       },
     );
     return { data };
@@ -132,6 +134,7 @@ export class TimetableController {
     @Query('classSectionId') classSectionId?: string,
     @Query('staffId') staffId?: string,
     @Query('academicYearId') academicYearId?: string,
+    @Query('subjectTemplateId') subjectTemplateId?: string,
   ) {
     // Same as conflicts endpoint (alias for validation)
     const data = await this.timetableService.checkConflicts(
@@ -140,6 +143,7 @@ export class TimetableController {
       {
         classSectionId,
         staffId,
+        subjectTemplateId,
       },
     );
     return { data };

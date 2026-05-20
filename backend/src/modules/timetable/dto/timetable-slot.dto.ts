@@ -8,6 +8,7 @@ export class TimetableSlotDto {
    */
   periodNumber?: number;
   startTime!: string;
+  /** Exclusive display end (HH:MM); database stores inclusive last minute. */
   endTime!: string;
   subjectId?: string;
   staffId?: string;

@@ -13,6 +13,8 @@ interface TimetableSlotProps {
   showConflict?: boolean;
   height?: number; // Optional: card height in pixels to determine if compact layout needed
   periodNumber?: number;
+  /** Hide redundant class/section line when viewing a single class-section timetable */
+  hideClassSectionLabel?: boolean;
 }
 
 // Calculate duration in minutes from time strings
@@ -32,6 +34,7 @@ export function TimetableSlotComponent({
   showConflict,
   height,
   periodNumber,
+  hideClassSectionLabel = false,
 }: TimetableSlotProps) {
   const theme = useMantineTheme();
   const colors = useThemeColors();
@@ -94,7 +97,7 @@ export function TimetableSlotComponent({
           <Text size="xs" fw={500} lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
             {periodName}
           </Text>
-          {slot.slotType === 'class' && (slot.className || slot.sectionName) && (
+          {slot.slotType === 'class' && !hideClassSectionLabel && (slot.className || slot.sectionName) && (
             <Text size="xs" c="dimmed" lineClamp={1} style={{ whiteSpace: 'nowrap' }}>
               {[slot.className, slot.sectionName].filter(Boolean).join(' ')}
             </Text>
@@ -177,7 +180,7 @@ export function TimetableSlotComponent({
           <Badge size="xs" variant="light" color={slotTypeColors[slot.slotType]}>
             {slot.slotType === 'class' ? 'class' : 'others'}
           </Badge>
-          {slot.slotType === 'class' && (slot.className || slot.sectionName) && (
+          {slot.slotType === 'class' && !hideClassSectionLabel && (slot.className || slot.sectionName) && (
             <Text size="xs" c="dimmed" lineClamp={1} style={{ minWidth: 0 }}>
               {[slot.className, slot.sectionName].filter(Boolean).join(' ')}
             </Text>

@@ -41,7 +41,8 @@ export class CreateTimetableSlotDto {
 
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  endTime!: string; // HH:MM format
+  /** Exclusive display end (HH:MM); persisted as inclusive last minute (one minute earlier). */
+  endTime!: string;
 
   @IsOptional()
   @IsUUID()

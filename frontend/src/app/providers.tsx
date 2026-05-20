@@ -17,6 +17,7 @@ import { FaviconUpdater } from '@/components/common/FaviconUpdater';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
+import { isAuthPathname } from '@/lib/utils/auth-pathname';
 import { NextStepRoot } from '@/components/onboarding/NextStepRoot';
 
 /** In development, unregister any existing service workers so the production sw.js (and workbox) are not used. */
@@ -41,14 +42,7 @@ function AuthRouteServiceWorkerCleanup() {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
 
-    const isAuth =
-      !!pathname &&
-      (pathname.startsWith('/login') ||
-        pathname.startsWith('/signup') ||
-        pathname.startsWith('/reset-password') ||
-        pathname.startsWith('/select-child'));
-
-    if (!isAuth) return;
+    if (!isAuthPathname(pathname)) return;
 
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       registrations.forEach((reg) => {
@@ -130,23 +124,12 @@ function LegacyLocaleStorageCleanup() {
   return null;
 }
 
-/** Auth routes where theme must be default green, not tenant primary */
-function isAuthRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return (
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/signup') ||
-    pathname.startsWith('/reset-password') ||
-    pathname.startsWith('/select-child')
-  );
-}
-
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { theme: colorScheme } = useTheme();
   const { primaryColor } = useThemeStore();
   // On auth pages use default green so login/signup/branch selector are not tenant-themed
-  const effectivePrimary = isAuthRoute(pathname) ? DEFAULT_THEME_COLOR : (primaryColor || DEFAULT_THEME_COLOR);
+  const effectivePrimary = isAuthPathname(pathname) ? DEFAULT_THEME_COLOR : (primaryColor || DEFAULT_THEME_COLOR);
   const mantineTheme = createDynamicTheme(effectivePrimary, colorScheme);
 
   return (

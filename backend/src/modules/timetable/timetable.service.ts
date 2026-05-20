@@ -4,14 +4,14 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import type { PostgrestError } from '@supabase/supabase-js';
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ScheduleService } from '../schedule/schedule.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
 import { TimetableSlotDto } from './dto/timetable-slot.dto';
-import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
+import { CreateTimetableSlotDto, TimetableSlotType } from './dto/create-timetable-slot.dto';
 import { ClassTimetableDto } from './dto/class-timetable.dto';
 import { TeacherTimetableDto, FreePeriod } from './dto/teacher-timetable.dto';
 import { ConflictDto, ConflictType, ConflictingSlot } from './dto/conflict.dto';
@@ -19,6 +19,12 @@ import { TimingTemplateInfoDto } from './dto/timing-template-info.dto';
 import { ReplicateDayDto } from './dto/replicate-day.dto';
 import { ReplicateAcrossSectionsDto } from './dto/replicate-across-sections.dto';
 import { ReplicateFromSectionDto } from './dto/replicate-from-section.dto';
+import {
+  clockTimeToMinutes,
+  storedSlotEndToUserDisplay,
+  storedTimetableSlotRangesOverlap,
+  userSlotEndDisplayToStoredEnd,
+} from './timetable-slot-time.util';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -59,19 +65,6 @@ function throwIfDbError(error: PostgrestError | null): void {
   throw new BadRequestException(error.message);
 }
 
-function parseTime(timeStr: string): number {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function timesOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
-  const s1 = parseTime(start1);
-  const e1 = parseTime(end1);
-  const s2 = parseTime(start2);
-  const e2 = parseTime(end2);
-  return s1 < e2 && s2 < e1;
-}
-
 function formatClockRange(start: string, end: string): string {
   const trim = (t: string) => t.split(':').slice(0, 2).join(':');
   return `${trim(start)}–${trim(end)}`;
@@ -88,6 +81,109 @@ function buildSlotLabel(slot: TimetableSlotWithRelations): string {
   const name =
     s && typeof s === 'object' && 'name' in s ? String((s as { name: string }).name).trim() : '';
   return name || 'Class';
+}
+
+/** Subject IDs linked to a subject template (tracks / subject group). */
+async function fetchSubjectIdsForSubjectTemplate(
+  supabase: SupabaseClient,
+  subjectTemplateId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('subject_template_subjects')
+    .select('subject_id')
+    .eq('subject_template_id', subjectTemplateId);
+  throwIfDbError(error);
+  const ids = (data ?? [])
+    .map((row: { subject_id: string }) => row.subject_id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+  return [...new Set(ids)];
+}
+
+/**
+ * Filters timetable_slots by template.
+ * Rows with matching subject_template_id always match.
+ * Rows with subject_template_id = null remain visible when either:
+ * - slot is structural (assembly / break / free), or
+ * - slot is instructional and subject_id belongs to this template (legacy data before template stamping).
+ */
+function applySlotsQuerySubjectTemplateFilter<T extends { is: (column: string, value: null) => unknown; or: (expression: string) => unknown }>(
+  slotsQuery: T,
+  subjectTemplateId: string | null | undefined,
+  templateSubjectIds: string[] | null,
+): T {
+  if (subjectTemplateId === undefined) {
+    return slotsQuery;
+  }
+  if (subjectTemplateId === null) {
+    return slotsQuery.is('subject_template_id', null) as T;
+  }
+  const explicit = `subject_template_id.eq.${subjectTemplateId}`;
+  const structuralNull =
+    'and(subject_template_id.is.null,slot_type.in.(assembly,break,free))';
+  const branches = [explicit, structuralNull];
+  if (templateSubjectIds && templateSubjectIds.length > 0) {
+    branches.push(
+      `and(subject_template_id.is.null,slot_type.eq.class,subject_id.in.(${templateSubjectIds.join(',')}))`,
+    );
+  }
+  return slotsQuery.or(branches.join(',')) as T;
+}
+
+const STRUCTURAL_SLOT_TYPES = new Set<TimetableSlotRow['slot_type']>(['assembly', 'break', 'free']);
+
+/** Same visibility rules as applySlotsQuerySubjectTemplateFilter, evaluated in memory. */
+function slotVisibleForSubjectTemplate(
+  slot: TimetableSlotRow,
+  subjectTemplateId: string,
+  templateSubjectIds: string[],
+): boolean {
+  if (slot.subject_template_id === subjectTemplateId) {
+    return true;
+  }
+  if (slot.subject_template_id === null && STRUCTURAL_SLOT_TYPES.has(slot.slot_type)) {
+    return true;
+  }
+  if (
+    slot.subject_template_id === null &&
+    slot.slot_type === 'class' &&
+    slot.subject_id &&
+    templateSubjectIds.includes(slot.subject_id)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Overlap groups for class-section conflicts.
+ * Stamped template IDs stay separate; structural slots share one lane per day;
+ * unstamped class slots resolve to a single assigned track when unambiguous.
+ */
+function computeClassSectionOverlapGroupKey(
+  slot: TimetableSlotRow,
+  classId: string,
+  templatesForClass: string[],
+  subjectIdToTemplateIds: Map<string, Set<string>>,
+): string {
+  const day = slot.day_of_week;
+  const cs = slot.class_section_id;
+
+  if (slot.subject_template_id) {
+    return `${cs}-${day}-${slot.subject_template_id}`;
+  }
+  if (STRUCTURAL_SLOT_TYPES.has(slot.slot_type)) {
+    return `${cs}-${day}-__structural__`;
+  }
+  if (slot.subject_id) {
+    const assignedOnClass = templatesForClass.filter((tid) =>
+      subjectIdToTemplateIds.get(slot.subject_id!)?.has(tid),
+    );
+    if (assignedOnClass.length === 1) {
+      return `${cs}-${day}-${assignedOnClass[0]}`;
+    }
+    return `${cs}-${day}-__subject__${slot.subject_id}`;
+  }
+  return `${cs}-${day}-__misc__`;
 }
 
 @Injectable()
@@ -159,16 +255,13 @@ export class TimetableService {
       .eq('branch_id', branchId)
       .eq('academic_year_id', activeYearId);
 
-    // Filter by subject template when explicitly specified.
-    // - string: return slots for that template
-    // - null: return generic (null-template) slots only
-    // - undefined: return all slots (no filtering)
-    if (subjectTemplateId !== undefined) {
-      slotsQuery =
-        subjectTemplateId === null
-          ? slotsQuery.is('subject_template_id', null)
-          : slotsQuery.eq('subject_template_id', subjectTemplateId);
+    let templateSubjectIds: string[] | null = null;
+    if (subjectTemplateId !== undefined && typeof subjectTemplateId === 'string') {
+      templateSubjectIds = await fetchSubjectIdsForSubjectTemplate(supabase, subjectTemplateId);
     }
+
+    // Filter by subject template when explicitly specified (see applySlotsQuerySubjectTemplateFilter).
+    slotsQuery = applySlotsQuerySubjectTemplateFilter(slotsQuery, subjectTemplateId, templateSubjectIds);
 
     const { data: slotsData, error: slotsError } = await slotsQuery
       .order('day_of_week', { ascending: true })
@@ -191,7 +284,7 @@ export class TimetableService {
         dayOfWeek: row.day_of_week,
         periodNumber: row.period_number ?? undefined, // Optional
         startTime: row.start_time,
-        endTime: row.end_time,
+        endTime: storedSlotEndToUserDisplay(row.end_time),
         subjectId: row.subject_id ?? undefined,
         staffId: row.staff_id ?? undefined,
         room: row.room ?? undefined,
@@ -326,22 +419,22 @@ export class TimetableService {
       )
       .in('class_section_id', uniqueIds)
       .eq('branch_id', branchId)
-      .eq('academic_year_id', activeYearId)
-      .order('day_of_week', { ascending: true })
-      .order('start_time', { ascending: true });
+      .eq('academic_year_id', activeYearId);
 
-    // Filter by subject template when explicitly specified.
-    // - string: return slots for that template
-    // - null: return generic (null-template) slots only
-    // - undefined: return all slots (no filtering)
-    if (subjectTemplateId !== undefined) {
-      slotsQuery =
-        subjectTemplateId === null
-          ? slotsQuery.is('subject_template_id', null)
-          : slotsQuery.eq('subject_template_id', subjectTemplateId);
+    let templateSubjectIdsBatch: string[] | null = null;
+    if (subjectTemplateId !== undefined && typeof subjectTemplateId === 'string') {
+      templateSubjectIdsBatch = await fetchSubjectIdsForSubjectTemplate(supabase, subjectTemplateId);
     }
 
-    const { data: slotsData, error: slotsError } = await slotsQuery;
+    slotsQuery = applySlotsQuerySubjectTemplateFilter(
+      slotsQuery,
+      subjectTemplateId,
+      templateSubjectIdsBatch,
+    );
+
+    const { data: slotsData, error: slotsError } = await slotsQuery
+      .order('day_of_week', { ascending: true })
+      .order('start_time', { ascending: true });
     throwIfDbError(slotsError);
     const slotRows = (slotsData as TimetableSlotWithRelations[]) ?? [];
 
@@ -364,7 +457,7 @@ export class TimetableService {
         dayOfWeek: row.day_of_week,
         periodNumber: row.period_number ?? undefined,
         startTime: row.start_time,
-        endTime: row.end_time,
+        endTime: storedSlotEndToUserDisplay(row.end_time),
         subjectId: row.subject_id ?? undefined,
         staffId: row.staff_id ?? undefined,
         room: row.room ?? undefined,
@@ -522,7 +615,7 @@ export class TimetableService {
         dayOfWeek: row.day_of_week,
         periodNumber: row.period_number ?? undefined, // Optional
         startTime: row.start_time,
-        endTime: row.end_time,
+        endTime: storedSlotEndToUserDisplay(row.end_time),
         subjectId: row.subject_id ?? undefined,
         staffId: row.staff_id ?? undefined,
         room: row.room ?? undefined,
@@ -572,6 +665,87 @@ export class TimetableService {
     });
   }
 
+  /**
+   * Subject templates assigned to a class via class-level and level-level mappings.
+   * Mirrors logic in StudentsService for template resolution.
+   */
+  private async fetchSubjectTemplateIdsForClass(
+    supabase: SupabaseClient,
+    branchId: string,
+    classId: string,
+  ): Promise<string[]> {
+    const ids = new Set<string>();
+
+    const { data: classAssignments, error: caError } = await supabase
+      .from('class_subject_template_assignments')
+      .select('subject_template_id')
+      .eq('class_id', classId)
+      .eq('branch_id', branchId);
+    throwIfDbError(caError);
+    for (const row of (classAssignments as Array<{ subject_template_id: string }>) ?? []) {
+      ids.add(row.subject_template_id);
+    }
+
+    const { data: levelClasses, error: lcError } = await supabase
+      .from('level_classes')
+      .select('level_id')
+      .eq('class_id', classId);
+    throwIfDbError(lcError);
+    const levelIds = [
+      ...new Set(
+        ((levelClasses as Array<{ level_id: string }>) ?? []).map((r) => r.level_id).filter(Boolean),
+      ),
+    ];
+
+    if (levelIds.length > 0) {
+      const { data: levelAssignments, error: laError } = await supabase
+        .from('level_subject_template_assignments')
+        .select('subject_template_id')
+        .in('level_id', levelIds)
+        .eq('branch_id', branchId);
+      throwIfDbError(laError);
+      for (const row of (levelAssignments as Array<{ subject_template_id: string }>) ?? []) {
+        ids.add(row.subject_template_id);
+      }
+    }
+
+    return [...ids];
+  }
+
+  /**
+   * When the client omits subjectTemplateId, stamp the slot only if exactly one assigned
+   * template for this class includes this subject (avoids guessing when a subject appears on
+   * multiple tracks, e.g. English on Science vs Commerce).
+   */
+  private async resolveSubjectTemplateIdForClassSubject(
+    supabase: SupabaseClient,
+    branchId: string,
+    classId: string,
+    subjectId: string,
+  ): Promise<string | null> {
+    const templateIds = await this.fetchSubjectTemplateIdsForClass(supabase, branchId, classId);
+    if (templateIds.length === 0) {
+      return null;
+    }
+
+    const { data: links, error } = await supabase
+      .from('subject_template_subjects')
+      .select('subject_template_id')
+      .eq('subject_id', subjectId)
+      .in('subject_template_id', templateIds);
+    throwIfDbError(error);
+
+    const matching = [
+      ...new Set(
+        ((links as Array<{ subject_template_id: string }>) ?? []).map((r) => r.subject_template_id),
+      ),
+    ];
+    if (matching.length === 1) {
+      return matching[0] ?? null;
+    }
+    return null;
+  }
+
   async createOrUpdateSlot(
     input: CreateTimetableSlotDto,
     branchId: string,
@@ -580,10 +754,11 @@ export class TimetableService {
   ): Promise<TimetableSlotDto> {
     const supabase = this.supabaseConfig.getClient();
 
-    // Validate times
-    if (parseTime(input.startTime) >= parseTime(input.endTime)) {
+    // Validate times (endTime is the exclusive display boundary; stored value is one minute earlier)
+    if (clockTimeToMinutes(input.startTime) >= clockTimeToMinutes(input.endTime)) {
       throw new BadRequestException('startTime must be before endTime');
     }
+    const storedEndTime = userSlotEndDisplayToStoredEnd(input.endTime);
 
     // Get active academic year
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
@@ -597,7 +772,7 @@ export class TimetableService {
     // Validate class-section belongs to branch
     const { data: classSection, error: csError } = await supabase
       .from('class_sections')
-      .select('id')
+      .select('id, class_id')
       .eq('id', input.classSectionId)
       .eq('branch_id', branchId)
       .eq('academic_year_id', academicYearId)
@@ -607,18 +782,54 @@ export class TimetableService {
       throw new NotFoundException('Class-section not found');
     }
 
+    const sectionRow = classSection as { id: string; class_id: string };
+
+    let existingStampedTemplateId: string | null | undefined;
+    if (input.id) {
+      const { data: stampPeek, error: stampErr } = await supabase
+        .from('timetable_slots')
+        .select('subject_template_id')
+        .eq('id', input.id)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      throwIfDbError(stampErr);
+      if (!stampPeek) {
+        throw new NotFoundException('Timetable slot not found');
+      }
+      existingStampedTemplateId = (stampPeek as { subject_template_id: string | null })
+        .subject_template_id;
+    }
+
+    const shouldAttemptTemplateResolve =
+      !input.subjectTemplateId &&
+      Boolean(input.subjectId) &&
+      input.slotType === TimetableSlotType.CLASS &&
+      (!input.id || existingStampedTemplateId === null);
+
+    let resolvedSubjectTemplateId: string | null = null;
+    if (shouldAttemptTemplateResolve && input.subjectId) {
+      resolvedSubjectTemplateId = await this.resolveSubjectTemplateIdForClassSubject(
+        supabase,
+        branchId,
+        sectionRow.class_id,
+        input.subjectId,
+      );
+    }
+
+    const effectiveSubjectTemplateId = input.subjectTemplateId ?? resolvedSubjectTemplateId ?? undefined;
+
     // Validate school day is active
     const schoolDays = await this.scheduleService.getSchoolDays();
     if (!schoolDays.data.includes(input.dayOfWeek)) {
       throw new BadRequestException(`Day ${input.dayOfWeek} is not an active school day`);
     }
 
-    // Validate subject-template if provided
-    if (input.subjectTemplateId) {
+    // Validate subject-template if provided or resolved (unambiguous)
+    if (effectiveSubjectTemplateId) {
       const { data: template, error: templateError } = await supabase
         .from('subject_templates')
         .select('id')
-        .eq('id', input.subjectTemplateId)
+        .eq('id', effectiveSubjectTemplateId)
         .eq('branch_id', branchId)
         .maybeSingle();
       throwIfDbError(templateError);
@@ -631,7 +842,7 @@ export class TimetableService {
         const { data: templateSubject, error: tsError } = await supabase
           .from('subject_template_subjects')
           .select('subject_id')
-          .eq('subject_template_id', input.subjectTemplateId)
+          .eq('subject_template_id', effectiveSubjectTemplateId)
           .eq('subject_id', input.subjectId)
           .maybeSingle();
         throwIfDbError(tsError);
@@ -664,12 +875,12 @@ export class TimetableService {
 
     // If ID is provided, update existing slot by ID (handles time changes)
     // Otherwise, use upsert based on unique constraint
-    const updateData: any = {
+    const updateData: Record<string, string | number | null> = {
       class_section_id: input.classSectionId,
       day_of_week: input.dayOfWeek,
       period_number: input.periodNumber ?? null, // Optional label
       start_time: input.startTime,
-      end_time: input.endTime,
+      end_time: storedEndTime,
       subject_id: input.subjectId ?? null,
       staff_id: input.staffId ?? null,
       room: input.room ?? null,
@@ -679,8 +890,8 @@ export class TimetableService {
       updated_at: new Date().toISOString(),
     };
 
-    if (input.subjectTemplateId) {
-      updateData.subject_template_id = input.subjectTemplateId;
+    if (effectiveSubjectTemplateId) {
+      updateData.subject_template_id = effectiveSubjectTemplateId;
     }
 
     let row: TimetableSlotRow;
@@ -746,7 +957,7 @@ export class TimetableService {
       input.classSectionId,
       branchId,
       academicYearId,
-      input.subjectTemplateId,
+      effectiveSubjectTemplateId ?? null,
     );
     
     return this.getClassTimetable(input.classSectionId, branchId, academicYearId).then(
@@ -1517,7 +1728,7 @@ export class TimetableService {
           day_of_week: day,
           period_number: periodNumber, // Optional label
           start_time: templateSlot.start_time!,
-          end_time: templateSlot.end_time!,
+          end_time: userSlotEndDisplayToStoredEnd(templateSlot.end_time!),
           subject_id: subjectId,
           staff_id: staffId,
           slot_type: slotType,
@@ -1684,6 +1895,8 @@ export class TimetableService {
     filters?: {
       classSectionId?: string;
       staffId?: string;
+      /** When set, only slots visible on the class timetable for this template are checked. */
+      subjectTemplateId?: string;
     },
   ): Promise<ConflictDto[]> {
     const supabase = this.supabaseConfig.getClient();
@@ -1717,14 +1930,16 @@ export class TimetableService {
     const { data: slots, error } = await query;
     throwIfDbError(error);
 
-    const slotsArray = (slots as TimetableSlotWithRelations[]) ?? [];
-    const conflicts: ConflictDto[] = [];
+    let slotsArray = (slots as TimetableSlotWithRelations[]) ?? [];
 
     // Fetch class-section names for better conflict messages (used by multiple conflict types)
     const classSectionIds = [
       ...new Set(slotsArray.map((s) => s.class_section_id)),
     ];
-    const classSectionMap = new Map<string, { className: string; sectionName: string }>();
+    const classSectionMap = new Map<
+      string,
+      { className: string; sectionName: string; classId: string }
+    >();
 
     if (classSectionIds.length > 0) {
       const { data: classSections, error: csError } = await supabase
@@ -1733,13 +1948,69 @@ export class TimetableService {
         .in('id', classSectionIds);
       throwIfDbError(csError);
 
-      for (const cs of (classSections as any[]) ?? []) {
+      for (const cs of (classSections as Array<{
+        id: string;
+        class_id: string;
+        section_id: string;
+        classes?: { name: string } | { name: string }[] | null;
+        sections?: { name: string } | { name: string }[] | null;
+      }>) ?? []) {
         const classData = Array.isArray(cs.classes) ? cs.classes[0] : cs.classes;
         const sectionData = Array.isArray(cs.sections) ? cs.sections[0] : cs.sections;
         classSectionMap.set(cs.id, {
           className: classData?.name ?? '',
           sectionName: sectionData?.name ?? '',
+          classId: cs.class_id,
         });
+      }
+    }
+
+    if (filters?.subjectTemplateId) {
+      const templateSubjectIds = await fetchSubjectIdsForSubjectTemplate(
+        supabase,
+        filters.subjectTemplateId,
+      );
+      slotsArray = slotsArray.filter((slot) =>
+        slotVisibleForSubjectTemplate(slot, filters.subjectTemplateId!, templateSubjectIds),
+      );
+    }
+
+    const conflicts: ConflictDto[] = [];
+
+    const uniqueClassIds = [
+      ...new Set(
+        slotsArray
+          .map((s) => classSectionMap.get(s.class_section_id)?.classId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    const templatesByClassId = new Map<string, string[]>();
+    for (const classId of uniqueClassIds) {
+      templatesByClassId.set(
+        classId,
+        await this.fetchSubjectTemplateIdsForClass(supabase, branchId, classId),
+      );
+    }
+
+    const subjectIdsForTrackResolve = [
+      ...new Set(
+        slotsArray
+          .filter((s) => !s.subject_template_id && s.slot_type === 'class' && s.subject_id)
+          .map((s) => s.subject_id as string),
+      ),
+    ];
+    const subjectIdToTemplateIds = new Map<string, Set<string>>();
+    if (subjectIdsForTrackResolve.length > 0) {
+      const { data: subjectLinks, error: linksError } = await supabase
+        .from('subject_template_subjects')
+        .select('subject_id, subject_template_id')
+        .in('subject_id', subjectIdsForTrackResolve);
+      throwIfDbError(linksError);
+      for (const row of (subjectLinks as Array<{ subject_id: string; subject_template_id: string }>) ??
+        []) {
+        const set = subjectIdToTemplateIds.get(row.subject_id) ?? new Set<string>();
+        set.add(row.subject_template_id);
+        subjectIdToTemplateIds.set(row.subject_id, set);
       }
     }
 
@@ -1839,7 +2110,7 @@ export class TimetableService {
                 className: csInfo.className,
                 sectionName: csInfo.sectionName,
                 startTime: slot.start_time,
-                endTime: slot.end_time,
+                endTime: storedSlotEndToUserDisplay(slot.end_time),
                 slotLabel: buildSlotLabel(slot),
               },
             ],
@@ -1878,7 +2149,14 @@ export class TimetableService {
             let hasOverlap = false;
             for (const slot1 of group1) {
               for (const slot2 of group2) {
-                if (timesOverlap(slot1.start_time, slot1.end_time, slot2.start_time, slot2.end_time)) {
+                if (
+                  storedTimetableSlotRangesOverlap(
+                    slot1.start_time,
+                    slot1.end_time,
+                    slot2.start_time,
+                    slot2.end_time,
+                  )
+                ) {
                   hasOverlap = true;
                   break;
                 }
@@ -1912,7 +2190,7 @@ export class TimetableService {
               className: csInfo.className,
               sectionName: csInfo.sectionName,
               startTime: slot.start_time,
-              endTime: slot.end_time,
+              endTime: storedSlotEndToUserDisplay(slot.end_time),
               slotLabel: buildSlotLabel(slot),
             };
           });
@@ -1953,9 +2231,15 @@ export class TimetableService {
     // Group overlapping slots together to avoid duplicate conflicts
     const classSectionSlotsMap = new Map<string, TimetableSlotWithRelations[]>();
     for (const slot of slotsArray) {
-      // Include subject_template_id in the key - slots with different templates don't conflict
-      const templateId = (slot as any).subject_template_id || 'null';
-      const key = `${slot.class_section_id}-${slot.day_of_week}-${templateId}`;
+      const csInfo = classSectionMap.get(slot.class_section_id);
+      const classId = csInfo?.classId;
+      if (!classId) continue;
+      const key = computeClassSectionOverlapGroupKey(
+        slot,
+        classId,
+        templatesByClassId.get(classId) ?? [],
+        subjectIdToTemplateIds,
+      );
       const existing = classSectionSlotsMap.get(key) ?? [];
       existing.push(slot);
       classSectionSlotsMap.set(key, existing);
@@ -1981,7 +2265,14 @@ export class TimetableService {
             let hasOverlap = false;
             for (const slot1 of group1) {
               for (const slot2 of group2) {
-                if (timesOverlap(slot1.start_time, slot1.end_time, slot2.start_time, slot2.end_time)) {
+                if (
+                  storedTimetableSlotRangesOverlap(
+                    slot1.start_time,
+                    slot1.end_time,
+                    slot2.start_time,
+                    slot2.end_time,
+                  )
+                ) {
                   hasOverlap = true;
                   break;
                 }
@@ -2013,7 +2304,7 @@ export class TimetableService {
             className: csInfo.className,
             sectionName: csInfo.sectionName,
             startTime: slot.start_time,
-            endTime: slot.end_time,
+            endTime: storedSlotEndToUserDisplay(slot.end_time),
             slotLabel: buildSlotLabel(slot),
           }));
 

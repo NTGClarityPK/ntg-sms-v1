@@ -153,6 +153,7 @@ interface ConflictFilters {
   classSectionId?: string;
   staffId?: string;
   academicYearId?: string;
+  subjectTemplateId?: string;
 }
 
 export function useConflicts(filters?: ConflictFilters) {
@@ -167,6 +168,9 @@ export function useConflicts(filters?: ConflictFilters) {
       if (filters?.classSectionId) queryParams.append('classSectionId', filters.classSectionId);
       if (filters?.staffId) queryParams.append('staffId', filters.staffId);
       if (filters?.academicYearId) queryParams.append('academicYearId', filters.academicYearId);
+      if (filters?.subjectTemplateId) {
+        queryParams.append('subjectTemplateId', filters.subjectTemplateId);
+      }
 
       const response = await apiClient.get<Conflict[]>(
         `/api/v1/timetable/conflicts${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,
@@ -317,6 +321,24 @@ export function useCheckSlotConflict() {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
 
+  const parseSlotTimeToMinutes = (t: string): number => {
+    const [h, m] = t.split(':').map((x) => parseInt(x, 10));
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  const halfOpenIntervalsOverlap = (
+    aStart: string,
+    aEnd: string,
+    bStart: string,
+    bEnd: string,
+  ): boolean => {
+    const sA = parseSlotTimeToMinutes(aStart);
+    const eA = parseSlotTimeToMinutes(aEnd);
+    const sB = parseSlotTimeToMinutes(bStart);
+    const eB = parseSlotTimeToMinutes(bEnd);
+    return sA < eB && sB < eA;
+  };
+
   return async (slot: Partial<CreateTimetableSlotInput>): Promise<boolean> => {
     if (!branchId || !slot.startTime || !slot.endTime || !slot.staffId) {
       return false;
@@ -339,15 +361,14 @@ export function useCheckSlotConflict() {
         if (conflict.dayOfWeek !== slot.dayOfWeek) return false;
         
         // Check if times overlap
-        return conflict.conflictingSlots.some((cs) => {
-          const slotStart = slot.startTime!;
-          const slotEnd = slot.endTime!;
-          const conflictStart = cs.startTime;
-          const conflictEnd = cs.endTime;
-          
-          // Times overlap if: slotStart < conflictEnd && slotEnd > conflictStart
-          return slotStart < conflictEnd && slotEnd > conflictStart;
-        });
+        return conflict.conflictingSlots.some((cs) =>
+          halfOpenIntervalsOverlap(
+            slot.startTime!,
+            slot.endTime!,
+            cs.startTime,
+            cs.endTime,
+          ),
+        );
       });
     } catch {
       // If check fails, don't block user - return false (no conflict detected)

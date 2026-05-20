@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Title,
@@ -16,12 +16,15 @@ import {
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useClassSections } from '@/hooks/useClassSections';
+import { useMyStaff } from '@/hooks/useStaff';
+import { useAuth } from '@/hooks/useAuth';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ClassTimetableContent } from '@/components/features/timetable/ClassTimetableContent';
 
 export default function TimetablePage() {
   const t = useTranslations('timetable');
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
   const colors = useThemeColors();
@@ -32,22 +35,68 @@ export default function TimetablePage() {
   } = useActiveAcademicYear();
   const activeYear = activeYearResponse?.data ?? null;
   const activeYearId = activeYear?.id;
+
+  const isSuperAdmin =
+    user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'super_admin') ?? false;
+  /** Same roles as Sidebar `canManageTimetable` — sees every class-section in the dropdown. */
+  const seesAllBranchClassSections =
+    isSuperAdmin ||
+    (user?.roles?.some((r) => {
+      const n = (r.roleName ?? '').toLowerCase();
+      return n === 'school_admin' || n === 'principal' || n === 'academic_coordinator';
+    }) ??
+      false);
+  const isTeachingStaff =
+    user?.roles?.some((r) => {
+      const n = (r.roleName ?? '').toLowerCase();
+      return n === 'class_teacher' || n === 'subject_teacher';
+    }) ?? false;
+
+  const scopeClassSectionsToTeachingStaff =
+    isTeachingStaff && !seesAllBranchClassSections;
+
+  const {
+    data: myStaffPayload,
+    isLoading: isLoadingMyStaff,
+  } = useMyStaff();
+  const myStaffRecord = myStaffPayload?.data ?? null;
+
+  const classSectionsParams = useMemo(() => {
+    if (!activeYearId) return null;
+    const base = {
+      isActive: true,
+      minimal: true,
+      academicYearId: activeYearId,
+      page: 1,
+      limit: 500,
+    } as const;
+    if (scopeClassSectionsToTeachingStaff && myStaffRecord?.id) {
+      return {
+        ...base,
+        classTeacherId: myStaffRecord.id,
+      };
+    }
+    if (scopeClassSectionsToTeachingStaff) {
+      return null;
+    }
+    return base;
+  }, [
+    activeYearId,
+    scopeClassSectionsToTeachingStaff,
+    myStaffRecord?.id,
+  ]);
+
+  const classSectionsQueryEnabled =
+    !!activeYearId && classSectionsParams !== null && (!scopeClassSectionsToTeachingStaff || !!myStaffRecord?.id);
+
   const {
     data: classSectionsData,
     isLoading: isLoadingClassSections,
     error: classSectionsError,
   } = useClassSections(
-    activeYearId
-      ? {
-          isActive: true,
-          minimal: true,
-          academicYearId: activeYearId,
-        }
-      : {
-          isActive: true,
-          minimal: true,
-          enabled: false,
-        },
+    classSectionsParams
+      ? { ...classSectionsParams, enabled: classSectionsQueryEnabled }
+      : { isActive: true, minimal: true, enabled: false },
   );
 
   const classSections = classSectionsData?.data || [];
@@ -63,6 +112,15 @@ export default function TimetablePage() {
       setSelectedClassSectionId(classSectionIdFromQuery);
     }
   }, [searchParams, classSections]);
+
+  useEffect(() => {
+    if (!selectedClassSectionId) return;
+    if (classSections.length === 0) return;
+    const stillVisible = classSections.some((cs) => cs.id === selectedClassSectionId);
+    if (!stillVisible) {
+      setSelectedClassSectionId(null);
+    }
+  }, [classSections, selectedClassSectionId]);
 
   const classSectionOptions = classSections
     .sort((a, b) => {
@@ -81,11 +139,27 @@ export default function TimetablePage() {
       label: `${cs.className || cs.classDisplayName || t('unknown')} - ${cs.sectionName || t('unknown')}`,
     }));
 
-  if (isLoadingActiveYear || isLoadingClassSections) {
+  const selectedClassSectionLabel = useMemo(() => {
+    if (!selectedClassSectionId) return null;
+    const cs = classSections.find((c) => c.id === selectedClassSectionId);
+    if (!cs) return null;
+    return `${cs.className || cs.classDisplayName || t('unknown')} - ${cs.sectionName || t('unknown')}`;
+  }, [selectedClassSectionId, classSections, t]);
+
+  const timetablePageTitle = selectedClassSectionLabel
+    ? t('pageTitleWithClassSection', { title: t('title'), classSection: selectedClassSectionLabel })
+    : t('title');
+
+  const timetablePageLoadingSections =
+    isLoadingActiveYear ||
+    (scopeClassSectionsToTeachingStaff && isLoadingMyStaff) ||
+    isLoadingClassSections;
+
+  if (timetablePageLoadingSections) {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>{t('title')}</Title>
+          <Title order={1}>{timetablePageTitle}</Title>
         </div>
         <div
           style={{
@@ -109,7 +183,7 @@ export default function TimetablePage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>{t('title')}</Title>
+          <Title order={1}>{timetablePageTitle}</Title>
         </div>
         <div
           style={{
@@ -133,11 +207,38 @@ export default function TimetablePage() {
     );
   }
 
+  if (
+    scopeClassSectionsToTeachingStaff &&
+    !isLoadingMyStaff &&
+    !myStaffRecord
+  ) {
+    return (
+      <>
+        <div className="page-title-bar">
+          <Title order={1}>{timetablePageTitle}</Title>
+        </div>
+        <div
+          style={{
+            marginTop: '60px',
+            paddingLeft: 'var(--mantine-spacing-md)',
+            paddingRight: 'var(--mantine-spacing-md)',
+            paddingTop: 'var(--mantine-spacing-sm)',
+            paddingBottom: 'var(--mantine-spacing-xl)',
+          }}
+        >
+          <Alert color={colors.info} title={t('noStaffRecord')}>
+            <Text size="sm">{t('noStaffRecordMessage')}</Text>
+          </Alert>
+        </div>
+      </>
+    );
+  }
+
   if (classSectionsError) {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>{t('title')}</Title>
+          <Title order={1}>{timetablePageTitle}</Title>
         </div>
         <div
           style={{
@@ -160,7 +261,7 @@ export default function TimetablePage() {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>{t('title')}</Title>
+          <Title order={1}>{timetablePageTitle}</Title>
         </div>
         <div
           style={{
@@ -173,7 +274,9 @@ export default function TimetablePage() {
         >
           <Paper p="md" withBorder>
             <Text c="dimmed" ta="center">
-              {t('noActiveClassSections')}
+              {scopeClassSectionsToTeachingStaff
+                ? t('noClassSectionsAssignedToTeacher')
+                : t('noActiveClassSections')}
             </Text>
           </Paper>
         </div>
@@ -184,7 +287,7 @@ export default function TimetablePage() {
   return (
     <>
       <div className="page-title-bar">
-        <Title order={1}>{t('title')}</Title>
+        <Title order={1}>{timetablePageTitle}</Title>
       </div>
       <div className="page-sub-title-bar" />
       <div

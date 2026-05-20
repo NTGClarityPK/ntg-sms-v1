@@ -7,6 +7,7 @@ import { useThemeStore } from '@/lib/store/theme-store';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { generateThemeConfig } from '@/lib/theme/themeConfig';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
+import { isAuthPathname } from '@/lib/utils/auth-pathname';
 
 /**
  * Provider that applies theme styles to all components
@@ -22,8 +23,24 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
   const { primaryColor: storeColor, themeVersion } = useThemeStore();
   const { isDark } = useTheme();
   
-  // Check if we're on an auth page - don't apply theme to auth pages
-  const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/signup');
+  // Public auth routes: never apply portal-wide !important overrides (see cleanup effect below).
+  const isAuthPage = isAuthPathname(pathname);
+
+  // After SPA navigation from the app, `#mantine-theme-override` can still contain rules like
+  // `.mantine-Text-root { color: … !important }` which override `c="white"` on the auth hero.
+  // Full page load on /login never injects those rules; this matches that behaviour.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!isAuthPage) return;
+
+    const styleElement = document.getElementById('mantine-theme-override');
+    if (styleElement) {
+      styleElement.textContent = '';
+    }
+    document.body.style.removeProperty('background-color');
+    document.body.style.removeProperty('color');
+    document.body.style.removeProperty('font-family');
+  }, [isAuthPage]);
   
   // Get theme config from Mantine theme as fallback
   const mantineThemeConfig = (theme.other as any) as ThemeConfig | undefined;

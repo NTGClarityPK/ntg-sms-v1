@@ -167,7 +167,7 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
             title={t('todaySlots')}
             value={todaySlotsCount}
             icon={IconCalendar}
-            href="/my-timetable"
+            href="/my-schedule"
           />
           <DashboardStatCard
             id="dashboard-stat-unread"
@@ -216,7 +216,7 @@ export function TeacherDashboardOverview({ user }: TeacherDashboardOverviewProps
         <Grid.Col span={{ base: 12, md: 4 }}>
           <Paper
             component={Link}
-            href="/my-timetable"
+            href="/my-schedule"
             id="dashboard-panel-today-schedule"
             p="md"
             withBorder

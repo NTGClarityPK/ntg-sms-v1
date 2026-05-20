@@ -1,9 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Paper, Text, Group } from '@mantine/core';
+import { useMemo, useState } from 'react';
+import { Paper, Text, Group, ActionIcon, Tooltip } from '@mantine/core';
+import { IconPlus, IconMinus } from '@tabler/icons-react';
+import { useTranslations } from 'next-intl';
 import type { TimetableSlot, Conflict, TimingTemplateInfo } from '@/types/timetable';
 import { TimetableSlotComponent } from './TimetableSlot';
+
+const BASE_ROW_HEIGHT = 80;
+const MIN_ZOOM_LEVEL = 1;
+const MAX_ZOOM_LEVEL = 5;
 
 interface TimetableGridProps {
   classSectionId: string;
@@ -12,6 +18,8 @@ interface TimetableGridProps {
   templateInfo?: TimingTemplateInfo | null;
   conflicts?: Conflict[];
   isLoading?: boolean;
+  /** When true, class/section name is omitted on slot cards (single-section timetable). */
+  hideClassSectionOnSlots?: boolean;
 }
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -112,36 +120,30 @@ export function TimetableGrid({
   templateInfo,
   conflicts,
   isLoading,
+  hideClassSectionOnSlots = false,
 }: TimetableGridProps) {
-  // If no timing template is available, we can't build a proper vertical timeline
-  if (!templateInfo) {
-    return (
-      <Paper withBorder p="md">
-        <Text size="sm">
-          No timing template is assigned to this class. Please assign one in Schedule Settings to
-          see the vertical timetable.
-        </Text>
-      </Paper>
-    );
-  }
+  const t = useTranslations('timetable');
+  const [zoomLevel, setZoomLevel] = useState(MIN_ZOOM_LEVEL);
 
-  // Time calculations based on timing template
   const schoolStartMinutes = useMemo(
-    () => parseTimeToMinutes(templateInfo.startTime),
-    [templateInfo.startTime],
+    () => (templateInfo ? parseTimeToMinutes(templateInfo.startTime) : 0),
+    [templateInfo?.startTime],
   );
   const schoolEndMinutes = useMemo(
-    () => parseTimeToMinutes(templateInfo.endTime),
-    [templateInfo.endTime],
+    () => (templateInfo ? parseTimeToMinutes(templateInfo.endTime) : 0),
+    [templateInfo?.endTime],
   );
+  const periodMinutes = templateInfo?.periodDurationMinutes || 60;
   const totalMinutes = Math.max(schoolEndMinutes - schoolStartMinutes, 0);
-  const periodMinutes = templateInfo.periodDurationMinutes || 60;
-  const rowCount = Math.max(Math.ceil(totalMinutes / periodMinutes), 1);
+  const rowCount = useMemo(
+    () => Math.max(Math.ceil(totalMinutes / periodMinutes), 1),
+    [totalMinutes, periodMinutes],
+  );
 
-  const ROW_HEIGHT = 80; // px per logical period row (taller for better readability)
-  const laneHeight = rowCount * ROW_HEIGHT;
+  const rowHeight = BASE_ROW_HEIGHT * zoomLevel;
+  const laneHeight = rowCount * rowHeight;
+  const compactHeightThreshold = 56 * zoomLevel;
 
-  // Build time labels at each period boundary
   const timeRows = useMemo(
     () =>
       Array.from({ length: rowCount + 1 }, (_, i) => schoolStartMinutes + i * periodMinutes).filter(
@@ -150,19 +152,16 @@ export function TimetableGrid({
     [rowCount, schoolStartMinutes, schoolEndMinutes, periodMinutes],
   );
 
-  // Active days (columns)
   const activeDays = useMemo(() => {
     const daysFromSlots = Array.from(new Set(slots.map((s) => s.dayOfWeek))).sort();
     if (daysFromSlots.length === 0) {
-      return [1, 2, 3, 4, 5]; // Default to Monday-Friday
+      return [1, 2, 3, 4, 5];
     }
-    // Ensure we show all school days (Monday-Friday) even if no slots exist
     const allSchoolDays = [1, 2, 3, 4, 5];
     const result = new Set([...daysFromSlots, ...allSchoolDays]);
     return Array.from(result).sort();
   }, [slots]);
 
-  // Group slots by day
   const slotsByDay = useMemo(() => {
     const map = new Map<number, TimetableSlot[]>();
     slots.forEach((slot) => {
@@ -173,7 +172,6 @@ export function TimetableGrid({
     return map;
   }, [slots]);
 
-  // Conflict slot IDs
   const conflictSlotIds = useMemo(() => {
     const ids = new Set<string>();
     conflicts?.forEach((conflict) => {
@@ -183,6 +181,17 @@ export function TimetableGrid({
   }, [conflicts]);
 
   const overlapColumnLayout = useMemo(() => buildOverlapColumnLayout(slots), [slots]);
+
+  if (!templateInfo) {
+    return (
+      <Paper withBorder p="md">
+        <Text size="sm">
+          No timing template is assigned to this class. Please assign one in Schedule Settings to
+          see the vertical timetable.
+        </Text>
+      </Paper>
+    );
+  }
 
   const minutesToOffset = (minutes: number): number => {
     if (totalMinutes <= 0) return 0;
@@ -213,6 +222,32 @@ export function TimetableGrid({
 
   return (
     <Paper withBorder p="md">
+      <Group justify="flex-start" gap="xs" mb="sm">
+        <Tooltip label={t('zoomOutTooltip')}>
+          <ActionIcon
+            variant="light"
+            radius="xl"
+            size="md"
+            aria-label={t('zoomOut')}
+            disabled={zoomLevel <= MIN_ZOOM_LEVEL}
+            onClick={() => setZoomLevel((z) => Math.max(MIN_ZOOM_LEVEL, z - 1))}
+          >
+            <IconMinus size={16} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label={t('zoomInTooltip')}>
+          <ActionIcon
+            variant="light"
+            radius="xl"
+            size="md"
+            aria-label={t('zoomIn')}
+            disabled={zoomLevel >= MAX_ZOOM_LEVEL}
+            onClick={() => setZoomLevel((z) => Math.min(MAX_ZOOM_LEVEL, z + 1))}
+          >
+            <IconPlus size={16} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
       <div
         style={{
           display: 'grid',
@@ -266,8 +301,8 @@ export function TimetableGrid({
                   borderLeft: '1px solid var(--mantine-color-gray-3)',
                   borderRight: '1px solid var(--mantine-color-gray-3)',
                   background: `repeating-linear-gradient(to bottom, transparent, transparent ${
-                    ROW_HEIGHT - 1
-                  }px, var(--mantine-color-gray-1) ${ROW_HEIGHT}px)`,
+                    rowHeight - 1
+                  }px, var(--mantine-color-gray-1) ${rowHeight}px)`,
                   cursor: 'pointer',
                 }}
                 onClick={(e) => handleLaneClick(day, e)}
@@ -282,10 +317,10 @@ export function TimetableGrid({
                     (endMinutes - schoolStartMinutes) % periodMinutes === 0;
 
                   const top = alignsToGrid
-                    ? ((startMinutes - schoolStartMinutes) / periodMinutes) * ROW_HEIGHT
+                    ? ((startMinutes - schoolStartMinutes) / periodMinutes) * rowHeight
                     : minutesToOffset(startMinutes);
                   const bottom = alignsToGrid
-                    ? ((endMinutes - schoolStartMinutes) / periodMinutes) * ROW_HEIGHT
+                    ? ((endMinutes - schoolStartMinutes) / periodMinutes) * rowHeight
                     : minutesToOffset(endMinutes);
                   const height = Math.max(bottom - top, 24);
                   const overlapInfo = overlapColumnLayout.get(slot.id) ?? { index: 0, count: 1 };
@@ -294,9 +329,7 @@ export function TimetableGrid({
                   // Only show conflict styling when backend reports a conflict for this slot.
                   const hasConflict = conflictSlotIds.has(slot.id);
 
-                  // Calculate duration to determine if compact layout needed
-                  const durationMinutes = endMinutes - startMinutes;
-                  const isCompact = durationMinutes < 15 || height < 50;
+                  const isCompact = height < compactHeightThreshold;
 
                   return (
                     <div
@@ -329,6 +362,7 @@ export function TimetableGrid({
                         showConflict={hasConflict}
                         height={height}
                         periodNumber={!isCompact ? slot.periodNumber : undefined}
+                        hideClassSectionLabel={hideClassSectionOnSlots}
                       />
                     </div>
                   );

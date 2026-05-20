@@ -13,7 +13,7 @@ import {
   useMantineColorScheme,
   useMantineTheme,
 } from '@mantine/core';
-import { useMyTimetable, useStudentTimetable, useTimingTemplateInfo } from '@/hooks/useTimetable';
+import { useStudentTimetable, useTimingTemplateInfo } from '@/hooks/useTimetable';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useStudentTemplate } from '@/hooks/useSubjectTemplates';
@@ -34,14 +34,14 @@ import { useTranslations } from 'next-intl';
 import { TimetableGrid } from '@/components/features/timetable/TimetableGrid';
 import { useMyStudent } from '@/hooks/useStudents';
 import { useClassSections } from '@/hooks/useClassSections';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDisclosure } from '@mantine/hooks';
 import type { TimetableSlot } from '@/types/timetable';
 import { IconX, IconClock } from '@tabler/icons-react';
-import { TeacherWeekView } from '@/components/features/timetable/TeacherWeekView';
-import { useMyStaff } from '@/hooks/useStaff';
 
 export default function MyTimetablePage() {
+  const router = useRouter();
   const t = useTranslations('timetable');
   const colors = useThemeColors();
   const theme = useMantineTheme();
@@ -58,6 +58,40 @@ export default function MyTimetablePage() {
       const roleName = r.roleName?.toLowerCase();
       return roleName === 'student';
     }) || false;
+
+  useLayoutEffect(() => {
+    if (!user) return;
+    if (isTeacher && !isStudent) {
+      router.replace('/my-schedule');
+    }
+  }, [user, isTeacher, isStudent, router]);
+
+  if (user && isTeacher && !isStudent) {
+    return (
+      <>
+        <div className="page-title-bar">
+          <Group justify="space-between" w="100%">
+            <Title order={1}>{t('mySchedule')}</Title>
+          </Group>
+        </div>
+        <div
+          style={{
+            marginTop: '60px',
+            paddingLeft: 'var(--mantine-spacing-md)',
+            paddingRight: 'var(--mantine-spacing-md)',
+            paddingTop: 'var(--mantine-spacing-sm)',
+            paddingBottom: 'var(--mantine-spacing-xl)',
+          }}
+        >
+          <Stack gap="md">
+            <Skeleton height={40} width="30%" />
+            <Skeleton height={400} />
+          </Stack>
+        </div>
+      </>
+    );
+  }
+
   const { data: activeYearResponse } = useActiveAcademicYear();
   const activeYear = activeYearResponse?.data ?? null;
   const activeYearId = activeYear?.id;
@@ -80,13 +114,6 @@ export default function MyTimetablePage() {
   // Get current student
   const { data: myStudentData, isLoading: myStudentLoading, error: myStudentError } = useMyStudent();
   const studentId = myStudentData?.data?.id;
-
-  // Teacher personal timetable (for class/subject teachers)
-  const { data: myStaffData, isLoading: myStaffLoading } = useMyStaff();
-  const myStaff = myStaffData?.data ?? null;
-  const { data: teacherTimetableResponse, isLoading: teacherTimetableLoading, error: teacherTimetableError } =
-    useMyTimetable(activeYearId);
-  const teacherTimetable = teacherTimetableResponse?.data ?? null;
 
   // Get student's template assignment
   const { data: templateData, isLoading: templateLoading } = useStudentTemplate(
@@ -272,56 +299,6 @@ export default function MyTimetablePage() {
       clearInterval(interval);
     };
   }, [timetable?.slots]);
-
-  // Teacher view: show personal timetable grid (uses separate backend endpoint)
-  if (isTeacher && !isStudent) {
-    return (
-      <>
-        <div className="page-title-bar">
-          <Group justify="space-between" w="100%">
-            <Title order={1}>{t('myTimetable')}</Title>
-          </Group>
-        </div>
-        <div
-          style={{
-            marginTop: '60px',
-            paddingLeft: 'var(--mantine-spacing-md)',
-            paddingRight: 'var(--mantine-spacing-md)',
-            paddingTop: 'var(--mantine-spacing-sm)',
-            paddingBottom: 'var(--mantine-spacing-xl)',
-          }}
-        >
-          {myStaffLoading || teacherTimetableLoading || !myStaffData || !teacherTimetableResponse ? (
-            <Stack gap="md">
-              <Skeleton height={40} width="30%" />
-              <Skeleton height={400} />
-            </Stack>
-          ) : !myStaff ? (
-            <Alert color={colors.info} title={t('noStaffRecord')}>
-              <Text size="sm">{t('noStaffRecordMessage')}</Text>
-            </Alert>
-          ) : teacherTimetableError ? (
-            <Alert color={colors.error} title={t('errorLoadingTimetable')}>
-              <Text size="sm">
-                {teacherTimetableError instanceof Error ? teacherTimetableError.message : t('unknown')}
-              </Text>
-            </Alert>
-          ) : !teacherTimetable || teacherTimetable.slots.length === 0 ? (
-            <Alert color={colors.info} title={t('noTimetableSlots')}>
-              <Text size="sm">{t('noTimetableSlotsMessage')}</Text>
-            </Alert>
-          ) : (
-            <TeacherWeekView
-              staffId={teacherTimetable.staffId}
-              slots={teacherTimetable.slots}
-              freePeriods={teacherTimetable.freePeriods}
-              isLoading={teacherTimetableLoading}
-            />
-          )}
-        </div>
-      </>
-    );
-  }
 
   // Loading state: show page as soon as student, timetable and class-section are ready.
   // Template info loads after classSectionId; we show the grid area as skeleton until then so the card doesn't hang.

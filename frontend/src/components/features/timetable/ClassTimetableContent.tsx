@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Text,
   Stack,
@@ -11,7 +10,7 @@ import {
   Alert,
   Alert as MantineAlert,
 } from '@mantine/core';
-import { IconArrowLeft, IconPlus, IconCopy, IconCopyCheck, IconCopyOff } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconCopy, IconCopyOff } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
@@ -24,25 +23,24 @@ import {
   useCheckSlotConflict,
   useTimingTemplateInfo,
   useReplicateDay,
-  useReplicateAcrossSections,
   useReplicateFromSection,
   useConflicts,
 } from '@/hooks/useTimetable';
-import { useQueries } from '@tanstack/react-query';
 import { useTemplatesForClass } from '@/hooks/useSubjectTemplates';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TimetableGrid } from '@/components/features/timetable/TimetableGrid';
 import { SlotEditPopover } from '@/components/features/timetable/SlotEditPopover';
 import { TemplateInfoBanner } from '@/components/features/timetable/TemplateInfoBanner';
 import { useDisclosure } from '@mantine/hooks';
-import { Select, Modal, MultiSelect } from '@mantine/core';
+import { Select, Modal, MultiSelect, Tooltip, Box } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useSchoolDays } from '@/hooks/useScheduleSettings';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { TimetableSlot, CreateTimetableSlotInput, ClassTimetable } from '@/types/timetable';
-import { apiClient } from '@/lib/api-client';
 import { TemplateSwitcher } from '@/components/features/timetable/TemplateSwitcher';
+import { SlotDetailsReadOnlyModal } from '@/components/features/timetable/SlotDetailsReadOnlyModal';
 
 interface ClassTimetableContentProps {
   classSectionId: string | null;
@@ -57,7 +55,6 @@ export function ClassTimetableContent({
   classSectionId,
   showHeaderActions = false,
 }: ClassTimetableContentProps) {
-  const router = useRouter();
   const colors = useThemeColors();
   const t = useTranslations('timetable');
   const [selectedSlot, setSelectedSlot] = useState<TimetableSlot | null>(null);
@@ -68,6 +65,10 @@ export function ClassTimetableContent({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
+  const { canEdit, isLoading: permissionsLoading } = usePermissions();
+  const canEditTimetable = canEdit('timetable_management');
+  const [slotDetailsModalOpened, { open: openSlotDetailsModal, close: closeSlotDetailsModal }] =
+    useDisclosure(false);
 
   const { data: classSectionData, isLoading: classSectionLoading, error: classSectionError } =
     useClassSection(classSectionId ?? '');
@@ -111,16 +112,11 @@ export function ClassTimetableContent({
   const generateMutation = useGenerateTimetable();
   const checkConflict = useCheckSlotConflict();
   const replicateDayMutation = useReplicateDay();
-  const replicateAcrossSectionsMutation = useReplicateAcrossSections();
   const replicateFromSectionMutation = useReplicateFromSection();
   const { data: schoolDaysData } = useSchoolDays();
   const { data: activeYear } = useActiveAcademicYear();
   const [replicateModalOpened, { open: openReplicateModal, close: closeReplicateModal }] =
     useDisclosure(false);
-  const [
-    replicateAcrossSectionsModalOpened,
-    { open: openReplicateAcrossSectionsModal, close: closeReplicateAcrossSectionsModal },
-  ] = useDisclosure(false);
   const [
     replicateFromSectionModalOpened,
     { open: openReplicateFromSectionModal, close: closeReplicateFromSectionModal },
@@ -129,32 +125,8 @@ export function ClassTimetableContent({
     useDisclosure(false);
   const [sourceDay, setSourceDay] = useState<number | null>(null);
   const [targetDays, setTargetDays] = useState<number[]>([]);
-  const [targetSectionIds, setTargetSectionIds] = useState<string[]>([]);
   const [sourceSectionId, setSourceSectionId] = useState<string | null>(null);
   const [sourceTemplateId, setSourceTemplateId] = useState<string | null>(null);
-
-  // Fetch all class sections with the same classId (excluding current) for replicate to other sections.
-  // Pass academicYearId so backend skips getActiveForBranch and responds faster.
-  const { data: allClassSectionsData } = useClassSections({
-    classId: classId ?? undefined,
-    isActive: true,
-    minimal: true,
-    academicYearId: activeYear?.data?.id,
-  });
-  const allClassSections = allClassSectionsData?.data ?? [];
-  const otherSections = allClassSections
-    .filter((cs) => cs.id !== classSectionId)
-    .sort((a, b) => {
-      // Sort by class sort order first, then by section sort order
-      const classOrderA = a.classSortOrder ?? 999;
-      const classOrderB = b.classSortOrder ?? 999;
-      if (classOrderA !== classOrderB) {
-        return classOrderA - classOrderB;
-      }
-      const sectionOrderA = a.sectionSortOrder ?? 999;
-      const sectionOrderB = b.sectionSortOrder ?? 999;
-      return sectionOrderA - sectionOrderB;
-    });
 
   // Fetch all active class sections for copying from other sections
   const { data: allActiveSectionsData } = useClassSections({
@@ -227,13 +199,16 @@ export function ClassTimetableContent({
   const { data: conflictsResponse } = useConflicts({
     classSectionId: classSectionId ?? undefined,
     academicYearId: activeYear?.data?.id,
+    subjectTemplateId: selectedTemplateId ?? undefined,
   });
 
   const conflictsForGrid = useMemo(() => {
     const all = conflictsResponse?.data ?? [];
     const slotIds = new Set((timetable?.slots ?? []).map((s) => s.id));
     if (slotIds.size === 0) return [];
-    return all.filter((c) => c.slotIds.some((id) => slotIds.has(id)));
+    return all.filter(
+      (c) => c.slotIds.length > 0 && c.slotIds.every((id) => slotIds.has(id)),
+    );
   }, [conflictsResponse?.data, timetable?.slots]);
 
   const handleSlotClick = (
@@ -242,11 +217,34 @@ export function ClassTimetableContent({
     timeRange: string,
     target: HTMLElement,
   ) => {
-    setSelectedSlot(slot);
+    if (permissionsLoading) return;
+
     setSelectedDay(day);
     setSelectedTimeRange(timeRange);
-    setPopoverTarget(target);
-    openPopover();
+
+    if (!slot && !canEditTimetable) {
+      notifications.show({
+        title: t('cannotEditSlotsTitle'),
+        message: t('cannotEditSlotsMessage'),
+        color: colors.primary,
+      });
+      return;
+    }
+
+    setSelectedSlot(slot);
+
+    if (!slot) {
+      setPopoverTarget(target);
+      openPopover();
+      return;
+    }
+
+    if (canEditTimetable) {
+      setPopoverTarget(target);
+      openPopover();
+    } else {
+      openSlotDetailsModal();
+    }
   };
 
   const handleConflictCheck = async (slotInput: Partial<CreateTimetableSlotInput>): Promise<boolean> => {
@@ -289,19 +287,16 @@ export function ClassTimetableContent({
     const targetDayNames = targetDays.map((d) => dayNames[d] || `Day ${d}`).join(', ');
 
     modals.openConfirmModal({
-      title: 'Confirm Day Replication',
+      title: t('confirmCopyDayTitle'),
       children: (
         <Text size="sm">
-          This action will replace all timetable slots on the selected target day(s) ({targetDayNames})
-          that match the time ranges from the source day ({sourceDayName}). Any existing slots with
-          matching times will be overwritten, while slots with different time ranges will remain
-          unchanged.
-          <br />
-          <br />
-          Are you sure you want to proceed?
+          {t('confirmCopyDayMessage', {
+            targetDayNames,
+            sourceDayName,
+          })}
         </Text>
       ),
-      labels: { confirm: 'Replicate', cancel: 'Cancel' },
+      labels: { confirm: t('copy'), cancel: t('cancel') },
       confirmProps: { color: colors.primary },
       onConfirm: () => {
         replicateDayMutation.mutate(
@@ -317,71 +312,6 @@ export function ClassTimetableContent({
               closeReplicateModal();
               setSourceDay(null);
               setTargetDays([]);
-            },
-          },
-        );
-      },
-    });
-  };
-
-  const handleReplicateAcrossSections = async () => {
-    if (!classSectionId || targetSectionIds.length === 0) {
-      notifications.show({
-        title: t('error'),
-        message: t('pleaseSelectTargetSection'),
-        color: colors.error,
-      });
-      return;
-    }
-
-    const sourceSectionName = classSection
-      ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
-      : 'this section';
-    const targetSectionNames = otherSections
-      .filter((cs) => targetSectionIds.includes(cs.id))
-      .map((cs) => `${cs.classDisplayName || cs.className || 'Unknown'} - ${cs.sectionName || 'Unknown'}`)
-      .join(', ');
-
-    modals.openConfirmModal({
-      title: t('confirmReplicationAcrossSections'),
-      children: (
-        <Stack gap="md">
-          <Text size="sm">
-            {t('confirmReplicationAcrossMessage', {
-              sourceSectionName,
-              targetSectionNames,
-            })}
-          </Text>
-          <MantineAlert
-            icon={<IconAlertTriangle size={16} />}
-            color="yellow"
-            variant="light"
-            title={t('warning')}
-          >
-            <Text size="sm">
-              {t('confirmReplicationAcrossMessage', {
-                sourceSectionName,
-                targetSectionNames,
-              })}
-            </Text>
-          </MantineAlert>
-          <Text size="sm">{t('areYouSureProceed')}</Text>
-        </Stack>
-      ),
-      labels: { confirm: t('replicate'), cancel: t('cancel') },
-      confirmProps: { color: colors.primary },
-      onConfirm: () => {
-        replicateAcrossSectionsMutation.mutate(
-          {
-            sourceClassSectionId: classSectionId,
-            targetClassSectionIds: targetSectionIds,
-            academicYearId: activeYear?.data?.id,
-            subjectTemplateId: selectedTemplateId ?? undefined,
-          },
-          {
-            onSuccess: () => {
-              closeReplicateAcrossSectionsModal();
-              setTargetSectionIds([]);
             },
           },
         );
@@ -506,27 +436,18 @@ export function ClassTimetableContent({
             />
           )}
           <Group>
-            <Button
-              leftSection={<IconCopy size={18} />}
-              onClick={openReplicateModal}
-              disabled={!classId || !timetable || timetable.slots.length === 0}
-              variant="light"
-            >
-              {t('replicateDay')}
-            </Button>
-            <Button
-              leftSection={<IconCopyCheck size={18} />}
-              onClick={openReplicateAcrossSectionsModal}
-              disabled={
-                !classId ||
-                !timetable ||
-                timetable.slots.length === 0 ||
-                otherSections.length === 0
-              }
-              variant="light"
-            >
-              {t('replicateToOtherSections')}
-            </Button>
+            <Tooltip label={t('copyDayButtonTooltip')}>
+              <Box component="span" style={{ display: 'inline-block' }}>
+                <Button
+                  leftSection={<IconCopy size={18} />}
+                  onClick={openReplicateModal}
+                  disabled={!classId || !timetable || timetable.slots.length === 0}
+                  variant="light"
+                >
+                  {t('replicateDay')}
+                </Button>
+              </Box>
+            </Tooltip>
             <Button
               leftSection={<IconCopyOff size={18} />}
               onClick={openReplicateFromSectionModal}
@@ -547,7 +468,12 @@ export function ClassTimetableContent({
       )}
 
       <Stack gap="md">
-        <TemplateInfoBanner templateInfo={templateInfoData || null} />
+        {canEditTimetable ? (
+          <TemplateInfoBanner
+            templateInfo={templateInfoData || null}
+            branchId={branchId ?? null}
+          />
+        ) : null}
 
         {classId && templatesLoading && <Skeleton height={36} />}
 
@@ -564,27 +490,18 @@ export function ClassTimetableContent({
               />
             )}
             <Group>
-              <Button
-                leftSection={<IconCopy size={18} />}
-                onClick={openReplicateModal}
-                disabled={!classId || !timetable || timetable.slots.length === 0}
-                variant="light"
-              >
-                {t('replicateDay')}
-              </Button>
-              <Button
-                leftSection={<IconCopyCheck size={18} />}
-                onClick={openReplicateAcrossSectionsModal}
-                disabled={
-                  !classId ||
-                  !timetable ||
-                  timetable.slots.length === 0 ||
-                  otherSections.length === 0
-                }
-                variant="light"
-              >
-                {t('replicateToOtherSections')}
-              </Button>
+              <Tooltip label={t('copyDayButtonTooltip')}>
+                <Box component="span" style={{ display: 'inline-block' }}>
+                  <Button
+                    leftSection={<IconCopy size={18} />}
+                    onClick={openReplicateModal}
+                    disabled={!classId || !timetable || timetable.slots.length === 0}
+                    variant="light"
+                  >
+                    {t('replicateDay')}
+                  </Button>
+                </Box>
+              </Tooltip>
               <Button
                 leftSection={<IconCopyOff size={18} />}
                 onClick={openReplicateFromSectionModal}
@@ -627,6 +544,7 @@ export function ClassTimetableContent({
                   templateInfo={templateInfoData || null}
                   conflicts={conflictsForGrid}
                   isLoading={false}
+                  hideClassSectionOnSlots
                 />
 
                 {timetable.slots.length === 0 && (
@@ -662,6 +580,15 @@ export function ClassTimetableContent({
         timeRange={selectedTimeRange}
         subjectTemplateId={selectedTemplateId ?? undefined}
         onConflictCheck={handleConflictCheck}
+      />
+
+      <SlotDetailsReadOnlyModal
+        opened={slotDetailsModalOpened}
+        onClose={() => {
+          closeSlotDetailsModal();
+          setSelectedSlot(null);
+        }}
+        slot={selectedSlot}
       />
 
       <Modal
@@ -701,6 +628,9 @@ export function ClassTimetableContent({
         size="md"
       >
         <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            {t('copyDayModalDescription')}
+          </Text>
           <Select
             label={t('sourceDay')}
             placeholder={t('selectDay')}
@@ -726,7 +656,7 @@ export function ClassTimetableContent({
               loading={replicateDayMutation.isPending}
               disabled={!sourceDay || targetDays.length === 0}
             >
-              {t('replicate')}
+              {t('copy')}
             </Button>
           </Group>
         </Stack>
@@ -832,73 +762,6 @@ export function ClassTimetableContent({
               disabled={!sourceSectionId || availableSourceSections.length === 0}
             >
               {t('copy')}
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
-
-      <Modal
-        opened={replicateAcrossSectionsModalOpened}
-        onClose={closeReplicateAcrossSectionsModal}
-        title={t('replicateAcrossModalTitle')}
-        size="md"
-      >
-        <Stack gap="md">
-          <Text size="sm" c="dimmed">
-            {t('confirmReplicationAcrossMessage', {
-              sourceSectionName:
-                classSection
-                  ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
-                  : t('classSection'),
-              targetSectionNames: t('selectTargetSections'),
-            })}
-          </Text>
-          {otherSections.length === 0 ? (
-            <Alert color={colors.info}>
-              <Text size="sm">{t('noOtherSectionsForClass')}</Text>
-            </Alert>
-          ) : (
-            <>
-              <MultiSelect
-                label={t('selectTargetSections')}
-                placeholder={t('selectOneOrMoreDays')}
-                data={otherSections.map((cs) => ({
-                  value: cs.id,
-                  label: `${cs.classDisplayName || cs.className || 'Unknown'} - ${cs.sectionName || 'Unknown'}`,
-                }))}
-                value={targetSectionIds}
-                onChange={setTargetSectionIds}
-                searchable
-                required
-              />
-              <MantineAlert
-                icon={<IconAlertTriangle size={16} />}
-                color="yellow"
-                variant="light"
-                title={t('warning')}
-              >
-                <Text size="sm">
-                  {t('confirmReplicationAcrossMessage', {
-                    sourceSectionName:
-                      classSection
-                        ? `${classSection.classDisplayName || classSection.className || 'Unknown'} - ${classSection.sectionName || 'Unknown'}`
-                        : t('classSection'),
-                    targetSectionNames: t('selectTargetSections'),
-                  })}
-                </Text>
-              </MantineAlert>
-            </>
-          )}
-          <Group justify="flex-end" gap="xs" mt="md">
-            <Button variant="subtle" onClick={closeReplicateAcrossSectionsModal}>
-              {t('cancel')}
-            </Button>
-            <Button
-              onClick={handleReplicateAcrossSections}
-              loading={replicateAcrossSectionsMutation.isPending}
-              disabled={targetSectionIds.length === 0 || otherSections.length === 0}
-            >
-              {t('replicate')}
             </Button>
           </Group>
         </Stack>

@@ -33,6 +33,13 @@ export class SetupWizardService {
     const payload = {
       ...input.payload,
       permissions: Array.isArray((input.payload as any).permissions) ? (input.payload as any).permissions : [],
+      schedule: {
+        ...input.payload.schedule,
+        timingTemplates: (input.payload.schedule?.timingTemplates ?? []).map((tt) => ({
+          ...tt,
+          periodDurationMinutes: tt.periodDurationMinutes ?? 60,
+        })),
+      },
     } as CommitSetupWizardDto;
 
     const termExaminationTypeCount = (payload.assessment?.assessmentTypes ?? []).filter(
