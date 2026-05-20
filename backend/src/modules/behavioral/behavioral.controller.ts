@@ -23,10 +23,12 @@ import { BehavioralAssessmentDto } from './dto/behavioral-assessment.dto';
 import { PendingStudentDto } from './dto/pending-student.dto';
 import { BehavioralMatrixResponseDto } from './dto/matrix-response.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 @ApiTags('Behavioural')
 @Controller('api/v1/behavioral')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasBehavioralTracking')
 export class BehavioralController {
   constructor(
     private readonly behavioralService: BehavioralService,

@@ -45,12 +45,15 @@ import {
   IconKey,
   IconMedal,
   IconCash,
+  IconCreditCard,
   IconArrowsShuffle,
   IconArrowUpRight,
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
+import type { PlanFeatures } from '@/types/subscription';
 import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { getFeatureCodeForPath } from '@/lib/permission/navFeatureMap';
@@ -211,6 +214,16 @@ const allNavItems: NavItem[] = [
     },
   },
   { key: 'settings', label: 'Settings', href: '/settings', icon: IconSettings },
+  {
+    key: 'billing',
+    label: 'Billing',
+    href: '/billing',
+    icon: IconCreditCard,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true;
+    },
+  },
 ];
 
 /** Only this School accordion stays open on load / refresh (all others collapsed). */
@@ -269,7 +282,7 @@ const MANAGEMENT_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[
   },
   {
     i18nKey: 'sidebarGroupSystem',
-    hrefs: ['/conflict-management', '/settings', '/admin/storage'],
+    hrefs: ['/conflict-management', '/settings', '/billing', '/admin/storage'],
   },
 ];
 
@@ -305,7 +318,19 @@ export function Sidebar({
   const tCommon = useTranslations('common');
   const { user } = useAuth();
   const { canView } = usePermissions();
+  const { data: planFeatures } = useSubscriptionFeatures();
   const { studentToken } = useStudentSessionStore();
+
+  const subscriptionNavFeatures: Partial<Record<string, keyof PlanFeatures>> = {
+    '/fees': 'hasFeeManagement',
+    '/behavioral': 'hasBehavioralTracking',
+    '/library': 'hasLibraryManagement',
+    '/inventory': 'hasInventoryManagement',
+    '/inventory/items': 'hasInventoryManagement',
+    '/inventory/requests': 'hasInventoryManagement',
+    '/inventory/history': 'hasInventoryManagement',
+    '/uniform-request': 'hasInventoryManagement',
+  };
   // When a parent is acting as a child, treat the sidebar as student mode
   const isActingAsStudent = !!studentToken;
 
@@ -319,6 +344,9 @@ export function Sidebar({
     const roleName = r.roleName?.toLowerCase();
     return roleName === 'super_admin';
   }) || false;
+
+  const isSchoolAdmin =
+    user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'school_admin') ?? false;
 
   // Check if user is a teacher (subject_teacher or class_teacher)
   const isTeacher = user?.roles?.some((r) => {
@@ -435,6 +463,13 @@ export function Sidebar({
       // Storage: school_admin, principal, super_admin only
       if (item.href === '/admin/storage') {
         return canManageStorage;
+      }
+      if (item.href === '/billing') {
+        return isSchoolAdmin;
+      }
+      const subFeature = subscriptionNavFeatures[item.href];
+      if (subFeature && planFeatures && !isSuperAdmin) {
+        if (!planFeatures[subFeature]) return false;
       }
       // Parent-facing view only page
       if (item.href === '/my-children') {

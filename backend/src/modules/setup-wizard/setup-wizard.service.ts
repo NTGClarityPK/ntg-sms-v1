@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
-import { DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES } from '../../common/constants/default-behavioral-attributes';
+import {
+  DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE,
+  DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES,
+} from '../../common/constants/default-behavioral-attributes';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { SystemSettingsService } from '../system-settings/system-settings.service';
 import { CommitSetupWizardDto } from './dto/commit-setup-wizard.dto';
@@ -72,8 +75,7 @@ export class SetupWizardService {
     const defaults = [...DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES];
     if (!behavior) {
       await this.systemSettingsService.upsert('behavioral_assessment', {
-        enabled: false,
-        mandatory: false,
+        ...DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE,
         attributes: defaults,
       });
       return;

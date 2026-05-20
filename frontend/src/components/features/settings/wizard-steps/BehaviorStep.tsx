@@ -4,7 +4,10 @@ import { ActionIcon, Button, Checkbox, Group, Stack, Text, TextInput } from '@ma
 import { IconX } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES } from '@/constants/default-behavior-attributes';
+import {
+  DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE,
+  DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES,
+} from '@/constants/default-behavior-attributes';
 import type { BehaviorData } from './types';
 import { useTranslations } from 'next-intl';
 
@@ -17,8 +20,8 @@ interface BehaviorStepProps {
 
 function mergeBehaviorForm(data: BehaviorData | null): BehaviorData {
   const base: BehaviorData = {
-    enabled: false,
-    mandatory: false,
+    enabled: DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE.enabled,
+    mandatory: DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE.mandatory,
     attributes: [...DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES],
   };
   if (!data) return base;

@@ -6,9 +6,10 @@ import { AcademicYearsModule } from '../academic-years/academic-years.module';
 import { InvitationsModule } from '../invitations/invitations.module';
 import { ParentsModule } from '../parents/parents.module';
 import { MessagesModule } from '../messages/messages.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
-  imports: [AcademicYearsModule, InvitationsModule, ParentsModule, MessagesModule],
+  imports: [AcademicYearsModule, InvitationsModule, ParentsModule, MessagesModule, SubscriptionModule],
   controllers: [StudentsController],
   providers: [StudentsService, SupabaseConfig],
   exports: [StudentsService],

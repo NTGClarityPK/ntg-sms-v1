@@ -4,6 +4,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { RegisterDto } from './dto/register.dto';
 import { RegisterResponseDto } from './dto/register-response.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
+import { SystemSettingsService } from '../system-settings/system-settings.service';
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
@@ -21,6 +22,7 @@ export class RegistrationService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly systemSettingsService: SystemSettingsService,
   ) {}
 
   async register(input: RegisterDto): Promise<RegisterResponseDto> {
@@ -234,6 +236,8 @@ export class RegistrationService {
       );
       academicYearId = createdAcademicYear.id;
       await this.academicYearsService.activate(createdAcademicYear.id, tenantId, input.email);
+
+      await this.systemSettingsService.seedDefaultBehavioralAssessmentIfMissing();
 
       // Step 9: Return user info - frontend will handle login
       // We can't generate tokens from admin API, so user needs to login after registration

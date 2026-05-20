@@ -16,7 +16,7 @@ const settingsKeys = {
 export function useSystemSetting<TValue = unknown>(key: string) {
   return useQuery({
     queryKey: settingsKeys.byKey(key),
-    queryFn: async () => apiClient.get<SystemSetting<TValue>>(`/api/v1/settings/${key}`),
+    queryFn: async () => apiClient.get<SystemSetting<TValue>>(`/api/v1/system-settings/${key}`),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -24,7 +24,8 @@ export function useSystemSetting<TValue = unknown>(key: string) {
 export function useUpdateSystemSetting<TValue = unknown>(key: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (value: TValue) => apiClient.put<SystemSetting<TValue>>(`/api/v1/settings/${key}`, { value }),
+    mutationFn: async (value: TValue) =>
+      apiClient.put<SystemSetting<TValue>>(`/api/v1/system-settings/${key}`, { value }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: settingsKeys.byKey(key) });
       await qc.invalidateQueries({ queryKey: settingsKeys.all });

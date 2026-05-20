@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsModule } from '../academic-years/academic-years.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 import { TemplateController } from './template.controller';
 import { TemplateService } from './template.service';
 import { FeeStudentsController } from './fee-students.controller';
@@ -21,7 +22,7 @@ import { FeeChallanSettingsController } from './fee-challan-settings.controller'
 import { FeeChallanSettingsService } from './fee-challan-settings.service';
 
 @Module({
-  imports: [AcademicYearsModule],
+  imports: [AcademicYearsModule, SubscriptionModule],
   controllers: [
     TemplateController,
     FeeStudentsController,

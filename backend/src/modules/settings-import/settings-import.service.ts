@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import { randomUUID } from 'crypto';
-import { DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES } from '../../common/constants/default-behavioral-attributes';
+import {
+  DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE,
+  DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES,
+} from '../../common/constants/default-behavioral-attributes';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { CoreLookupsService } from '../core-lookups/core-lookups.service';
@@ -612,8 +615,7 @@ export class SettingsImportService {
         ? prepared.behavioralAttributeNames
         : [...DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES];
     await this.systemSettingsService.upsert('behavioral_assessment', {
-      enabled: false,
-      mandatory: false,
+      ...DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE,
       attributes: behaviouralAttrs,
     });
 

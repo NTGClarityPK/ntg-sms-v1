@@ -6,10 +6,12 @@ import { CurrentBranch, type CurrentBranchContext } from '../../common/decorator
 import { FeeCalculationService } from './fee-calculation.service';
 import { FeeStudentTemplatesResponseDto } from './dto/fee-student-templates.dto';
 import { FeeChallanPreviewDto } from './dto/fee-challan-preview.dto';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 @ApiTags('Fees')
 @Controller('api/v1/fees/students')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasFeeManagement')
 export class FeeStudentsController {
   constructor(private readonly feeCalculationService: FeeCalculationService) {}
 

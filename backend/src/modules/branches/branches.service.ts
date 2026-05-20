@@ -7,6 +7,7 @@ import { QueryBranchesDto } from './dto/query-branches.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { AssignBranchToTenantDto } from './dto/assign-branch-to-tenant.dto';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 type BranchRow = {
   id: string;
@@ -76,6 +77,7 @@ export class BranchesService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   async list(query: QueryBranchesDto): Promise<{
@@ -389,6 +391,13 @@ export class BranchesService {
       throw new NotFoundException('Tenant not found');
     }
 
+    const usagePayload = await this.subscriptionService.getUsageWithLimits(input.tenantId, true);
+    const proposedBranches = usagePayload.usage.branchesUsed + 1;
+    await this.subscriptionService.assertWithinLimit(input.tenantId, 'branches', proposedBranches);
+    if (proposedBranches > 1) {
+      await this.subscriptionService.assertFeature(input.tenantId, 'hasMultiBranch');
+    }
+
     const requestedCode = (input.code ?? '').trim();
 
     let lastError: PostgrestError | null = null;
@@ -450,6 +459,7 @@ export class BranchesService {
         { branchId: newBranch.id, tenantId: input.tenantId },
       )
       .catch(() => {});
+    void this.subscriptionService.syncUsage(input.tenantId).catch(() => {});
 
     // Find all school_admin users for this tenant (from existing branches)
     const { data: existingBranches, error: branchesError } = await supabase

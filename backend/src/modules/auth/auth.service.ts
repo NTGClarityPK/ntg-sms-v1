@@ -15,12 +15,14 @@ import { BranchSummaryDto } from './dto/branch-summary.dto';
 import { StudentTokenService } from '../../common/modules/student-token/student-token.service';
 import { ProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { SystemSettingsService } from '../system-settings/system-settings.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly studentTokenService: StudentTokenService,
+    private readonly systemSettingsService: SystemSettingsService,
   ) {}
 
   private async listUserBranches(userId: string): Promise<BranchSummaryDto[]> {
@@ -1131,6 +1133,8 @@ export class AuthService {
       created_by: 'system',
       updated_by: 'system',
     });
+
+    await this.systemSettingsService.seedDefaultBehavioralAssessmentIfMissing();
 
     // Upsert profile
     const { error: profileError } = await supabase

@@ -7,10 +7,12 @@ import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/cu
 import { CreateFeeStudentTemplateLinkDto, UpdateFeeStudentTemplateLinkDto } from './dto/create-student-template-link.dto';
 import { CreateFeeMetricExclusionDto } from './dto/create-metric-exclusion.dto';
 import { FeeStudentConfigService } from './fee-student-config.service';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 @ApiTags('Fees')
 @Controller('api/v1/fees')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasFeeManagement')
 export class FeeStudentConfigController {
   constructor(private readonly feeStudentConfigService: FeeStudentConfigService) {}
 

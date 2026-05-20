@@ -34,6 +34,7 @@ import { UpdateLibraryItemDto } from './dto/update-library-item.dto';
 import { BranchesService } from '../branches/branches.service';
 import { StorageService } from '../storage/storage.service';
 import { SupabaseConfig } from '../../common/config/supabase.config';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 type UploadedFileType = {
   originalname: string;
@@ -46,7 +47,8 @@ type UploadedFileType = {
 const MAX_LIBRARY_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB
 
 @ApiTags('Library')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasLibraryManagement')
 @Controller('api/v1/library')
 export class LibraryController {
   constructor(

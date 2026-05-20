@@ -85,3 +85,44 @@ All endpoints are **branch-scoped** (via `BranchGuard`) and return `{ data: ... 
 |--------|------|--------|
 | `GET` | `/api/v1/fees/late-fees/recent` | Report of recently applied late fees. |
 | `PUT` | `/api/v1/fees/late-fees/:id/waive` | Waive an applied late fee and adjust challan totals. |
+
+---
+
+## Subscription & billing
+
+Manual billing (no Stripe). Plans: `free`, `starter`, `pro`, `enterprise`. Limits enforced per **tenant** (all branches).
+
+### Portal (`school_admin` for mutating billing)
+
+| Method | Path | Response |
+|--------|------|----------|
+| `GET` | `/api/v1/subscription/plans` | `{ data: PlanConfig[] }` |
+| `GET` | `/api/v1/subscription/current-plan` | `{ data: { planId } }` |
+| `GET` | `/api/v1/subscription` | `{ data: Subscription }` |
+| `GET` | `/api/v1/subscription/usage` | `{ data: { usage, limits, planId } }` — query `refresh=true` recomputes usage |
+| `POST` | `/api/v1/subscription/change-plan` | `{ data: ChangePlanResult }` — body `{ planId, billingCycle? }`. Paid upgrades with Stripe configured and amount &gt; 0 return `type: checkout_required` + `checkoutUrl` (plan applies after payment webhook). Without Stripe or zero amount, immediate `upgrade`. |
+| `DELETE` | `/api/v1/subscription/pending-change` | `{ data: { message } }` |
+| `GET` | `/api/v1/subscription/invoices` | `{ data: SubscriptionInvoice[], meta }` — paginated billing history |
+| `GET` | `/api/v1/subscription/invoices/:invoiceId/download` | `{ data: { url } }` — signed PDF URL or Stripe hosted URL |
+| `GET` | `/api/v1/subscription/payment-config` | `{ data: { stripeEnabled: boolean } }` — school admin |
+| `POST` | `/api/v1/subscription/invoices/:invoiceId/checkout` | `{ data: { checkoutUrl, sessionId } }` — Stripe Checkout for open invoice |
+| `GET` | `/api/v1/subscription/customer-portal` | `{ data: { url } }` — Stripe Billing Portal (saved cards) |
+| `POST` | `/api/v1/subscription/webhooks/stripe` | Stripe webhook (no JWT; `stripe-signature` + raw body) |
+
+Invoices are created automatically on paid-plan **upgrade**, **period renewal**, or **admin** generate. Amount = per-student rate × active students (see marketing pricing). Status aligns with Stripe (`open`, `paid`, etc.). `payment_provider`: `manual` \| `stripe`. Checkout stores `stripe_checkout_session_id` on the invoice while payment is in progress; webhook `checkout.session.completed` marks the invoice `paid` and records `billing_payment_events`.
+
+### Admin (`super_admin`)
+
+| Method | Path | Notes |
+|--------|------|--------|
+| `GET` | `/api/v1/admin/subscriptions` | All tenants with subscription + usage |
+| `PATCH` | `/api/v1/admin/subscriptions/invoices/:invoiceId` | Mark paid / void — body `{ status?, notes? }` |
+| `PATCH` | `/api/v1/admin/subscriptions/:tenantId` | Manual override: `planId`, `billingCycle`, `status`, `notes`, `clearPending` |
+| `POST` | `/api/v1/admin/subscriptions/:tenantId/sync-usage` | Recompute usage counters |
+| `POST` | `/api/v1/admin/subscriptions/:tenantId/invoices` | Generate invoice for current period (idempotent) |
+
+### Error codes (403 body)
+
+- `SUBSCRIPTION_FEATURE` — feature not on current plan
+- `SUBSCRIPTION_LIMIT` — `{ metric, limit, used }`
+- `DOWNGRADE_NOT_ALLOWED` — `{ reasons: string[] }`

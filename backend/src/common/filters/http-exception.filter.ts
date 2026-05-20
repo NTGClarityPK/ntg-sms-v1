@@ -33,21 +33,38 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message = 'Internal server error';
     let code = 'INTERNAL_ERROR';
 
+    const errorDetails: Record<string, unknown> = {};
+
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object') {
-        const responseMessage = (exceptionResponse as { message?: string | string[] }).message;
+      } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+        const resp = exceptionResponse as Record<string, unknown>;
+        const responseMessage = resp.message;
         message = Array.isArray(responseMessage)
           ? responseMessage.join(', ')
-          : responseMessage || message;
+          : typeof responseMessage === 'string'
+            ? responseMessage
+            : message;
         code =
-          (exceptionResponse as { code?: string }).code ||
+          (typeof resp.code === 'string' ? resp.code : undefined) ||
           exception.name ||
           code;
+
+        for (const key of [
+          'reasons',
+          'metric',
+          'limit',
+          'used',
+          'feature',
+        ] as const) {
+          if (resp[key] !== undefined) {
+            errorDetails[key] = resp[key];
+          }
+        }
       }
     } else if (
       exception instanceof Error &&
@@ -87,6 +104,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error: {
         code,
         message: Array.isArray(message) ? message.join(', ') : message,
+        ...errorDetails,
       },
     });
   }

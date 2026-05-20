@@ -6,6 +6,7 @@ import { notifications } from '@mantine/notifications';
 import { useNotificationColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
 import { useTranslations } from 'next-intl';
+import { DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE } from '@/constants/default-behavior-attributes';
 
 interface BehavioralAssessmentValue {
   enabled: boolean;
@@ -14,9 +15,9 @@ interface BehavioralAssessmentValue {
 }
 
 const DEFAULT_VALUE: BehavioralAssessmentValue = {
-  enabled: false,
-  mandatory: false,
-  attributes: [],
+  enabled: DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE.enabled,
+  mandatory: DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE.mandatory,
+  attributes: [...DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE.attributes],
 };
 
 export function BehaviorSettings({ showHeader = true }: { showHeader?: boolean }) {

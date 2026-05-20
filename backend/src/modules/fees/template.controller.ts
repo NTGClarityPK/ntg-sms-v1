@@ -20,10 +20,12 @@ import { CreateFeeTemplateDto } from './dto/create-fee-template.dto';
 import { UpdateFeeTemplateDto } from './dto/update-fee-template.dto';
 import { CreateFeeTemplateAssignmentDto } from './dto/create-fee-template-assignment.dto';
 import { FeeTemplateDto } from './dto/fee-template.dto';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 @ApiTags('Fees')
 @Controller('api/v1/fees/templates')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasFeeManagement')
 export class TemplateController {
   constructor(private readonly templateService: TemplateService) {}
 

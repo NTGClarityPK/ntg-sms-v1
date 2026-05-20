@@ -1,6 +1,7 @@
 /**
  * Marketing pricing plans — School Management System context.
- * Home teaser cards.
+ * Display-only for /pricing and /billing UI.
+ * Enforcement limits: backend `modules/subscription/plan-config.ts`.
  */
 export const plans = [
   {

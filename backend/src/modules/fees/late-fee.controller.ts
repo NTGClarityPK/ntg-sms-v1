@@ -8,10 +8,12 @@ import { LateFeeService } from './late-fee.service';
 import { Body } from '@nestjs/common';
 import { WaiveLateFeeDto } from './dto/waive-late-fee.dto';
 import { ForbiddenException } from '@nestjs/common';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 @ApiTags('Fees')
 @Controller('api/v1/fees/late-fees')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasFeeManagement')
 export class LateFeeController {
   constructor(private readonly lateFeeService: LateFeeService) {}
 

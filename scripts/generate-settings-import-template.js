@@ -68,6 +68,17 @@ const definition = {
       columns: ['category'],
       sample: { category: 'Uniforms' },
     },
+    {
+      name: 'behavioral_attributes',
+      columns: ['attribute_name'],
+      samples: [
+        { attribute_name: 'Discipline' },
+        { attribute_name: 'Respect & Courtesy' },
+        { attribute_name: 'Class Engagement' },
+        { attribute_name: 'Work Habits' },
+        { attribute_name: 'Extracurriculars' },
+      ],
+    },
   ],
 };
 
@@ -81,7 +92,9 @@ function main() {
         return acc;
       }, {}),
     ];
-    const rows = header.concat([sheet.sample]);
+    const dataRows =
+      Array.isArray(sheet.samples) && sheet.samples.length > 0 ? sheet.samples : [sheet.sample];
+    const rows = header.concat(dataRows);
     const worksheet = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
     XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
   });

@@ -16,6 +16,7 @@ import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { InvitationsService } from '../invitations/invitations.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 type ProfileRow = {
   id: string;
@@ -101,7 +102,23 @@ export class UsersService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
     private readonly invitationsService: InvitationsService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
+
+  private async getTenantIdForBranch(branchId: string): Promise<string> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch, error } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+    const tenantId = (branch as { tenant_id: string | null } | null)?.tenant_id;
+    if (!tenantId) {
+      throw new BadRequestException('Tenant not resolved for this branch');
+    }
+    return tenantId;
+  }
 
   private randomTempPassword(): string {
     // >= 24 chars, includes letters+numbers to satisfy common policies.
@@ -596,6 +613,21 @@ export class UsersService {
     }
 
     const userType: 'parent' | 'staff' = isParentUser ? 'parent' : 'staff';
+
+    if (isStaffUser) {
+      const resolvedTenantId =
+        tenantId ?? (await this.getTenantIdForBranch(branchId));
+      const usagePayload = await this.subscriptionService.getUsageWithLimits(
+        resolvedTenantId,
+        true,
+      );
+      await this.subscriptionService.assertWithinLimit(
+        resolvedTenantId,
+        'staff',
+        usagePayload.usage.staffUsed + 1,
+        adminUser.roles,
+      );
+    }
 
     const resolvedLoginEmail = await (async () => {
       if (userType === 'parent') {

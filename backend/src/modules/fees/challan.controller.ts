@@ -6,10 +6,12 @@ import { CurrentBranch, type CurrentBranchContext } from '../../common/decorator
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { GenerateFeeChallansDto } from './dto/generate-challans.dto';
 import { ChallanService } from './challan.service';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 @ApiTags('Fees')
 @Controller('api/v1/fees/challans')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasFeeManagement')
 export class ChallanController {
   constructor(private readonly challanService: ChallanService) {}
 

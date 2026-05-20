@@ -5,10 +5,12 @@ import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, type CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { FeeReportsService } from './fee-reports.service';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 @ApiTags('Fees')
 @Controller('api/v1/fees/reports')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasFeeManagement')
 export class FeeReportsController {
   constructor(private readonly feeReportsService: FeeReportsService) {}
 

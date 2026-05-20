@@ -18,6 +18,7 @@ import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 import { InvitationsService } from '../invitations/invitations.service';
 import { ParentsService } from '../parents/parents.service';
 import { MessagesService } from '../messages/messages.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import crypto from 'crypto';
 
@@ -65,7 +66,33 @@ export class StudentsService {
     private readonly invitationsService: InvitationsService,
     private readonly parentsService: ParentsService,
     private readonly messagesService: MessagesService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
+
+  private async getTenantIdForBranch(branchId: string): Promise<string> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch, error } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+    const tenantId = (branch as { tenant_id: string | null } | null)?.tenant_id;
+    if (!tenantId) {
+      throw new BadRequestException('Tenant not resolved for this branch');
+    }
+    return tenantId;
+  }
+
+  private async assertStudentLimit(branchId: string): Promise<void> {
+    const tenantId = await this.getTenantIdForBranch(branchId);
+    const usagePayload = await this.subscriptionService.getUsageWithLimits(tenantId, true);
+    await this.subscriptionService.assertWithinLimit(
+      tenantId,
+      'students',
+      usagePayload.usage.studentsUsed + 1,
+    );
+  }
 
   private randomTempPassword(): string {
     // >= 24 chars, includes letters+numbers to satisfy common policies.
@@ -800,6 +827,8 @@ export class StudentsService {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
 
+    await this.assertStudentLimit(branchId);
+
     const tenantDomain = await this.getTenantDomainForBranch(branchId);
     const normalizedLoginEmail = this.normalizeLoginEmail(
       this.buildLoginEmail(input.username, tenantDomain),
@@ -995,6 +1024,8 @@ export class StudentsService {
     // If we create a brand-new parent account during this flow and later fail,
     // we must roll it back to avoid orphan parent records for failed imports.
     let createdParentUserId: string | null = null;
+
+    await this.assertStudentLimit(branchId);
 
     const tenantDomain = await this.getTenantDomainForBranch(branchId);
     const normalizedLoginEmail = this.normalizeLoginEmail(

@@ -33,6 +33,7 @@ import {
   RejectFeePaymentDto,
   VerifyFeePaymentDto,
 } from './dto/verify-reject-payment.dto';
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 type UploadedFileType = {
   originalname: string;
@@ -45,7 +46,8 @@ const MAX_PROOF_BYTES = 5 * 1024 * 1024; // 5MB
 
 @ApiTags('Fees')
 @Controller('api/v1/fees/payments')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasFeeManagement')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 

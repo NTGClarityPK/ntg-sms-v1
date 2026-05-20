@@ -14,6 +14,7 @@ import { BulkCreateClassSectionDto } from './dto/bulk-create-class-section.dto';
 import { UpdateClassSectionDto } from './dto/update-class-section.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 type ClassSectionRow = {
   id: string;
@@ -47,7 +48,23 @@ export class ClassSectionsService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
+
+  private async getTenantIdForBranch(branchId: string): Promise<string> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branch, error } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .eq('id', branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+    const tenantId = (branch as { tenant_id: string | null } | null)?.tenant_id;
+    if (!tenantId) {
+      throw new BadRequestException('Tenant not resolved for this branch');
+    }
+    return tenantId;
+  }
 
   async listClassSections(
     query: QueryClassSectionsDto,
@@ -242,6 +259,14 @@ export class ClassSectionsService {
   ): Promise<ClassSectionDto> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(userEmail);
+
+    const tenantId = await this.getTenantIdForBranch(branchId);
+    const usagePayload = await this.subscriptionService.getUsageWithLimits(tenantId, true);
+    await this.subscriptionService.assertWithinLimit(
+      tenantId,
+      'classes',
+      usagePayload.usage.classesUsed + 1,
+    );
 
     // Use provided academicYearId or get active year
     let activeYearId = academicYearId;

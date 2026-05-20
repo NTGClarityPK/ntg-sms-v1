@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
-import { DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES } from '../../common/constants/default-behavioral-attributes';
+import { DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE } from '../../common/constants/default-behavioral-attributes';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { SystemSettingDto } from './dto/system-setting.dto';
 
@@ -24,6 +24,9 @@ function mapSetting(row: SystemSettingRow): SystemSettingDto {
     updatedAt: row.updated_at,
   });
 }
+
+/** Keys handled by other controllers under `/api/v1/settings/*` — not system_settings rows. */
+const RESERVED_SETTINGS_ROUTE_KEYS = new Set(['school-days', 'leave-quota', 'status']);
 
 @Injectable()
 export class SystemSettingsService {
@@ -51,14 +54,13 @@ export class SystemSettingsService {
       allow_admin_assistant: false,
       allow_principal: false,
     },
-    behavioral_assessment: {
-      enabled: false,
-      mandatory: false,
-      attributes: [...DEFAULT_BEHAVIOURAL_ATTRIBUTE_NAMES],
-    },
+    behavioral_assessment: { ...DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE },
   };
 
   async getByKey(key: string): Promise<{ data: SystemSettingDto }> {
+    if (RESERVED_SETTINGS_ROUTE_KEYS.has(key)) {
+      throw new NotFoundException(`Setting not found (reserved route key: ${key})`);
+    }
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase.from('system_settings').select('*').eq('key', key).maybeSingle();
     throwIfDbError(error);
@@ -100,6 +102,19 @@ export class SystemSettingsService {
       throw new NotFoundException('Setting not found');
     }
     return { data: mapSetting(data as SystemSettingRow) };
+  }
+
+  /** Persist default behavioural assessment when the setting row does not exist yet (e.g. new tenant signup). */
+  async seedDefaultBehavioralAssessmentIfMissing(): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('key')
+      .eq('key', 'behavioral_assessment')
+      .maybeSingle();
+    throwIfDbError(error);
+    if (data) return;
+    await this.upsert('behavioral_assessment', { ...DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE });
   }
 
   async upsert(key: string, value: unknown): Promise<{ data: SystemSettingDto }> {

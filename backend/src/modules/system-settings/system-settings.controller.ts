@@ -9,7 +9,7 @@ import { UpdateSystemSettingDto } from './dto/update-system-setting.dto';
 
 @ApiTags('System settings')
 @UseGuards(JwtAuthGuard, BranchGuard)
-@Controller('api/v1/settings')
+@Controller('api/v1/system-settings')
 export class SystemSettingsController {
   constructor(private readonly systemSettingsService: SystemSettingsService) {}
 

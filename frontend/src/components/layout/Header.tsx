@@ -23,6 +23,7 @@ import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useStudentSessionStore } from '@/lib/store/student-session-store';
+import { SubscriptionBadge } from '@/components/subscription/SubscriptionBadge';
 
 const headerBadgeStyle = {
   cursor: 'default' as const,
@@ -63,6 +64,8 @@ export function Header() {
     : null;
 
   const isParent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'parent') || false;
+  const isSchoolAdmin =
+    user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'school_admin') ?? false;
 
   const { data: childrenData, refetch: refetchChildren } = useQuery({
     queryKey: ['auth', 'my-children'],
@@ -344,6 +347,7 @@ export function Header() {
           </Menu>
         )}
 
+        {isSchoolAdmin && !isSuperAdmin && <SubscriptionBadge />}
         <LanguageSwitcher />
         <Group gap="xs" align="center" wrap="nowrap" visibleFrom="sm">
           {/* Online/Offline Status Badge (green when online, gray when offline) */}

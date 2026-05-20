@@ -45,8 +45,11 @@ type UploadedImageFile = {
   size: number;
 };
 
+import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
+
 @ApiTags('Uniforms')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasInventoryManagement')
 @Controller('api/v1/uniforms')
 export class UniformsController {
   constructor(
