@@ -30,6 +30,11 @@ function setLogoutInProgress(value: boolean): void {
   }
 }
 
+/** Clears the logout-in-progress flag (call when the login screen mounts). */
+export function clearLogoutInProgress(): void {
+  setLogoutInProgress(false);
+}
+
 export function syncLocaleCookieFromStorage(): void {
   if (typeof window === 'undefined') return;
 
@@ -98,36 +103,36 @@ export async function signOut() {
 
   if (typeof window !== 'undefined') {
     // Prevent stale `auth/me` (and branch-gated queries) from keeping the dashboard on skeletons after re-login.
-    // A hard refresh clears caches; we do it explicitly here so normal login works first time.
     queryClient.removeQueries({ queryKey: ['auth'] });
     queryClient.removeQueries({ queryKey: ['permissions'] });
     queryClient.removeQueries({ queryKey: ['settingsStatus'] });
 
     // Keep the currently active language on the login screen.
-    // Do NOT overwrite NEXT_LOCALE from potentially-stale localStorage during logout.
     syncLocaleCookieFromStorage();
     clearAuthClientState();
 
-    // Best-effort: remove SW + caches so auth redirects never use stale Workbox state.
-    // Non-blocking; logout must still proceed even if these throw.
-    try {
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister()));
-      }
-    } catch {
-      // Non-blocking
-    }
-    try {
-      if ('caches' in window) {
-        const names = await caches.keys();
-        await Promise.all(names.map((n) => caches.delete(n)));
-      }
-    } catch {
-      // Non-blocking
-    }
+    // Redirect immediately — do not await SW/cache cleanup (that delay left portal pages blank).
+    window.location.replace('/login');
 
-    window.location.href = '/login';
+    // Best-effort cleanup after navigation starts; AuthRouteServiceWorkerCleanup also runs on /login.
+    void (async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch {
+        // Non-blocking
+      }
+      try {
+        if ('caches' in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map((n) => caches.delete(n)));
+        }
+      } catch {
+        // Non-blocking
+      }
+    })();
   }
 }
 

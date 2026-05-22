@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton, Container, Stack, Alert, Text } from '@mantine/core';
-import { getSession } from '@/lib/auth';
+import { getSession, isLogoutInProgress } from '@/lib/auth';
+import { supabase } from '@/lib/supabase/client';
 import { apiClient } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useThemeStore } from '@/lib/store/theme-store';
@@ -19,9 +20,32 @@ export function AdminAuthGuard({ children }: AdminAuthGuardProps) {
   const [hasSession, setHasSession] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
+  const redirectToLogin = () => {
+    if (typeof window === 'undefined') return;
+    if (window.location.pathname.startsWith('/login')) return;
+    window.location.replace('/login');
+  };
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== 'SIGNED_OUT' && session?.access_token) return;
+      setHasSession(false);
+      setIsSuperAdmin(false);
+      setCheckingSession(false);
+      redirectToLogin();
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   // Check Supabase session and verify super admin role
   useEffect(() => {
     const checkAdminSession = async () => {
+      if (isLogoutInProgress()) {
+        setHasSession(false);
+        setCheckingSession(false);
+        redirectToLogin();
+        return;
+      }
       try {
         const session = await getSession();
         if (session?.access_token) {
@@ -35,7 +59,6 @@ export function AdminAuthGuard({ children }: AdminAuthGuardProps) {
             );
 
             if (!hasSuperAdminRole) {
-              // Not super admin - redirect to regular portal
               router.push('/dashboard');
               return;
             }
@@ -43,15 +66,14 @@ export function AdminAuthGuard({ children }: AdminAuthGuardProps) {
             setIsSuperAdmin(true);
             useThemeStore.getState().setPrimaryColor(DEFAULT_THEME_COLOR);
             setHasSession(true);
-          } catch (error) {
-            console.error('Failed to fetch user data:', error);
-            router.push('/login');
+          } catch {
+            redirectToLogin();
           }
         } else {
-          router.push('/login');
+          redirectToLogin();
         }
       } catch {
-        router.push('/login');
+        redirectToLogin();
       } finally {
         setCheckingSession(false);
       }

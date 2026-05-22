@@ -19,7 +19,7 @@ import {
   Group,
 } from '@mantine/core';
 import { IconAlertCircle, IconBrandGoogle, IconMail, IconLock, IconCheck } from '@tabler/icons-react';
-import { signIn } from '@/lib/auth';
+import { clearLogoutInProgress, signIn } from '@/lib/auth';
 import { useErrorColor } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeColor } from '@/lib/hooks/use-theme-color';
@@ -94,6 +94,7 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
+    clearLogoutInProgress();
     const flash = typeof window !== 'undefined'
       ? window.sessionStorage.getItem('ntg_auth_inactive_message')
       : null;

@@ -74,24 +74,34 @@ export function useAuth() {
   // Bootstrap: detect whether a Supabase session exists.
   useEffect(() => {
     let alive = true;
+    const applyHasSession = (next: boolean) => {
+      if (!alive) return;
+      setHasSession(next);
+    };
+
+    const onSessionEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ hasSession?: boolean }>).detail;
+      if (typeof detail?.hasSession === 'boolean') applyHasSession(detail.hasSession);
+    };
+
+    window.addEventListener('ntg-auth-session', onSessionEvent);
+
     void (async () => {
       if (isLogoutInProgress()) {
-        if (!alive) return;
-        setHasSession(false);
+        applyHasSession(false);
         return;
       }
       try {
         const { data } = await supabase.auth.getSession();
-        if (!alive) return;
-        const nextHasSession = !!data.session?.access_token;
-        setHasSession(nextHasSession);
+        applyHasSession(!!data.session?.access_token);
       } catch {
-        if (!alive) return;
-        setHasSession(false);
+        applyHasSession(false);
       }
     })();
+
     return () => {
       alive = false;
+      window.removeEventListener('ntg-auth-session', onSessionEvent);
     };
   }, []);
 
@@ -184,10 +194,11 @@ export function useAuth() {
           } catch {
             // ignore
           }
-          // Clear persisted auth snapshot so guards don't think we're logged in.
           useAuthStore.getState().clear();
           globalQueryClient.cancelQueries({ queryKey: ['auth', 'me'] });
           globalQueryClient.removeQueries({ queryKey: ['auth', 'me'] });
+          // Notify all mounted useAuth instances so queries stay disabled after logout.
+          window.dispatchEvent(new CustomEvent('ntg-auth-session', { detail: { hasSession: false } }));
           return;
         }
 
@@ -196,6 +207,7 @@ export function useAuth() {
         }
 
         if (event === 'SIGNED_IN') {
+          window.dispatchEvent(new CustomEvent('ntg-auth-session', { detail: { hasSession: true } }));
           globalQueryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
           return;
         }
