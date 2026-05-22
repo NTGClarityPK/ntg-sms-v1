@@ -138,15 +138,22 @@ export class StaffService {
     // Fetch profiles separately (include activation state)
     const { data: profilesData } = await supabase
       .from('profiles')
-      .select('id, full_name, is_active')
+      .select('id, full_name, is_active, avatar_url, phone, address, date_of_birth')
       .in('id', userIds);
 
     const profileMap = new Map<string, string>();
     const profileActiveMap = new Map<string, boolean>();
+    const profileAvatarMap = new Map<string, string>();
+    const profilePhoneMap = new Map<string, string>();
+    const profileAddressMap = new Map<string, string>();
+    const profileDobMap = new Map<string, string>();
     (profilesData || []).forEach((profile) => {
       profileMap.set(profile.id, profile.full_name || '');
-      // Default to true if missing for safety; most rows should have it.
       profileActiveMap.set(profile.id, profile.is_active !== false);
+      if (profile.avatar_url) profileAvatarMap.set(profile.id, profile.avatar_url);
+      if (profile.phone) profilePhoneMap.set(profile.id, profile.phone);
+      if (profile.address) profileAddressMap.set(profile.id, profile.address);
+      if (profile.date_of_birth) profileDobMap.set(profile.id, profile.date_of_birth);
     });
 
     // If search was provided, filter by profile name and employee_id client-side
@@ -247,6 +254,10 @@ export class StaffService {
         fullName,
         email: emailMap.get(row.user_id),
         roles,
+        avatarUrl: profileAvatarMap.get(row.user_id),
+        phone: profilePhoneMap.get(row.user_id),
+        address: profileAddressMap.get(row.user_id),
+        dateOfBirth: profileDobMap.get(row.user_id),
       });
     });
 
@@ -312,7 +323,7 @@ export class StaffService {
     // Fetch profile separately
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('id, full_name')
+      .select('id, full_name, avatar_url, phone, address, date_of_birth')
       .eq('id', row.user_id)
       .single();
 
@@ -376,6 +387,10 @@ export class StaffService {
         fullName,
         email: authUser.user?.email,
         roles,
+        avatarUrl: profileData?.avatar_url ?? undefined,
+        phone: profileData?.phone ?? undefined,
+        address: profileData?.address ?? undefined,
+        dateOfBirth: profileData?.date_of_birth ?? undefined,
       });
   }
 

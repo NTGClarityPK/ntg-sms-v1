@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alma ID Card - Modern Design 1</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f0f0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .card-wrapper {
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .card-side {
+            text-align: center;
+        }
+
+        .card-label {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* PROPER RECTANGULAR - WIDE like credit card! */
+        .card {
+            width: 480px;   /* MUCH WIDER */
+            height: 300px;  /* Standard height */
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ============ FRONT SIDE ============ */
+        .front {
+            background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+        }
+
+        /* Diagonal corner accent */
+        .front::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            clip-path: polygon(100% 0, 100% 100%, 0 0);
+        }
+
+        .front-header {
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .school-branding {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .school-logo {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: #6366F1;
+            font-size: 24px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .school-text {
+            color: white;
+        }
+
+        .school-name {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .school-location {
+            font-size: 10px;
+            opacity: 0.9;
+            margin-top: 3px;
+        }
+
+        .validity-pill {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            backdrop-filter: blur(10px);
+        }
+
+        .front-body {
+            flex: 1;
+            padding: 0 30px 20px 30px;
+            display: flex;
+            gap: 25px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .photo-container {
+            flex-shrink: 0;
+        }
+
+        .photo {
+            width: 100px;
+            height: 130px;
+            background: white;
+            border-radius: 12px;
+            border: 5px solid white;
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+        }
+
+        .student-details {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .student-name {
+            color: white;
+            font-size: 32px;
+            font-weight: 900;
+            line-height: 1.1;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px 20px;
+        }
+
+        .info-label {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 12px;
+            font-weight: 600;
+            text-align: left;
+        }
+
+        .info-value {
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            text-align: left;
+        }
+
+        .blood-highlight {
+            color: #FCA5A5 !important;
+        }
+
+        .front-footer {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .student-id {
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        .qr-box {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            color: #6366F1;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        /* ============ BACK SIDE ============ */
+        .back {
+            background: white;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .back-header {
+            background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+        }
+
+        .back-title {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        .back-body {
+            flex: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .emergency-panel {
+            background: #FEF3C7;
+            border-left: 6px solid #F59E0B;
+            padding: 18px 20px;
+            border-radius: 10px;
+        }
+
+        .emergency-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #92400E;
+            margin-bottom: 10px;
+        }
+
+        .emergency-text {
+            font-size: 13px;
+            color: #78350F;
+            line-height: 1.6;
+        }
+
+        .guidelines {
+            flex: 1;
+        }
+
+        .guidelines-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        .guideline-item {
+            font-size: 11px;
+            color: #6B7280;
+            margin-bottom: 8px;
+            padding-left: 18px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .guideline-item::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #6366F1;
+            font-weight: 900;
+            font-size: 16px;
+        }
+
+        .back-footer {
+            border-top: 3px solid #E5E7EB;
+            padding: 18px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .contact-info {
+            font-size: 11px;
+            color: #6B7280;
+            line-height: 1.7;
+        }
+
+        .qr-code {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.3;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        @page {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .card {
+                box-shadow: none;
+                page-break-inside: avoid;
+            }
+            .card-label {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 style="font-size: 28px; color: #333; margin-bottom: 10px;">Modern Design 1 - RECTANGULAR Layout Fixed!</h1>
+    <p style="color: #666; margin-bottom: 20px;">Wide like credit card • Diagonal corner accent • Proper proportions</p>
+    
+    <div class="card-wrapper">
+        <!-- FRONT SIDE -->
+        <div class="card-side">
+            <div class="card-label">— FRONT SIDE —</div>
+            <div class="card front">
+                <div class="front-header">
+                    <div class="school-branding">
+                        <div class="school-logo">A</div>
+                        <div class="school-text">
+                            <div class="school-name">AL NOOR ACADEMY</div>
+                            <div class="school-location">Sector F-7/2, Islamabad</div>
+                        </div>
+                    </div>
+                    <div class="validity-pill">2024-25</div>
+                </div>
+
+                <div class="front-body">
+                    <div class="photo-container">
+                        <div class="photo">👤</div>
+                    </div>
+
+                    <div class="student-details">
+                        <div class="student-name">ANAM FATIMA</div>
+                        
+                        <div class="info-grid">
+                            <div class="info-label">Class:</div>
+                            <div class="info-value">VIIth</div>
+                            
+                            <div class="info-label">Roll No:</div>
+                            <div class="info-value">1002</div>
+                            
+                            <div class="info-label">Father:</div>
+                            <div class="info-value">Sajjan Jamali</div>
+                            
+                            <div class="info-label">Blood:</div>
+                            <div class="info-value blood-highlight">B+</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="front-footer">
+                    <div class="student-id">ID: 1775394833478</div>
+                    <div class="qr-box">SCAN<br>QR</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BACK SIDE -->
+        <div class="card-side">
+            <div class="card-label">— BACK SIDE —</div>
+            <div class="card back">
+                <div class="back-header">
+                    <div class="back-title">STUDENT IDENTITY CARD</div>
+                </div>
+
+                <div class="back-body">
+                    <div class="emergency-panel">
+                        <div class="emergency-title">⚠️ EMERGENCY CONTACT</div>
+                        <div class="emergency-text">
+                            <strong>Name:</strong> Sajjan Jamali (Father)<br>
+                            <strong>Phone:</strong> +92 300 1234567
+                        </div>
+                    </div>
+
+                    <div class="guidelines">
+                        <div class="guidelines-title">IMPORTANT GUIDELINES</div>
+                        <div class="guideline-item">This card must be carried at all times on school premises</div>
+                        <div class="guideline-item">Report loss to admin office immediately</div>
+                        <div class="guideline-item">Property of Al Noor Academy - non-transferable</div>
+                        <div class="guideline-item">Replacement fee: PKR 500</div>
+                    </div>
+                </div>
+
+                <div class="back-footer">
+                    <div class="contact-info">
+                        📞 +92-51-2345678<br>
+                        📧 info@alnoor.edu.pk<br>
+                        🌐 www.alnoor.edu.pk
+                    </div>
+                    <div class="qr-code">SCAN FOR<br>FULL<br>DETAILS</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -28,6 +28,7 @@ interface QueryStaffParams {
   role?: string;
   isActive?: boolean;
   search?: string;
+  enabled?: boolean;
 }
 
 export function useStaff(params?: QueryStaffParams) {
@@ -51,13 +52,10 @@ export function useStaff(params?: QueryStaffParams) {
       // HTTP response body: { data: StaffDto[], meta: {...} }
       // Axios response.data: { data: StaffDto[], meta: {...} }
       // apiClient.get() returns response.data, which is { data: StaffDto[], meta: {...} }
-      const response = await apiClient.get<{
-        data: Staff[];
-        meta: { total: number; page: number; limit: number; totalPages: number };
-      }>(`/api/v1/staff?${queryParams.toString()}`);
+      const response = await apiClient.get<Staff[]>(`/api/v1/staff?${queryParams.toString()}`);
       return response;
     },
-    enabled: !!branchId,
+    enabled: !!branchId && (params?.enabled !== false),
     staleTime: 2 * 60 * 1000,  // 2 minutes - staff list rarely changes mid-session
   });
 }

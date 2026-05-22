@@ -18,6 +18,7 @@ import { BehavioralMatrixResponseDto } from './dto/matrix-response.dto';
 import { BehavioralMatrixRowDto } from './dto/matrix-row.dto';
 import { CreateBehavioralAssessmentDto } from './dto/create-behavioral-assessment.dto';
 import { UpdateBehavioralAssessmentDto } from './dto/update-behavioral-assessment.dto';
+import { StudentPlacementService } from '../../common/services/student-placement.service';
 
 type BehavioralAssessmentRow = {
   id: string;
@@ -57,6 +58,7 @@ export class BehavioralService {
     private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly systemSettingsService: SystemSettingsService,
+    private readonly studentPlacementService: StudentPlacementService,
   ) {}
 
   private async getBehavioralAssessmentConfig(): Promise<{
@@ -165,22 +167,11 @@ export class BehavioralService {
       return { data: [] };
     }
 
-    // 4) Get all students in those (class_id, section_id) for this branch and academic year (single query, filter in memory)
-    const pairSet = new Set(classSectionPairs.map((p) => `${p.class_id}:${p.section_id}`));
-    const { data: allStudentsInBranch, error: studentsErr } = await supabase
-      .from('students')
-      .select('id, class_id, section_id')
-      .eq('branch_id', branchId)
-      .eq('academic_year_id', academicYearId)
-      .eq('is_active', true);
-    throwIfDbError(studentsErr);
-    const uniqueStudentIds = [...new Set(
-      (allStudentsInBranch || [])
-        .filter((s: { class_id: string; section_id: string }) =>
-          pairSet.has(`${s.class_id}:${s.section_id}`),
-        )
-        .map((s: { id: string }) => s.id),
-    )];
+    const uniqueStudentIds = await this.studentPlacementService.listActiveStudentIdsForClassSectionPairs(
+      branchId,
+      academicYearId,
+      classSectionPairs.map((p) => ({ classId: p.class_id, sectionId: p.section_id })),
+    );
     if (uniqueStudentIds.length === 0) {
       return { data: [] };
     }
@@ -569,38 +560,35 @@ export class BehavioralService {
       academic_year_id: string;
     };
 
-    const [classesRes, sectionsRes, studentsRes] = await Promise.all([
+    const [classesRes, sectionsRes, rosterIds] = await Promise.all([
       supabase.from('classes').select('id, display_name').eq('id', cs.class_id).single(),
       supabase.from('sections').select('id, name').eq('id', cs.section_id).single(),
-      supabase
-        .from('student_enrolments')
-        .select('student_id')
-        .eq('branch_id', branchId)
-        .eq('academic_year_id', academicYearId)
-        .eq('class_id', cs.class_id)
-        .eq('section_id', cs.section_id)
-        .eq('status', 'active'),
+      this.studentPlacementService.listActiveStudentIdsForClassSection({
+        branchId,
+        academicYearId,
+        classId: cs.class_id,
+        sectionId: cs.section_id,
+      }),
     ]);
     const className = (classesRes.data as { display_name?: string } | null)?.display_name;
     const sectionName = (sectionsRes.data as { name?: string } | null)?.name;
 
-    throwIfDbError(studentsRes.error);
-    const enrolledStudentIds = (studentsRes.data || []) as Array<{ student_id: string }>;
-    const ids = enrolledStudentIds.map((r) => r.student_id);
     const studentList =
-      ids.length > 0
+      rosterIds.length > 0
         ? (
             (
               await supabase
                 .from('students')
                 .select('id, user_id')
-                .in('id', ids)
+                .in('id', rosterIds)
                 .eq('branch_id', branchId)
+                .eq('is_active', true)
                 .order('id')
             ).data || []
           )
         : [];
-    if (studentList.length === 0) {
+    const typedStudentList = studentList as Array<{ id: string; user_id: string | null }>;
+    if (typedStudentList.length === 0) {
       return {
         data: new BehavioralMatrixResponseDto({
           attributes: allowedAttrsPromise,
@@ -613,7 +601,7 @@ export class BehavioralService {
       };
     }
 
-    const userIds = studentList.map((s) => s.user_id).filter(Boolean) as string[];
+    const userIds = typedStudentList.map((s) => s.user_id).filter(Boolean) as string[];
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name')
@@ -622,7 +610,7 @@ export class BehavioralService {
       (profiles || []).map((p: { id: string; full_name: string }) => [p.id, p.full_name]),
     );
 
-    const studentIds = studentList.map((s) => s.id);
+    const studentIds = typedStudentList.map((s) => s.id);
     const { data: assessments } = await supabase
       .from('behavioral_assessments')
       .select('id, student_id')
@@ -661,7 +649,7 @@ export class BehavioralService {
     const studentIdToAssessmentId = new Map<string, string>();
     assessmentByStudent.forEach((aid, sid) => studentIdToAssessmentId.set(sid, aid));
 
-    const rows: BehavioralMatrixRowDto[] = studentList.map((s) => {
+    const rows: BehavioralMatrixRowDto[] = typedStudentList.map((s) => {
       const assessmentId = studentIdToAssessmentId.get(s.id);
       const scoresMap = assessmentId
         ? assessmentIdToScores.get(assessmentId) || {}

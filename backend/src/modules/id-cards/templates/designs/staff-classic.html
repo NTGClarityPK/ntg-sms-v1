@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff ID Card - Classic</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f0f0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .card-wrapper {
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .card-side {
+            text-align: center;
+        }
+
+        .card-label {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card {
+            width: 480px;
+            height: 300px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ============ FRONT SIDE (same layout shell as student classic) ============ */
+        .front {
+            background: white;
+            display: flex;
+            height: 100%;
+            position: relative;
+        }
+
+        .vertical-strip {
+            width: 130px;
+            background: linear-gradient(180deg, var(--pdf-a) 0%, var(--pdf-dark) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            align-self: stretch;
+            min-height: 100%;
+            padding: 14px 15px 12px;
+            box-sizing: border-box;
+            position: relative;
+            justify-content: flex-start;
+        }
+
+        .photo-strip {
+            width: 100px;
+            height: 130px;
+            flex-shrink: 0;
+            background: white;
+            border: 5px solid white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .role-badge {
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 900;
+            text-transform: uppercase;
+            text-align: center;
+            line-height: 1.2;
+            max-width: 100%;
+        }
+
+        .strip-year {
+            margin-top: auto;
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 18px;
+            font-size: 11px;
+            font-weight: 700;
+            backdrop-filter: blur(10px);
+        }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: 14px 22px 12px;
+            min-height: 0;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        .school-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+            border-bottom: 3px solid var(--pdf-a);
+            padding-bottom: 10px;
+        }
+
+        .school-header-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .school-name-main {
+            color: #0F172A;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .school-tagline {
+            color: #64748B;
+            font-size: 10px;
+            margin-top: 4px;
+        }
+
+        .staff-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            min-height: 0;
+        }
+
+        .student-name-main {
+            color: #0F172A;
+            font-size: 26px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 12px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px 15px;
+            align-items: baseline;
+        }
+
+        .detail-label {
+            color: #64748B;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: left;
+            padding-top: 3px;
+        }
+
+        .detail-value {
+            color: #0F172A;
+            font-size: 14px;
+            font-weight: 700;
+            text-align: left;
+            line-height: 1.25;
+        }
+
+        .header-logo {
+            width: 52px;
+            height: 52px;
+            flex-shrink: 0;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            font-weight: 900;
+            color: var(--pdf-a);
+            font-size: 22px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-id-footer {
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 2px solid #E5E7EB;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .employee-id {
+            color: #0F172A;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        .validity {
+            background: var(--pdf-a);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 9px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        /* ============ BACK SIDE (staff classic — from design spec) ============ */
+        .back {
+            background: white;
+            display: flex;
+            height: 100%;
+        }
+
+        .back-red-strip {
+            width: 80px;
+            flex-shrink: 0;
+            background: linear-gradient(180deg, var(--pdf-a) 0%, var(--pdf-dark) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 25px 15px;
+            box-sizing: border-box;
+        }
+
+        .back-strip-title {
+            color: white;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.3;
+            transform: rotate(-90deg);
+            white-space: nowrap;
+            margin: auto 0;
+        }
+
+        .back-qr-large {
+            width: 60px;
+            height: 60px;
+            flex-shrink: 0;
+            background: white;
+            border-radius: 8px;
+            padding: 5px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .back-content {
+            flex: 1;
+            min-width: 0;
+            padding: 25px 30px;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .back-header {
+            background: linear-gradient(90deg, var(--pdf-dark) 0%, var(--pdf-a) 100%);
+            color: white;
+            padding: 12px 20px;
+            margin: -25px -30px 20px -30px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .back-title {
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: 2px;
+        }
+
+        .guidelines-section {
+            flex: 1;
+            min-height: 0;
+        }
+
+        .guidelines-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #1F2937;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .guideline-item {
+            font-size: 9px;
+            color: #4B5563;
+            margin-bottom: 8px;
+            padding-left: 15px;
+            position: relative;
+            line-height: 1.4;
+        }
+
+        .guideline-item::before {
+            content: "—";
+            position: absolute;
+            left: 0;
+            color: var(--pdf-a);
+            font-weight: 700;
+        }
+
+        .contact-footer {
+            margin-top: auto;
+            padding-top: 15px;
+            border-top: 2px solid #E5E7EB;
+            font-size: 9px;
+            color: #6B7280;
+            line-height: 1.6;
+            flex-shrink: 0;
+        }
+
+        .contact-data {
+            font-size: 9px;
+            color: #6B7280;
+            line-height: 1.6;
+        }
+
+        @page {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .card {
+                box-shadow: none;
+                page-break-inside: avoid;
+            }
+            .card-label {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="card-wrapper">
+        <!-- FRONT SIDE -->
+        <div class="card-side">
+            <div class="card-label">— FRONT SIDE —</div>
+            <div class="card front">
+                <div class="vertical-strip">
+                    <div class="photo-strip">👤</div>
+                    <div class="role-badge">SUBJECT<br>TEACHER</div>
+                    <div class="strip-year">2024-25</div>
+                </div>
+
+                <div class="main-area">
+                    <div class="school-header">
+                        <div class="school-header-text">
+                            <div class="school-name-main">AL NOOR ACADEMY</div>
+                            <div class="school-tagline">Excellence in Education Since 1995</div>
+                        </div>
+                        <div class="header-logo">A</div>
+                    </div>
+
+                    <div class="staff-area">
+                        <div class="student-name-main">Ayesha Tarar</div>
+
+                        <div class="details-grid">
+                            <div class="detail-label">Department:</div>
+                            <div class="detail-value">Mathematics</div>
+
+                            <div class="detail-label">Position:</div>
+                            <div class="detail-value">Subject Teacher</div>
+
+                            <div class="detail-label">Employee ID:</div>
+                            <div class="detail-value">STF-2024-0045</div>
+
+                            <div class="detail-label">Join Date:</div>
+                            <div class="detail-value">January 2024</div>
+                        </div>
+                    </div>
+
+                    <div class="card-id-footer">
+                        <div class="employee-id">ID: STF-2024-0045</div>
+                        <div class="validity">VALID 2024-25</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BACK SIDE -->
+        <div class="card-side">
+            <div class="card-label">— BACK SIDE —</div>
+            <div class="card back">
+                <div class="back-red-strip">
+                    <div class="back-strip-title">STAFF IDENTITY</div>
+                    <div class="back-qr-large">QR</div>
+                </div>
+
+                <div class="back-content">
+                    <div class="back-header">
+                        <div class="back-title">STAFF IDENTITY CARD</div>
+                    </div>
+
+                    <div class="guidelines-section">
+                        <div class="guidelines-title">Card Guidelines</div>
+                        <div class="guideline-item">Carry this card at all times on campus</div>
+                        <div class="guideline-item">Report loss immediately to administration</div>
+                        <div class="guideline-item">Property of Al Noor Academy - non-transferable</div>
+                        <div class="guideline-item">Replacement cost: PKR 500</div>
+                    </div>
+
+                    <div class="contact-footer">
+                        Phone: +92-51-2345678<br>
+                        Email: info@alnoor.edu.pk<br>
+                        Web: www.alnoor.edu.pk
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

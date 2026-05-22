@@ -368,17 +368,34 @@ class ApiClient {
       responseType: 'blob',
       timeout: config?.timeout ?? 60000,
     });
+    return this.blobResponseWithFilename(response);
+  }
 
+  async postBlobWithFilename(
+    url: string,
+    data?: unknown,
+    config?: AxiosRequestConfig,
+  ): Promise<{ blob: Blob; filename?: string }> {
+    const response = await this.client.post<Blob>(url, data, {
+      ...config,
+      responseType: 'blob',
+      timeout: config?.timeout ?? 60000,
+    });
+    return this.blobResponseWithFilename(response);
+  }
+
+  private blobResponseWithFilename(response: { data: Blob; headers?: Record<string, unknown> }): {
+    blob: Blob;
+    filename?: string;
+  } {
     const cd = (response.headers?.['content-disposition'] as string | undefined) ?? undefined;
     const filename = (() => {
       if (!cd) return undefined;
-      // Handles: filename="x.pdf" and RFC5987: filename*=UTF-8''x.pdf
       const matchStar = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
       if (matchStar?.[1]) return decodeURIComponent(matchStar[1].trim().replace(/^\"|\"$/g, ''));
       const match = cd.match(/filename\s*=\s*\"?([^\";]+)\"?/i);
       return match?.[1]?.trim();
     })();
-
     return { blob: response.data, filename };
   }
 

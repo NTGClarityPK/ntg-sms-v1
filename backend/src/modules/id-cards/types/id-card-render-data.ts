@@ -1,0 +1,36 @@
+export type IdCardRenderData = {
+  schoolName: string;
+  schoolLogoUrl: string;
+  academicYearLabel: string;
+  personType: string;
+  fullName: string;
+  roleLabel: string;
+  classSection: string;
+  rollOrEmployeeId: string;
+  email: string;
+  phone: string;
+  cardNumber: string;
+  photoUrl: string;
+  validFrom: string;
+  validUntil: string;
+  qrCodeDataUrl: string;
+  primaryColor: string;
+  guardianName: string;
+  guardianPhone: string;
+  guardianRelation: string;
+  address: string;
+  bloodGroup: string;
+  dateOfBirth: string;
+  admissionDate: string;
+  schoolPhone: string;
+  schoolEmail: string;
+  schoolWebsite: string;
+  schoolLocation: string;
+  isReissued: boolean;
+  reissuedLabel: string;
+  /** HTML for strip/header role badge (staff cards). */
+  staffRoleBadgeHtml?: string;
+  staffDepartment?: string;
+  staffPosition?: string;
+  staffJoinDate?: string;
+};

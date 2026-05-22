@@ -41,6 +41,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/reports/public': 'reports',
   '/reports/administrative': 'reports',
   '/settings': 'settings',
+  '/id-cards': 'id_cards',
 };
 
 /**

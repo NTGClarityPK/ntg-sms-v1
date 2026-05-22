@@ -5,7 +5,13 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "watchAssets": true,
-    "assets": []
+    "assets": [
+      {
+        "include": "modules/id-cards/templates/**/*",
+        "outDir": "dist/src",
+        "watchAssets": true
+      }
+    ]
   },
   "watchOptions": {
     "usePolling": false,

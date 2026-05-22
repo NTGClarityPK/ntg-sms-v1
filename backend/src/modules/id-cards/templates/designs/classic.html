@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alma ID Card - Modern Design 2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f0f0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .card-wrapper {
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .card-side {
+            text-align: center;
+        }
+
+        .card-label {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* WIDE RECTANGULAR LAYOUT */
+        .card {
+            width: 480px;
+            height: 300px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ============ FRONT SIDE with VERTICAL STRIP ============ */
+        .front {
+            background: white;
+            display: flex;
+            height: 100%;
+            position: relative;
+        }
+
+        /* Vertical blue strip on LEFT - wider for rectangular card */
+        .vertical-strip {
+            width: 130px;
+            background: linear-gradient(180deg, var(--pdf-a) 0%, var(--pdf-dark) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            align-self: stretch;
+            min-height: 100%;
+            padding: 14px 15px 12px;
+            box-sizing: border-box;
+            position: relative;
+            justify-content: flex-start;
+        }
+
+        /* Photo aligned with school name row on the right */
+        .photo-strip {
+            width: 100px;
+            height: 130px;
+            flex-shrink: 0;
+            background: white;
+            border: 5px solid white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .strip-year {
+            margin-top: auto;
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 18px;
+            font-size: 11px;
+            font-weight: 700;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Main content area - much wider now */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: 14px 22px 12px;
+            min-height: 0;
+            box-sizing: border-box;
+        }
+
+        .school-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+            border-bottom: 3px solid var(--pdf-a);
+            padding-bottom: 10px;
+        }
+
+        .school-header-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .school-name-main {
+            color: #0F172A;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .school-tagline {
+            color: #64748B;
+            font-size: 10px;
+            margin-top: 4px;
+        }
+
+        .student-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            min-height: 0;
+        }
+
+        .student-name-main {
+            color: #0F172A;
+            font-size: 28px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 12px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px 15px;
+            align-items: baseline;
+        }
+
+        .detail-label {
+            color: #64748B;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: left;
+            padding-top: 3px;
+        }
+
+        .detail-value {
+            color: #0F172A;
+            font-size: 14px;
+            font-weight: 700;
+            text-align: left;
+            line-height: 1.25;
+        }
+
+        .blood-badge {
+            background: #FEE2E2;
+            color: #DC2626;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .header-logo {
+            width: 52px;
+            height: 52px;
+            flex-shrink: 0;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            font-weight: 900;
+            color: var(--pdf-a);
+            font-size: 22px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+        }
+
+        /* ============ BACK SIDE with LEFT STRIP ============ */
+        .back {
+            background: white;
+            display: flex;
+            height: 100%;
+        }
+
+        .back-strip {
+            width: 130px;
+            background: linear-gradient(180deg, var(--pdf-a) 0%, var(--pdf-dark) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 25px 15px;
+        }
+
+        .back-strip-title {
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.3;
+            transform: rotate(-90deg);
+            white-space: nowrap;
+            margin: auto 0;
+        }
+
+        .back-qr {
+            width: 70px;
+            height: 70px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--pdf-a);
+            font-size: 10px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.3;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .back-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+        }
+
+        .emergency-section {
+            background: #FEF3C7;
+            border: 3px solid #F59E0B;
+            padding: 18px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .emergency-heading {
+            font-size: 11px;
+            font-weight: 700;
+            color: #92400E;
+            margin-bottom: 10px;
+        }
+
+        .emergency-details {
+            font-size: 13px;
+            color: #78350F;
+            line-height: 1.6;
+        }
+
+        .rules-area {
+            flex: 1;
+        }
+
+        .rules-heading {
+            font-size: 11px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .rule {
+            font-size: 11px;
+            color: #475569;
+            margin-bottom: 8px;
+            padding-left: 18px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .rule::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--pdf-a);
+            font-weight: 900;
+        }
+
+        .contact-footer {
+            margin-top: auto;
+            padding-top: 15px;
+            border-top: 3px solid #E5E7EB;
+            font-size: 11px;
+            color: #64748B;
+            line-height: 1.7;
+        }
+
+        @page {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .card {
+                box-shadow: none;
+                page-break-inside: avoid;
+            }
+            .card-label {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 style="font-size: 28px; color: #333; margin-bottom: 10px;">Modern Design 2 - RECTANGULAR with Vertical Strip</h1>
+    <p style="color: #666; margin-bottom: 20px;">Wide layout • Unique left strip • Photo overlaps • Very different from Schoolify</p>
+    
+    <div class="card-wrapper">
+        <!-- FRONT SIDE -->
+        <div class="card-side">
+            <div class="card-label">— FRONT SIDE —</div>
+            <div class="card front">
+                <div class="vertical-strip">
+                    <div class="photo-strip">👤</div>
+                    <div class="strip-year">2024-25</div>
+                </div>
+
+                <div class="main-area">
+                    <div class="school-header">
+                        <div class="school-header-text">
+                            <div class="school-name-main">AL NOOR ACADEMY</div>
+                            <div class="school-tagline">Excellence in Education Since 1995</div>
+                        </div>
+                        <div class="header-logo">A</div>
+                    </div>
+
+                    <div class="student-area">
+                        <div class="student-name-main">ANAM FATIMA</div>
+                        
+                        <div class="details-grid">
+                            <div class="detail-label">Class:</div>
+                            <div class="detail-value">VIIth</div>
+                            
+                            <div class="detail-label">Roll No:</div>
+                            <div class="detail-value">1002</div>
+                            
+                            <div class="detail-label">Parent/Guardian:</div>
+                            <div class="detail-value">Sajjan Jamali</div>
+                            
+                            <div class="detail-label">Blood:</div>
+                            <div class="detail-value">
+                                <span class="blood-badge">B+</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BACK SIDE -->
+        <div class="card-side">
+            <div class="card-label">— BACK SIDE —</div>
+            <div class="card back">
+                <div class="back-strip">
+                    <div class="back-strip-title">STUDENT ID</div>
+                    <div class="back-qr">SCAN<br>FOR<br>INFO</div>
+                </div>
+
+                <div class="back-content">
+                    <div class="emergency-section">
+                        <div class="emergency-heading">⚠️ EMERGENCY CONTACT</div>
+                        <div class="emergency-details">
+                            <strong>Name:</strong> Sajjan Jamali (Parent/Guardian)<br>
+                            <strong>Mobile:</strong> +92 300 1234567
+                        </div>
+                    </div>
+
+                    <div class="rules-area">
+                        <div class="rules-heading">Card Guidelines</div>
+                        <div class="rule">Carry this card at all times on campus</div>
+                        <div class="rule">Report loss immediately to administration</div>
+                        <div class="rule">Property of Al Noor Academy - non-transferable</div>
+                        <div class="rule">Replacement cost: PKR 500</div>
+                    </div>
+
+                    <div class="contact-footer">
+                        📞 +92-51-2345678<br>
+                        📧 info@alnoor.edu.pk<br>
+                        🌐 www.alnoor.edu.pk
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

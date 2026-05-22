@@ -81,3 +81,34 @@ Server-side snapshot selection for `progress_report` follows configured **`progr
 ## Parent portal vs delivery
 
 Published cards remain visible to authorised parents regardless of delivery rows; **`result_card_deliveries`** is additive metadata for “sent / printed / downloaded” style tracking.
+
+---
+
+# API contracts — ID Cards module
+
+Branch-scoped. JSON responses: `{ data: T, meta?: … }`. Access: `school_admin`, `principal`, or `super_admin` (feature code `id_cards` for permission matrix).
+
+## Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/id-cards` | Paginated list. Query: `personType`, `status`, `classSectionId` (or `classId` + `sectionId`), `search`, `missingPhotoOnly`, pagination. |
+| `GET` | `/api/v1/id-cards/stats` | Counts: issued, pending, missingPhotos, draft. |
+| `GET` | `/api/v1/id-cards/analytics` | Total cards, issued, reprint count/rate. |
+| `GET` | `/api/v1/id-cards/templates` | Active templates for branch. Query: `roleType?`. |
+| `GET` | `/api/v1/id-cards/card-data/:personType/:personId` | Render payload for preview (not persisted). |
+| `GET` | `/api/v1/id-cards/verify/:cardNumber` | QR verification (minimal fields). |
+| `POST` | `/api/v1/id-cards/photos` | Multipart `file`, `personType`, optional `personId`, `matchKey` (filename → roll/employee id). |
+| `POST` | `/api/v1/id-cards/generate` | Body: `personType`, `personIds?`, `classSectionId?`, `templateId?`. Upserts draft cards. |
+| `POST` | `/api/v1/id-cards/generation-jobs` | Enqueue bulk generation (worker). Returns `{ jobId }`. |
+| `GET` | `/api/v1/id-cards/generation-jobs/:jobId` | Job status + progress. |
+| `POST` | `/api/v1/id-cards/bulk-pdf` | Body: `cardIds[]`, `layout?` (`single` \| `a4_9up`). Returns ZIP. |
+| `PATCH` | `/api/v1/id-cards/status` | Body: `status`, `cardIds[]`. Bulk status update. |
+| `GET` | `/api/v1/id-cards/:id` | Single card. |
+| `GET` | `/api/v1/id-cards/:id/pdf` | PDF stream. Query: `side?` (`front` \| `back` \| `both`). |
+| `POST` | `/api/v1/id-cards/:id/reprint` | Body: `reason`, `feeCharged?`. Sets `is_reissued`, logs reprint. |
+
+## Storage
+
+- Bucket: `id-card-assets` (public URLs for photos/PDFs).
+- Card size: CR80 85.6mm × 54mm via Puppeteer HTML templates under `backend/src/modules/id-cards/templates/`.

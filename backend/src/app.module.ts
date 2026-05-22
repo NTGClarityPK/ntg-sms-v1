@@ -38,6 +38,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { ResultsModule } from './modules/results/results.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { AuditLogModule } from './common/modules/audit-log/audit-log.module';
+import { StudentPlacementModule } from './common/modules/student-placement/student-placement.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { LibraryModule } from './modules/library/library.module';
 import { UniformsModule } from './modules/uniforms/uniforms.module';
@@ -54,6 +55,7 @@ import { PromotionPlacementModule } from './modules/promotion-placement/promotio
 import { SetupWizardModule } from './modules/setup-wizard/setup-wizard.module';
 import { FeesModule } from './modules/fees/fees.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { IdCardsModule } from './modules/id-cards/id-cards.module';
 
 @Module({
   imports: [
@@ -64,6 +66,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     NestCronScheduleModule.forRoot(),
     GlobalJwtModule,
     AuditLogModule,
+    StudentPlacementModule,
     AuthModule,
     AcademicYearsModule,
     CoreLookupsModule,
@@ -110,6 +113,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     SetupWizardModule,
     FeesModule,
     SubscriptionModule,
+    IdCardsModule,
   ],
   controllers: [AppController],
   providers: [

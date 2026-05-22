@@ -30,6 +30,7 @@ export class StudentDto {
   sectionName?: string;
   subjectTemplateId?: string;
   subjectTemplateName?: string;
+  avatarUrl?: string;
 
   constructor(partial: Partial<StudentDto>) {
     Object.assign(this, partial);

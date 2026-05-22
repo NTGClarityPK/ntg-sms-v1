@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { width: 85.6mm; height: 54mm; font-family: Inter, Arial, sans-serif; font-size: 7pt; color: #1f2937; padding: 4mm; }
+    h2 { font-size: 8pt; margin-bottom: 2mm; color: #4f46e5; }
+    .section { margin-bottom: 2mm; line-height: 1.4; }
+    .rules { font-size: 6.5pt; color: #4b5563; margin-top: 2mm; }
+  </style>
+</head>
+<body>
+  <h2>Emergency contact</h2>
+  <div class="section">
+    {{guardianName}} ({{guardianRelation}})<br/>
+    {{guardianPhone}}<br/>
+    {{address}}
+  </div>
+  <div class="section">Blood group: {{bloodGroup}} &nbsp; DOB: {{dateOfBirth}}</div>
+  <div class="rules">
+    • Carry this card on campus at all times.<br/>
+    • Report lost cards to the admin office.<br/>
+    • {{schoolPhone}}
+  </div>
+</body>
+</html>

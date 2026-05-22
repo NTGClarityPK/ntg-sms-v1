@@ -78,7 +78,7 @@ export default function ConflictManagementPage() {
 
   const conflicts = conflictsData?.data || [];
   const classSections = classSectionsData?.data || [];
-  const staff = staffData?.data?.data || [];
+  const staff = staffData?.data || [];
   const academicYears = academicYearsData?.data || [];
 
   // Set default academic year to active year

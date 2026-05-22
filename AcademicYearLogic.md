@@ -37,6 +37,24 @@ When a new academic year is activated, the school should experience a **fresh op
 
 ---
 
+## Data model (student placement)
+
+Three tables work together. **Do not treat `students.class_id` as the only source of truth.**
+
+| Table | One row means | Used for |
+|--------|----------------|----------|
+| **`students`** | The **person** (name, roll number, login) | Identity; **`class_id` / `section_id` / `academic_year_id`** are a **mirror of the active year’s enrolment** for day-to-day screens |
+| **`student_enrolments`** | **This student, this branch, this academic year** → class, section, status (`active`, `graduated`, …) | **Source of truth** for rosters, class filters, and year-scoped placement |
+| **`student_promotion_decisions`** | **End-of-year decision** for closing year X → outcome + target class/section | Checklist before lock; drives enrolments on **save**, **lock**, and **new year** |
+
+**Writes:** all `student_enrolments` upserts go through **`StudentPlacementService`** (backend), which keeps the `students` mirror in sync when the year is active.
+
+**Reads:** class-section lists and filters should use **`student_enrolments`** for the selected/active year (with the `students` mirror as fallback only if enrolment is missing).
+
+**Attendance / results / behaviour** for a past year stay on those records’ own `academic_year_id` (and often `class_section_id` at time of entry). They are **not** moved when a student is promoted.
+
+---
+
 ## School User Journey (After Implementation)
 
 ### 1) Staff/teachers complete Promotion (end-of-year requirement)
@@ -49,8 +67,8 @@ From **Sidebar → Promotion**, staff record each student’s outcome:
 
 Important behaviour (**two steps — not “only on lock”**):
 
-- **When staff click Save on Promotion:** for **Promoted** and **Repeated**, the system updates **`student_enrolments` for the academic year you are working in** (the closing year while it is still active). Staff should see the new class/section straight away on **Students** and class rosters for **that same year**.
-- **When the year is locked and the next year becomes active:** the system applies the same promotion decisions again into **`student_enrolments` for the newly active year**, so roster and placement stay correct **after** you switch into the new year. Outcomes such as graduated / left do not carry a class in the new year.
+- **When staff click Save on Promotion:** closing-year **`student_enrolments`** are aligned with **all** saved decisions for that year (promoted/repeated → target class/section; graduated/left → matching status). Staff should see the new class/section straight away on **Students** and class rosters for **that same year**.
+- **When the year is locked:** the system runs the same alignment **once more** on the closing year (so locked-year enrolment rows cannot drift from decisions), then applies decisions into **`student_enrolments` for the newly active year**. Outcomes such as graduated / left do not carry a class in the new year.
 
 ### 2) Admin locks the academic year
 
@@ -165,6 +183,135 @@ This ensures:
 Important:
 
 - Operational screens and class rosters should use **enrolment for the active year** to determine a student’s current class/section.
+- The **`students`** row keeps a **mirror** of the active year’s active enrolment (`class_id`, `section_id`, `academic_year_id`) so older screens and filters stay aligned.
+- All enrolment writes go through **`StudentPlacementService`**, which:
+  - upserts **`student_enrolments`**
+  - mirrors to **`students`** when the row’s year is the branch **active** year (or when locking assigns the new active year)
+  - on **Promotion save** and **Lock**, aligns **closing-year** enrolments with **`student_promotion_decisions`** so locked-year placement cannot disagree with promotion (e.g. decision “Class II” but enrolment still “Class I”).
+
+See **Worked example: Lock** above for row-by-row behaviour.
+
+---
+
+## Worked example: Lock (user journey + database rows)
+
+**School:** Credo School · **Main Branch**  
+**Closing year:** 2026–2027 (currently **active**)  
+**Next year:** 2028–2029 (exists, inactive)  
+**Class section:** Class I · C → after promotion, target **Class II · C**
+
+**Pupils in the example:** Ali Hassan (roll 0031) and Nameer Ali Khan (roll 0045) — both in Class I · C during the year.
+
+### Step 0 — Before promotion (active year 2026–2027)
+
+**`academic_years`**
+
+| name | is_active | is_locked |
+|------|-----------|-----------|
+| 2026–2027 | yes | no |
+| 2028–2029 | no | no |
+
+**`student_enrolments`** (placement for **2026–2027**)
+
+| student | academic_year | class | section | status |
+|---------|---------------|-------|---------|--------|
+| Ali Hassan | 2026–2027 | Class I | C | active |
+| Nameer Ali Khan | 2026–2027 | Class I | C | active |
+
+**`students`** (mirror — same as enrolment while this year is active)
+
+| student | academic_year | class | section |
+|---------|---------------|-------|---------|
+| Ali Hassan | 2026–2027 | Class I | C |
+| Nameer Ali Khan | 2026–2027 | Class I | C |
+
+**`student_promotion_decisions`:** *(empty)*
+
+---
+
+### Step 1 — Staff complete Promotion (Sidebar → Promotion → Save)
+
+Admin promotes both to **Class II · C** for the closing year.
+
+**`student_promotion_decisions`** (one row per student per closing year)
+
+| student | source_year | outcome | target_class | target_section |
+|---------|-------------|---------|--------------|----------------|
+| Ali Hassan | 2026–2027 | promoted | Class II | C |
+| Nameer Ali Khan | 2026–2027 | promoted | Class II | C |
+
+**`student_enrolments`** for **2026–2027** is **updated** to match decisions (end-of-year placement on the closing year):
+
+| student | academic_year | class | section | status |
+|---------|---------------|-------|---------|--------|
+| Ali Hassan | 2026–2027 | Class II | C | active |
+| Nameer Ali Khan | 2026–2027 | Class II | C | active |
+
+**`students`** mirror (still active year 2026–2027):
+
+| student | academic_year | class | section |
+|---------|---------------|-------|---------|
+| Ali Hassan | 2026–2027 | Class II | C |
+| Nameer Ali Khan | 2026–2027 | Class II | C |
+
+*Operational history (e.g. attendance marked in September in Class I) is unchanged — it still points at the old class section for that date.*
+
+---
+
+### Step 2 — Admin clicks Lock on 2026–2027
+
+**Gate:** every active student in 2026–2027 must have a promotion decision; another year (2028–2029) must exist.
+
+**Before** setting `is_locked`, the system **re-applies** promotion decisions onto **2026–2027** enrolments (safety net so locked rows cannot drift).
+
+Then:
+
+1. **2026–2027** → `is_active = no`, `is_locked = yes`  
+2. **2028–2029** → `is_active = yes`, `is_locked = no`  
+3. **New enrolment rows** for **2028–2029** are created from promotion decisions  
+4. **`students`** mirror is updated for the **new** active year
+
+**`academic_years` (after lock)**
+
+| name | is_active | is_locked |
+|------|-----------|-----------|
+| 2026–2027 | no | **yes** |
+| 2028–2029 | **yes** | no |
+
+**`student_enrolments`** (two rows per promoted student)
+
+| student | academic_year | class | section | status |
+|---------|---------------|-------|---------|--------|
+| Ali Hassan | 2026–2027 | Class II | C | active |
+| Ali Hassan | **2028–2029** | Class II | C | active |
+| Nameer Ali Khan | 2026–2027 | Class II | C | active |
+| Nameer Ali Khan | **2028–2029** | Class II | C | active |
+
+**`students`** (mirror = **active** year only)
+
+| student | academic_year | class | section |
+|---------|---------------|-------|---------|
+| Ali Hassan | **2028–2029** | Class II | C |
+| Nameer Ali Khan | **2028–2029** | Class II | C |
+
+**`student_promotion_decisions`:** unchanged (still the audit of what was decided for 2026–2027).
+
+---
+
+### Step 3 — What staff see day-to-day (after lock)
+
+| Screen | Year used | Class II · C roster |
+|--------|-----------|---------------------|
+| Attendance, Behaviour matrix, Students filter | **Active 2028–2029** | Ali, Nameer, and other promoted pupils in II · C |
+| Reports filtered to **2026–2027** | Locked year | Enrolment shows **II · C**; attendance lines may still show **Class I** where marked earlier |
+
+Trying to **edit** 2026–2027 data (timetable, attendance, student placement for that year) is **blocked** with: *This academic year is locked.*
+
+---
+
+### Step 4 — Optional Rollover (later, separate action)
+
+On **2028–2029**, admin may run **Rollover** to copy leave settings, timetable, teacher assignments, etc. from a **locked** source year. Rollover does **not** change student class placement (that already came from lock + promotion).
 
 ---
 

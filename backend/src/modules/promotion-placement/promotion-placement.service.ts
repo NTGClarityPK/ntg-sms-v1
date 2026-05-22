@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
+import { StudentPlacementService } from '../../common/services/student-placement.service';
 import { PromotionStudentDto } from './dto/promotion-student.dto';
 import type { PromotionOutcome } from './dto/promotion-outcome.enum';
 import { YearCloseReadinessDto } from './dto/year-close-readiness.dto';
@@ -22,6 +23,7 @@ export class PromotionPlacementService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly studentPlacementService: StudentPlacementService,
   ) {}
 
   async listStudentsForPromotion(
@@ -190,25 +192,10 @@ export class PromotionPlacementService {
     });
     throwIfDbError(error);
 
-    // Immediate effect on the current (closing) year roster view:
-    // After staff enter promotion decisions, they expect to see the updated class/section immediately.
-    // So we update the current year's enrolments to the chosen target placement for promoted/repeated.
-    const enrolmentUpdates = decisions
-      .filter((d) => d.outcome === 'promoted' || d.outcome === 'repeated')
-      .map((d) => ({
-        student_id: d.studentId,
-        branch_id: branchId,
-        academic_year_id: sourceAcademicYearId,
-        class_id: d.targetClassId ?? null,
-        section_id: d.targetSectionId ?? null,
-        status: 'active',
-      }));
-    if (enrolmentUpdates.length > 0) {
-      const { error: upErr } = await supabase.from('student_enrolments').upsert(enrolmentUpdates, {
-        onConflict: 'student_id,branch_id,academic_year_id',
-      });
-      throwIfDbError(upErr);
-    }
+    await this.studentPlacementService.applyPromotionDecisionsToClosingYearEnrolments(
+      branchId,
+      sourceAcademicYearId,
+    );
 
     return { upserted: rows.length };
   }

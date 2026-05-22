@@ -15,6 +15,7 @@ import { UpdateClassSectionDto } from './dto/update-class-section.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { StudentPlacementService } from '../../common/services/student-placement.service';
 
 type ClassSectionRow = {
   id: string;
@@ -49,6 +50,7 @@ export class ClassSectionsService {
     private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly studentPlacementService: StudentPlacementService,
   ) {}
 
   private async getTenantIdForBranch(branchId: string): Promise<string> {
@@ -606,34 +608,12 @@ export class ClassSectionsService {
 
     const cs = classSection as { class_id: string; section_id: string; academic_year_id: string };
 
-    // Use enrolments to ensure year-scoped roster
-    const { data: enrolments, error: enrolError } = await supabase
-      .from('student_enrolments')
-      .select('student_id')
-      .eq('branch_id', branchId)
-      .eq('academic_year_id', cs.academic_year_id)
-      .eq('class_id', cs.class_id)
-      .eq('section_id', cs.section_id)
-      .eq('status', 'active');
-
-    throwIfDbError(enrolError);
-
-    let studentIds = (enrolments || []).map((e) => (e as { student_id: string }).student_id);
-
-    // Backward compatibility: if enrolments were not backfilled/maintained for this tenant/year,
-    // fall back to legacy students placement (students.academic_year_id + class_id + section_id).
-    if (studentIds.length === 0) {
-      const { data: legacyStudents, error: legacyErr } = await supabase
-        .from('students')
-        .select('id')
-        .eq('branch_id', branchId)
-        .eq('academic_year_id', cs.academic_year_id)
-        .eq('class_id', cs.class_id)
-        .eq('section_id', cs.section_id)
-        .eq('is_active', true);
-      throwIfDbError(legacyErr);
-      studentIds = (legacyStudents || []).map((s) => (s as { id: string }).id);
-    }
+    const studentIds = await this.studentPlacementService.listActiveStudentIdsForClassSection({
+      branchId,
+      academicYearId: cs.academic_year_id,
+      classId: cs.class_id,
+      sectionId: cs.section_id,
+    });
 
     if (studentIds.length === 0) return { data: [] };
 

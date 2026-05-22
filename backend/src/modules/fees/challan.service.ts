@@ -9,6 +9,7 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { FeeCalculationService } from './fee-calculation.service';
 import { FeePdfService } from './fee-pdf.service';
+import { StudentPlacementService } from '../../common/services/student-placement.service';
 
 type StudentRow = {
   id: string;
@@ -108,6 +109,7 @@ export class ChallanService {
     private readonly academicYearsService: AcademicYearsService,
     private readonly feeCalculationService: FeeCalculationService,
     private readonly feePdfService: FeePdfService,
+    private readonly studentPlacementService: StudentPlacementService,
   ) {}
 
   async enqueueGenerateJob(
@@ -1366,35 +1368,12 @@ export class ChallanService {
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) throw new BadRequestException('No active academic year found');
 
-    // Prefer year-scoped enrolments (source of truth). Fall back to legacy placement on students table.
-    const { data: enrolments, error: enrolErr } = await supabase
-      .from('student_enrolments')
-      .select('student_id')
-      .eq('branch_id', branchId)
-      .eq('academic_year_id', activeYear.id)
-      .eq('class_id', classId)
-      .eq('section_id', sectionId)
-      .eq('status', 'active');
-    throwIfDbError(enrolErr);
-
-    let studentIds = (enrolments ?? [])
-      .map((e) => (e as { student_id: string }).student_id)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0);
-
-    if (studentIds.length === 0) {
-      const { data: legacyStudents, error: legacyErr } = await supabase
-        .from('students')
-        .select('id')
-        .eq('branch_id', branchId)
-        .eq('academic_year_id', activeYear.id)
-        .eq('class_id', classId)
-        .eq('section_id', sectionId)
-        .eq('is_active', true);
-      throwIfDbError(legacyErr);
-      studentIds = (legacyStudents ?? [])
-        .map((s) => (s as { id: string }).id)
-        .filter((id): id is string => typeof id === 'string' && id.length > 0);
-    }
+    const studentIds = await this.studentPlacementService.listActiveStudentIdsForClassSection({
+      branchId,
+      academicYearId: activeYear.id,
+      classId,
+      sectionId,
+    });
 
     if (studentIds.length === 0) return { data: [] };
 

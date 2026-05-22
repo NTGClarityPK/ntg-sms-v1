@@ -18,6 +18,10 @@ export class StaffDto {
     roleName: string;
     branchId: string;
   }>;
+  avatarUrl?: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string;
 
   constructor(partial: Partial<StaffDto>) {
     Object.assign(this, partial);

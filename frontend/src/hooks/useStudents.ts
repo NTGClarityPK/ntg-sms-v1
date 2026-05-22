@@ -20,6 +20,7 @@ interface QueryStudentsParams {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  enabled?: boolean;
 }
 
 export function useStudents(params?: QueryStudentsParams) {
@@ -63,7 +64,7 @@ export function useStudents(params?: QueryStudentsParams) {
       // We want to return { data: Student[], meta: {...} }
       return response;
     },
-    enabled: !!branchId,
+    enabled: !!branchId && (params?.enabled !== false),
     staleTime: 2 * 60 * 1000,  // 2 minutes - student list rarely changes mid-session
   });
 }

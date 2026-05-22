@@ -46,6 +46,7 @@ import {
   IconMedal,
   IconCash,
   IconCreditCard,
+  IconId,
   IconArrowsShuffle,
   IconArrowUpRight,
   type IconProps,
@@ -140,6 +141,16 @@ const allNavItems: NavItem[] = [
   { key: 'inventory', label: 'Inventory', href: '/inventory', icon: IconPackage },
   { key: 'uniformRequest', label: 'Request uniform', href: '/uniform-request', icon: IconClipboardList },
   { key: 'fees', label: 'Fees', href: '/fees', icon: IconCash },
+  {
+    key: 'idCards',
+    label: 'ID Cards',
+    href: '/id-cards',
+    icon: IconId,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true;
+    },
+  },
   {
     key: 'myEvents',
     label: 'My Event',
@@ -274,7 +285,7 @@ const COLLAPSED_GROUP_ICONS: Record<string, ComponentType<IconProps>> = {
 const MANAGEMENT_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[] = [
   {
     i18nKey: 'sidebarGroupSetup',
-    hrefs: ['/academic/class-sections', '/promotion-placement', '/mapping', '/users', '/fees'],
+    hrefs: ['/academic/class-sections', '/promotion-placement', '/mapping', '/users', '/fees', '/id-cards'],
   },
   {
     i18nKey: 'sidebarGroupResources',
@@ -404,6 +415,20 @@ export function Sidebar({
     // Request uniform: only for parents
     if (item.href === '/uniform-request') {
       return isParent;
+    }
+
+    // ID Cards — before permission-matrix check (matrix may not be seeded yet)
+    if (item.href === '/id-cards') {
+      if (isSchoolAdmin || isSuperAdmin) return true;
+      const canManageIdCards = user?.roles?.some((r) => {
+        const roleName = r.roleName?.toLowerCase();
+        return (
+          roleName === 'principal' ||
+          roleName === 'academic_coordinator' ||
+          roleName === 'admin_assistant'
+        );
+      });
+      return canManageIdCards || canView('id_cards');
     }
 
     const featureCode = getFeatureCodeForPath(item.href);

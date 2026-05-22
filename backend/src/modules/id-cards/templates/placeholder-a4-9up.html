@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @page { size: A4; margin: 8mm; }
+    body { margin: 0; font-family: Arial, sans-serif; }
+    .sheet { display: grid; grid-template-columns: repeat(3, 85.6mm); grid-template-rows: repeat(3, 54mm); gap: 3mm; }
+    .slot { width: 85.6mm; height: 54mm; overflow: hidden; outline: 0.2mm dashed #9ca3af; position: relative; }
+    .slot iframe { width: 85.6mm; height: 54mm; border: 0; transform: scale(1); }
+    .cut { position: absolute; font-size: 5pt; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="sheet">{{CARD_SLOTS}}</div>
+</body>
+</html>

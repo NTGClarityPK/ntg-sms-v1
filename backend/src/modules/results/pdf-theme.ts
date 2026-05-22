@@ -3,7 +3,8 @@
  * Injected before template CSS so `var(--pdf-*)` in design HTML resolves correctly.
  */
 
-const PDF_DEFAULT_PRIMARY = '#11998e';
+/** Fallback when tenant theme is unset (matches `buildPdfThemeVariablesCss`). */
+export const PDF_DEFAULT_PRIMARY = '#11998e';
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));

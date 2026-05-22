@@ -10,6 +10,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { AcademicYearDto } from './dto/academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
+import { StudentPlacementService } from '../../common/services/student-placement.service';
 
 type AcademicYearRow = {
   id: string;
@@ -52,6 +53,7 @@ export class AcademicYearsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly auditLogService: AuditLogService,
+    private readonly studentPlacementService: StudentPlacementService,
   ) {}
 
   /**
@@ -740,10 +742,10 @@ export class AcademicYearsService {
 
     if (rows.length === 0) return { upserted: 0 };
 
-    const { error: upErr } = await supabase.from('student_enrolments').upsert(rows, {
-      onConflict: 'student_id,branch_id,academic_year_id',
+    await this.studentPlacementService.upsertEnrolments(rows, {
+      mirrorToStudentsForYearId: input.targetAcademicYearId,
     });
-    throwIfDbError(upErr);
+
     return { upserted: rows.length };
   }
 
@@ -773,6 +775,12 @@ export class AcademicYearsService {
     if (!nextYear) {
       throw new BadRequestException('Please create a new academic year before locking the current academic year');
     }
+
+    // Freeze closing-year enrolments that match promotion decisions (avoids Class I on locked year vs Class II on decisions).
+    await this.studentPlacementService.applyPromotionDecisionsToClosingYearEnrolments(
+      branchId,
+      id,
+    );
 
     const { data, error } = await supabase
       .from('academic_years')

@@ -19,6 +19,7 @@ import { InvitationsService } from '../invitations/invitations.service';
 import { ParentsService } from '../parents/parents.service';
 import { MessagesService } from '../messages/messages.service';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { StudentPlacementService } from '../../common/services/student-placement.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import crypto from 'crypto';
 
@@ -67,6 +68,7 @@ export class StudentsService {
     private readonly parentsService: ParentsService,
     private readonly messagesService: MessagesService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly studentPlacementService: StudentPlacementService,
   ) {}
 
   private async getTenantIdForBranch(branchId: string): Promise<string> {
@@ -288,17 +290,43 @@ export class StudentsService {
       dbQuery = dbQuery.in('id', allowedStudentIds);
     }
 
-    // Support both single (backward compatibility) and multiple filters
-    if (query.classIds && query.classIds.length > 0) {
-      dbQuery = dbQuery.in('class_id', query.classIds);
-    } else if (query.classId) {
-      dbQuery = dbQuery.eq('class_id', query.classId);
-    }
+    const classIdsFilter =
+      query.classIds && query.classIds.length > 0
+        ? query.classIds
+        : query.classId
+          ? [query.classId]
+          : [];
+    const sectionIdsFilter =
+      query.sectionIds && query.sectionIds.length > 0
+        ? query.sectionIds
+        : query.sectionId
+          ? [query.sectionId]
+          : [];
 
-    if (query.sectionIds && query.sectionIds.length > 0) {
-      dbQuery = dbQuery.in('section_id', query.sectionIds);
-    } else if (query.sectionId) {
-      dbQuery = dbQuery.eq('section_id', query.sectionId);
+    if (classIdsFilter.length > 0 || sectionIdsFilter.length > 0) {
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+      if (activeYear) {
+        const placementIds = await this.studentPlacementService.listActiveStudentIdsForClassFilters(
+          branchId,
+          activeYear.id,
+          classIdsFilter,
+          sectionIdsFilter,
+        );
+        if (!placementIds || placementIds.length === 0) {
+          return {
+            data: [],
+            meta: { total: 0, page, limit, totalPages: 0 },
+          };
+        }
+        dbQuery = dbQuery.in('id', placementIds);
+      } else {
+        if (classIdsFilter.length > 0) {
+          dbQuery = dbQuery.in('class_id', classIdsFilter);
+        }
+        if (sectionIdsFilter.length > 0) {
+          dbQuery = dbQuery.in('section_id', sectionIdsFilter);
+        }
+      }
     }
 
     if (query.isActive !== undefined) {
@@ -414,7 +442,7 @@ export class StudentsService {
       userIds.length > 0
         ? await supabase
             .from('profiles')
-            .select('id, phone, address, date_of_birth, gender')
+            .select('id, phone, address, date_of_birth, gender, avatar_url')
             .in('id', userIds)
         : { data: [], error: null };
     throwIfDbError(profilesError);
@@ -425,6 +453,7 @@ export class StudentsService {
         address: string | null;
         date_of_birth: string | null;
         gender: string | null;
+        avatar_url: string | null;
       }>) ?? []).map((p) => [p.id, p] as const),
     );
 
@@ -610,6 +639,7 @@ export class StudentsService {
         sectionName: effectiveSectionId ? sectionNameById.get(effectiveSectionId) : undefined,
         subjectTemplateId: safeTemplateInfo?.templateId,
         subjectTemplateName: safeTemplateInfo?.templateName,
+        avatarUrl: profile?.avatar_url ?? undefined,
       });
     });
 
@@ -685,7 +715,7 @@ export class StudentsService {
         ? (
             await supabase
               .from('profiles')
-              .select('phone, address, date_of_birth, gender')
+              .select('phone, address, date_of_birth, gender, avatar_url')
               .eq('id', row.user_id)
               .maybeSingle()
           ).data
@@ -758,6 +788,7 @@ export class StudentsService {
       sectionName: sectionData?.name,
       subjectTemplateId: safeTemplateId,
       subjectTemplateName: safeTemplateName,
+      avatarUrl: (profile as { avatar_url?: string | null } | null)?.avatar_url ?? undefined,
     });
   }
 
@@ -959,22 +990,16 @@ export class StudentsService {
       // Maintain year-scoped placement for attendance/results/etc.
       // Without this, class-section rosters (which read student_enrolments) can appear empty.
       if (academicYearId) {
-        const { error: enrolUpsertError } = await supabase
-          .from('student_enrolments')
-          .upsert(
-            {
-              student_id: studentRow.id,
-              branch_id: branchId,
-              academic_year_id: academicYearId,
-              class_id: input.classId ?? null,
-              section_id: input.sectionId ?? null,
-              status: 'active',
-              created_by: username,
-              updated_by: username,
-            },
-            { onConflict: 'student_id,branch_id,academic_year_id' },
-          );
-        throwIfDbError(enrolUpsertError);
+        await this.studentPlacementService.upsertEnrolment({
+          student_id: studentRow.id,
+          branch_id: branchId,
+          academic_year_id: academicYearId,
+          class_id: input.classId ?? null,
+          section_id: input.sectionId ?? null,
+          status: 'active',
+          created_by: username,
+          updated_by: username,
+        });
       }
 
       // Create subject template assignment if provided (requires an academic year).
@@ -1135,22 +1160,16 @@ export class StudentsService {
       // Maintain year-scoped placement for attendance/results/etc.
       // Without this, the Students list (which reads student_enrolments) can show N/A for class/section.
       if (academicYearId) {
-        const { error: enrolUpsertError } = await supabase
-          .from('student_enrolments')
-          .upsert(
-            {
-              student_id: studentRow.id,
-              branch_id: branchId,
-              academic_year_id: academicYearId,
-              class_id: input.classId ?? null,
-              section_id: input.sectionId ?? null,
-              status: 'active',
-              created_by: username,
-              updated_by: username,
-            },
-            { onConflict: 'student_id,branch_id,academic_year_id' },
-          );
-        throwIfDbError(enrolUpsertError);
+        await this.studentPlacementService.upsertEnrolment({
+          student_id: studentRow.id,
+          branch_id: branchId,
+          academic_year_id: academicYearId,
+          class_id: input.classId ?? null,
+          section_id: input.sectionId ?? null,
+          status: 'active',
+          created_by: username,
+          updated_by: username,
+        });
       }
 
       // Optional: template assignment
@@ -1760,21 +1779,18 @@ export class StudentsService {
       const effectiveSectionId =
         input.sectionId !== undefined ? (input.sectionId ?? null) : ((oldRow as { section_id?: string | null } | null)?.section_id ?? null);
 
-      const { error: enrolUpsertError } = await supabase
-        .from('student_enrolments')
-        .upsert(
-          {
-            student_id: id,
-            branch_id: branchId,
-            academic_year_id: effectiveAcademicYearId,
-            class_id: effectiveClassId,
-            section_id: effectiveSectionId,
-            status: (input.isActive ?? (oldRow as { is_active?: boolean } | null)?.is_active ?? true) ? 'active' : 'inactive',
-            updated_by: username,
-          },
-          { onConflict: 'student_id,branch_id,academic_year_id' },
-        );
-      throwIfDbError(enrolUpsertError);
+      await this.studentPlacementService.upsertEnrolment({
+        student_id: id,
+        branch_id: branchId,
+        academic_year_id: effectiveAcademicYearId,
+        class_id: effectiveClassId,
+        section_id: effectiveSectionId,
+        status:
+          (input.isActive ?? (oldRow as { is_active?: boolean } | null)?.is_active ?? true)
+            ? 'active'
+            : 'inactive',
+        updated_by: username,
+      });
     }
 
     if (newRow) {
