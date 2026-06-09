@@ -21,6 +21,10 @@ export interface TimetableSlot {
   staffName?: string;
   className?: string;
   sectionName?: string;
+  /** Active substitution display (timetable view for a calendar date) */
+  isSubstitutionDisplay?: boolean;
+  substitutionId?: string;
+  originalStaffName?: string;
 }
 
 export interface ClassTimetable {

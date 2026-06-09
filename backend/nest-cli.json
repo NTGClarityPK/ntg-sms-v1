@@ -10,6 +10,11 @@
         "include": "modules/id-cards/templates/**/*",
         "outDir": "dist/src",
         "watchAssets": true
+      },
+      {
+        "include": "modules/certificates/templates/**/*",
+        "outDir": "dist/src",
+        "watchAssets": true
       }
     ]
   },

@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { isCronJobEnabled } from '../../common/config/cron-job-enabled.util';
+import { CRON_JOB_ENV_KEYS } from '../../common/config/cron-job-env-keys';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
 function throwIfDbError(error: PostgrestError | null): void {
@@ -18,7 +21,18 @@ function daysBetween(dueDateIso: string, todayIso: string): number {
 
 @Injectable()
 export class LateFeeService {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  private readonly nightlyJobEnabled: boolean;
+
+  constructor(
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly configService: ConfigService,
+  ) {
+    this.nightlyJobEnabled = isCronJobEnabled(
+      this.configService,
+      CRON_JOB_ENV_KEYS.lateFeeApplication,
+      'production',
+    );
+  }
 
   /**
    * Nightly job: apply late fees once per challan.
@@ -27,6 +41,7 @@ export class LateFeeService {
    */
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async applyLateFeesNightly(): Promise<void> {
+    if (!this.nightlyJobEnabled) return;
     const supabase = this.supabaseConfig.getClient();
     const todayIso = new Date().toISOString().slice(0, 10);
 

@@ -5,6 +5,8 @@ import { StudentJwtGuard } from '../../common/guards/student-jwt.guard';
 import { CurrentStudent, CurrentStudentPayload } from '../../common/decorators/current-student.decorator';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AssessmentsService } from '../assessments/assessments.service';
+import { CertificatesService } from '../certificates/certificates.service';
+import { QueryCertificateHistoryDto } from '../certificates/dto/query-certificate-history.dto';
 import { AssessmentDto } from '../assessments/dto/assessment.dto';
 import { QueryExaminationScheduleDto } from '../assessments/dto/query-examination-schedule.dto';
 import { UpdateStudentAssessmentStatusDto } from '../assessments/dto/update-student-assessment-status.dto';
@@ -16,6 +18,7 @@ export class StudentSelfController {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly assessmentsService: AssessmentsService,
+    private readonly certificatesService: CertificatesService,
   ) {}
 
   @Get('me')
@@ -112,6 +115,50 @@ export class StudentSelfController {
       student.branchId,
     );
     return { data: result };
+  }
+
+  @Get('certificates')
+  async getMyCertificates(
+    @CurrentStudent() student: CurrentStudentPayload,
+  ) {
+    const query = Object.assign(new QueryCertificateHistoryDto(), {
+      page: 1,
+      limit: 100,
+      status: 'issued' as const,
+    });
+    return this.certificatesService.findHistory(
+      student.branchId,
+      query,
+      { restrictStudentIds: [student.id] },
+    );
+  }
+
+  @Get('certificates/:id/pdf')
+  async downloadMyCertificate(
+    @Param('id') id: string,
+    @CurrentStudent() student: CurrentStudentPayload,
+    @Res() res: Response,
+  ) {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: cert } = await supabase
+      .from('certificates')
+      .select('status')
+      .eq('id', id)
+      .eq('student_id', student.id)
+      .eq('branch_id', student.branchId)
+      .maybeSingle();
+    if ((cert as { status?: string } | null)?.status === 'revoked') {
+      res.status(403).json({ message: 'This certificate has been revoked' });
+      return;
+    }
+    const buffer = await this.certificatesService.getPdfBuffer(
+      student.branchId,
+      id,
+      { studentIdScope: student.id },
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="certificate-${id}.pdf"`);
+    res.send(buffer);
   }
 
   @Post('assessments/:id/status')

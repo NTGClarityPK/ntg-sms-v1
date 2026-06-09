@@ -109,12 +109,41 @@ export class StudentPlacementService {
       .eq('source_academic_year_id', sourceAcademicYearId);
     throwIfDbError(dErr);
 
-    const rows: UpsertStudentEnrolmentInput[] = ((decisions as Array<{
-      student_id: string;
-      outcome: string;
-      target_class_id: string | null;
-      target_section_id: string | null;
-    }>) ?? []).map((d) => {
+    const decisionRows =
+      (decisions as Array<{
+        student_id: string;
+        outcome: string;
+        target_class_id: string | null;
+        target_section_id: string | null;
+      }>) ?? [];
+
+    const decisionStudentIds = decisionRows.map((d) => d.student_id);
+    const priorClassByStudent = new Map<
+      string,
+      { class_id: string | null; section_id: string | null }
+    >();
+
+    if (decisionStudentIds.length > 0) {
+      const { data: priorEnrols, error: priorErr } = await supabase
+        .from('student_enrolments')
+        .select('student_id, class_id, section_id')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', sourceAcademicYearId)
+        .in('student_id', decisionStudentIds);
+      throwIfDbError(priorErr);
+      for (const row of (priorEnrols as Array<{
+        student_id: string;
+        class_id: string | null;
+        section_id: string | null;
+      }>) ?? []) {
+        priorClassByStudent.set(row.student_id, {
+          class_id: row.class_id,
+          section_id: row.section_id,
+        });
+      }
+    }
+
+    const rows: UpsertStudentEnrolmentInput[] = decisionRows.map((d) => {
       if (d.outcome === 'promoted' || d.outcome === 'repeated') {
         return {
           student_id: d.student_id,
@@ -125,12 +154,13 @@ export class StudentPlacementService {
           status: 'active',
         };
       }
+      const prior = priorClassByStudent.get(d.student_id);
       return {
         student_id: d.student_id,
         branch_id: branchId,
         academic_year_id: sourceAcademicYearId,
-        class_id: null,
-        section_id: null,
+        class_id: prior?.class_id ?? null,
+        section_id: prior?.section_id ?? null,
         status: d.outcome,
       };
     });

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Group, Title, Stack, Skeleton, SimpleGrid } from '@mantine/core';
+import { Box, Group, Title, Stack, Skeleton, SimpleGrid } from '@mantine/core';
 import {
   useDashboardWidgets,
   useDashboardPreferencesQuery,
@@ -114,14 +114,18 @@ export default function DashboardPage() {
           overflow: 'hidden',
         }}
       >
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{t('dashboard')}</Title>
-          <RoleSwitcher
-            user={userTyped}
-            selectedRoleId={preferences?.selectedRoleId}
-            onRoleChange={handleRoleChange}
-            disabled={savePreferences.isPending}
-          />
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center" gap="xs">
+          <Title order={1} style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
+            {t('dashboard')}
+          </Title>
+          <Box style={{ flexShrink: 0, marginInlineStart: 'auto' }}>
+            <RoleSwitcher
+              user={userTyped}
+              selectedRoleId={preferences?.selectedRoleId}
+              onRoleChange={handleRoleChange}
+              disabled={savePreferences.isPending}
+            />
+          </Box>
         </Group>
       </div>
       <div

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsBoolean, IsArray, IsUUID } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsBoolean, IsArray, IsUUID } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { BasePaginationDto } from '../../../common/dto/base-pagination.dto';
 
@@ -49,5 +49,16 @@ export class QueryStudentsDto extends BasePaginationDto {
   })
   @IsBoolean()
   isActive?: boolean;
+
+  /** Filter by student_enrolments.status for the branch active academic year. */
+  @IsOptional()
+  @IsArray()
+  @IsIn(['active', 'graduated', 'transferred_out', 'withdrawn', 'inactive'], { each: true })
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return [value];
+    return undefined;
+  })
+  enrolmentStatuses?: string[];
 }
 

@@ -11,6 +11,7 @@ import {
   Badge,
   Button,
   Table,
+  Box,
   Skeleton,
   Chip,
   Tabs,
@@ -155,7 +156,9 @@ export default function NotificationsPage() {
     }
 
     return (
-      <Table striped highlightOnHover>
+      <Box style={{ overflow: 'hidden' }}>
+        <Table.ScrollContainer minWidth={640}>
+          <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>{t('type')}</Table.Th>
@@ -226,7 +229,9 @@ export default function NotificationsPage() {
             </Table.Tr>
           ))}
         </Table.Tbody>
-      </Table>
+          </Table>
+        </Table.ScrollContainer>
+      </Box>
     );
   };
 
@@ -284,8 +289,8 @@ export default function NotificationsPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <Tabs value={activeTab} onChange={setActiveTab}>
-          <Tabs.List>
+        <Tabs value={activeTab} onChange={setActiveTab} orientation="horizontal" keepMounted={false}>
+          <Tabs.List style={{ flexWrap: 'nowrap' }}>
             <Tabs.Tab value="all" leftSection={<IconBell size={16} />}>
               {t('tabAll')}
             </Tabs.Tab>

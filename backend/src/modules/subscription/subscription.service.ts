@@ -6,7 +6,10 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { isCronJobEnabled } from '../../common/config/cron-job-enabled.util';
+import { CRON_JOB_ENV_KEYS } from '../../common/config/cron-job-env-keys';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import {
   BillingCycle,
@@ -76,12 +79,21 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 @Injectable()
 export class SubscriptionService {
+  private readonly endOfPeriodJobEnabled: boolean;
+
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly subscriptionInvoiceService: SubscriptionInvoiceService,
     @Inject(forwardRef(() => SubscriptionStripeService))
     private readonly subscriptionStripeService: SubscriptionStripeService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.endOfPeriodJobEnabled = isCronJobEnabled(
+      this.configService,
+      CRON_JOB_ENV_KEYS.subscriptionEndOfPeriod,
+      'production',
+    );
+  }
 
   async getByTenantId(tenantId: string): Promise<SubscriptionDto> {
     const supabase = this.supabaseConfig.getClient();
@@ -641,6 +653,7 @@ export class SubscriptionService {
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async processAllEndOfPeriod(): Promise<void> {
+    if (!this.endOfPeriodJobEnabled) return;
     const supabase = this.supabaseConfig.getClient();
     const nowIso = new Date().toISOString();
     const { data: due, error } = await supabase

@@ -56,6 +56,9 @@ import { SetupWizardModule } from './modules/setup-wizard/setup-wizard.module';
 import { FeesModule } from './modules/fees/fees.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { IdCardsModule } from './modules/id-cards/id-cards.module';
+import { DataExportModule } from './modules/data-export/data-export.module';
+import { SubstitutionsModule } from './modules/substitutions/substitutions.module';
+import { CertificatesModule } from './modules/certificates/certificates.module';
 
 @Module({
   imports: [
@@ -114,6 +117,9 @@ import { IdCardsModule } from './modules/id-cards/id-cards.module';
     FeesModule,
     SubscriptionModule,
     IdCardsModule,
+    DataExportModule,
+    SubstitutionsModule,
+    CertificatesModule,
   ],
   controllers: [AppController],
   providers: [

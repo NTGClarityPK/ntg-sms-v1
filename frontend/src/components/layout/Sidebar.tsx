@@ -47,6 +47,7 @@ import {
   IconCash,
   IconCreditCard,
   IconId,
+  IconCertificate,
   IconArrowsShuffle,
   IconArrowUpRight,
   type IconProps,
@@ -152,6 +153,26 @@ const allNavItems: NavItem[] = [
     },
   },
   {
+    key: 'certificates',
+    label: 'Certificates',
+    href: '/certificates',
+    icon: IconCertificate,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true;
+    },
+  },
+  {
+    key: 'myCertificates',
+    label: 'My Certificates',
+    href: '/my-certificates',
+    icon: IconCertificate,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true;
+    },
+  },
+  {
     key: 'myEvents',
     label: 'My Event',
     href: '/my-events',
@@ -211,6 +232,16 @@ const allNavItems: NavItem[] = [
       return true;
     },
   },
+  {
+    key: 'substitution',
+    label: 'Substitution',
+    href: '/substitution',
+    icon: IconArrowsShuffle,
+    showCondition: () => {
+      if (typeof window === 'undefined') return false;
+      return true;
+    },
+  },
   { key: 'promotionPlacement', label: 'Promotion & Placement', href: '/promotion-placement', icon: IconArrowUpRight },
   { key: 'reports', label: 'Report', href: '/reports', icon: IconChartBar },
   { key: 'results', label: 'Results', href: '/results', icon: IconMedal },
@@ -260,6 +291,7 @@ const SCHOOL_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[
       '/assessments',
       '/my-assessments',
       '/timetable',
+      '/substitution',
       '/my-schedule',
       '/my-timetable',
       '/children-timetable',
@@ -285,7 +317,7 @@ const COLLAPSED_GROUP_ICONS: Record<string, ComponentType<IconProps>> = {
 const MANAGEMENT_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[] = [
   {
     i18nKey: 'sidebarGroupSetup',
-    hrefs: ['/academic/class-sections', '/promotion-placement', '/mapping', '/users', '/fees', '/id-cards'],
+    hrefs: ['/academic/class-sections', '/promotion-placement', '/mapping', '/users', '/fees', '/id-cards', '/certificates'],
   },
   {
     i18nKey: 'sidebarGroupResources',
@@ -328,7 +360,7 @@ export function Sidebar({
   const tNav = useTranslations('navigation');
   const tCommon = useTranslations('common');
   const { user } = useAuth();
-  const { canView } = usePermissions();
+  const { canView, canEdit } = usePermissions();
   const { data: planFeatures } = useSubscriptionFeatures();
   const { studentToken } = useStudentSessionStore();
 
@@ -373,6 +405,11 @@ export function Sidebar({
   
   // Check if user has admin/coordinator role for timetable management
   const canManageTimetable = user?.roles?.some((r) => {
+    const roleName = r.roleName?.toLowerCase();
+    return roleName === 'school_admin' || roleName === 'principal' || roleName === 'academic_coordinator';
+  }) || false;
+
+  const canManageSubstitution = user?.roles?.some((r) => {
     const roleName = r.roleName?.toLowerCase();
     return roleName === 'school_admin' || roleName === 'principal' || roleName === 'academic_coordinator';
   }) || false;
@@ -431,6 +468,16 @@ export function Sidebar({
       return canManageIdCards || canView('id_cards');
     }
 
+    if (item.href === '/certificates') {
+      if (isStudent || isParent) return false;
+      if (isSchoolAdmin || isSuperAdmin) return true;
+      return canView('certificates') || canEdit('certificates');
+    }
+
+    if (item.href === '/my-certificates') {
+      return (isStudent || isParent) && canView('certificates');
+    }
+
     const featureCode = getFeatureCodeForPath(item.href);
     // Mapping is a combined page; show it if user can view either mapping feature.
     if (item.href === '/mapping') {
@@ -470,6 +517,9 @@ export function Sidebar({
       // For "Conflict Management", visibility is permission-controlled (Settings → Permission matrix).
       if (item.href === '/conflict-management') {
         return true;
+      }
+      if (item.href === '/substitution') {
+        return canView('teacher_substitution') || canManageSubstitution || isTeacher;
       }
       // For "My Events", show for parents, students, and teachers
       if (item.href === '/my-events') {

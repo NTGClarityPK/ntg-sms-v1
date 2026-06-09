@@ -34,6 +34,9 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/my-timetable': 'timetable_personal',
   '/timetable': 'timetable_management',
   '/conflict-management': 'conflict_management',
+  '/substitution': 'teacher_substitution',
+  '/substitution/history': 'teacher_substitution',
+  '/substitution/assign': 'teacher_substitution',
   '/promotion-placement': 'students',
   '/reports': 'reports',
   /** Class result cards: staff often have `assessment` without a separate `reports` matrix row. */
@@ -42,6 +45,9 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/reports/administrative': 'reports',
   '/settings': 'settings',
   '/id-cards': 'id_cards',
+  '/certificates': 'certificates',
+  '/my-certificates': 'certificates',
+  '/settings/certificates': 'certificates',
 };
 
 /**

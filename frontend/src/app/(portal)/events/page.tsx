@@ -22,8 +22,9 @@ import {
   Menu,
   Pagination,
   Table,
-  ScrollArea,
+  useMantineTheme,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconPlus, IconRefresh, IconSearch, IconDotsVertical, IconEdit, IconTrash, IconEye } from '@tabler/icons-react';
@@ -38,6 +39,8 @@ import { IconAlertTriangle } from '@tabler/icons-react';
 
 export default function EventsPage() {
   const t = useTranslations('event');
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const queryClient = useQueryClient();
   const router = useRouter();
   const [page, setPage] = useState(1);
@@ -152,7 +155,7 @@ export default function EventsPage() {
           {/* Filters */}
           <Paper p="md" withBorder>
             <Stack gap="md">
-              <Group grow>
+              <Group grow={!isMobile}>
                 <TextInput
                   id="events-search"
                   placeholder={t('searchPlaceholder')}
@@ -184,7 +187,7 @@ export default function EventsPage() {
                   clearable
                 />
               </Group>
-              <Group grow>
+              <Group grow={!isMobile}>
                 <DatePickerInput
                   id="events-filter-start-date"
                   placeholder={t('startDate')}
@@ -204,7 +207,7 @@ export default function EventsPage() {
           </Paper>
 
           {/* Events Table */}
-          <Paper p="md" withBorder>
+          <Paper p="md" withBorder style={{ overflow: 'hidden' }}>
             {isLoading || isRefetching || !data ? (
               <Stack gap="md">
                 {[...Array(5)].map((_, i) => (
@@ -213,7 +216,7 @@ export default function EventsPage() {
               </Stack>
             ) : data.data.length > 0 ? (
               <Stack gap="md">
-                <ScrollArea>
+                <Table.ScrollContainer minWidth={720}>
                   <Table striped highlightOnHover>
                     <Table.Thead>
                       <Table.Tr>
@@ -294,7 +297,7 @@ export default function EventsPage() {
                       ))}
                     </Table.Tbody>
                   </Table>
-                </ScrollArea>
+                </Table.ScrollContainer>
 
                 {/* Pagination */}
                 {data.meta && data.meta.totalPages > 1 && (

@@ -347,7 +347,11 @@ export function Header() {
           </Menu>
         )}
 
-        {isSchoolAdmin && !isSuperAdmin && <SubscriptionBadge />}
+        {isSchoolAdmin && !isSuperAdmin && (
+          <Box visibleFrom="sm" style={{ flexShrink: 0 }}>
+            <SubscriptionBadge />
+          </Box>
+        )}
         <LanguageSwitcher />
         <Group gap="xs" align="center" wrap="nowrap" visibleFrom="sm">
           {/* Online/Offline Status Badge (green when online, gray when offline) */}

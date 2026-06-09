@@ -1,6 +1,5 @@
 import { IsArray, IsIn, IsOptional, IsUUID, ArrayMinSize } from 'class-validator';
 import type { IdCardDesignVariant } from '../types/id-card-design-variant';
-import { GenerateIdCardsDto } from './generate-id-cards.dto';
 
 export class BulkIdCardsPdfDto {
   @IsArray()
@@ -16,5 +15,3 @@ export class BulkIdCardsPdfDto {
   @IsIn(['classic', 'minimal', 'modern'])
   designVariant?: IdCardDesignVariant;
 }
-
-export class EnqueueIdCardGenerationJobDto extends GenerateIdCardsDto {}

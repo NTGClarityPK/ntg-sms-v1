@@ -41,48 +41,6 @@ export class ChallanController {
     );
   }
 
-  @Post('generate-jobs')
-  async enqueueGenerateJob(
-    @Body() dto: GenerateFeeChallansDto,
-    @CurrentBranch() branch: CurrentBranchContext,
-    @CurrentUser() user: CurrentUserPayload,
-  ): Promise<{ data: { jobId: string } }> {
-    this.ensureFeesAdmin(user);
-    return this.challanService.enqueueGenerateJob(
-      {
-        studentIds: dto.studentIds,
-        months: dto.months,
-        dueDate: dto.dueDate,
-        autoCalculateDueDate: dto.autoCalculateDueDate,
-        studentOverrides: dto.studentOverrides,
-        selectedInheritedTemplateId: dto.selectedInheritedTemplateId,
-      },
-      branch.branchId,
-      user.id,
-    );
-  }
-
-  @Get('generate-jobs/:jobId')
-  async getGenerateJob(
-    @Param('jobId') jobId: string,
-    @CurrentBranch() branch: CurrentBranchContext,
-    @CurrentUser() user: CurrentUserPayload,
-  ): Promise<{
-    data: {
-      id: string;
-      status: 'queued' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
-      totalStudents: number;
-      processedStudents: number;
-      errorMessage: string | null;
-      result: unknown | null;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }> {
-    this.ensureFeesAdmin(user);
-    return this.challanService.getGenerateJob(jobId, branch.branchId);
-  }
-
   @Get('roster')
   async getRoster(
     @Query('classId') classId: string,

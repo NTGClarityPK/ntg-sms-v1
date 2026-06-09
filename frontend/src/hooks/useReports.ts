@@ -13,6 +13,7 @@ import type {
   LowAttendanceReport,
   AcademicReportBySubject,
   AcademicComparison,
+  RevenueReport,
 } from '@/types/reports';
 import { ReportPeriodType } from '@/types/reports';
 import { useAuth } from './useAuth';
@@ -340,6 +341,59 @@ export function useAcademicComparison(
       return response.data;
     },
     enabled: !!branchId && (!!classSectionIds?.length || !!subjectIds?.length),
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export type RevenueQueryScope = 'current' | 'branch' | 'combined';
+
+export function useRevenueReport(params: {
+  scope: RevenueQueryScope;
+  branchId?: string | null;
+  startDate: string;
+  endDate: string;
+  detail?: 'summary' | 'detailed';
+  locale?: string;
+  enabled?: boolean;
+}) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useQuery({
+    queryKey: [
+      'reports',
+      'revenue',
+      branchId,
+      params.scope,
+      params.branchId,
+      params.startDate,
+      params.endDate,
+      params.detail ?? 'summary',
+      params.locale,
+    ],
+    queryFn: async (): Promise<RevenueReport | null> => {
+      if (!branchId) return null;
+      const search = new URLSearchParams({
+        scope: params.scope,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        detail: params.detail ?? 'summary',
+      });
+      if (params.locale) search.set('locale', params.locale);
+      if (params.scope === 'branch' && params.branchId) {
+        search.set('branchId', params.branchId);
+      }
+      const response = await apiClient.get<RevenueReport>(
+        `/api/v1/reports/revenue?${search.toString()}`,
+      );
+      return response.data;
+    },
+    enabled:
+      (params.enabled ?? true) &&
+      !!branchId &&
+      !!params.startDate &&
+      !!params.endDate &&
+      (params.scope !== 'branch' || !!params.branchId),
     staleTime: 2 * 60 * 1000,
   });
 }

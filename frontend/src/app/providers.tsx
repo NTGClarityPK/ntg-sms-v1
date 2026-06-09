@@ -19,6 +19,7 @@ import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { isAuthPathname } from '@/lib/utils/auth-pathname';
 import { NextStepRoot } from '@/components/onboarding/NextStepRoot';
+import { PageTitleBarLongTitleSizing } from '@/components/common/PageTitleBarLongTitleSizing';
 
 /** In development, unregister any existing service workers so the production sw.js (and workbox) are not used. */
 function DevServiceWorkerCleanup() {
@@ -153,6 +154,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <LegacyLocaleStorageCleanup />
           <DevServiceWorkerCleanup />
           <AuthRouteServiceWorkerCleanup />
+          <PageTitleBarLongTitleSizing />
           <Notifications />
           <SafariInstallModal />
           <PushSubscribe />

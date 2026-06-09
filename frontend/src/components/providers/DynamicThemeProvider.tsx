@@ -325,7 +325,7 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
         text-align: left !important;
         line-height: 1.15 !important;
       }
-      
+
       html[dir="rtl"] .page-title-bar .mantine-Title-root,
       [dir="rtl"] .page-title-bar .mantine-Title-root {
         text-align: right !important;
@@ -563,6 +563,20 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       .page-title-bar .mantine-Title-root[data-order="1"],
       .page-title-bar h1.mantine-Title-root {
         color: ${config.typography.pageTitleBarHeaderColor} !important;
+      }
+
+      /* Mobile: compact long titles only (>= 10 chars, class set by PageTitleBarLongTitleSizing) */
+      @media (max-width: 767px) {
+        .page-title-bar .mantine-Title-root[data-order="1"].page-title-bar-title--long-mobile,
+        .page-title-bar h1.mantine-Title-root.page-title-bar-title--long-mobile {
+          font-size: 1.125rem !important;
+          line-height: 1.25 !important;
+        }
+
+        .page-title-bar:has(.page-title-bar-title--long-mobile) {
+          padding-top: 8px !important;
+          align-items: center !important;
+        }
       }
       
       /* Section titles (order={2} or h2) - Use pageSectionHeaderColor */
@@ -880,6 +894,19 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       
       .mantine-Tabs-list {
         border-bottom-color: ${config.components.tabs.borderColor} !important;
+      }
+
+      @media (max-width: 767px) {
+        .mantine-Tabs-list {
+          flex-direction: row !important;
+          flex-wrap: nowrap !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .mantine-Tabs-tab {
+          flex-shrink: 0 !important;
+        }
       }
       
       .mantine-Tabs-tab {

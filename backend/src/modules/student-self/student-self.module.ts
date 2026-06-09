@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { StudentSelfController } from './student-self.controller';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AssessmentsModule } from '../assessments/assessments.module';
+import { CertificatesModule } from '../certificates/certificates.module';
 import { ChallanService } from '../fees/challan.service';
 import { PaymentService } from '../fees/payment.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
@@ -10,7 +11,7 @@ import { FeePdfService } from '../fees/fee-pdf.service';
 import { StudentFeesController } from './student-fees.controller';
 
 @Module({
-  imports: [AssessmentsModule],
+  imports: [AssessmentsModule, CertificatesModule],
   controllers: [StudentSelfController, StudentFeesController],
   providers: [
     SupabaseConfig,

@@ -20,6 +20,7 @@ import {
   ActionIcon,
   Anchor,
   List,
+  Box,
 } from '@mantine/core';
 import { IconAlertTriangle, IconExternalLink, IconRefresh } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -27,8 +28,13 @@ import { useTranslations } from 'next-intl';
 import { useConflicts } from '@/hooks/useTimetable';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStaff } from '@/hooks/useStaff';
-import { useActiveAcademicYear, useAcademicYearsList } from '@/hooks/useAcademicYears';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMediaQuery } from '@mantine/hooks';
+import {
+  PAGE_TITLE_BAR_MOBILE_MEDIA,
+  pageTitleBarTitleClassName,
+} from '@/components/common/PageTitleBarLongTitleSizing';
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function formatHm(time: string): string {
@@ -54,10 +60,11 @@ export default function ConflictManagementPage() {
   const t = useTranslations('timetable');
   const queryClient = useQueryClient();
   const router = useRouter();
+  const isMobile = useMediaQuery(PAGE_TITLE_BAR_MOBILE_MEDIA);
   const colors = useThemeColors();
+  const pageTitle = t('conflictManagement');
   const [selectedClassSectionId, setSelectedClassSectionId] = useState<string | null>(null);
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
-  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | null>(null);
 
   const { data: classSectionsData, isLoading: isLoadingClassSections } = useClassSections({
     isActive: true,
@@ -68,22 +75,18 @@ export default function ConflictManagementPage() {
     isLoading: activeYearLoading,
     error: activeYearError,
   } = useActiveAcademicYear();
-  const { data: academicYearsData } = useAcademicYearsList();
+  const activeAcademicYear = activeYear?.data ?? null;
+  const activeAcademicYearId = activeAcademicYear?.id ?? null;
 
   const { data: conflictsData, isLoading: isLoadingConflicts, isRefetching } = useConflicts({
     classSectionId: selectedClassSectionId ?? undefined,
     staffId: selectedStaffId ?? undefined,
-    academicYearId: selectedAcademicYearId ?? undefined,
+    academicYearId: activeAcademicYearId ?? undefined,
   });
 
   const conflicts = conflictsData?.data || [];
   const classSections = classSectionsData?.data || [];
   const staff = staffData?.data || [];
-  const academicYears = academicYearsData?.data || [];
-
-  // Set default academic year to active year
-  const effectiveAcademicYearId = selectedAcademicYearId || activeYear?.data?.id || null;
-
   // Format options for selects
   const classSectionOptions = classSections
     .sort((a, b) => {
@@ -107,11 +110,6 @@ export default function ConflictManagementPage() {
     label: s.fullName || t('unknown'),
   }));
 
-  const academicYearOptions = academicYears.map((ay) => ({
-    value: ay.id,
-    label: ay.name,
-  }));
-
   // Group conflicts by type for summary
   const conflictSummary = useMemo(() => {
     const summary: Record<string, number> = {};
@@ -132,14 +130,18 @@ export default function ConflictManagementPage() {
   const handleClearFilters = () => {
     setSelectedClassSectionId(null);
     setSelectedStaffId(null);
-    setSelectedAcademicYearId(null);
   };
 
   if (activeYearLoading || isLoadingClassSections || isLoadingStaff) {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>{t('conflictManagement')}</Title>
+          <Title
+            order={1}
+            className={pageTitleBarTitleClassName(pageTitle, !!isMobile)}
+          >
+            {pageTitle}
+          </Title>
         </div>
         <div
           style={{
@@ -159,11 +161,16 @@ export default function ConflictManagementPage() {
     );
   }
 
-  if (activeYearError || !effectiveAcademicYearId) {
+  if (activeYearError || !activeAcademicYearId) {
     return (
       <>
         <div className="page-title-bar">
-          <Title order={1}>{t('conflictManagement')}</Title>
+          <Title
+            order={1}
+            className={pageTitleBarTitleClassName(pageTitle, !!isMobile)}
+          >
+            {pageTitle}
+          </Title>
         </div>
         <div
           style={{
@@ -190,18 +197,26 @@ export default function ConflictManagementPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{t('conflictManagement')}</Title>
-          <Tooltip label={t('refresh')}>
-            <ActionIcon
-              variant="light"
-              size="lg"
-              loading={isRefetching}
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['timetable', 'conflicts'] })}
-            >
-              <IconRefresh size={18} />
-            </ActionIcon>
-          </Tooltip>
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center" gap="xs">
+          <Title
+            order={1}
+            className={pageTitleBarTitleClassName(pageTitle, !!isMobile)}
+            style={{ flex: 1, minWidth: 0 }}
+          >
+            {pageTitle}
+          </Title>
+          <Box style={{ flexShrink: 0, marginInlineStart: 'auto' }}>
+            <Tooltip label={t('refresh')}>
+              <ActionIcon
+                variant="light"
+                size={isMobile ? 'md' : 'lg'}
+                loading={isRefetching}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['timetable', 'conflicts'] })}
+              >
+                <IconRefresh size={isMobile ? 16 : 18} />
+              </ActionIcon>
+            </Tooltip>
+          </Box>
         </Group>
       </div>
       <div
@@ -219,18 +234,15 @@ export default function ConflictManagementPage() {
           </Text>
 
           {/* Filters */}
+          {activeAcademicYear && (
+            <Text size="sm" c="dimmed">
+              {t('academicYear')}: {activeAcademicYear.name}
+            </Text>
+          )}
+
           <Paper p="md" withBorder>
             <Stack gap="md">
-              <Group grow>
-                <Select
-                  label={t('academicYear')}
-                  placeholder={t('selectAcademicYear')}
-                  data={academicYearOptions}
-                  value={selectedAcademicYearId}
-                  onChange={(value) => setSelectedAcademicYearId(value)}
-                  clearable
-                  searchable
-                />
+              <Group grow={!isMobile}>
                 <Select
                   label={t('selectClassSection')}
                   placeholder={t('filterByClassSection')}
@@ -250,7 +262,7 @@ export default function ConflictManagementPage() {
                   searchable
                 />
               </Group>
-              {(selectedClassSectionId || selectedStaffId || selectedAcademicYearId) && (
+              {(selectedClassSectionId || selectedStaffId) && (
                 <Group justify="flex-end">
                   <Button variant="subtle" size="xs" onClick={handleClearFilters}>
                     {t('clearFilters')}

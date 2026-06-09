@@ -8,7 +8,6 @@ import { CardDataService } from './card-data.service';
 import { IdCardPdfService } from './id-card-pdf.service';
 import { IdCardPhotoService } from './id-card-photo.service';
 import { TemplatesService } from './templates.service';
-import { IdCardJobWorkerService } from './id-card-job-worker.service';
 import { IdCardDesignService } from './id-card-design.service';
 
 @Module({
@@ -21,7 +20,6 @@ import { IdCardDesignService } from './id-card-design.service';
     IdCardPhotoService,
     TemplatesService,
     IdCardDesignService,
-    IdCardJobWorkerService,
     SupabaseConfig,
   ],
   exports: [IdCardsService],

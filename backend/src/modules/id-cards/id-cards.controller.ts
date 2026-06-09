@@ -31,7 +31,7 @@ import { GenerateIdCardsDto } from './dto/generate-id-cards.dto';
 import { UpdateIdCardStatusDto } from './dto/update-id-card-status.dto';
 import { UploadIdCardPhotoDto } from './dto/upload-id-card-photo.dto';
 import { ReprintIdCardDto } from './dto/reprint-id-card.dto';
-import { BulkIdCardsPdfDto, EnqueueIdCardGenerationJobDto } from './dto/bulk-id-cards.dto';
+import { BulkIdCardsPdfDto } from './dto/bulk-id-cards.dto';
 import type { IdCardPersonType } from './types/id-card-person-type';
 import { IdCardDesignService } from './id-card-design.service';
 
@@ -183,26 +183,6 @@ export class IdCardsController {
   ) {
     this.ensureAdminAccess(user, branch.branchId);
     return this.idCardsService.generate(body, branch.branchId, user.id);
-  }
-
-  @Post('generation-jobs')
-  async enqueueJob(
-    @Body() body: EnqueueIdCardGenerationJobDto,
-    @CurrentBranch() branch: CurrentBranchContext,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
-    this.ensureAdminAccess(user, branch.branchId);
-    return this.idCardsService.enqueueGenerationJob(body, branch.branchId, user.id);
-  }
-
-  @Get('generation-jobs/:jobId')
-  async getJob(
-    @Param('jobId') jobId: string,
-    @CurrentBranch() branch: CurrentBranchContext,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
-    this.ensureAdminAccess(user, branch.branchId);
-    return this.idCardsService.getGenerationJob(jobId, branch.branchId);
   }
 
   @Post('bulk-pdf')

@@ -1,6 +1,17 @@
 'use client';
 
-import { Table, Pagination, Group, Text, Badge, ActionIcon, Image, Modal, Stack } from '@mantine/core';
+import {
+  Table,
+  Pagination,
+  Group,
+  Text,
+  Badge,
+  ActionIcon,
+  Image,
+  Modal,
+  Stack,
+  Paper,
+} from '@mantine/core';
 import { IconDownload, IconEye, IconEdit, IconTrash } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useTranslations } from 'next-intl';
@@ -79,7 +90,9 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
 
   return (
     <>
-      <Table striped highlightOnHover>
+      <Paper withBorder p={0} style={{ overflow: 'hidden' }}>
+        <Table.ScrollContainer minWidth={720}>
+          <Table striped highlightOnHover>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>{t('thumbnail')}</Table.Th>
@@ -152,7 +165,9 @@ export function LibraryList({ items, meta, onPageChange, canEdit = false }: Libr
             </Table.Tr>
           ))}
         </Table.Tbody>
-      </Table>
+          </Table>
+        </Table.ScrollContainer>
+      </Paper>
 
       {meta && meta.totalPages > 1 && (
         <Group justify="center" mt="xl">

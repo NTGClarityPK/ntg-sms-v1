@@ -17,7 +17,8 @@ import {
   Badge,
   Skeleton,
 } from '@mantine/core';
-import { IconUser, IconUsersGroup, IconChartBar, IconReportAnalytics } from '@tabler/icons-react';
+import { IconUser, IconUsersGroup, IconChartBar, IconReportAnalytics, IconCoin } from '@tabler/icons-react';
+import { RevenueReportContent } from '@/components/features/reports/RevenueReportContent';
 import { useTranslations } from 'next-intl';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStudents, useMyStudent } from '@/hooks/useStudents';
@@ -94,6 +95,11 @@ export default function ReportsPage() {
     return n === 'school_admin' || n === 'principal' || n === 'academic_coordinator';
   }) ?? false;
   const showAdministrativeTab = !isParent && !isStudent && (isTeacher || canManageReports);
+  const showRevenueTab =
+    user?.roles?.some((r) => {
+      const n = r.roleName?.toLowerCase();
+      return n === 'school_admin' || n === 'principal';
+    }) ?? false;
   const myStudentQuery = useMyStudent();
   const studentsQuery = useStudents({ limit: 100 });
   const classSectionsQuery = useClassSections({ limit: 200, minimal: true });
@@ -150,12 +156,19 @@ export default function ReportsPage() {
     if (tab === 'administrative' && showAdministrativeTab) {
       setActiveTab('administrative');
     }
-  }, [searchParams, showAdministrativeTab]);
+    if (tab === 'revenue' && showRevenueTab) {
+      setActiveTab('revenue');
+    }
+  }, [searchParams, showAdministrativeTab, showRevenueTab]);
 
   const handleTabChange = (value: string | null) => {
     setActiveTab(value);
     if (value === 'administrative') {
       router.replace('/reports?tab=administrative', { scroll: false });
+    } else if (value === 'revenue') {
+      router.replace('/reports?tab=revenue', { scroll: false });
+    } else if (searchParams?.get('tab')) {
+      router.replace('/reports', { scroll: false });
     }
   };
 
@@ -193,6 +206,11 @@ export default function ReportsPage() {
             {showAdministrativeTab && (
               <Tabs.Tab value="administrative" leftSection={<IconReportAnalytics size={16} />}>
                 {t('administrativeTab')}
+              </Tabs.Tab>
+            )}
+            {showRevenueTab && (
+              <Tabs.Tab value="revenue" leftSection={<IconCoin size={16} />}>
+                {t('revenueTab')}
               </Tabs.Tab>
             )}
           </Tabs.List>
@@ -447,6 +465,12 @@ export default function ReportsPage() {
                 classList={classList}
                 isActive={activeTab === 'administrative'}
               />
+            </Tabs.Panel>
+          )}
+
+          {showRevenueTab && (
+            <Tabs.Panel value="revenue" pt="md">
+              <RevenueReportContent isActive={activeTab === 'revenue'} />
             </Tabs.Panel>
           )}
         </Tabs>

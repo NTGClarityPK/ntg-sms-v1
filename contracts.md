@@ -84,6 +84,85 @@ Published cards remain visible to authorised parents regardless of delivery rows
 
 ---
 
+# API contracts — Revenue report
+
+Aggregates **collected** revenue across registered sources. **Roles:** `school_admin`, `principal`, `super_admin`. Guards: `JwtAuthGuard`, `BranchGuard` (header `x-branch-id` still required; scope selects which branches are aggregated).
+
+## Extensibility
+
+New modules add a `RevenueSourceProvider` implementation and register it in `ReportsModule` (`REVENUE_SOURCE_PROVIDERS`). Example future key: `uniform_inventory`.
+
+## Revenue sources (v1)
+
+| `sourceKey` | Data | Included when |
+| --- | --- | --- |
+| `fee_management` | `fee_payments` where `status = Verified`, sum `amount_paid` by `payment_date` | Tenant plan has `hasFeeManagement` |
+| `id_card_reprints` | `id_card_reprints` where `fee_charged > 0`, by `printed_at` (fallback `created_at`) | Always enabled |
+
+## `GET /api/v1/reports/revenue`
+
+Query:
+
+| Param | Values |
+| --- | --- |
+| `scope` | `current` (header branch only), `branch` (`branchId` required), `combined` (all branches user can access in tenant) |
+| `branchId` | UUID — required when `scope=branch`; must be in `user_branches` |
+| `startDate` / `endDate` | ISO dates (`YYYY-MM-DD`), required |
+| `detail` | `summary` (default) \| `detailed` — line-level fee payments and ID reprint fees |
+| `locale` | Optional (`en-GB`, `en-US`, `ar`) for export labels |
+
+Response `data`:
+
+```ts
+{
+  scope: 'current' | 'branch' | 'combined';
+  startDate: string;
+  endDate: string;
+  grandTotal: number;
+  detailMode: 'summary' | 'detailed';
+  sources: Array<{ sourceKey: string; enabled: boolean; total: number; transactionCount: number }>;
+  byBranch: Array<{ branchId: string; branchName: string; total: number; sources: Record<string, number> }>;
+  feeManagement?: { byPaymentMethod: Array<{ methodKey: string; total: number }> };
+  feeLines?: Array<{ id: string; personName: string; paymentMethodKey: string; amount: number; paymentDate: string; challanNumber?: string; branchName?: string }>;
+  idCardLines?: Array<{ id: string; personName: string; personType: string; amount: number; eventDate: string; cardNumber?: string; branchName?: string }>;
+  branding?: { schoolName: string; branchSubtitle: string };
+}
+```
+
+## `GET /api/v1/reports/revenue/export`
+
+Same query params plus `format` (`pdf` \| `excel`, default `pdf`). Returns file download.
+
+---
+
+# API contracts — School data export (Phase 1)
+
+Branch header required. Access: `school_admin` or `super_admin` only.
+
+## `GET /api/v1/data-export/status`
+
+Returns `{ data: { canExport, lastExportAt, nextAvailableAt, lastScope } }`.
+
+- Rate limit: **one successful export per tenant per 24 hours** (`canExport: false` until `nextAvailableAt`).
+
+## `POST /api/v1/data-export`
+
+Body (JSON):
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `accountPassword` | string | Re-authentication; not stored |
+| `backupPassword` | string | Min 12 chars; upper, lower, digit, symbol |
+| `confirmBackupPassword` | string | Must match `backupPassword` |
+| `scope` | `tenant` \| `branch` | Tenant = all active branches; branch = current branch only |
+| `acknowledgedWarning` | boolean | Must be `true` |
+
+Response: **binary ZIP** (`application/zip`), not JSON. Archive contains AES-encrypted `school-data.json.enc`, `.meta`, and `README.txt`. ZIP is password-protected with `backupPassword`.
+
+Excluded from export: auth credentials, push subscriptions, invitation tokens, internal job queues, storage bucket files, and denylisted column names (passwords, tokens, API keys, Stripe secrets).
+
+---
+
 # API contracts — ID Cards module
 
 Branch-scoped. JSON responses: `{ data: T, meta?: … }`. Access: `school_admin`, `principal`, or `super_admin` (feature code `id_cards` for permission matrix).
@@ -112,3 +191,70 @@ Branch-scoped. JSON responses: `{ data: T, meta?: … }`. Access: `school_admin`
 
 - Bucket: `id-card-assets` (public URLs for photos/PDFs).
 - Card size: CR80 85.6mm × 54mm via Puppeteer HTML templates under `backend/src/modules/id-cards/templates/`.
+
+---
+
+# API contracts — Certificates module
+
+Branch-scoped. JSON responses: `{ data: T, meta?: … }`. Feature code: `certificates` (`view` / `edit` in permission matrix). Designs are fixed: **award** (landscape, sports/academic/promotion/participation/custom) and **administrative** (portrait, leaving/character). `custom` type supports editable title, subtitle, citation parts, signature labels, optional certificate number override, and show/hide toggles for distinction badge and certificate number (`certificateData` fields).
+
+## Endpoints
+
+| Method | Path | Access | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/certificates/designs` | view+ | Two design families and supported types. |
+| `GET` | `/api/v1/certificates/settings` | edit | Branch branding settings. |
+| `PUT` | `/api/v1/certificates/settings` | edit | Update logo URL, primary colour, tagline, signatory names. |
+| `POST` | `/api/v1/certificates/settings/logo` | edit | Multipart logo upload. |
+| `POST` | `/api/v1/certificates/generate-preview` | edit | Body: `{ studentId, certificateType, certificateData }` → `{ html }`. |
+| `POST` | `/api/v1/certificates/issue` | edit | Body: `{ studentId, certificateType, certificateData }` → issued record + PDF. |
+| `GET` | `/api/v1/certificates/history` | view+ | Paginated list. Query: `type`, `studentId`, `classSectionId`, `status`, `startDate`, `endDate`. |
+| `GET` | `/api/v1/certificates/history/export` | edit | CSV download (same filters). |
+| `PUT` | `/api/v1/certificates/:id/revoke` | edit | Sets `status` to `revoked`. |
+| `GET` | `/api/v1/certificates/:id/pdf` | view+ | PDF stream (revoked includes CANCELLED watermark). |
+| `GET` | `/api/v1/my-certificates` | student/parent view | Own / children's issued certificates. |
+| `GET` | `/api/v1/my-certificates/:id/pdf` | student/parent view | Download if issued (revoked blocked). |
+| `GET` | `/api/v1/student/certificates` | student JWT | Student self-service list. |
+| `GET` | `/api/v1/student/certificates/:id/pdf` | student JWT | Student self-service PDF. |
+
+## Business rules
+
+- **Leaving:** `student_enrolments.status` ∈ `transferred_out`, `withdrawn`, `graduated` for active academic year.
+- **Other types:** active enrolment required.
+- **Certificate number:** `CERT-{year}-{seq}` via `allocate_certificate_number` RPC.
+- **Storage:** bucket `certificate-documents`, path `{branchId}/{certificateId}.pdf`.
+
+---
+
+# API contracts — Teacher substitution
+
+Branch-scoped substitute assignments for absent teachers. Feature code: `teacher_substitution`. Requires `JwtAuthGuard` + `BranchGuard`.
+
+**Roles:** `school_admin` bypasses matrix; `principal` / `academic_coordinator` need **edit** via `role_permissions`; teachers need **view** for history or use `GET /me` without matrix.
+
+## Notification type
+
+- `teacher_substitution` — push deep-link `/substitution/me`
+- Reminder uses same type with `data.isReminder: true`
+
+## Endpoints
+
+| Method | Path | Access | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/substitutions/suggest` | edit | Body: `absentTeacherId`, `date` (ISO date). Returns `{ data: { absentTeacherId, absentTeacherName, date, affectedSlots[], suggested[], others[] } }`. |
+| `POST` | `/api/v1/substitutions/assign` | edit | Body: `absentTeacherId`, `substituteTeacherId`, `date`, `timetableSlotIds[]`, `absenceReason` (`sick_leave` \| `casual_leave` \| `emergency` \| `other`). Creates one row per slot; `status: confirmed`; notifies substitute. Returns `{ data: { substitutionIds[] } }`. |
+| `GET` | `/api/v1/substitutions` | view | List. Query: `date?`, `startDate?`, `endDate?`, `status?`, pagination. Returns `{ data, meta }`. |
+| `GET` | `/api/v1/substitutions/history` | view | Same as list (alias for history UI). |
+| `GET` | `/api/v1/substitutions/history/export` | edit | CSV download. Same query filters as list. |
+| `GET` | `/api/v1/substitutions/load-stats` | edit | Query: `startDate`, `endDate`. Returns `{ data: [{ staffId, staffName, substitutionCount, isOverloaded }] }` (`isOverloaded` when count > 10). |
+| `GET` | `/api/v1/substitutions/me` | authenticated staff | Substitute’s own assignments. Query: date range / pagination. |
+| `PATCH` | `/api/v1/substitutions/:id/cancel` | edit | Cancel if more than 1 hour before period start. |
+
+## Errors
+
+| Code | When |
+| --- | --- |
+| `400` | Past date; invalid slots; same teacher as substitute |
+| `403` | Missing permission; cancel outside allowed window |
+| `409` | Duplicate slot/date; substitute busy; substitute absent; monthly load > 8 on assign |
+| `404` | Staff / substitution not found |

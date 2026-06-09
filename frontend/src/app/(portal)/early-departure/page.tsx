@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import {
+  Box,
   Card,
   Group,
   Stack,
@@ -16,6 +17,7 @@ import {
   Tooltip,
   ActionIcon,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconUser, IconRefresh } from '@tabler/icons-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,6 +30,10 @@ import { apiClient } from '@/lib/api-client';
 import type { User } from '@/types/auth';
 import type { Student } from '@/types/students';
 import { useFeaturePermission } from '@/hooks/usePermissions';
+import {
+  PAGE_TITLE_BAR_MOBILE_MEDIA,
+  pageTitleBarTitleClassName,
+} from '@/components/common/PageTitleBarLongTitleSizing';
 
 interface ParentChild {
   id: string;
@@ -44,6 +50,8 @@ interface ParentChild {
 
 export default function EarlyDeparturePage() {
   const t = useTranslations('earlyDeparture');
+  const isMobile = useMediaQuery(PAGE_TITLE_BAR_MOBILE_MEDIA);
+  const pageTitle = t('title');
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isParent = user?.roles?.some((r) => r.roleName === 'parent');
@@ -122,19 +130,28 @@ export default function EarlyDeparturePage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{t('title')}</Title>
-          <Tooltip label={t('refresh')}>
-            <ActionIcon
-              variant="light"
-              size="lg"
-              onClick={() =>
-                queryClient.invalidateQueries({ queryKey: ['early-departures'] })
-              }
-            >
-              <IconRefresh size={18} />
-            </ActionIcon>
-          </Tooltip>
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center" gap="xs">
+          <Title
+            order={1}
+            className={pageTitleBarTitleClassName(pageTitle, !!isMobile)}
+            style={{ flex: 1, minWidth: 0 }}
+          >
+            {pageTitle}
+          </Title>
+          <Box style={{ flexShrink: 0, marginInlineStart: 'auto' }}>
+            <Tooltip label={t('refresh')}>
+              <ActionIcon
+                id="early-departure-btn-refresh"
+                variant="light"
+                size={isMobile ? 'md' : 'lg'}
+                onClick={() =>
+                  queryClient.invalidateQueries({ queryKey: ['early-departures'] })
+                }
+              >
+                <IconRefresh size={isMobile ? 16 : 18} />
+              </ActionIcon>
+            </Tooltip>
+          </Box>
         </Group>
       </div>
       <div

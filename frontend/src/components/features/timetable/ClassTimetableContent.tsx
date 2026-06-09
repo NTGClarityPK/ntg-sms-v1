@@ -32,7 +32,10 @@ import { TimetableGrid } from '@/components/features/timetable/TimetableGrid';
 import { SlotEditPopover } from '@/components/features/timetable/SlotEditPopover';
 import { TemplateInfoBanner } from '@/components/features/timetable/TemplateInfoBanner';
 import { useDisclosure } from '@mantine/hooks';
-import { Select, Modal, MultiSelect, Tooltip, Box } from '@mantine/core';
+import { Select, Modal, MultiSelect, Tooltip, Box, Switch } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
+import { IconCalendar } from '@tabler/icons-react';
+import '@mantine/dates/styles.css';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useSchoolDays } from '@/hooks/useScheduleSettings';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
@@ -41,6 +44,12 @@ import { usePermissions } from '@/hooks/usePermissions';
 import type { TimetableSlot, CreateTimetableSlotInput, ClassTimetable } from '@/types/timetable';
 import { TemplateSwitcher } from '@/components/features/timetable/TemplateSwitcher';
 import { SlotDetailsReadOnlyModal } from '@/components/features/timetable/SlotDetailsReadOnlyModal';
+import { useSubstitutionOverlays } from '@/hooks/useSubstitutions';
+import {
+  applySubstitutionOverlaysToSlots,
+  weekDatesFromAnchor,
+} from '@/lib/substitution-timetable';
+import { useTranslations as useSubTranslations } from 'next-intl';
 
 interface ClassTimetableContentProps {
   classSectionId: string | null;
@@ -57,6 +66,9 @@ export function ClassTimetableContent({
 }: ClassTimetableContentProps) {
   const colors = useThemeColors();
   const t = useTranslations('timetable');
+  const tSub = useSubTranslations('substitution');
+  const [showSubstitutions, setShowSubstitutions] = useState(true);
+  const [substitutionWeekAnchor, setSubstitutionWeekAnchor] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<TimetableSlot | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('');
@@ -195,6 +207,27 @@ export function ClassTimetableContent({
     }
   }, [sourceSectionId, sourceTemplates, sourceTemplateId]);
   const timetable = timetableData?.data;
+
+  const weekDatesByDay = useMemo(() => {
+    const y = substitutionWeekAnchor.getFullYear();
+    const m = String(substitutionWeekAnchor.getMonth() + 1).padStart(2, '0');
+    const d = String(substitutionWeekAnchor.getDate()).padStart(2, '0');
+    return weekDatesFromAnchor(`${y}-${m}-${d}`);
+  }, [substitutionWeekAnchor]);
+
+  const overlayStart = weekDatesByDay[0];
+  const overlayEnd = weekDatesByDay[6];
+
+  const { data: substitutionOverlays } = useSubstitutionOverlays(
+    showSubstitutions ? overlayStart : null,
+    showSubstitutions ? overlayEnd : null,
+  );
+
+  const displaySlots = useMemo(() => {
+    const base = timetable?.slots ?? [];
+    if (!showSubstitutions || !substitutionOverlays?.length) return base;
+    return applySubstitutionOverlaysToSlots(base, substitutionOverlays, weekDatesByDay);
+  }, [timetable?.slots, showSubstitutions, substitutionOverlays, weekDatesByDay]);
 
   const { data: conflictsResponse } = useConflicts({
     classSectionId: classSectionId ?? undefined,
@@ -537,9 +570,31 @@ export function ClassTimetableContent({
 
             {!timetableLoading && timetable && (
               <>
+                <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm" mb="sm">
+                  <Switch
+                    id="timetable-show-substitutions"
+                    label={tSub('showSubstitutionsOnTimetable')}
+                    checked={showSubstitutions}
+                    onChange={(e) => setShowSubstitutions(e.currentTarget.checked)}
+                  />
+                  {showSubstitutions ? (
+                    <Box style={{ minWidth: 0, flex: '1 1 220px', maxWidth: 280 }}>
+                      <DatePickerInput
+                        id="timetable-substitution-week"
+                        label={tSub('substitutionWeekLabel')}
+                        placeholder={tSub('substitutionWeekPlaceholder')}
+                        value={substitutionWeekAnchor}
+                        onChange={(v) => v && setSubstitutionWeekAnchor(v)}
+                        leftSection={<IconCalendar size={16} />}
+                        maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 1))}
+                        clearable={false}
+                      />
+                    </Box>
+                  ) : null}
+                </Group>
                 <TimetableGrid
                   classSectionId={classSectionId}
-                  slots={timetable.slots}
+                  slots={displaySlots}
                   onSlotClick={handleSlotClick}
                   templateInfo={templateInfoData || null}
                   conflicts={conflictsForGrid}

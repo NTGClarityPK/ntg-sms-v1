@@ -75,7 +75,7 @@ export function AssignClassTeacherModal({
           <Select
             searchable
             clearable
-            nothingFoundMessage={tCommon('notFound')}
+            nothingFoundMessage={tCommon('errors.notFound')}
             label={t('classTeacher')}
             placeholder={t('noneUnassign')}
             data={staffOptions}

@@ -16,6 +16,7 @@ type EnrolmentRow = {
   student_id: string;
   class_id: string | null;
   section_id: string | null;
+  status?: string;
 };
 
 @Injectable()
@@ -53,20 +54,50 @@ export class PromotionPlacementService {
       sectionId = csRow.section_id;
     }
 
-    // Enrolments are the source of truth per year.
-    let enrolmentsQuery = supabase
+    const terminalStatuses = [
+      'graduated',
+      'transferred_out',
+      'withdrawn',
+      'inactive',
+    ] as const;
+
+    // Active enrolments (pending decisions) plus terminal outcomes (already decided).
+    let activeQuery = supabase
       .from('student_enrolments')
-      .select('student_id, class_id, section_id')
+      .select('student_id, class_id, section_id, status')
       .eq('branch_id', branchId)
       .eq('academic_year_id', academicYearId)
       .eq('status', 'active');
 
-    if (classId) enrolmentsQuery = enrolmentsQuery.eq('class_id', classId);
-    if (sectionId) enrolmentsQuery = enrolmentsQuery.eq('section_id', sectionId);
+    let terminalQuery = supabase
+      .from('student_enrolments')
+      .select('student_id, class_id, section_id, status')
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId)
+      .in('status', [...terminalStatuses]);
 
-    const { data: enrolments, error: enrolErr } = await enrolmentsQuery;
-    throwIfDbError(enrolErr);
-    const enrolmentRows = (enrolments as EnrolmentRow[]) ?? [];
+    if (classId) {
+      activeQuery = activeQuery.eq('class_id', classId);
+      terminalQuery = terminalQuery.eq('class_id', classId);
+    }
+    if (sectionId) {
+      activeQuery = activeQuery.eq('section_id', sectionId);
+      terminalQuery = terminalQuery.eq('section_id', sectionId);
+    }
+
+    const [{ data: activeEnrolments, error: activeErr }, { data: terminalEnrolments, error: terminalErr }] =
+      await Promise.all([activeQuery, terminalQuery]);
+    throwIfDbError(activeErr);
+    throwIfDbError(terminalErr);
+
+    const enrolmentByStudent = new Map<string, EnrolmentRow>();
+    for (const row of [
+      ...((activeEnrolments as EnrolmentRow[]) ?? []),
+      ...((terminalEnrolments as EnrolmentRow[]) ?? []),
+    ]) {
+      enrolmentByStudent.set(row.student_id, row);
+    }
+    const enrolmentRows = [...enrolmentByStudent.values()];
     const studentIds = enrolmentRows.map((e) => e.student_id);
 
     if (studentIds.length === 0) {
@@ -148,21 +179,32 @@ export class PromotionPlacementService {
 
     if (decisions.length === 0) return { upserted: 0 };
 
-    // Validate students belong to branch and are active in enrolments for this year
     const studentIds = [...new Set(decisions.map((d) => d.studentId))];
     const { data: enrolments, error: enrolErr } = await supabase
       .from('student_enrolments')
-      .select('student_id')
+      .select('student_id, status')
       .eq('branch_id', branchId)
       .eq('academic_year_id', sourceAcademicYearId)
-      .eq('status', 'active')
       .in('student_id', studentIds);
     throwIfDbError(enrolErr);
 
-    const activeSet = new Set(((enrolments as Array<{ student_id: string }>) ?? []).map((r) => r.student_id));
-    const invalid = studentIds.filter((id) => !activeSet.has(id));
+    const allowedStatuses = new Set([
+      'active',
+      'graduated',
+      'transferred_out',
+      'withdrawn',
+      'inactive',
+    ]);
+    const enrolledSet = new Set(
+      ((enrolments as Array<{ student_id: string; status: string }>) ?? [])
+        .filter((r) => allowedStatuses.has(r.status))
+        .map((r) => r.student_id),
+    );
+    const invalid = studentIds.filter((id) => !enrolledSet.has(id));
     if (invalid.length > 0) {
-      throw new BadRequestException('One or more students are not active in this academic year');
+      throw new BadRequestException(
+        'One or more students are not enrolled in this academic year',
+      );
     }
 
     // Validate target fields

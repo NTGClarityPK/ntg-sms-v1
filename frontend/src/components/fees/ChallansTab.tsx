@@ -14,7 +14,6 @@ import {
   Modal,
   NumberInput,
   Paper,
-  Progress,
   SimpleGrid,
   Select,
   Skeleton,
@@ -34,8 +33,6 @@ import {
   useFeeTemplates,
   useCreateFeeStudentTemplateLink,
   useGenerateFeeChallans,
-  useEnqueueFeeChallanGenerateJob,
-  useFeeChallanGenerateJob,
   usePrefetchStudentFeeTemplates,
   useStudentFeeTemplates,
   useUpdateFeeStudentTemplateLink,
@@ -149,21 +146,15 @@ export function ChallansTab() {
   });
 
   const generateMutation = useGenerateFeeChallans();
-  const enqueueGenerateJobMutation = useEnqueueFeeChallanGenerateJob();
-  const [bulkJobId, setBulkJobId] = useState<string | null>(null);
-  const bulkJobQuery = useFeeChallanGenerateJob(bulkJobId);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const storedJobId = window.localStorage.getItem('fees_bulk_generate_job_id');
-    if (storedJobId && !bulkJobId) setBulkJobId(storedJobId);
     const storedLast = window.localStorage.getItem('fees_bulk_generate_last_generated_at');
     if (storedLast) {
       const d = new Date(storedLast);
       if (!Number.isNaN(d.getTime())) setLastGeneratedAt(d);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const rosterAllowed = Boolean(classSectionId && activeMonth && isValidMonth(activeMonth));
@@ -212,10 +203,7 @@ export function ChallansTab() {
 
   const hasApplicableTemplates = !!previewForMonth && previewForMonth.items.length > 0;
 
-  const bulkGenerateInFlight =
-    (generateMutation.isPending && generateTarget?.kind === 'bulk') ||
-    enqueueGenerateJobMutation.isPending ||
-    (bulkJobQuery.data?.status === 'queued' || bulkJobQuery.data?.status === 'in_progress');
+  const bulkGenerateInFlight = generateMutation.isPending && generateTarget?.kind === 'bulk';
 
   const bulkCandidates = inheritedCandidatesQuery.data;
   const bulkCandidatesTotal =
@@ -266,47 +254,6 @@ export function ChallansTab() {
     allStudentIdsInRoster.length > 0 &&
     hasApplicableTemplates;
 
-  useEffect(() => {
-    const s = bulkJobQuery.data;
-    if (!s) return;
-    if (s.status === 'completed') {
-      const results = s.result?.data ?? [];
-      notifications.show({
-        title: t('challans.generatedTitle'),
-        message: t('challans.generatedMessage', { count: results.length }),
-        color: 'green',
-      });
-      void rosterQuery.refetch();
-      try {
-        if (typeof window !== 'undefined') {
-          const d = new Date(s.updatedAt);
-          if (!Number.isNaN(d.getTime())) {
-            window.localStorage.setItem('fees_bulk_generate_last_generated_at', d.toISOString());
-            setLastGeneratedAt(d);
-          }
-          window.localStorage.removeItem('fees_bulk_generate_job_id');
-        }
-      } catch {
-        // non-blocking
-      }
-      setBulkJobId(null);
-    } else if (s.status === 'failed') {
-      notifications.show({
-        title: t('challans.generateErrorTitle'),
-        message: s.errorMessage || t('challans.generateErrorMessage'),
-        color: 'red',
-      });
-      try {
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem('fees_bulk_generate_job_id');
-        }
-      } catch {
-        // non-blocking
-      }
-      setBulkJobId(null);
-    }
-  }, [bulkJobQuery.data, rosterQuery, t]);
-
   const singleGenerateInFlightForOpenModal =
     generateMutation.isPending &&
     generateTarget?.kind === 'single' &&
@@ -321,26 +268,6 @@ export function ChallansTab() {
             <Text size="sm" c="dimmed">
               {t('challans.lastGeneratedLabel', { at: formatLastGeneratedLabel(lastGeneratedAt) })}
             </Text>
-          ) : null}
-          {bulkJobQuery.data && (bulkJobQuery.data.status === 'queued' || bulkJobQuery.data.status === 'in_progress') ? (
-            <Group gap="sm" align="center" wrap="nowrap">
-              <Text size="sm" c="dimmed">
-                {t('challans.jobProgressLabel', {
-                  done: bulkJobQuery.data.processedStudents,
-                  total: bulkJobQuery.data.totalStudents,
-                })}
-              </Text>
-              <Progress
-                value={
-                  bulkJobQuery.data.totalStudents > 0
-                    ? (bulkJobQuery.data.processedStudents / bulkJobQuery.data.totalStudents) * 100
-                    : 0
-                }
-                w={160}
-                color="blue"
-                radius="xl"
-              />
-            </Group>
           ) : null}
         </Stack>
         <Button
@@ -562,27 +489,28 @@ export function ChallansTab() {
               onClick={async () => {
                 if (!bulkSelectedTemplateId) return;
                 setBulkSpecificityModalOpened(false);
+                setGenerateTarget({ kind: 'bulk' });
                 try {
-                  const jobId = await enqueueGenerateJobMutation.mutateAsync({
+                  const results = await generateMutation.mutateAsync({
                     studentIds: allStudentIdsInRoster,
                     months: activeMonth ? [activeMonth] : [],
                     autoCalculateDueDate: true,
                     selectedInheritedTemplateId: bulkSelectedTemplateId,
                   });
-                  if (jobId) {
-                    setBulkJobId(jobId);
-                    try {
-                      if (typeof window !== 'undefined') {
-                        window.localStorage.setItem('fees_bulk_generate_job_id', jobId);
-                      }
-                    } catch {
-                      // non-blocking
+                  notifications.show({
+                    title: t('challans.generatedTitle'),
+                    message: t('challans.generatedMessage', { count: results.length }),
+                    color: 'green',
+                  });
+                  void rosterQuery.refetch();
+                  const now = new Date();
+                  setLastGeneratedAt(now);
+                  try {
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('fees_bulk_generate_last_generated_at', now.toISOString());
                     }
-                    notifications.show({
-                      title: t('challans.jobQueuedTitle'),
-                      message: t('challans.jobQueuedMessage'),
-                      color: 'blue',
-                    });
+                  } catch {
+                    // non-blocking
                   }
                 } catch (error) {
                   notifications.show({
@@ -590,6 +518,8 @@ export function ChallansTab() {
                     message: error instanceof Error ? error.message : t('challans.generateErrorMessage'),
                     color: 'red',
                   });
+                } finally {
+                  setGenerateTarget(null);
                 }
               }}
               disabled={!bulkSelectedTemplateId || bulkGenerateInFlight || bulkCandidatesLoadingInModal}

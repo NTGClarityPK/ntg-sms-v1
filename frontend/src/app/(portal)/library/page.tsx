@@ -13,9 +13,11 @@ import {
   Alert,
   Text,
   Chip,
+  SimpleGrid,
+  Box,
 } from '@mantine/core';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
-import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
+import { useDisclosure, useDebouncedValue, useMediaQuery } from '@mantine/hooks';
 import { useTranslations } from 'next-intl';
 import { useLibraryItems, useLibraryCategories } from '@/hooks/useLibrary';
 import { useCoreLookups } from '@/hooks/useCoreLookups';
@@ -25,9 +27,11 @@ import { LibraryGrid } from '@/components/features/library/LibraryGrid';
 import { LibraryList } from '@/components/features/library/LibraryList';
 import { UploadModal } from '@/components/features/library/UploadModal';
 import type { ClassEntity } from '@/types/settings';
+import { PAGE_TITLE_BAR_MOBILE_MEDIA } from '@/components/common/PageTitleBarLongTitleSizing';
 
 export default function LibraryPage() {
   const t = useTranslations('library');
+  const isMobile = useMediaQuery(PAGE_TITLE_BAR_MOBILE_MEDIA);
   const colors = useThemeColors();
   const { canEdit } = useFeaturePermission('library');
   const [opened, { open, close }] = useDisclosure(false);
@@ -83,12 +87,21 @@ export default function LibraryPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{t('title')}</Title>
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center" gap="xs">
+          <Title order={1} style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
+            {t('title')}
+          </Title>
           {canEdit && (
-            <Button id="library-btn-upload" leftSection={<IconPlus size={16} />} onClick={open}>
-              {t('uploadItem')}
-            </Button>
+            <Box style={{ flexShrink: 0 }}>
+              <Button
+                id="library-btn-upload"
+                size={isMobile ? 'xs' : 'sm'}
+                leftSection={<IconPlus size={16} />}
+                onClick={open}
+              >
+                {t('uploadItem')}
+              </Button>
+            </Box>
           )}
         </Group>
       </div>
@@ -103,20 +116,19 @@ export default function LibraryPage() {
         }}
       >
         <Stack gap="md">
-          {/* Filters */}
           <Paper p="md" withBorder>
-            <Stack gap="md">
-              <Group grow>
-                <TextInput
-                  id="library-search"
-                  placeholder={t('searchPlaceholder')}
-                  leftSection={<IconSearch size={16} />}
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.currentTarget.value);
-                    handleFilterChange();
-                  }}
-                />
+            <Stack gap="sm">
+              <TextInput
+                id="library-search"
+                placeholder={t('searchPlaceholder')}
+                leftSection={<IconSearch size={16} />}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.currentTarget.value);
+                  handleFilterChange();
+                }}
+              />
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
                 <Select
                   id="library-filter-category"
                   placeholder={t('filterByCategory')}
@@ -146,7 +158,10 @@ export default function LibraryPage() {
                   placeholder={t('filterByClass')}
                   data={classes.map((c) => {
                     const classEntity = c as ClassEntity;
-                    return { value: classEntity.id, label: classEntity.displayName || classEntity.name };
+                    return {
+                      value: classEntity.id,
+                      label: classEntity.displayName || classEntity.name,
+                    };
                   })}
                   value={classFilter}
                   onChange={(value) => {
@@ -156,26 +171,27 @@ export default function LibraryPage() {
                   clearable
                   searchable
                 />
-                <Group gap="xs" wrap="wrap" className="filter-chip-group">
-                  <Chip.Group
-                    value={viewMode}
-                    onChange={(v) => setViewMode(((Array.isArray(v) ? v[0] : v) === 'list' ? 'list' : 'grid'))}
-                  >
-                    <Group gap="xs" wrap="wrap">
-                      <Chip value="grid" variant="filled">
-                        {t('grid')}
-                      </Chip>
-                      <Chip value="list" variant="filled">
-                        {t('list')}
-                      </Chip>
-                    </Group>
-                  </Chip.Group>
-                </Group>
+              </SimpleGrid>
+              <Group gap="xs" wrap="wrap" className="filter-chip-group" justify="flex-start">
+                <Chip.Group
+                  value={viewMode}
+                  onChange={(v) =>
+                    setViewMode((Array.isArray(v) ? v[0] : v) === 'list' ? 'list' : 'grid')
+                  }
+                >
+                  <Group gap="xs" wrap="wrap">
+                    <Chip value="grid" variant="filled">
+                      {t('grid')}
+                    </Chip>
+                    <Chip value="list" variant="filled">
+                      {t('list')}
+                    </Chip>
+                  </Group>
+                </Chip.Group>
               </Group>
             </Stack>
           </Paper>
 
-          {/* Library Items */}
           {libraryQuery.isLoading || !libraryResponse ? (
             <Stack gap="md">
               <Skeleton height={40} width="30%" />
@@ -193,9 +209,7 @@ export default function LibraryPage() {
             </Alert>
           ) : !libraryResponse?.data || libraryResponse.data.length === 0 ? (
             <Alert color={colors.info} title={t('noItemsFound')}>
-              <Text size="sm">
-                {canEdit ? t('noItemsHintCanEdit') : t('noItemsHint')}
-              </Text>
+              <Text size="sm">{canEdit ? t('noItemsHintCanEdit') : t('noItemsHint')}</Text>
             </Alert>
           ) : viewMode === 'grid' ? (
             <LibraryGrid

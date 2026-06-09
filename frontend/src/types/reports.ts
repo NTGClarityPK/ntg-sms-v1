@@ -223,3 +223,67 @@ export interface AcademicComparison {
   academicYearId: string;
   items: AcademicComparisonItem[];
 }
+
+export type RevenueSourceKey = 'fee_management' | 'id_card_reprints';
+
+export type RevenueReportScope = 'current' | 'branch' | 'combined';
+
+export interface RevenueReportSource {
+  sourceKey: RevenueSourceKey;
+  enabled: boolean;
+  total: number;
+  transactionCount: number;
+}
+
+export interface RevenueReportBranchRow {
+  branchId: string;
+  branchName: string;
+  total: number;
+  sources: Record<RevenueSourceKey, number>;
+}
+
+export interface RevenueFeeLine {
+  id: string;
+  branchId: string;
+  branchName?: string;
+  studentId: string;
+  personName: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethodKey: string;
+  challanNumber?: string;
+}
+
+export interface RevenueIdCardLine {
+  id: string;
+  branchId: string;
+  branchName?: string;
+  personName: string;
+  personType: string;
+  amount: number;
+  eventDate: string;
+  cardNumber?: string;
+  reason?: string;
+}
+
+export type RevenueDetailMode = 'summary' | 'detailed';
+
+export interface RevenueReport {
+  scope: RevenueReportScope;
+  startDate: string;
+  endDate: string;
+  grandTotal: number;
+  detailMode: RevenueDetailMode;
+  sources: RevenueReportSource[];
+  byBranch: RevenueReportBranchRow[];
+  feeManagement?: {
+    byPaymentMethod: Array<{ methodKey: string; total: number }>;
+  };
+  feeLines?: RevenueFeeLine[];
+  idCardLines?: RevenueIdCardLine[];
+  branding?: {
+    schoolName: string;
+    branchSubtitle: string;
+    logoDataUrl?: string;
+  };
+}

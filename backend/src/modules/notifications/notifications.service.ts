@@ -52,6 +52,8 @@ function pushUrlForType(type: string, data?: Record<string, unknown> | null): st
       return '/inventory/requests';
     case 'attendance':
       return '/attendance/child';
+    case 'teacher_substitution':
+      return '/substitution/me';
     default:
       return '/notifications';
   }

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff ID Card - Minimal Design</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f0f0f0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .card-wrapper {
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .card-side {
+            text-align: center;
+        }
+
+        .card-label {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card {
+            width: 480px;
+            height: 300px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ============ FRONT SIDE ============ */
+        .front {
+            background: white;
+            height: 100%;
+            border: 3px solid #1F2937;
+            position: relative;
+        }
+
+        /* Thick RED left border accent */
+        .front::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 12px;
+            background: #DC2626;
+        }
+
+        .front-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding-left: 12px;
+        }
+
+        .header-section {
+            padding: 20px 30px;
+            border-bottom: 4px solid #1F2937;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .school-identity {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-box {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #1F2937;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: #1F2937;
+            font-size: 24px;
+        }
+
+        .school-info {
+            text-align: left;
+        }
+
+        .school-title-text {
+            color: #000;
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .school-location-text {
+            color: #666;
+            font-size: 9px;
+            margin-top: 4px;
+        }
+
+        .role-badge-box {
+            background: #DC2626;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 900;
+            text-transform: uppercase;
+            line-height: 1.2;
+            text-align: center;
+        }
+
+        .body-section {
+            flex: 1;
+            padding: 25px 30px;
+            display: flex;
+            gap: 25px;
+        }
+
+        .photo-area {
+            flex-shrink: 0;
+        }
+
+        .photo-box {
+            width: 100px;
+            height: 130px;
+            background: #F9FAFB;
+            border: 4px solid #1F2937;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+        }
+
+        .data-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .name-display {
+            color: #000;
+            font-size: 30px;
+            font-weight: 900;
+            line-height: 1.1;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+
+        .info-table {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px 15px;
+        }
+
+        .info-key {
+            color: #666;
+            font-size: 11px;
+            font-weight: 700;
+            text-align: left;
+            text-transform: uppercase;
+        }
+
+        .info-val {
+            color: #000;
+            font-size: 13px;
+            font-weight: 900;
+            text-align: left;
+        }
+
+        .footer-section {
+            background: #F9FAFB;
+            border-top: 4px solid #1F2937;
+            padding: 12px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .id-display {
+            color: #000;
+            font-size: 12px;
+            font-weight: 900;
+            font-family: 'Courier New', monospace;
+        }
+
+        .year-box {
+            background: #1F2937;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 900;
+        }
+
+        .qr-mini {
+            width: 45px;
+            height: 45px;
+            border: 3px solid #1F2937;
+            border-radius: 8px;
+            padding: 3px;
+            background: white;
+        }
+
+        .qr-pattern {
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(90deg, #000 0%, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%),
+                linear-gradient(0deg, #000 0%, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%);
+            background-size: 8px 8px;
+            border-radius: 4px;
+        }
+
+        /* ============ BACK SIDE ============ */
+        .back {
+            background: white;
+            height: 100%;
+            border: 3px solid #1F2937;
+            position: relative;
+        }
+
+        /* Thick RED left border accent */
+        .back::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 12px;
+            background: #DC2626;
+        }
+
+        .back-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding-left: 12px;
+        }
+
+        .back-header {
+            background: #1F2937;
+            color: white;
+            padding: 18px 30px;
+            text-align: center;
+        }
+
+        .back-title-text {
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .back-subtitle {
+            font-size: 9px;
+            margin-top: 4px;
+            opacity: 0.9;
+        }
+
+        .back-body {
+            flex: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .guidelines-container {
+            flex: 1;
+        }
+
+        .guidelines-title-text {
+            font-size: 11px;
+            font-weight: 900;
+            color: #000;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .guideline-row {
+            font-size: 10px;
+            color: #333;
+            margin-bottom: 8px;
+            padding-left: 18px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .guideline-row::before {
+            content: "■";
+            position: absolute;
+            left: 0;
+            color: #DC2626;
+            font-size: 8px;
+        }
+
+        .back-footer {
+            background: #F9FAFB;
+            border-top: 3px solid #1F2937;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .contact-data {
+            font-size: 10px;
+            color: #333;
+            line-height: 1.7;
+        }
+
+        .qr-big {
+            width: 55px;
+            height: 55px;
+            border: 3px solid #1F2937;
+            border-radius: 8px;
+            padding: 4px;
+            background: white;
+        }
+
+        @page {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .card {
+                box-shadow: none;
+                page-break-inside: avoid;
+            }
+            .card-label {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 style="font-size: 28px; color: #333; margin-bottom: 10px;">Staff ID Card - Minimal Design</h1>
+    <p style="color: #666; margin-bottom: 20px;">Printer-friendly • Red left accent • Low ink usage • Professional</p>
+    
+    <div class="card-wrapper">
+        <!-- FRONT SIDE -->
+        <div class="card-side">
+            <div class="card-label">— FRONT SIDE —</div>
+            <div class="card front">
+                <div class="front-wrapper">
+                    <div class="header-section">
+                        <div class="school-identity">
+                            <div class="logo-box">CS</div>
+                            <div class="school-info">
+                                <div class="school-title-text">Credo School</div>
+                                <div class="school-location-text">Excellence in Education Since 1997</div>
+                            </div>
+                        </div>
+                        <div class="role-badge-box">SUBJECT<br>TEACHER</div>
+                    </div>
+
+                    <div class="body-section">
+                        <div class="photo-area">
+                            <div class="photo-box">👤</div>
+                        </div>
+
+                        <div class="data-area">
+                            <div class="name-display">Ayesha Tarar</div>
+                            
+                            <div class="info-table">
+                                <div class="info-key">Department:</div>
+                                <div class="info-val">Mathematics</div>
+                                
+                                <div class="info-key">Position:</div>
+                                <div class="info-val">Subject Teacher</div>
+                                
+                                <div class="info-key">Employee ID:</div>
+                                <div class="info-val">STF-2024-0045</div>
+                                
+                                <div class="info-key">Join Date:</div>
+                                <div class="info-val">January 2024</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="footer-section">
+                        <div class="id-display">ID: STF-2024-0045</div>
+                        <div class="year-box">2024-25</div>
+                        <div class="qr-mini">
+                            <div class="qr-pattern"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BACK SIDE -->
+        <div class="card-side">
+            <div class="card-label">— BACK SIDE —</div>
+            <div class="card back">
+                <div class="back-wrapper">
+                    <div class="back-header">
+                        <div class="back-title-text">Staff Identity Card</div>
+                        <div class="back-subtitle">Valid for Academic Year 2024-2025</div>
+                    </div>
+
+                    <div class="back-body">
+                        <div class="guidelines-container">
+                            <div class="guidelines-title-text">Important Instructions</div>
+                            <div class="guideline-row">This card must be carried at all times on school premises</div>
+                            <div class="guideline-row">Immediately report loss to school administration</div>
+                            <div class="guideline-row">Property of Credo School - non-transferable</div>
+                            <div class="guideline-row">Replacement fee: PKR 500</div>
+                        </div>
+                    </div>
+
+                    <div class="back-footer">
+                        <div class="contact-data">
+                            Phone: +92-51-2345678<br>
+                            Email: info@credoschool.edu.pk<br>
+                            Web: www.credoschool.edu.pk
+                        </div>
+                        <div class="qr-big">
+                            <div class="qr-pattern"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role Badge Color Options -->
+    <h2 style="font-size: 24px; color: #333; margin-top: 40px; margin-bottom: 20px;">Role Badge Examples (All use same red accent)</h2>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; max-width: 900px;">
+        <div style="background: #f9fafb; padding: 12px; border-radius: 8px; border: 2px solid #e5e7eb; text-align: center;">
+            <div style="background: #DC2626; color: white; padding: 8px 14px; border-radius: 6px; font-size: 9px; font-weight: 900; margin-bottom: 8px;">SUBJECT<br>TEACHER</div>
+            <span style="font-size: 10px; color: #666;">Subject Teacher</span>
+        </div>
+        <div style="background: #f9fafb; padding: 12px; border-radius: 8px; border: 2px solid #e5e7eb; text-align: center;">
+            <div style="background: #DC2626; color: white; padding: 8px 14px; border-radius: 6px; font-size: 9px; font-weight: 900; margin-bottom: 8px;">CLASS<br>TEACHER</div>
+            <span style="font-size: 10px; color: #666;">Class Teacher</span>
+        </div>
+        <div style="background: #f9fafb; padding: 12px; border-radius: 8px; border: 2px solid #e5e7eb; text-align: center;">
+            <div style="background: #DC2626; color: white; padding: 8px 14px; border-radius: 6px; font-size: 9px; font-weight: 900; margin-bottom: 8px;">PRINCIPAL</div>
+            <span style="font-size: 10px; color: #666;">Principal</span>
+        </div>
+        <div style="background: #f9fafb; padding: 12px; border-radius: 8px; border: 2px solid #e5e7eb; text-align: center;">
+            <div style="background: #DC2626; color: white; padding: 8px 14px; border-radius: 6px; font-size: 9px; font-weight: 900; margin-bottom: 8px;">ACADEMIC<br>COORDINATOR</div>
+            <span style="font-size: 10px; color: #666;">Coordinator</span>
+        </div>
+        <div style="background: #f9fafb; padding: 12px; border-radius: 8px; border: 2px solid #e5e7eb; text-align: center;">
+            <div style="background: #DC2626; color: white; padding: 8px 14px; border-radius: 6px; font-size: 9px; font-weight: 900; margin-bottom: 8px;">GUIDANCE<br>COUNSELOR</div>
+            <span style="font-size: 10px; color: #666;">Counselor</span>
+        </div>
+        <div style="background: #f9fafb; padding: 12px; border-radius: 8px; border: 2px solid #e5e7eb; text-align: center;">
+            <div style="background: #DC2626; color: white; padding: 8px 14px; border-radius: 6px; font-size: 9px; font-weight: 900; margin-bottom: 8px;">ADMIN<br>ASSISTANT</div>
+            <span style="font-size: 10px; color: #666;">Admin Assistant</span>
+        </div>
+    </div>
+</body>
+</html>

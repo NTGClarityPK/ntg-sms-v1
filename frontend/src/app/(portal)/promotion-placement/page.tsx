@@ -1,8 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Group, Paper, Select, Skeleton, Stack, Table, Text, Title } from '@mantine/core';
+import {
+  Alert,
+  Box,
+  Button,
+  Group,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  Table,
+  Text,
+  Title,
+} from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useTranslations } from 'next-intl';
+import { PAGE_TITLE_BAR_MOBILE_MEDIA } from '@/components/common/PageTitleBarLongTitleSizing';
 import { notifications } from '@mantine/notifications';
 import { useThemeColors, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useActiveAcademicYear, useAcademicYearsList } from '@/hooks/useAcademicYears';
@@ -29,6 +43,7 @@ function buildClassSectionLabel(input: {
 
 export default function PromotionPlacementPage() {
   const tNav = useTranslations('navigation');
+  const isMobile = useMediaQuery(PAGE_TITLE_BAR_MOBILE_MEDIA);
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
 
@@ -227,11 +242,10 @@ export default function PromotionPlacementPage() {
   return (
     <>
       <div className="page-title-bar">
-        <Group justify="space-between" w="100%">
-          <Title order={1}>{tNav('promotionPlacement')}</Title>
-          <Button onClick={handleSave} loading={saveMutation.isPending} disabled={!academicYearId}>
-            Save
-          </Button>
+        <Group justify="space-between" w="100%" wrap="nowrap" align="center" gap="xs">
+          <Title order={1} style={{ flex: 1, minWidth: 0 }} lineClamp={isMobile ? 2 : 1}>
+            {tNav('promotionPlacement')}
+          </Title>
         </Group>
       </div>
 
@@ -262,7 +276,7 @@ export default function PromotionPlacementPage() {
               )}
 
               <Paper withBorder p="md">
-                <Group grow align="flex-end">
+                <Group grow={!isMobile} align="flex-end">
                   <Select
                     label="Academic year"
                     data={years.map((y) => ({ value: y.id, label: y.name }))}
@@ -283,20 +297,44 @@ export default function PromotionPlacementPage() {
               </Paper>
 
               <Paper withBorder p="md">
-                <Group>
-                  <Button variant="light" onClick={() => bulkSetOutcome('promoted')} disabled={students.length === 0}>
-                    Promote all
-                  </Button>
-                  <Button variant="light" onClick={() => bulkSetOutcome('repeated')} disabled={students.length === 0}>
-                    Repeat all
-                  </Button>
-                  <Button variant="light" onClick={() => bulkSetOutcome('graduated')} disabled={students.length === 0}>
-                    Graduate all
-                  </Button>
+                <Group justify="space-between" w="100%" wrap="wrap" gap="xs" align="center">
+                  <Group wrap="wrap" gap="xs">
+                    <Button
+                      variant="light"
+                      onClick={() => bulkSetOutcome('promoted')}
+                      disabled={students.length === 0}
+                    >
+                      Promote all
+                    </Button>
+                    <Button
+                      variant="light"
+                      onClick={() => bulkSetOutcome('repeated')}
+                      disabled={students.length === 0}
+                    >
+                      Repeat all
+                    </Button>
+                    <Button
+                      variant="light"
+                      onClick={() => bulkSetOutcome('graduated')}
+                      disabled={students.length === 0}
+                    >
+                      Graduate all
+                    </Button>
+                  </Group>
+                  <Box style={{ flexShrink: 0 }}>
+                    <Button
+                      id="promotion-placement-btn-save"
+                      onClick={handleSave}
+                      loading={!!academicYearId && saveMutation.isPending}
+                      disabled={!academicYearId}
+                    >
+                      Save
+                    </Button>
+                  </Box>
                 </Group>
               </Paper>
 
-              <Paper withBorder p="md">
+              <Paper withBorder p="md" style={{ overflow: 'hidden' }}>
                 {studentsQuery.error ? (
                   <Alert color={colors.error} title="Failed to load students">
                     <Text size="sm">Please try again.</Text>
@@ -304,7 +342,8 @@ export default function PromotionPlacementPage() {
                 ) : students.length === 0 ? (
                   <Text c="dimmed">No active students found for the selected year/class-section.</Text>
                 ) : (
-                  <Table withTableBorder withColumnBorders striped highlightOnHover>
+                  <Table.ScrollContainer minWidth={880}>
+                    <Table withTableBorder withColumnBorders striped highlightOnHover>
                     <Table.Thead>
                       <Table.Tr>
                         <Table.Th>Student</Table.Th>
@@ -406,7 +445,8 @@ export default function PromotionPlacementPage() {
                         </Table.Tr>
                       ))}
                     </Table.Tbody>
-                  </Table>
+                    </Table>
+                  </Table.ScrollContainer>
                 )}
               </Paper>
             </>

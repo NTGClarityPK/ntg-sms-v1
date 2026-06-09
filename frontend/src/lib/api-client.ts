@@ -4,9 +4,56 @@ import { ApiResponse } from '@/types/api';
 import { supabase } from './supabase/client';
 import { clearLocalSupabaseSession } from '@/lib/auth';
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /** When true, connection/offline snackbars are not shown for this request. */
+    suppressErrorNotification?: boolean;
+  }
+}
+
+/** Alias for requests that may suppress global error snackbars. */
+export type ApiRequestConfig = AxiosRequestConfig;
+
 const STUDENT_TOKEN_STORAGE_KEY = 'studentToken';
 
 const LOCAL_API = 'http://localhost:3001';
+
+const API_OFFLINE_NOTIFICATION_ID = 'ntg-api-offline';
+const API_CONNECTION_NOTIFICATION_ID = 'ntg-api-connection-error';
+const API_ERROR_TOAST_COOLDOWN_MS = 20_000;
+
+let lastOfflineToastAt = 0;
+let lastConnectionToastAt = 0;
+
+function shouldShowGlobalErrorToast(config?: InternalAxiosRequestConfig): boolean {
+  return !config?.suppressErrorNotification;
+}
+
+function showOfflineToastOnce(): void {
+  const now = Date.now();
+  if (now - lastOfflineToastAt < API_ERROR_TOAST_COOLDOWN_MS) return;
+  lastOfflineToastAt = now;
+  notifications.show({
+    id: API_OFFLINE_NOTIFICATION_ID,
+    title: 'No Internet Connection',
+    message: 'Please check your connection and try again.',
+    color: 'red',
+    autoClose: 8000,
+  });
+}
+
+function showConnectionToastOnce(): void {
+  const now = Date.now();
+  if (now - lastConnectionToastAt < API_ERROR_TOAST_COOLDOWN_MS) return;
+  lastConnectionToastAt = now;
+  notifications.show({
+    id: API_CONNECTION_NOTIFICATION_ID,
+    title: 'Connection Error',
+    message: 'Could not reach the server. Please check your internet connection.',
+    color: 'red',
+    autoClose: 8000,
+  });
+}
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
@@ -100,11 +147,9 @@ class ApiClient {
     this.client.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
         if (typeof window !== 'undefined' && !window.navigator.onLine) {
-          notifications.show({
-            title: 'No Internet Connection',
-            message: 'Please check your connection and try again.',
-            color: 'red',
-          });
+          if (shouldShowGlobalErrorToast(config)) {
+            showOfflineToastOnce();
+          }
           const offlineError = new Error('No internet connection') as Error & { isOfflineError?: boolean };
           offlineError.isOfflineError = true;
           return Promise.reject(offlineError);
@@ -208,12 +253,12 @@ class ApiClient {
         // Network/timeout errors - show connection message
         const isNetworkError =
           error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED' || error.message === 'Network Error';
-        if (isNetworkError && typeof window !== 'undefined') {
-          notifications.show({
-            title: 'Connection Error',
-            message: 'Could not reach the server. Please check your internet connection.',
-            color: 'red',
-          });
+        if (
+          isNetworkError &&
+          typeof window !== 'undefined' &&
+          shouldShowGlobalErrorToast(error.config)
+        ) {
+          showConnectionToastOnce();
         }
 
         const isUnreachable = error.code === 'ERR_NETWORK' || error.message === 'Network Error';

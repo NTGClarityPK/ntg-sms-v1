@@ -32,6 +32,7 @@ import {
   IconPlus,
 } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
+import { useMediaQuery } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { useClassSections } from '@/hooks/useClassSections';
@@ -78,7 +79,14 @@ export default function ResultsPage() {
 
   const t = useTranslations('results');
   const mantineTheme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${mantineTheme.breakpoints.sm})`);
   const themeCfg = mantineTheme.other as ThemeConfig | undefined;
+
+  const reportKindControlData = [
+    { value: 'term_report', label: t('reportKindTerm') },
+    { value: 'annual_report', label: t('reportKindAnnual') },
+    { value: 'progress_report', label: t('reportKindProgress') },
+  ] as const;
   const { user } = useAuth();
   const userTyped = user as User | undefined;
   const { canEdit } = useFeaturePermission('results');
@@ -313,15 +321,23 @@ export default function ResultsPage() {
                   </Text>
                 ) : null;
               })()}
-            <SegmentedControl
-              value={reportKind}
-              onChange={(v) => setReportKind(v as ReportKind)}
-              data={[
-                { value: 'term_report', label: t('reportKindTerm') },
-                { value: 'annual_report', label: t('reportKindAnnual') },
-                { value: 'progress_report', label: t('reportKindProgress') },
-              ]}
-            />
+            {isMobile ? (
+              <Select
+                id="results-select-report-kind"
+                label={t('reportKindLabel')}
+                value={reportKind}
+                onChange={(v) => v && setReportKind(v as ReportKind)}
+                data={[...reportKindControlData]}
+                allowDeselect={false}
+              />
+            ) : (
+              <SegmentedControl
+                id="results-segment-report-kind"
+                value={reportKind}
+                onChange={(v) => setReportKind(v as ReportKind)}
+                data={[...reportKindControlData]}
+              />
+            )}
             {reportKind === 'term_report' && (
               <Select
                 label={t('status')}
@@ -478,17 +494,18 @@ export default function ResultsPage() {
                   </Stack>
                 </Paper>
 
-                <Paper withBorder p="md">
-                  <Table withTableBorder withColumnBorders>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>{t('studentName')}</Table.Th>
-                        <Table.Th>{t('columnOverall')}</Table.Th>
-                        <Table.Th>{t('columnCard')}</Table.Th>
-                        <Table.Th>{t('actionsMenuColumn')}</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
+                <Paper withBorder p={0} style={{ overflow: 'hidden' }}>
+                  <Table.ScrollContainer minWidth={520}>
+                    <Table withTableBorder withColumnBorders>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>{t('studentName')}</Table.Th>
+                          <Table.Th>{t('columnOverall')}</Table.Th>
+                          <Table.Th>{t('columnCard')}</Table.Th>
+                          <Table.Th style={{ whiteSpace: 'nowrap' }}>{t('actionsMenuColumn')}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
                       {results.students.map((s) => {
                         const card = cardByStudent.get(s.studentId);
                         const genBusy =
@@ -581,8 +598,9 @@ export default function ResultsPage() {
                           </Table.Tr>
                         );
                       })}
-                    </Table.Tbody>
-                  </Table>
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
                 </Paper>
               </>
             )}

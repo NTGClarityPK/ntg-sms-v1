@@ -1,6 +1,7 @@
 'use client';
 
-import { Select } from '@mantine/core';
+import { Select, useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import type { User } from '@/types/auth';
 
 function formatRoleLabel(roleName: string): string {
@@ -41,15 +42,31 @@ export function RoleSwitcher({
     ? selectedRoleId
     : options[0]?.value ?? null;
 
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+
   return (
     <Select
-      size="sm"
-      w={180}
+      size={isMobile ? 'xs' : 'sm'}
+      w={isMobile ? 120 : 180}
+      maw={isMobile ? 120 : 180}
+      miw={isMobile ? 96 : 140}
       data={options}
       value={value}
       onChange={(v) => v && onRoleChange(v)}
       disabled={disabled}
       allowDeselect={false}
+      comboboxProps={{ withinPortal: true }}
+      styles={
+        isMobile
+          ? {
+              input: {
+                fontSize: 'var(--mantine-font-size-xs)',
+                textOverflow: 'ellipsis',
+              },
+            }
+          : undefined
+      }
     />
   );
 }

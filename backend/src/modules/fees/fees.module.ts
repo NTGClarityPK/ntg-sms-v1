@@ -10,7 +10,6 @@ import { FeeStudentConfigController } from './fee-student-config.controller';
 import { FeeStudentConfigService } from './fee-student-config.service';
 import { ChallanController } from './challan.controller';
 import { ChallanService } from './challan.service';
-import { ChallanJobWorkerService } from './challan-job-worker.service';
 import { FeePdfService } from './fee-pdf.service';
 import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
@@ -38,7 +37,6 @@ import { FeeChallanSettingsService } from './fee-challan-settings.service';
     FeeCalculationService,
     FeeStudentConfigService,
     ChallanService,
-    ChallanJobWorkerService,
     FeePdfService,
     PaymentService,
     LateFeeService,

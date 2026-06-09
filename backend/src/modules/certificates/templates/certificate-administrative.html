@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{certificate_type}} — {{student_name}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* --theme, --theme-deep, --theme-soft are injected at render from certificate settings */
+  :root {
+    --paper:      #FFFFFF;
+    --ink:        #1F2A1C;
+    --ink-soft:   #5A6157;
+    --rule:       #D9D5CC;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: white;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .cert {
+    width: 210mm;
+    height: 297mm;
+    max-height: 297mm;
+    margin: 0;
+    background: var(--paper);
+    position: relative;
+    padding: 14mm 16mm 12mm;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+  .revoked-watermark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: rgba(180, 40, 40, 0.35);
+    transform: rotate(-28deg);
+    pointer-events: none;
+    z-index: 100;
+  }
+  .top-band {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 8mm;
+    background: var(--theme);
+  }
+  .top-band::after {
+    content: '';
+    position: absolute;
+    bottom: -2mm; left: 0; right: 0;
+    height: 2mm;
+    background: var(--theme-deep);
+  }
+  .letterhead {
+    display: flex; align-items: center; gap: 14px;
+    padding-top: 6mm;
+    padding-bottom: 10px;
+    flex-shrink: 0;
+    border-bottom: 2px solid var(--theme);
+    position: relative;
+  }
+  .letterhead::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: -5px;
+    height: 1px; background: var(--theme);
+    opacity: 0.4;
+  }
+  .letterhead-logo { width: 60px; height: 60px; object-fit: contain; flex-shrink: 0; }
+  .letterhead-text { flex: 1; }
+  .school-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px; font-weight: 700;
+    color: var(--theme-deep);
+    line-height: 1.05;
+  }
+  .school-tagline {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--theme); margin-top: 4px;
+  }
+  .school-meta { font-size: 10px; color: var(--ink-soft); margin-top: 6px; line-height: 1.5; }
+  .meta-bar {
+    display: flex; justify-content: space-between;
+    padding: 6px 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .meta-bar strong { color: var(--ink); font-weight: 600; }
+  .cert-title-block { text-align: center; margin: 14px 0 12px; flex-shrink: 0; }
+  .cert-title-eyebrow {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.4em; text-transform: uppercase;
+    color: var(--theme); margin-bottom: 8px;
+  }
+  .cert-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px; font-weight: 600;
+    color: var(--theme-deep);
+    line-height: 1;
+  }
+  .cert-title-underline {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; margin-top: 12px;
+  }
+  .cert-title-underline .line { width: 50px; height: 1px; background: var(--theme); }
+  .cert-title-underline .diamond {
+    width: 8px; height: 8px;
+    background: var(--theme);
+    transform: rotate(45deg);
+  }
+  .body {
+    flex: 1 1 auto;
+    min-height: 0;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--ink);
+    text-align: justify;
+  }
+  .body p { margin-bottom: 8px; }
+  .body .field {
+    display: inline-block;
+    font-weight: 600;
+    color: var(--theme-deep);
+    border-bottom: 1px dotted var(--ink-soft);
+    padding: 0 6px 1px;
+    min-width: 100px;
+    text-align: center;
+  }
+  .details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 11.5px;
+  }
+  .details-table th, .details-table td {
+    padding: 5px 10px;
+    border: 1px solid var(--rule);
+    text-align: left;
+    vertical-align: top;
+  }
+  .details-table th {
+    background: var(--theme-soft);
+    color: var(--theme-deep);
+    font-weight: 600;
+    font-size: 12px;
+    width: 38%;
+  }
+  .remarks-block {
+    background: var(--theme-soft);
+    border-left: 3px solid var(--theme);
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size: 11.5px;
+    line-height: 1.55;
+  }
+  .remarks-block strong {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--theme);
+    margin-bottom: 6px;
+  }
+  .footer {
+    margin-top: auto;
+    padding-top: 8px;
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    align-items: end;
+  }
+  .sig-block {
+    text-align: center;
+    min-height: 52px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .sig-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    font-style: italic;
+    margin-bottom: 4px;
+    min-height: 1.2em;
+  }
+  .sig-line {
+    border-top: 1px solid var(--ink);
+    padding-top: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .sig-role {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 3px;
+  }
+  .footer .seal {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    border: 2px solid var(--theme);
+    background: var(--paper);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    color: var(--theme-deep);
+    position: relative;
+    margin: 0 auto;
+  }
+  .footer .seal::before {
+    content: '';
+    position: absolute; inset: 4px;
+    border: 1px dashed var(--theme);
+    border-radius: 50%;
+    opacity: 0.5;
+  }
+  .seal-school {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 10px; font-weight: 600;
+    line-height: 1.05;
+    padding: 0 6px;
+  }
+  .seal-est { font-size: 8px; color: var(--ink-soft); margin-top: 2px; }
+  .bottom-note {
+    text-align: center;
+    margin-top: 8px;
+    padding-top: 6px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--rule);
+    font-size: 10px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  @page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+<div class="cert">
+  {{#if isRevoked}}<div class="revoked-watermark">CANCELLED</div>{{/if}}
+  <div class="top-band"></div>
+  <div class="letterhead">
+    <img class="letterhead-logo" src="{{school_logo_url}}" alt="School logo" onerror="this.style.display='none'" />
+    <div class="letterhead-text">
+      <div class="school-name">{{school_name}}</div>
+      <div class="school-tagline">{{school_tagline}}</div>
+      <div class="school-meta">
+        {{school_address}} &nbsp;·&nbsp; {{school_phone}} &nbsp;·&nbsp; {{school_email}}
+      </div>
+    </div>
+  </div>
+  <div class="meta-bar">
+    {{#if showCertificateNumber}}
+    <span>Reference No: <strong>{{certificate_no}}</strong></span>
+    {{/if}}
+    <span>Date of Issue: <strong>{{issue_date}}</strong></span>
+  </div>
+  <div class="cert-title-block">
+    <div class="cert-title-eyebrow">To Whom It May Concern</div>
+    <h1 class="cert-title">{{certificate_type}}</h1>
+    <div class="cert-title-underline">
+      <div class="line"></div>
+      <div class="diamond"></div>
+      <div class="line"></div>
+    </div>
+  </div>
+  <div class="body">
+    <p>
+      This is to certify that <span class="field">{{student_name}}</span>,
+      son/daughter of <span class="field">{{parent_name}}</span>,
+      was a bonafide student of this institution.
+    </p>
+    <table class="details-table">
+      {{details_table_rows}}
+    </table>
+    <div class="remarks-block">
+      <strong>Conduct &amp; Character</strong>
+      During the period of study at our institution, the conduct and character of
+      the student remained <span class="field">{{conduct}}</span>.
+      {{remarks_paragraph}}
+    </div>
+    <p>
+      To the best of our knowledge, no dues are outstanding against the student at the
+      time of issuance of this certificate. We wish them all the very best in their
+      future endeavours.
+    </p>
+  </div>
+  <div class="footer">
+    <div class="sig-block">
+      {{#if signature1_name}}<div class="sig-name">{{signature1_name}}</div>{{/if}}
+      <div class="sig-line">{{signature1_label}}</div>
+    </div>
+    <div class="sig-block">
+      <div class="seal">
+        <div class="seal-school">{{school_name}}</div>
+        <div class="seal-est">EST. {{school_established}}</div>
+      </div>
+    </div>
+    <div class="sig-block">
+      {{#if signature2_name}}<div class="sig-name">{{signature2_name}}</div>{{/if}}
+      <div class="sig-line">{{signature2_label}}</div>
+    </div>
+  </div>
+  <div class="bottom-note">
+    This is a digitally generated certificate. Any unauthorised alteration or duplication is strictly prohibited.
+  </div>
+</div>
+</body>
+</html>

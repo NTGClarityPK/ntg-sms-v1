@@ -43,6 +43,7 @@ begin
       ('principal','teacher_mapping','edit'),
       ('principal','timetable_management','edit'),
       ('principal','timetable_personal','none'),
+      ('principal','teacher_substitution','edit'),
       ('principal','inventory','view'),
 
       -- Academic Coordinator
@@ -66,6 +67,7 @@ begin
       ('academic_coordinator','teacher_mapping','edit'),
       ('academic_coordinator','timetable_management','edit'),
       ('academic_coordinator','timetable_personal','none'),
+      ('academic_coordinator','teacher_substitution','edit'),
       ('academic_coordinator','inventory','view'),
 
       -- Admin Assistant
@@ -112,6 +114,7 @@ begin
       ('class_teacher','teacher_mapping','view'),
       ('class_teacher','timetable_management','view'),
       ('class_teacher','timetable_personal','edit'),
+      ('class_teacher','teacher_substitution','view'),
       ('class_teacher','inventory','none'),
 
       -- Subject Teacher
@@ -135,6 +138,7 @@ begin
       ('subject_teacher','teacher_mapping','view'),
       ('subject_teacher','timetable_management','view'),
       ('subject_teacher','timetable_personal','edit'),
+      ('subject_teacher','teacher_substitution','view'),
       ('subject_teacher','inventory','none'),
 
       -- Guidance Counselor
@@ -251,6 +255,7 @@ begin
       ('principal','teacher_mapping','edit'),
       ('principal','timetable_management','edit'),
       ('principal','timetable_personal','none'),
+      ('principal','teacher_substitution','edit'),
       ('principal','inventory','view'),
 
       ('academic_coordinator','assessment','edit'),
@@ -273,6 +278,7 @@ begin
       ('academic_coordinator','teacher_mapping','edit'),
       ('academic_coordinator','timetable_management','edit'),
       ('academic_coordinator','timetable_personal','none'),
+      ('academic_coordinator','teacher_substitution','edit'),
       ('academic_coordinator','inventory','view'),
 
       ('admin_assistant','assessment','none'),
@@ -317,6 +323,7 @@ begin
       ('class_teacher','teacher_mapping','view'),
       ('class_teacher','timetable_management','view'),
       ('class_teacher','timetable_personal','edit'),
+      ('class_teacher','teacher_substitution','view'),
       ('class_teacher','inventory','none'),
 
       ('subject_teacher','assessment','edit'),
@@ -339,6 +346,7 @@ begin
       ('subject_teacher','teacher_mapping','view'),
       ('subject_teacher','timetable_management','view'),
       ('subject_teacher','timetable_personal','edit'),
+      ('subject_teacher','teacher_substitution','view'),
       ('subject_teacher','inventory','none'),
 
       ('guidance_counselor','assessment','view'),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Alert,
@@ -10,7 +10,6 @@ import {
   List,
   MultiSelect,
   Paper,
-  Progress,
   Select,
   Stack,
   Text,
@@ -22,8 +21,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import {
-  useEnqueueIdCardJob,
-  useIdCardGenerationJob,
+  useGenerateIdCards,
   useIdCardStats,
   useUploadIdCardPhoto,
   downloadBulkIdCardsZip,
@@ -35,8 +33,6 @@ import { IdCardPhotoIdReference } from '@/components/features/id-cards/IdCardPho
 import { IdCardStatsCards } from '@/components/features/id-cards/IdCardStatsCards';
 import { STAFF_ID_CARD_ROLE_EXCLUDE } from '@/lib/id-cards/format-staff-role';
 import type { IdCardDesignVariant, IdCardPersonType } from '@/types/id-cards';
-
-const JOB_STORAGE_KEY = 'idCardGenerationJobId';
 
 function GenerateSection({
   title,
@@ -74,9 +70,9 @@ export function IdCardsGenerateWizard() {
   const [debouncedStaffSearch] = useDebouncedValue(staffSearch, 300);
   const [designVariant, setDesignVariant] = useState<IdCardDesignVariant>('classic');
   const [photosAcknowledged, setPhotosAcknowledged] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [generatedCardIds, setGeneratedCardIds] = useState<string[]>([]);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [zipLoading, setZipLoading] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useIdCardStats();
@@ -89,9 +85,8 @@ export function IdCardsGenerateWizard() {
     enabled: !!activeYearId && personType === 'student',
   });
   const { data: rolesResponse } = useRoles();
-  const enqueue = useEnqueueIdCardJob();
+  const generateCards = useGenerateIdCards();
   const uploadPhoto = useUploadIdCardPhoto();
-  const { data: job } = useIdCardGenerationJob(jobId);
 
   const { data: staffResponse, isLoading: staffPickerLoading } = useStaff({
     isActive: true,
@@ -100,20 +95,6 @@ export function IdCardsGenerateWizard() {
     search: debouncedStaffSearch || undefined,
     enabled: personType === 'staff',
   });
-
-  useEffect(() => {
-    const stored = localStorage.getItem(JOB_STORAGE_KEY);
-    if (stored) setJobId(stored);
-  }, []);
-
-  useEffect(() => {
-    if (job?.status === 'completed' || job?.status === 'failed') {
-      localStorage.removeItem(JOB_STORAGE_KEY);
-    }
-    if (job?.status === 'completed' && job.result?.cardIds?.length) {
-      setGeneratedCardIds(job.result.cardIds);
-    }
-  }, [job?.status, job?.result?.cardIds]);
 
   const classSections = classSectionsResponse?.data ?? [];
 
@@ -154,13 +135,7 @@ export function IdCardsGenerateWizard() {
     designVariant,
   };
 
-  const isJobRunning =
-    !!job && (job.status === 'queued' || job.status === 'in_progress');
-  const isJobComplete = job?.status === 'completed';
-  const isJobFailed = job?.status === 'failed';
-
-  const jobProgress =
-    job && job.totalCount > 0 ? Math.round((job.processedCount / job.totalCount) * 100) : 0;
+  const isGenerateComplete = generatedCardIds.length > 0;
 
   const resetRecipientFlow = () => {
     setPhotosAcknowledged(false);
@@ -169,9 +144,13 @@ export function IdCardsGenerateWizard() {
 
   const runGenerate = async () => {
     setGeneratedCardIds([]);
-    const { jobId: id } = await enqueue.mutateAsync(generatePayload);
-    setJobId(id);
-    localStorage.setItem(JOB_STORAGE_KEY, id);
+    setGenerateError(null);
+    try {
+      const cards = await generateCards.mutateAsync(generatePayload);
+      setGeneratedCardIds(cards.map((c) => c.id));
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : t('wizard.failed'));
+    }
   };
 
   const uploadAllPhotos = async () => {
@@ -316,8 +295,8 @@ export function IdCardsGenerateWizard() {
           <Alert>{t('wizard.reviewHint')}</Alert>
           <Button
             id="id-cards-wizard-generate"
-            disabled={!canGenerate || enqueue.isPending || isJobRunning}
-            loading={enqueue.isPending}
+            disabled={!canGenerate || generateCards.isPending}
+            loading={generateCards.isPending}
             onClick={() => void runGenerate()}
           >
             {t('wizard.generateNow')}
@@ -325,55 +304,35 @@ export function IdCardsGenerateWizard() {
         </GenerateSection>
       ) : null}
 
-      {jobId ? (
+      {generateError ? (
+        <Alert color="red">{generateError}</Alert>
+      ) : null}
+
+      {isGenerateComplete ? (
         <GenerateSection title={t('wizard.step4')} description={t('wizard.step4Desc')}>
-          {isJobRunning ? (
-            <Text size="sm" c="dimmed">
-              {t('wizard.backgroundJobHint')}
-            </Text>
-          ) : null}
-          {isJobRunning ? (
-            <>
-              <Text size="sm">
-                {t('wizard.progress', {
-                  processed: job?.processedCount ?? 0,
-                  total: job?.totalCount ?? 0,
-                })}
-              </Text>
-              <Progress value={jobProgress} />
-            </>
-          ) : null}
-          {isJobComplete ? <Alert color="green">{t('wizard.complete')}</Alert> : null}
-          {isJobFailed ? (
-            <Alert color="red">{job?.errorMessage ?? t('wizard.failed')}</Alert>
-          ) : null}
-          {(generatedCardIds.length > 0 ||
-            (isJobComplete && (job?.result?.cardIds?.length ?? 0) > 0)) && (
-            <Button
-              id="id-cards-wizard-download-pdf-zip"
-              leftSection={<IconDownload size={18} />}
-              loading={zipLoading}
-              disabled={zipLoading}
-              onClick={async () => {
-                const ids =
-                  generatedCardIds.length > 0 ? generatedCardIds : (job?.result?.cardIds ?? []);
-                setZipLoading(true);
-                try {
-                  await downloadBulkIdCardsZip(ids, 'single', {
-                    designVariant,
-                    messages: {
-                      preparing: t('downloadPdfPreparing'),
-                      failed: t('downloadPdfFailed'),
-                    },
-                  });
-                } finally {
-                  setZipLoading(false);
-                }
-              }}
-            >
-              {t('wizard.downloadZip')}
-            </Button>
-          )}
+          <Alert color="green">{t('wizard.complete')}</Alert>
+          <Button
+            id="id-cards-wizard-download-pdf-zip"
+            leftSection={<IconDownload size={18} />}
+            loading={zipLoading}
+            disabled={zipLoading}
+            onClick={async () => {
+              setZipLoading(true);
+              try {
+                await downloadBulkIdCardsZip(generatedCardIds, 'single', {
+                  designVariant,
+                  messages: {
+                    preparing: t('downloadPdfPreparing'),
+                    failed: t('downloadPdfFailed'),
+                  },
+                });
+              } finally {
+                setZipLoading(false);
+              }
+            }}
+          >
+            {t('wizard.downloadZip')}
+          </Button>
           <Button id="id-cards-wizard-finish" component={Link} href="/id-cards" variant="light">
             {t('wizard.viewCards')}
           </Button>

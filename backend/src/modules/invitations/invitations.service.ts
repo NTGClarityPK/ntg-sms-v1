@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
+import { isCronJobEnabled } from '../../common/config/cron-job-enabled.util';
+import { CRON_JOB_ENV_KEYS } from '../../common/config/cron-job-env-keys';
 import crypto from 'crypto';
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
@@ -64,10 +66,11 @@ export class InvitationsService {
     // This cron is useful in production to clean up unused, expired invitations.
     // In development it creates unnecessary background DB traffic and log noise,
     // so we default it to OFF unless explicitly enabled.
-    const enabledRaw = this.configService.get<string>('INVITATIONS_EXPIRE_UNUSED_JOB_ENABLED')?.trim().toLowerCase();
-    if (enabledRaw === 'true') this.expireUnusedInvitationsEnabled = true;
-    else if (enabledRaw === 'false') this.expireUnusedInvitationsEnabled = false;
-    else this.expireUnusedInvitationsEnabled = this.configService.get<string>('NODE_ENV') === 'production';
+    this.expireUnusedInvitationsEnabled = isCronJobEnabled(
+      this.configService,
+      CRON_JOB_ENV_KEYS.invitationsExpireUnused,
+      'production',
+    );
   }
 
   private getFrontendUrl(): string {

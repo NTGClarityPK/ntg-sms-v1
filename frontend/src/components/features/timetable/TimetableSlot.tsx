@@ -102,6 +102,11 @@ export function TimetableSlotComponent({
               {[slot.className, slot.sectionName].filter(Boolean).join(' ')}
             </Text>
           )}
+          {slot.isSubstitutionDisplay ? (
+            <Badge size="xs" variant="filled" color={colors.success} style={{ flexShrink: 0 }}>
+              SUB
+            </Badge>
+          ) : null}
           {slot.staffName && (
             <Text 
               size="xs" 
@@ -190,6 +195,11 @@ export function TimetableSlotComponent({
         {/* Row 3: staff/room (left) + time range (right) */}
         <Group justify="space-between" gap={4} wrap="nowrap">
           <Group gap={4} wrap="nowrap" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            {slot.isSubstitutionDisplay ? (
+              <Badge size="xs" variant="filled" color={colors.success}>
+                SUB
+              </Badge>
+            ) : null}
             {slot.staffName && (
               <Text size="xs" c="dimmed" lineClamp={1} style={{ minWidth: 0 }}>
                 {slot.staffName}

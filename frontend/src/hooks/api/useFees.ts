@@ -12,17 +12,6 @@ import type {
 } from '@/types/fees';
 import { notifications } from '@mantine/notifications';
 
-export type FeeChallanGenerateJobStatus = {
-  id: string;
-  status: 'queued' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
-  totalStudents: number;
-  processedStudents: number;
-  errorMessage: string | null;
-  result: { data: FeeChallanGenerateResult[] } | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export function useFeeTemplates(params: { scope?: string; type?: string; isActive?: string } = {}) {
   return useQuery({
     queryKey: ['fees', 'templates', params],
@@ -139,50 +128,6 @@ export function useGenerateFeeChallans() {
       const response = await apiClient.post<FeeChallanGenerateResult[]>('/api/v1/fees/challans/generate', input);
       return response.data ?? [];
     },
-  });
-}
-
-export function useEnqueueFeeChallanGenerateJob() {
-  return useMutation({
-    mutationFn: async (input: {
-      studentIds: string[];
-      months: string[];
-      autoCalculateDueDate?: boolean;
-      dueDate?: string;
-      billingStartDate?: string;
-      billingEndDate?: string;
-      selectedInheritedTemplateId?: string;
-      studentOverrides?: Array<{
-        studentId: string;
-        month: string;
-        includeIndividualTemplateIds?: string[];
-        templateEdits?: Array<{ templateId: string; action: 'exclude' }>;
-        metricEdits?: Array<{ templateId: string; metricId: string; action: 'exclude' | 'overrideAmount'; amount?: number }>;
-      }>;
-    }) => {
-      const response = await apiClient.post<{ jobId: string }>('/api/v1/fees/challans/generate-jobs', input);
-      return response.data?.jobId ?? null;
-    },
-  });
-}
-
-export function useFeeChallanGenerateJob(jobId: string | null) {
-  return useQuery({
-    queryKey: ['fees', 'challans', 'generate-jobs', jobId],
-    queryFn: async () => {
-      if (!jobId) return null;
-      const response = await apiClient.get<FeeChallanGenerateJobStatus>(`/api/v1/fees/challans/generate-jobs/${jobId}`);
-      return response.data ?? null;
-    },
-    enabled: !!jobId,
-    // Poll until terminal state
-    refetchInterval: (query) => {
-      const s = query.state.data?.status;
-      if (!s) return 1500;
-      if (s === 'completed' || s === 'failed' || s === 'cancelled') return false;
-      return 1500;
-    },
-    staleTime: 0,
   });
 }
 

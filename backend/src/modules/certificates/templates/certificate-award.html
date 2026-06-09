@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{certificate_type}} — {{student_name}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* --theme, --theme-deep, --theme-soft are injected at render from certificate settings */
+  :root {
+    --gold:         #B8923A;
+    --paper:        #FBF9F4;
+    --ink:          #1F2A1C;
+    --ink-soft:     #5A6157;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: white;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .cert {
+    width: 297mm; height: 210mm;
+    margin: 0 auto;
+    background: var(--paper);
+    position: relative;
+    overflow: hidden;
+  }
+  .revoked-watermark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 72px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: rgba(180, 40, 40, 0.35);
+    transform: rotate(-28deg);
+    pointer-events: none;
+    z-index: 100;
+  }
+  .frame-outer {
+    position: absolute;
+    top: 14mm; right: 14mm; bottom: 14mm; left: 14mm;
+    border: 2px solid var(--theme);
+  }
+  .frame-inner {
+    position: absolute;
+    top: 17mm; right: 17mm; bottom: 17mm; left: 17mm;
+    border: 0.5px solid var(--theme);
+    opacity: 0.5;
+  }
+  .corner { position: absolute; width: 60px; height: 60px; color: var(--gold); }
+  .corner-tl { top: 20mm; left: 20mm; }
+  .corner-tr { top: 20mm; right: 20mm; transform: scaleX(-1); }
+  .corner-bl { bottom: 20mm; left: 20mm; transform: scaleY(-1); }
+  .corner-br { bottom: 20mm; right: 20mm; transform: scale(-1,-1); }
+  .bg-pattern {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 10%, var(--theme-soft) 0%, transparent 35%),
+      radial-gradient(circle at 80% 95%, var(--theme-soft) 0%, transparent 40%);
+    pointer-events: none;
+  }
+  .content {
+    position: absolute; inset: 0;
+    padding: 28mm 32mm;
+    display: flex; flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .header { display: flex; align-items: center; gap: 16px; margin-bottom: 8mm; }
+  .header-logo { width: 56px; height: 56px; object-fit: contain; }
+  .header-school { text-align: left; }
+  .header-school-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 600;
+    color: var(--theme-deep);
+    letter-spacing: 0.02em;
+    line-height: 1.1;
+  }
+  .header-school-tagline {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .eyebrow {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.4em; text-transform: uppercase;
+    color: var(--theme);
+    margin-bottom: 6px;
+  }
+  .title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 52px; font-weight: 600;
+    color: var(--theme-deep);
+    letter-spacing: -0.01em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .title-italic {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic; font-weight: 500;
+    font-size: 38px;
+    color: var(--theme);
+    letter-spacing: -0.01em;
+    margin-bottom: 18px;
+  }
+  .divider-fancy { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .divider-line { width: 80px; height: 1px; background: var(--theme); opacity: 0.5; }
+  .divider-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+  .presented-to {
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+  .recipient {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 64px; font-weight: 500;
+    color: var(--ink);
+    line-height: 1;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--theme);
+    padding-bottom: 14px;
+    min-width: 60%;
+  }
+  .citation {
+    font-size: 14px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+    max-width: 600px;
+    margin-bottom: 6px;
+  }
+  .citation strong { color: var(--theme-deep); font-weight: 600; }
+  .footer {
+    margin-top: auto;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 32px;
+    align-items: end;
+  }
+  .sig-block {
+    text-align: center;
+    min-height: 52px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .sig-line {
+    border-top: 1px solid var(--ink);
+    padding-top: 6px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    letter-spacing: 0.04em;
+  }
+  .sig-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px; font-weight: 600;
+    color: var(--ink); font-style: italic;
+    margin-bottom: 2px;
+  }
+  .sig-role {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .seal-slot {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto;
+  }
+  .seal {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--theme) 0%, var(--theme-deep) 100%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: var(--paper);
+    box-shadow: 0 6px 20px rgba(43,71,40,0.3);
+    position: relative;
+  }
+  .seal::before {
+    content: '';
+    position: absolute; inset: 6px;
+    border: 1.5px dashed rgba(255,255,255,0.3);
+    border-radius: 50%;
+  }
+  .seal-icon { font-size: 28px; line-height: 1; margin-bottom: 4px; }
+  .seal-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 12px; font-style: italic;
+    text-align: center; line-height: 1.1;
+    padding: 0 8px;
+  }
+  .meta-row {
+    position: absolute;
+    bottom: 8mm; left: 22mm; right: 22mm;
+    display: flex; justify-content: space-between;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  @page { size: A4 landscape; margin: 0; }
+</style>
+</head>
+<body>
+<div class="cert">
+  {{#if isRevoked}}<div class="revoked-watermark">CANCELLED</div>{{/if}}
+  <div class="bg-pattern"></div>
+  <div class="frame-outer"></div>
+  <div class="frame-inner"></div>
+  <svg class="corner corner-tl" viewBox="0 0 60 60" fill="none">
+    <path d="M2 30 Q2 2 30 2" stroke="currentColor" stroke-width="1" fill="none"/>
+    <path d="M8 30 Q8 8 30 8" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+    <path d="M14 22 L14 30 M22 14 L30 14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+  <svg class="corner corner-tr" viewBox="0 0 60 60" fill="none">
+    <path d="M2 30 Q2 2 30 2" stroke="currentColor" stroke-width="1" fill="none"/>
+    <path d="M8 30 Q8 8 30 8" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+    <path d="M14 22 L14 30 M22 14 L30 14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+  <svg class="corner corner-bl" viewBox="0 0 60 60" fill="none">
+    <path d="M2 30 Q2 2 30 2" stroke="currentColor" stroke-width="1" fill="none"/>
+    <path d="M8 30 Q8 8 30 8" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+    <path d="M14 22 L14 30 M22 14 L30 14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+  <svg class="corner corner-br" viewBox="0 0 60 60" fill="none">
+    <path d="M2 30 Q2 2 30 2" stroke="currentColor" stroke-width="1" fill="none"/>
+    <path d="M8 30 Q8 8 30 8" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+    <path d="M14 22 L14 30 M22 14 L30 14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+  <div class="content">
+    <div class="header">
+      <img class="header-logo" src="{{school_logo_url}}" alt="School logo" onerror="this.style.display='none'" />
+      <div class="header-school">
+        <div class="header-school-name">{{school_name}}</div>
+        <div class="header-school-tagline">{{school_tagline}}</div>
+      </div>
+    </div>
+    <div class="eyebrow">Certificate of</div>
+    <div class="title">{{certificate_type}}</div>
+    <div class="title-italic">{{certificate_subtype}}</div>
+    <div class="divider-fancy">
+      <div class="divider-line"></div>
+      <div class="divider-dot"></div>
+      <div class="divider-line"></div>
+    </div>
+    <div class="presented-to">This certificate is proudly presented to</div>
+    <div class="recipient">{{student_name}}</div>
+    <p class="citation">{{citation_html}}</p>
+    <div class="footer">
+      <div class="sig-block">
+        {{#if signature1_name}}<div class="sig-name">{{signature1_name}}</div>{{/if}}
+        <div class="sig-line">{{signature1_label}}</div>
+      </div>
+      <div class="seal-slot">
+        {{#if showDistinctionBadge}}
+        <div class="seal">
+          <div class="seal-icon">★</div>
+          <div class="seal-text">Awarded with<br>Distinction</div>
+        </div>
+        {{/if}}
+      </div>
+      <div class="sig-block">
+        {{#if signature2_name}}<div class="sig-name">{{signature2_name}}</div>{{/if}}
+        <div class="sig-line">{{signature2_label}}</div>
+      </div>
+    </div>
+  </div>
+  <div class="meta-row">
+    {{#if showCertificateNumber}}
+    <span>Certificate No: {{certificate_no}}</span>
+    {{/if}}
+    <span>Date of Issue: {{issue_date}}</span>
+  </div>
+</div>
+</body>
+</html>

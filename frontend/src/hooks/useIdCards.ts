@@ -7,7 +7,6 @@ import type {
   IdCard,
   IdCardAnalytics,
   IdCardDesignVariant,
-  IdCardGenerationJob,
   IdCardClassSectionRecipientsMeta,
   IdCardStudentRecipient,
   IdCardPersonType,
@@ -176,48 +175,10 @@ export function useGenerateIdCards() {
       designVariant?: IdCardDesignVariant;
     }) => {
       const res = await apiClient.post<IdCard[]>('/api/v1/id-cards/generate', input);
-      return res.data;
+      return res.data ?? [];
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['id-cards'] });
-      notifications.show({ title: 'Success', message: 'ID cards generated', color: 'green' });
-    },
-  });
-}
-
-export function useEnqueueIdCardJob() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      personType: IdCardPersonType;
-      personIds?: string[];
-      classSectionId?: string;
-      staffRoleId?: string;
-      templateId?: string;
-      designVariant?: IdCardDesignVariant;
-    }) => {
-      const res = await apiClient.post<{ jobId: string }>('/api/v1/id-cards/generation-jobs', input);
-      return res.data;
-    },
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['id-cards'] });
-    },
-  });
-}
-
-export function useIdCardGenerationJob(jobId: string | null) {
-  const branchId = branchKey();
-  return useQuery({
-    queryKey: ['id-cards', 'job', jobId, branchId],
-    queryFn: async () => {
-      const res = await apiClient.get<IdCardGenerationJob>(`/api/v1/id-cards/generation-jobs/${jobId}`);
-      return res.data;
-    },
-    enabled: !!branchId && !!jobId,
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      if (!status || ['completed', 'failed', 'cancelled'].includes(status)) return false;
-      return 1500;
     },
   });
 }

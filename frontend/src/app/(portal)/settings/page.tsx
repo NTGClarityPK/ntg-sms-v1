@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconSchool, IconClock, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments, IconCash, IconFileText } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconShield, IconSchool, IconClock, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments, IconCash, IconFileText, IconDownload } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -70,6 +70,7 @@ import { PublicStatsSettings } from '@/components/features/settings/PublicStatsS
 import { BulkSetupTabContent } from '@/components/features/settings/BulkSetupTabContent';
 import { FeeSettingsTabContent } from '@/components/features/settings/FeeSettingsTabContent';
 import { ResultReportsSettingsTabContent } from '@/components/features/settings/ResultReportsSettingsTabContent';
+import { DataExportTabContent } from '@/components/features/settings/DataExportTabContent';
 
 // Common timezones list with GMT offsets (matching RMS)
 const TIMEZONE_DATA = [
@@ -182,6 +183,10 @@ export default function SettingsPage() {
 
   const hasCurrentBranch = !!user?.currentBranch?.id;
   const isSchoolAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
+  const canDataExport =
+    user?.roles?.some((r) =>
+      ['school_admin', 'super_admin'].includes((r.roleName ?? '').toLowerCase()),
+    ) || false;
   const canManageResultReports =
     user?.roles?.some((r) =>
       ['school_admin', 'super_admin', 'principal'].includes((r.roleName ?? '').toLowerCase()),
@@ -320,6 +325,11 @@ export default function SettingsPage() {
                     {tSettings('tabPublicStatistics')}
                   </Tabs.Tab>
                 )}
+                {canDataExport && (
+                  <Tabs.Tab value="data-export" leftSection={<IconDownload size={16} />}>
+                    {tSettings('tabDataExport')}
+                  </Tabs.Tab>
+                )}
               </Tabs.List>
 
               {/* Business Information Tab */}
@@ -380,6 +390,12 @@ export default function SettingsPage() {
               {isSchoolAdmin && (
                 <Tabs.Panel value="public-statistics" pt="md" px="md" pb="md">
                   <PublicStatsSettings />
+                </Tabs.Panel>
+              )}
+
+              {canDataExport && (
+                <Tabs.Panel value="data-export" pt="md" px="md" pb="md">
+                  <DataExportTabContent />
                 </Tabs.Panel>
               )}
 

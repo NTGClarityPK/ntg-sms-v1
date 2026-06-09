@@ -17,6 +17,7 @@ interface QueryStudentsParams {
   sectionId?: string; // Deprecated: use sectionIds instead
   sectionIds?: string[]; // Array of section IDs
   isActive?: boolean;
+  enrolmentStatuses?: string[];
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
@@ -46,6 +47,11 @@ export function useStudents(params?: QueryStudentsParams) {
         queryParams.append('sectionId', params.sectionId);
       }
       if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+      if (params?.enrolmentStatuses?.length) {
+        params.enrolmentStatuses.forEach((status) =>
+          queryParams.append('enrolmentStatuses', status),
+        );
+      }
       if (params?.search) queryParams.append('search', params.search);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);

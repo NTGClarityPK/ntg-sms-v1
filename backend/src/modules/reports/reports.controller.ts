@@ -19,6 +19,10 @@ import { AttendanceSummaryBranchDto } from './dto/attendance-summary-branch.dto'
 import { LowAttendanceReportDto } from './dto/low-attendance.dto';
 import { AcademicReportBySubjectDto } from './dto/academic-report-by-subject.dto';
 import { AcademicComparisonDto } from './dto/academic-comparison.dto';
+import { QueryRevenueReportDto } from './dto/query-revenue-report.dto';
+import { QueryRevenueReportExportDto } from './dto/query-revenue-report-export.dto';
+import { RevenueReportDto } from './dto/revenue-report.dto';
+import { RevenueReportsService } from './revenue/revenue-reports.service';
 
 @ApiTags('Reports')
 @Controller('api/v1/reports')
@@ -27,6 +31,7 @@ export class ReportsController {
   constructor(
     private readonly reportsService: ReportsService,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly revenueReportsService: RevenueReportsService,
   ) {}
 
   @Get('student/:id/export/pdf')
@@ -186,6 +191,57 @@ export class ReportsController {
       branch.branchId,
       academicYearId,
     );
+  }
+
+  // --- Revenue report (school admin / principal) ---
+  @Get('revenue')
+  async getRevenueReport(
+    @Query() query: QueryRevenueReportDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: { id: string; roles?: string[] },
+  ): Promise<{ data: RevenueReportDto }> {
+    RevenueReportsService.ensureRevenueAdmin(user.roles);
+    return this.revenueReportsService.getRevenueReport(
+      query,
+      branch.branchId,
+      branch.tenantId,
+      user.id,
+    );
+  }
+
+  @Get('revenue/export')
+  async exportRevenueReport(
+    @Res() res: Response,
+    @Query() query: QueryRevenueReportExportDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: { id: string; roles?: string[] },
+  ): Promise<void> {
+    RevenueReportsService.ensureRevenueAdmin(user.roles);
+    const isPdf = (query.format || 'pdf').toLowerCase() === 'pdf';
+    const buffer = isPdf
+      ? await this.revenueReportsService.exportRevenueReportPdf(
+          query,
+          branch.branchId,
+          branch.tenantId,
+          user.id,
+        )
+      : await this.revenueReportsService.exportRevenueReportExcel(
+          query,
+          branch.branchId,
+          branch.tenantId,
+          user.id,
+        );
+    if (isPdf) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="revenue-report.pdf"');
+    } else {
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader('Content-Disposition', 'attachment; filename="revenue-report.xlsx"');
+    }
+    res.send(buffer);
   }
 
   // --- Administrative Attendance Reports (route order: specific before :param) ---

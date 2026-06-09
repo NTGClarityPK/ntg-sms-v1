@@ -303,7 +303,46 @@ export class StudentsService {
           ? [query.sectionId]
           : [];
 
-    if (classIdsFilter.length > 0 || sectionIdsFilter.length > 0) {
+    const enrolmentStatusesFilter =
+      query.enrolmentStatuses && query.enrolmentStatuses.length > 0
+        ? query.enrolmentStatuses
+        : [];
+
+    if (enrolmentStatusesFilter.length > 0) {
+      const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+      if (!activeYear) {
+        return {
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 0 },
+        };
+      }
+      let enrolQuery = supabase
+        .from('student_enrolments')
+        .select('student_id')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', activeYear.id)
+        .in('status', enrolmentStatusesFilter);
+      if (classIdsFilter.length > 0) {
+        enrolQuery = enrolQuery.in('class_id', classIdsFilter);
+      }
+      if (sectionIdsFilter.length > 0) {
+        enrolQuery = enrolQuery.in('section_id', sectionIdsFilter);
+      }
+      const { data: enrolRows, error: enrolErr } = await enrolQuery;
+      throwIfDbError(enrolErr);
+      const placementIds = [
+        ...new Set(
+          ((enrolRows || []) as Array<{ student_id: string }>).map((r) => r.student_id),
+        ),
+      ];
+      if (placementIds.length === 0) {
+        return {
+          data: [],
+          meta: { total: 0, page, limit, totalPages: 0 },
+        };
+      }
+      dbQuery = dbQuery.in('id', placementIds);
+    } else if (classIdsFilter.length > 0 || sectionIdsFilter.length > 0) {
       const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
       if (activeYear) {
         const placementIds = await this.studentPlacementService.listActiveStudentIdsForClassFilters(
