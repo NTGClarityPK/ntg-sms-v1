@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import type { PostgrestError } from '@supabase/supabase-js';
+import { mapWithConcurrency } from '../../common/utils/map-with-concurrency.util';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { GradesService } from '../grades/grades.service';
 import { AttendanceService } from '../attendance/attendance.service';
@@ -1498,15 +1499,14 @@ export class ReportsService {
       };
     }
 
-    const raws = await Promise.all(
-      allowed.map((csId) =>
-        this.attendanceService.getAttendanceReportByClassSection(
-          csId,
-          branchId,
-          yearId,
-          startDate,
-          endDate,
-        ),
+    // Cap concurrency so Nano is not hit with one query storm per class section.
+    const raws = await mapWithConcurrency(allowed, 4, (csId) =>
+      this.attendanceService.getAttendanceReportByClassSection(
+        csId,
+        branchId,
+        yearId,
+        startDate,
+        endDate,
       ),
     );
 
@@ -1576,15 +1576,13 @@ export class ReportsService {
     const allowed = await this.getAllowedClassSectionIdsForAdminReports(userId, userRoles, branchId, yearId);
     const lowList: LowAttendanceStudentDto[] = [];
 
-    const raws = await Promise.all(
-      allowed.map((csId) =>
-        this.attendanceService.getAttendanceReportByClassSection(
-          csId,
-          branchId,
-          yearId,
-          startDate,
-          endDate,
-        ),
+    const raws = await mapWithConcurrency(allowed, 4, (csId) =>
+      this.attendanceService.getAttendanceReportByClassSection(
+        csId,
+        branchId,
+        yearId,
+        startDate,
+        endDate,
       ),
     );
 

@@ -124,24 +124,16 @@ export class StaffService {
       };
     }
 
-    // Get user emails and profiles
+    // Profiles + email from public.profiles (one query) — avoid Auth Admin getUserById storms on Nano.
     const userIds = (data as unknown as Array<{ user_id: string }>).map((s) => s.user_id);
-    
-    // OPTIMISED: Fetch emails only for needed users via batched individual lookups
-    // (instead of fetching ALL auth users and filtering client-side)
-    const emailPromises = userIds.map((id) =>
-      supabase.auth.admin.getUserById(id).then((res) => [id, res.data.user?.email || ''] as const),
-    );
-    const emailEntries = await Promise.all(emailPromises);
-    const emailMap = new Map(emailEntries);
 
-    // Fetch profiles separately (include activation state)
     const { data: profilesData } = await supabase
       .from('profiles')
-      .select('id, full_name, is_active, avatar_url, phone, address, date_of_birth')
+      .select('id, full_name, email, is_active, avatar_url, phone, address, date_of_birth')
       .in('id', userIds);
 
     const profileMap = new Map<string, string>();
+    const emailMap = new Map<string, string>();
     const profileActiveMap = new Map<string, boolean>();
     const profileAvatarMap = new Map<string, string>();
     const profilePhoneMap = new Map<string, string>();
@@ -149,6 +141,7 @@ export class StaffService {
     const profileDobMap = new Map<string, string>();
     (profilesData || []).forEach((profile) => {
       profileMap.set(profile.id, profile.full_name || '');
+      if (profile.email) emailMap.set(profile.id, profile.email);
       profileActiveMap.set(profile.id, profile.is_active !== false);
       if (profile.avatar_url) profileAvatarMap.set(profile.id, profile.avatar_url);
       if (profile.phone) profilePhoneMap.set(profile.id, profile.phone);

@@ -21,6 +21,8 @@ out/
 .env.test.local
 .env.production.local
 .env*.local
+.env.prod
+.env.staging
 
 # IDE
 .vscode/
@@ -36,7 +38,6 @@ logs/
 
 # OS
 Thumbs.db
-.DS_Store
 
 # Testing
 coverage/
@@ -47,24 +48,27 @@ coverage/
 *.temp
 .cache/
 
-# Reference files (if needed)
-rmsreference/*
-# Environment files with secrets.env.prod
-.env.staging
-.env.local# Docker
-docker-compose.override.yml# Cursor IDE
+# Docker
+docker-compose.override.yml
+
+# Cursor IDE
 .cursor/
 .cursorignore
 
-# Project documentation and guides
+# Project documentation (local only — not committed)
+docs/
+README.md
+report.md
+
+# Legacy doc paths (removed from root; ignore if recreated)
 developmentguide/
 documentations/
 myfiles/
-scripts/# Documentation files (not to be committed)
-arabicdict.md
-mistakes.md
-overallcontext.md
-prompts.md
+CertificateDesigns/
+features-sms/
+FeeModuleDesign/
+resultmoduleredsign/
+rmsreference/
 
 # Seed files
 **/seed*.sql

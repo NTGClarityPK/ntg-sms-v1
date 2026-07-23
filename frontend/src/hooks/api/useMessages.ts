@@ -16,6 +16,8 @@ import type { QueryKey } from '@tanstack/react-query';
 interface QueryConversationsParams {
   page?: number;
   limit?: number;
+  /** Light polling while Messages page is open (avoids unfiltered Realtime). */
+  refetchIntervalMs?: number | false;
 }
 
 interface QueryMessagesParams {
@@ -27,14 +29,15 @@ interface QueryMessagesParams {
 export function useConversations(params: QueryConversationsParams = {}) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
+  const { refetchIntervalMs, ...queryParams } = params;
 
   return useQuery({
-    queryKey: ['conversations', branchId, params],
+    queryKey: ['conversations', branchId, queryParams],
     queryFn: async () => {
       if (!branchId) return null;
       const searchParams = new URLSearchParams();
-      if (params.page) searchParams.set('page', params.page.toString());
-      if (params.limit) searchParams.set('limit', params.limit.toString());
+      if (queryParams.page) searchParams.set('page', queryParams.page.toString());
+      if (queryParams.limit) searchParams.set('limit', queryParams.limit.toString());
       const response = await apiClient.get<ConversationListItem[]>(
         `/api/v1/conversations?${searchParams.toString()}`,
       );
@@ -42,6 +45,7 @@ export function useConversations(params: QueryConversationsParams = {}) {
     },
     enabled: !!branchId,
     staleTime: 2 * 60 * 1000,
+    refetchInterval: refetchIntervalMs === false || refetchIntervalMs == null ? false : refetchIntervalMs,
   });
 }
 

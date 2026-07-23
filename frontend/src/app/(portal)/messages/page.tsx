@@ -101,9 +101,11 @@ export default function MessagesPage() {
   // Use useMemo to ensure stable reference for query key
   const messagesParams = useMemo(() => ({ page: 1, limit: 50 }), []);
 
-  const { data: conversationsResponse, isLoading: loadingList } = useConversations({ limit: 50 });
+  const { data: conversationsResponse, isLoading: loadingList } = useConversations({
+    limit: 50,
+    refetchIntervalMs: 20_000,
+  });
   const conversations: ConversationListItem[] = conversationsResponse?.data ?? [];
-  const meta = (conversationsResponse as { meta?: { total?: number; allConversationIds?: string[] } })?.meta;
 
   const { data: conversation, isLoading: loadingConv } = useConversation(selectedId);
   const { data: messagesResponse, isLoading: loadingMessages } = useConversationMessages(
@@ -362,49 +364,8 @@ export default function MessagesPage() {
     };
   }, [selectedId, user?.id, queryClient]);
 
-  // Realtime: when a new message arrives in any of my conversations (including hidden), refetch list so it appears
-  const allConversationIds = useMemo(() => new Set(meta?.allConversationIds ?? []), [meta?.allConversationIds]);
-  useEffect(() => {
-    if (!user?.id || allConversationIds.size === 0) return;
-
-    let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-
-    const setupSubscription = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.access_token) return;
-      try {
-        await supabase.realtime.setAuth(session.access_token);
-      } catch {
-        return;
-      }
-      if (cancelled) return;
-
-      channel = supabase
-        .channel('messages-list-invalidate')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-          },
-          (payload) => {
-            const convId = (payload.new as { conversation_id?: string })?.conversation_id;
-            if (convId && allConversationIds.has(convId)) {
-              queryClient.invalidateQueries({ queryKey: ['conversations'] });
-            }
-          },
-        )
-        .subscribe();
-    };
-
-    setupSubscription();
-    return () => {
-      cancelled = true;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [user?.id, queryClient, allConversationIds]);
+  // List freshness: short polling via useConversations(refetchIntervalMs) instead of
+  // an unfiltered Realtime subscription on all messages INSERTs (Nano-safe).
 
   const { data: commSetting } = useSystemSetting<{ teacher_student?: string; teacher_parent?: string }>('communication_direction');
   const { data: branchBroadcastSetting } = useSystemSetting<{

@@ -99,7 +99,7 @@ function main() {
     XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
   });
 
-  const outPath = path.join(process.cwd(), definition.workbookName);
+  const outPath = path.join(process.cwd(), 'scripts', 'templates', definition.workbookName);
   XLSX.writeFile(workbook, outPath);
   console.log(`Generated template at: ${outPath}`);
 }

@@ -467,33 +467,30 @@ export class StudentsService {
       .map((s) => s.user_id)
       .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
-    // OPTIMISED: Fetch emails only for needed users via batched individual lookups
-    // (instead of fetching ALL auth users and filtering client-side)
-    const emailPromises = userIds.map((id) =>
-      supabase.auth.admin.getUserById(id).then((res) => [id, res.data.user?.email || ''] as const),
-    );
-    const emailEntries = await Promise.all(emailPromises);
-    const emailMap = new Map(emailEntries);
-
-    // Fetch profile fields needed for edit/display (DOB, gender, phone, address).
-    // Do not rely on PostgREST relationship cache; fetch explicitly by profile id.
+    // Emails from profiles.email (one DB query) — avoid Auth Admin getUserById storms on Nano.
     const { data: profileRows, error: profilesError } =
       userIds.length > 0
         ? await supabase
             .from('profiles')
-            .select('id, phone, address, date_of_birth, gender, avatar_url')
+            .select('id, email, phone, address, date_of_birth, gender, avatar_url')
             .in('id', userIds)
         : { data: [], error: null };
     throwIfDbError(profilesError);
     const profileByUserId = new Map(
       ((profileRows as Array<{
         id: string;
+        email: string | null;
         phone: string | null;
         address: string | null;
         date_of_birth: string | null;
         gender: string | null;
         avatar_url: string | null;
       }>) ?? []).map((p) => [p.id, p] as const),
+    );
+    const emailMap = new Map<string, string>(
+      Array.from(profileByUserId.entries())
+        .filter(([, p]) => !!p.email)
+        .map(([id, p]) => [id, p.email as string]),
     );
 
     const studentIdsOnPage = (data as unknown as Array<{ id: string }>)

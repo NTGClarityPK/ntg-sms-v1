@@ -47,11 +47,12 @@ export class ParentsService {
     const parentUserIds = [...new Set(rows.map((r) => r.parent_user_id))];
     const studentIds = [...new Set(rows.map((r) => r.student_id))];
 
+    // Names, phones, emails from profiles — avoid Auth Admin getUserById storms on Nano.
     const { data: parentProfiles, error: parentProfilesError } =
       parentUserIds.length > 0
         ? await supabase
             .from('profiles')
-            .select('id, full_name, phone')
+            .select('id, full_name, phone, email')
             .in('id', parentUserIds)
         : { data: [], error: null };
     throwIfDbError(parentProfilesError);
@@ -70,17 +71,11 @@ export class ParentsService {
       ]),
     );
 
-    // Fetch emails from auth.users
     const emailMap = new Map<string, string>();
-    if (parentUserIds.length > 0) {
-      const emailPromises = parentUserIds.map((id) =>
-        supabase.auth.admin.getUserById(id).then((res) => [id, res.data.user?.email || ''] as const).catch(() => [id, ''] as const),
-      );
-      const emailEntries = await Promise.all(emailPromises);
-      emailEntries.forEach(([id, email]) => {
-        if (email) emailMap.set(id, email);
-      });
-    }
+    (parentProfiles || []).forEach((p) => {
+      const email = (p as { email?: string | null }).email;
+      if (email) emailMap.set((p as { id: string }).id, email);
+    });
 
     const { data: students, error: studentsError } = await supabase
       .from('students')

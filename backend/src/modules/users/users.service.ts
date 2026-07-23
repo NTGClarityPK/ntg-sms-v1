@@ -280,6 +280,7 @@ export class UsersService {
 
     let profilesQuery = supabase.from('profiles').select('*').in('id', pageUserIds);
 
+    // Note: Search by name/email is applied on the current page of profiles (profiles.email).
     // isActive is kept as string in DTO ('true' | 'false') to avoid NestJS converting 'false' to boolean true
     const isActiveBool: boolean | undefined =
       query.isActive === undefined
@@ -292,10 +293,13 @@ export class UsersService {
       profilesQuery = profilesQuery.eq('is_active', isActiveBool);
     }
 
-    // Note: Search by email will be handled client-side after fetching auth users
-    // For now, only search by full_name in profiles
     if (query.search) {
-      profilesQuery = profilesQuery.ilike('full_name', `%${query.search}%`);
+      const term = query.search.trim().replace(/[%_,]/g, '');
+      if (term.length > 0) {
+        profilesQuery = profilesQuery.or(
+          `full_name.ilike.%${term}%,email.ilike.%${term}%`,
+        );
+      }
     }
 
     // Apply sorting
@@ -372,53 +376,11 @@ export class UsersService {
       }
     }
 
-    // Step 5: Email resolution
-    // For large seeded tenants (like abcschool) calling auth.admin.getUserById
-    // hundreds of times per page was causing unstable \"fetch failed\" errors.
-    // To keep the users list reliable, we avoid runtime auth lookups here and
-    // fall back to empty emails (or future profile-backed emails).
-    const emailMap = new Map<string, string>();
+    // Step 5: Emails from profiles.email only — no Auth Admin getUserById on list (Nano-safe).
+    // Users with null profiles.email show blank until backfilled; detail/create still use Auth where needed.
 
-    // If profile emails are missing, resolve only for the current page users.
-    // This keeps list performance stable while fixing tenants where profiles.email was never populated.
-    const missingEmailIds = (profilesData || [])
-      .filter((p: ProfileRow) => !p.email)
-      .map((p: ProfileRow) => p.id);
-
-    const fetchEmailBatch = async (ids: string[]) => {
-      await Promise.all(
-        ids.map(async (id) => {
-          const { data, error } = await supabase.auth.admin.getUserById(id);
-          if (!error && data?.user?.email) {
-            emailMap.set(id, data.user.email);
-          }
-        }),
-      );
-    };
-
-    // Batch to reduce transient fetch failures
-    const batchSize = 10;
-    for (let i = 0; i < missingEmailIds.length; i += batchSize) {
-      // eslint-disable-next-line no-await-in-loop
-      await fetchEmailBatch(missingEmailIds.slice(i, i + batchSize));
-    }
-
-    // Step 6: Filter by email search if needed (client-side after fetching emails)
-    let filteredProfiles = profilesData || [];
-    if (query.search) {
-      // Filter by email if search term doesn't match full_name (already filtered in query)
-      const searchLower = query.search.toLowerCase();
-      filteredProfiles = (profilesData || []).filter((profile: ProfileRow) => {
-        const email = emailMap.get(profile.id) || '';
-        return (
-          profile.full_name.toLowerCase().includes(searchLower) ||
-          email.toLowerCase().includes(searchLower)
-        );
-      });
-    }
-
-    // Step 7: Combine the data
-    const users = filteredProfiles.map((profile: ProfileRow) => {
+    // Step 6: Combine the data
+    const users = (profilesData || []).map((profile: ProfileRow) => {
       const userRolesForUser = (userRolesForBranch || []).filter(
         (ur: { user_id: string; role_id: string; branch_id: string }) =>
           ur.user_id === profile.id,
@@ -449,7 +411,7 @@ export class UsersService {
 
       return new UserDto({
         id: profile.id,
-        email: profile.email ?? emailMap.get(profile.id) ?? '',
+        email: profile.email ?? '',
         fullName: profile.full_name,
         avatarUrl: profile.avatar_url ?? undefined,
         phone: profile.phone ?? undefined,
