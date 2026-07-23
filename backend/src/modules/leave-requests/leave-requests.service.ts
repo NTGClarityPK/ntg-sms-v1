@@ -599,19 +599,30 @@ export class LeaveRequestsService {
       }
     }
 
-    // Quota usage per student (for distinct students on this page)
+    // Quota usage per student — shared calendar/settings once; one leaves query for the page (Nano-safe).
     const distinctStudentIds = Array.from(new Set(rows.map((r) => r.student_id)));
     const quotaMap = new Map<string, { usedDays: number; totalQuota: number }>();
-    await Promise.all(
-      distinctStudentIds.map(async (sid) => {
-        try {
-          const quota = await this.getStudentQuotaUsage(sid, branchId);
-          quotaMap.set(sid, { usedDays: quota.usedDays, totalQuota: quota.totalQuota });
-        } catch {
-          // omit quota for this student on error
+    if (distinctStudentIds.length > 0) {
+      try {
+        const ctx = await this.loadLeaveQuotaContext(branchId);
+        const leaveRowsByStudent = await this.fetchQuotaLeaveRowsForStudents(
+          distinctStudentIds,
+          ctx.academicYearId,
+        );
+        for (const sid of distinctStudentIds) {
+          const usage = this.computeQuotaUsageFromLeaveRows(
+            leaveRowsByStudent.get(sid) ?? [],
+            ctx,
+          );
+          quotaMap.set(sid, {
+            usedDays: usage.usedDays,
+            totalQuota: usage.totalQuota,
+          });
         }
-      }),
-    );
+      } catch {
+        // omit quota on page if shared context fails (same as previous per-student catch)
+      }
+    }
 
     const items = rows.map((row) => {
       const baseDto = this.mapRowToDto(row);
@@ -912,14 +923,22 @@ export class LeaveRequestsService {
     return counts;
   }
 
-  async getStudentQuotaUsage(
-    studentId: string,
-    branchId: string,
-  ): Promise<LeaveQuotaDto> {
+  private static readonly UNREQUESTED_ABSENCE_REASON =
+    'Unrequested absence - automatically created from attendance record';
+
+  /**
+   * Shared inputs for quota maths (active year, annual quota, school days, holiday/vacation exclusions).
+   * Loaded once per list page instead of once per student.
+   */
+  private async loadLeaveQuotaContext(branchId: string): Promise<{
+    academicYearId: string;
+    totalQuota: number;
+    activeDaySet: number[];
+    excludedDates: Set<string>;
+  }> {
     const supabase = this.supabaseConfig.getClient();
 
-    const activeYear =
-      await this.academicYearsService.getActiveForBranch(branchId);
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) {
       throw new BadRequestException('No active academic year found');
     }
@@ -933,21 +952,7 @@ export class LeaveRequestsService {
     throwIfDbError(quotaError);
 
     const totalQuota =
-      quotaRow && typeof quotaRow.annual_quota === 'number'
-        ? quotaRow.annual_quota
-        : 0;
-
-    const UNREQUESTED_ABSENCE_REASON =
-      'Unrequested absence - automatically created from attendance record';
-
-    const { data: approvedLeaves, error: leavesError } = await supabase
-      .from('leave_requests')
-      .select('start_date, end_date, reason')
-      .eq('student_id', studentId)
-      .eq('academic_year_id', activeYear.id)
-      .in('status', ['approved', 'absent']);
-
-    throwIfDbError(leavesError);
+      quotaRow && typeof quotaRow.annual_quota === 'number' ? quotaRow.annual_quota : 0;
 
     const { data: activeSchoolDays } = await this.scheduleService.getSchoolDays();
     const activeDaySet = activeSchoolDays ?? [];
@@ -964,29 +969,96 @@ export class LeaveRequestsService {
       rangeToDateSet(v.startDate, v.endDate).forEach((d) => excludedDates.add(d));
     });
 
+    return {
+      academicYearId: activeYear.id,
+      totalQuota,
+      activeDaySet,
+      excludedDates,
+    };
+  }
+
+  private computeQuotaUsageFromLeaveRows(
+    leaveRows: Array<{ start_date: string; end_date: string; reason?: string | null }>,
+    ctx: {
+      totalQuota: number;
+      activeDaySet: number[];
+      excludedDates: Set<string>;
+    },
+  ): LeaveQuotaDto {
     let usedDays = 0;
     let daysFromAbsences = 0;
-    (approvedLeaves ?? []).forEach((row: { start_date: string; end_date: string; reason?: string | null }) => {
+    leaveRows.forEach((row) => {
       const days = countActiveSchoolDaysInRangeExcluding(
         row.start_date,
         row.end_date,
-        activeDaySet,
-        excludedDates,
+        ctx.activeDaySet,
+        ctx.excludedDates,
       );
       usedDays += days;
-      if (row.reason === UNREQUESTED_ABSENCE_REASON) {
+      if (row.reason === LeaveRequestsService.UNREQUESTED_ABSENCE_REASON) {
         daysFromAbsences += days;
       }
     });
 
-    const remainingDays = Math.max(totalQuota - usedDays, 0);
-
     return new LeaveQuotaDto({
-      totalQuota,
+      totalQuota: ctx.totalQuota,
       usedDays,
-      remainingDays,
+      remainingDays: Math.max(ctx.totalQuota - usedDays, 0),
       daysFromAbsences,
     });
+  }
+
+  private async fetchQuotaLeaveRowsForStudents(
+    studentIds: string[],
+    academicYearId: string,
+  ): Promise<Map<string, Array<{ start_date: string; end_date: string; reason?: string | null }>>> {
+    const byStudent = new Map<
+      string,
+      Array<{ start_date: string; end_date: string; reason?: string | null }>
+    >();
+    if (studentIds.length === 0) return byStudent;
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: approvedLeaves, error: leavesError } = await supabase
+      .from('leave_requests')
+      .select('student_id, start_date, end_date, reason')
+      .in('student_id', studentIds)
+      .eq('academic_year_id', academicYearId)
+      .in('status', ['approved', 'absent']);
+
+    throwIfDbError(leavesError);
+
+    for (const row of (approvedLeaves ?? []) as Array<{
+      student_id: string;
+      start_date: string;
+      end_date: string;
+      reason?: string | null;
+    }>) {
+      const list = byStudent.get(row.student_id) ?? [];
+      list.push({
+        start_date: row.start_date,
+        end_date: row.end_date,
+        reason: row.reason,
+      });
+      byStudent.set(row.student_id, list);
+    }
+
+    return byStudent;
+  }
+
+  async getStudentQuotaUsage(
+    studentId: string,
+    branchId: string,
+  ): Promise<LeaveQuotaDto> {
+    const ctx = await this.loadLeaveQuotaContext(branchId);
+    const leaveRowsByStudent = await this.fetchQuotaLeaveRowsForStudents(
+      [studentId],
+      ctx.academicYearId,
+    );
+    return this.computeQuotaUsageFromLeaveRows(
+      leaveRowsByStudent.get(studentId) ?? [],
+      ctx,
+    );
   }
 }
 
