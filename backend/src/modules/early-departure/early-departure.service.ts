@@ -7,9 +7,11 @@ import {
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
+import { mapWithConcurrency } from '../../common/utils/map-with-concurrency.util';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TimetableService } from '../timetable/timetable.service';
+import type { TimetableSlotDto } from '../timetable/dto/timetable-slot.dto';
 import { EarlyDepartureRequestDto } from './dto/early-departure.dto';
 import { CreateEarlyDepartureRequestDto } from './dto/create-early-departure.dto';
 import { UpdateEarlyDepartureStatusDto } from './dto/update-early-departure-status.dto';
@@ -77,45 +79,53 @@ export class EarlyDepartureService {
         activeYearId = activeYear.id;
       }
 
-      // Get day of week from date (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-      const dateObj = new Date(date + 'T12:00:00Z');
-      const dayOfWeek = dateObj.getUTCDay();
-
-      // Get student timetable
       const timetable = await this.timetableService.getStudentTimetable(
         studentId,
         branchId,
         activeYearId,
       );
 
-      // Check if any slot overlaps with departure time
-      const departureMinutes = this.timeToMinutes(departureTime);
-      const conflictingSlot = timetable.slots.find((slot) => {
-        if (slot.dayOfWeek !== dayOfWeek) return false;
-        if (slot.slotType !== 'class') return false; // Only check class slots, not breaks/assembly
-        
-        const startMinutes = this.timeToMinutes(slot.startTime);
-        const endMinutes = this.timeToMinutes(slot.endTime);
-        
-        // Check if departure time falls within class time
-        return departureMinutes >= startMinutes && departureMinutes < endMinutes;
-      });
-
-      if (conflictingSlot) {
-        const subjectName = conflictingSlot.subjectName || 'Class';
-        const startTime = conflictingSlot.startTime.slice(0, 5);
-        const endTime = conflictingSlot.endTime.slice(0, 5);
-        return {
-          hasConflict: true,
-          conflictDetails: `${subjectName} (${startTime} - ${endTime})`,
-        };
-      }
-
-      return { hasConflict: false };
+      return this.findConflictInSlots(timetable.slots, date, departureTime);
     } catch {
       // If error checking timetable, assume no conflict (best-effort)
       return { hasConflict: false };
     }
+  }
+
+  /**
+   * Same conflict rules as checkClassConflict, using an already-loaded timetable
+   * (avoids N timetable fetches on list pages).
+   */
+  private findConflictInSlots(
+    slots: TimetableSlotDto[],
+    date: string,
+    departureTime: string,
+  ): { hasConflict: boolean; conflictDetails?: string } {
+    const dateObj = new Date(date + 'T12:00:00Z');
+    const dayOfWeek = dateObj.getUTCDay();
+    const departureMinutes = this.timeToMinutes(departureTime);
+
+    const conflictingSlot = slots.find((slot) => {
+      if (slot.dayOfWeek !== dayOfWeek) return false;
+      if (slot.slotType !== 'class') return false;
+
+      const startMinutes = this.timeToMinutes(slot.startTime);
+      const endMinutes = this.timeToMinutes(slot.endTime);
+
+      return departureMinutes >= startMinutes && departureMinutes < endMinutes;
+    });
+
+    if (conflictingSlot) {
+      const subjectName = conflictingSlot.subjectName || 'Class';
+      const startTime = conflictingSlot.startTime.slice(0, 5);
+      const endTime = conflictingSlot.endTime.slice(0, 5);
+      return {
+        hasConflict: true,
+        conflictDetails: `${subjectName} (${startTime} - ${endTime})`,
+      };
+    }
+
+    return { hasConflict: false };
   }
 
   /**
@@ -557,28 +567,51 @@ export class EarlyDepartureService {
       }
     }
 
-    // Map rows to DTOs with conflict detection (in parallel for performance)
-    const items = await Promise.all(
-      rows.map(async (row) => {
-        const baseDto = await this.mapRowToDtoWithConflict(row, branchId);
-        
-        // Add reviewer information if available
-        if (row.reviewed_by) {
-          const reviewerName = reviewerProfileMap.get(row.reviewed_by);
-          const reviewerRole = reviewerRoleMap.get(row.reviewed_by);
-          
-          if (reviewerName) {
-            return new EarlyDepartureRequestDto({
-              ...baseDto,
-              reviewerName,
-              reviewerRole: reviewerRole || undefined,
-            });
-          }
-        }
-        
-        return baseDto;
-      })
+    // Prefetch one timetable per distinct student (not per row) — same conflict rules, far less load.
+    const timetableCache = new Map<string, TimetableSlotDto[]>();
+    const uniqueStudentYearKeys = Array.from(
+      new Set(rows.map((r) => `${r.student_id}:${r.academic_year_id}`)),
     );
+
+    await mapWithConcurrency(uniqueStudentYearKeys, 4, async (key) => {
+      const [studentId, academicYearId] = key.split(':');
+      if (!studentId || !academicYearId) return;
+      try {
+        const timetable = await this.timetableService.getStudentTimetable(
+          studentId,
+          branchId,
+          academicYearId,
+        );
+        timetableCache.set(key, timetable.slots);
+      } catch {
+        // Same as checkClassConflict: treat as no conflict on timetable errors
+      }
+    });
+
+    const items = rows.map((row) => {
+      const baseDto = this.mapRowToDto(row);
+      const slots = timetableCache.get(`${row.student_id}:${row.academic_year_id}`);
+      const conflict = slots
+        ? this.findConflictInSlots(slots, row.date, row.departure_time)
+        : { hasConflict: false };
+      baseDto.hasConflict = conflict.hasConflict;
+      baseDto.conflictDetails = conflict.conflictDetails;
+
+      if (row.reviewed_by) {
+        const reviewerName = reviewerProfileMap.get(row.reviewed_by);
+        const reviewerRole = reviewerRoleMap.get(row.reviewed_by);
+
+        if (reviewerName) {
+          return new EarlyDepartureRequestDto({
+            ...baseDto,
+            reviewerName,
+            reviewerRole: reviewerRole || undefined,
+          });
+        }
+      }
+
+      return baseDto;
+    });
 
     const total = count ?? items.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
