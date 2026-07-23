@@ -338,9 +338,8 @@ export class CertificatesService {
     const { data: rows, error, count } = await dbQuery;
     throwIfDbError(error);
 
-    const list = await Promise.all(
-      (rows || []).map((r) => this.mapRowToDto(r as CertificateRow, branchId)),
-    );
+    // Lean list mapping: batch student/issuer names only — skip loadStudentSnapshot per row (Nano-safe).
+    const list = await this.mapHistoryRowsToDtos((rows || []) as CertificateRow[]);
 
     const total = count ?? 0;
     return {
@@ -640,6 +639,64 @@ export class CertificatesService {
     const supabase = this.supabaseConfig.getClient();
     const { data } = supabase.storage.from('certificate-documents').getPublicUrl(path);
     return data.publicUrl;
+  }
+
+  /**
+   * History/CSV list mapping: one students query + one profiles query for the page.
+   * Does not call loadStudentSnapshot (issue/PDF/revoke still use mapRowToDto).
+   */
+  private async mapHistoryRowsToDtos(rows: CertificateRow[]): Promise<CertificateDto[]> {
+    if (rows.length === 0) return [];
+
+    const supabase = this.supabaseConfig.getClient();
+    const studentIds = Array.from(new Set(rows.map((r) => r.student_id)));
+    const issuerIds = Array.from(
+      new Set(rows.map((r) => r.issued_by).filter((id): id is string => !!id)),
+    );
+
+    const studentNameById = new Map<string, string>();
+    if (studentIds.length > 0) {
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, first_name, last_name')
+        .in('id', studentIds);
+      for (const s of students ?? []) {
+        const row = s as { id: string; first_name?: string | null; last_name?: string | null };
+        const name = [row.first_name, row.last_name].filter(Boolean).join(' ');
+        studentNameById.set(row.id, name);
+      }
+    }
+
+    const issuerNameById = new Map<string, string>();
+    if (issuerIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', issuerIds);
+      for (const p of profiles ?? []) {
+        const row = p as { id: string; full_name?: string | null };
+        if (row.full_name) issuerNameById.set(row.id, row.full_name);
+      }
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      branchId: row.branch_id,
+      studentId: row.student_id,
+      studentName: studentNameById.get(row.student_id) ?? '',
+      certificateType: row.certificate_type,
+      templateId: row.template_id,
+      certificateNumber: row.certificate_number,
+      certificateData: row.certificate_data,
+      issuedBy: row.issued_by,
+      issuedByName: row.issued_by ? issuerNameById.get(row.issued_by) ?? null : null,
+      issuedAt: row.issued_at,
+      pdfUrl: this.pdfPublicUrl(row.pdf_storage_path),
+      status: row.status as CertificateDto['status'],
+      classSectionLabel: null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
   }
 
   private async mapRowToDto(

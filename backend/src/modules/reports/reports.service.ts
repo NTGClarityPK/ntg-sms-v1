@@ -1914,7 +1914,7 @@ ${shouldInclude('excused') ? `<td>${c.totalExcused}</td>` : ''}
     return this.getClassReport(classSectionId, branchId, yearId, userId, userRoles);
   }
 
-  /** Subject performance across allowed class sections. */
+  /** Subject performance across allowed class sections (batched queries — Nano-safe). */
   async getAcademicReportBySubject(
     subjectId: string,
     branchId: string,
@@ -1944,31 +1944,155 @@ ${shouldInclude('excused') ? `<td>${c.totalExcused}</td>` : ''}
     if (!subjectRow) throw new NotFoundException('Subject not found');
     const subjectName = (subjectRow as { name?: string }).name ?? 'Unknown';
 
+    if (allowedSections.length === 0) {
+      return {
+        data: new AcademicReportBySubjectDto({
+          subjectId,
+          subjectName,
+          academicYearId: yearId,
+          byClass: [],
+        }),
+      };
+    }
+
+    const { data: csRows, error: csErr } = await supabase
+      .from('class_sections')
+      .select('id, class_id, section_id')
+      .in('id', allowedSections)
+      .eq('branch_id', branchId);
+    throwIfDbError(csErr);
+    const classSections = (csRows || []) as { id: string; class_id: string; section_id: string }[];
+    const csById = new Map(classSections.map((cs) => [cs.id, cs]));
+
+    const classIds = [...new Set(classSections.map((cs) => cs.class_id))];
+    const sectionIds = [...new Set(classSections.map((cs) => cs.section_id))];
+
+    const [classesRes, sectionsRes, enrolRes, assessRes] = await Promise.all([
+      classIds.length
+        ? supabase.from('classes').select('id, display_name').in('id', classIds)
+        : Promise.resolve({ data: [], error: null }),
+      sectionIds.length
+        ? supabase.from('sections').select('id, name').in('id', sectionIds)
+        : Promise.resolve({ data: [], error: null }),
+      classIds.length && sectionIds.length
+        ? supabase
+            .from('student_enrolments')
+            .select('student_id, class_id, section_id')
+            .eq('branch_id', branchId)
+            .eq('academic_year_id', yearId)
+            .eq('status', 'active')
+            .in('class_id', classIds)
+            .in('section_id', sectionIds)
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from('assessments')
+        .select('id, total_marks, class_section_id')
+        .eq('subject_id', subjectId)
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', yearId)
+        .in('class_section_id', allowedSections),
+    ]);
+    throwIfDbError(classesRes.error as PostgrestError | null);
+    throwIfDbError(sectionsRes.error as PostgrestError | null);
+    throwIfDbError(enrolRes.error as PostgrestError | null);
+    throwIfDbError(assessRes.error as PostgrestError | null);
+
+    const classNameById = new Map(
+      ((classesRes.data || []) as { id: string; display_name: string }[]).map((c) => [
+        c.id,
+        c.display_name,
+      ]),
+    );
+    const sectionNameById = new Map(
+      ((sectionsRes.data || []) as { id: string; name: string }[]).map((s) => [s.id, s.name]),
+    );
+
+    // Enrolments may include class×section combos outside allowed sections — filter to matching CS pairs.
+    const enrolments = (enrolRes.data || []) as {
+      student_id: string;
+      class_id: string;
+      section_id: string;
+    }[];
+    const studentIdsByCs = new Map<string, string[]>();
+    for (const csId of allowedSections) {
+      const cs = csById.get(csId);
+      if (!cs) {
+        studentIdsByCs.set(csId, []);
+        continue;
+      }
+      const ids = enrolments
+        .filter((e) => e.class_id === cs.class_id && e.section_id === cs.section_id)
+        .map((e) => e.student_id);
+      studentIdsByCs.set(csId, [...new Set(ids)]);
+    }
+
+    const allStudentIds = [...new Set([...studentIdsByCs.values()].flat())];
+    const assessments = (assessRes.data || []) as {
+      id: string;
+      total_marks: number;
+      class_section_id: string;
+    }[];
+    const assessmentIds = assessments.map((a) => a.id);
+    const assessByCs = new Map<string, typeof assessments>();
+    for (const a of assessments) {
+      const list = assessByCs.get(a.class_section_id) || [];
+      list.push(a);
+      assessByCs.set(a.class_section_id, list);
+    }
+
+    const [studentsRes, gradesRes] = await Promise.all([
+      allStudentIds.length
+        ? supabase
+            .from('students')
+            .select('id, user_id')
+            .in('id', allStudentIds)
+            .eq('branch_id', branchId)
+            .eq('is_active', true)
+        : Promise.resolve({ data: [], error: null }),
+      assessmentIds.length && allStudentIds.length
+        ? supabase
+            .from('student_grades')
+            .select('student_id, marks_obtained, assessment_id')
+            .in('student_id', allStudentIds)
+            .in('assessment_id', assessmentIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    throwIfDbError(studentsRes.error as PostgrestError | null);
+    throwIfDbError(gradesRes.error as PostgrestError | null);
+
+    const studentRows = (studentsRes.data || []) as { id: string; user_id: string | null }[];
+    const studentById = new Map(studentRows.map((s) => [s.id, s]));
+    const userIds = [...new Set(studentRows.map((s) => s.user_id).filter(Boolean))] as string[];
+
+    const profileMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      throwIfDbError(pErr);
+      (profiles || []).forEach((p: { id: string; full_name: string }) =>
+        profileMap.set(p.id, p.full_name),
+      );
+    }
+
+    const totalMap = new Map(assessments.map((a) => [a.id, Number(a.total_marks) || 1]));
+    const gradeRows = (gradesRes.data || []) as {
+      student_id: string;
+      marks_obtained: number;
+      assessment_id: string;
+    }[];
+
     const byClass: SubjectClassPerformanceDto[] = [];
     for (const csId of allowedSections) {
-      const { data: cs } = await supabase
-        .from('class_sections')
-        .select('id, class_id, section_id')
-        .eq('id', csId)
-        .single();
+      const cs = csById.get(csId);
       if (!cs) continue;
-      const c = cs as { class_id: string; section_id: string };
-      const [classRes, sectionRes, studentsRes] = await Promise.all([
-        supabase.from('classes').select('display_name').eq('id', c.class_id).single(),
-        supabase.from('sections').select('name').eq('id', c.section_id).single(),
-        supabase
-          .from('student_enrolments')
-          .select('student_id')
-          .eq('class_id', c.class_id)
-          .eq('section_id', c.section_id)
-          .eq('branch_id', branchId)
-          .eq('academic_year_id', yearId)
-          .eq('status', 'active'),
-      ]);
-      const className = (classRes.data as { display_name?: string } | null)?.display_name ?? '';
-      const sectionName = (sectionRes.data as { name?: string } | null)?.name ?? '';
-      const studentIds = ((studentsRes.data || []) as Array<{ student_id: string }>).map((s) => s.student_id);
-      if (studentIds.length === 0) {
+      const className = classNameById.get(cs.class_id) ?? '';
+      const sectionName = sectionNameById.get(cs.section_id) ?? '';
+      const studentIdSet = new Set(
+        (studentIdsByCs.get(csId) || []).filter((id) => studentById.has(id)),
+      );
+      if (studentIdSet.size === 0) {
         byClass.push(
           new SubjectClassPerformanceDto({
             classSectionId: csId,
@@ -1983,57 +2107,30 @@ ${shouldInclude('excused') ? `<td>${c.totalExcused}</td>` : ''}
         continue;
       }
 
-      const { data: students } = await supabase
-        .from('students')
-        .select('id, user_id')
-        .in('id', studentIds)
-        .eq('branch_id', branchId)
-        .eq('is_active', true);
-      const studentRows = (students || []) as { id: string; user_id: string | null }[];
-
-      const { data: assessList } = await supabase
-        .from('assessments')
-        .select('id, total_marks')
-        .eq('class_section_id', csId)
-        .eq('subject_id', subjectId)
-        .eq('branch_id', branchId)
-        .eq('academic_year_id', yearId);
-      const assessmentIds = (assessList || []).map((a: { id: string }) => a.id);
+      const csAssessIds = new Set((assessByCs.get(csId) || []).map((a) => a.id));
       const studentPcts = new Map<string, number[]>();
-      if (assessmentIds.length > 0) {
-        const { data: gradeRows } = await supabase
-          .from('student_grades')
-          .select('student_id, marks_obtained, assessment_id')
-          .in('student_id', studentIds)
-          .in('assessment_id', assessmentIds);
-        const totalMap = new Map(
-          (assessList || []).map((a: { id: string; total_marks: number }) => [a.id, Number(a.total_marks) || 1]),
-        );
-        for (const row of gradeRows || []) {
-          const r = row as { student_id: string; marks_obtained: number; assessment_id: string };
-          const total = totalMap.get(r.assessment_id) ?? 1;
-          const pct = Math.round((Number(r.marks_obtained) / total) * 100);
-          const list = studentPcts.get(r.student_id) || [];
-          list.push(pct);
-          studentPcts.set(r.student_id, list);
-        }
+      for (const row of gradeRows) {
+        if (!csAssessIds.has(row.assessment_id)) continue;
+        if (!studentIdSet.has(row.student_id)) continue;
+        const total = totalMap.get(row.assessment_id) ?? 1;
+        const pct = Math.round((Number(row.marks_obtained) / total) * 100);
+        const list = studentPcts.get(row.student_id) || [];
+        list.push(pct);
+        studentPcts.set(row.student_id, list);
       }
+
       const averages = new Map<string, number>();
       studentPcts.forEach((pcts, sid) => {
         const avg = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
         averages.set(sid, Math.round(avg));
       });
-      const userIds = studentRows.map((s) => s.user_id).filter(Boolean) as string[];
-      const profileMap = new Map<string, string>();
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', userIds);
-        (profiles || []).forEach((p: { id: string; full_name: string }) => profileMap.set(p.id, p.full_name));
-      }
+
       const studentIdToName = new Map(
-        studentRows.map((s) => [s.id, s.user_id ? profileMap.get(s.user_id) ?? 'Unknown' : 'Unknown']),
+        [...studentIdSet].map((id) => {
+          const row = studentById.get(id);
+          const name = row?.user_id ? profileMap.get(row.user_id) ?? 'Unknown' : 'Unknown';
+          return [id, name] as const;
+        }),
       );
       const sorted = [...averages.entries()].sort((a, b) => b[1] - a[1]);
       const top5 = sorted.slice(0, 5).map(([id, pct]) => ({
@@ -2041,11 +2138,14 @@ ${shouldInclude('excused') ? `<td>${c.totalExcused}</td>` : ''}
         studentName: studentIdToName.get(id) ?? 'Unknown',
         percentage: pct,
       }));
-      const bottom5 = sorted.slice(-5).reverse().map(([id, pct]) => ({
-        studentId: id,
-        studentName: studentIdToName.get(id) ?? 'Unknown',
-        percentage: pct,
-      }));
+      const bottom5 = sorted
+        .slice(-5)
+        .reverse()
+        .map(([id, pct]) => ({
+          studentId: id,
+          studentName: studentIdToName.get(id) ?? 'Unknown',
+          percentage: pct,
+        }));
       const avgPct =
         sorted.length > 0
           ? Math.round(sorted.reduce((sum, [, pct]) => sum + pct, 0) / sorted.length)
@@ -2127,7 +2227,13 @@ ${shouldInclude('excused') ? `<td>${c.totalExcused}</td>` : ''}
           .eq('id', subId)
           .maybeSingle();
         const name = (subRow as { name?: string } | null)?.name ?? 'Unknown';
-        const { data: report } = await this.getAcademicReportBySubject(subId, branchId, yearId, userId, userRoles);
+        const { data: report } = await this.getAcademicReportBySubject(
+          subId,
+          branchId,
+          yearId,
+          userId,
+          userRoles,
+        );
         const avg =
           report.byClass.length > 0
             ? Math.round(
