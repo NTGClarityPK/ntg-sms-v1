@@ -7,8 +7,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function PendingApprovalsWidget() {
   const colors = useThemeColors();
-  const leavesQuery = useLeaveRequests({ status: 'pending', limit: 100 });
-  const earlyQuery = useEarlyDepartures({ status: 'pending', limit: 100 });
+  // Counts only — avoid loading 100 leave/early rows (quota + timetable work) on the dashboard.
+  const leavesQuery = useLeaveRequests({ status: 'pending', page: 1, limit: 1 });
+  const earlyQuery = useEarlyDepartures({ status: 'pending', page: 1, limit: 1 });
 
   const pendingLeaves = leavesQuery.data?.meta?.total ?? leavesQuery.data?.data?.length ?? 0;
   const pendingEarly = earlyQuery.data?.meta?.total ?? earlyQuery.data?.data?.length ?? 0;

@@ -73,8 +73,8 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
   });
   const associations = associationsResponse?.data ?? [];
   const childrenCount = new Set(associations.map((a) => a.studentId)).size;
-  const leavePendingQuery = useLeaveRequests({ status: 'pending', limit: 1 });
-  const earlyPendingQuery = useEarlyDepartures({ status: 'pending', limit: 1 });
+  const leavePendingQuery = useLeaveRequests({ status: 'pending', page: 1, limit: 1 });
+  const earlyPendingQuery = useEarlyDepartures({ status: 'pending', page: 1, limit: 1 });
   const pendingLeaves = leavePendingQuery.data?.meta?.total ?? leavePendingQuery.data?.data?.length ?? 0;
   const pendingEarly = earlyPendingQuery.data?.meta?.total ?? earlyPendingQuery.data?.data?.length ?? 0;
   const pendingTotal = pendingLeaves + pendingEarly;

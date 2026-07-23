@@ -7,13 +7,12 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function PendingTasksWidget() {
   const colors = useThemeColors();
-  const leavesQuery = useLeaveRequests({ status: 'pending', limit: 10 });
-  const earlyQuery = useEarlyDepartures({ status: 'pending', limit: 10 });
+  // Counts only — use meta.total (data.length with limit 10 wrongly capped the badge at 10).
+  const leavesQuery = useLeaveRequests({ status: 'pending', page: 1, limit: 1 });
+  const earlyQuery = useEarlyDepartures({ status: 'pending', page: 1, limit: 1 });
 
-  const leavesData = leavesQuery.data?.data ?? [];
-  const earlyData = earlyQuery.data?.data ?? [];
-  const pendingLeaves = leavesData.length;
-  const pendingEarly = earlyData.length;
+  const pendingLeaves = leavesQuery.data?.meta?.total ?? leavesQuery.data?.data?.length ?? 0;
+  const pendingEarly = earlyQuery.data?.meta?.total ?? earlyQuery.data?.data?.length ?? 0;
   const isLoading = leavesQuery.isLoading || earlyQuery.isLoading;
   const error = leavesQuery.error ?? earlyQuery.error;
 

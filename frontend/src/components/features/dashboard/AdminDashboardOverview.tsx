@@ -77,8 +77,8 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
   const colors = useThemeColors();
   const studentsQuery = useStudents({ limit: 1, page: 1 });
   const staffQuery = useStaff({ limit: 1, page: 1 });
-  const leavePendingQuery = useLeaveRequests({ status: 'pending', limit: 1 });
-  const earlyPendingQuery = useEarlyDepartures({ status: 'pending', limit: 1 });
+  const leavePendingQuery = useLeaveRequests({ status: 'pending', page: 1, limit: 1 });
+  const earlyPendingQuery = useEarlyDepartures({ status: 'pending', page: 1, limit: 1 });
   const storageQuery = useStorageOverview();
   const lowStockQuery = useLowStock();
   const { data: unreadCount = 0 } = useUnreadCount();
