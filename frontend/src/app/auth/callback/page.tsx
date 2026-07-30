@@ -7,7 +7,7 @@ import { IconAlertCircle, IconBrandGoogle, IconCheck, IconLayoutDashboard } from
 import { supabase } from '@/lib/supabase/client';
 import { apiClient } from '@/lib/api-client';
 import { clearLocalSupabaseSession } from '@/lib/auth';
-import { normalizeUiLocale, readResolvedUiLocaleFromBrowser, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
+import { reconcileUiLocaleCookie, resolveEffectiveLocale, SYSTEM_DEFAULT_LOCALE } from '@/lib/ui-locale';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 import { selectBranchAndGoDashboard } from '@/lib/auth/complete-session-routing';
@@ -17,11 +17,14 @@ interface Branch {
   name: string;
   code: string;
   tenantId?: string | null;
+  tenantDefaultLocale?: string | null;
 }
 
 interface UserResponseDto {
-  preferredLocale?: string;
-  preferred_locale?: string;
+  preferredLocale?: string | null;
+  preferred_locale?: string | null;
+  tenantDefaultLocale?: string | null;
+  effectiveLocale?: string;
   roles?: Array<{ roleName?: string }>;
   branches?: Branch[];
   currentBranch?: Branch | null;
@@ -151,13 +154,16 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        // Cookie is the source of truth for UI locale.
-        // Only initialise from DB when cookie is absent (first-time device / cleared cookies).
-        const existing = readResolvedUiLocaleFromBrowser();
-        if (!existing) {
-          const rawPreferred = userData.preferredLocale ?? userData.preferred_locale ?? 'en-US';
-          setUiLocaleCookieOnDocument(normalizeUiLocale(rawPreferred));
-        }
+        // Align UI cookie with server-resolved effective locale on every OAuth login.
+        const effective =
+          userData.effectiveLocale ??
+          resolveEffectiveLocale(
+            userData.preferredLocale ?? userData.preferred_locale,
+            userData.tenantDefaultLocale ??
+              userData.currentBranch?.tenantDefaultLocale ??
+              SYSTEM_DEFAULT_LOCALE,
+          );
+        reconcileUiLocaleCookie(effective);
 
         if (roleNames.includes('super_admin')) {
           setStepMsg(2, 'Taking you to admin portal...');

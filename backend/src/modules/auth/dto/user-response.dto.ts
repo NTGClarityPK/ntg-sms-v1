@@ -11,7 +11,15 @@ export class UserResponseDto {
   email!: string;
   fullName!: string;
   avatarUrl?: string;
-  preferredLocale?: string;
+  /**
+   * Personal UI language override.
+   * `null` / omitted means inherit the current tenant default.
+   */
+  preferredLocale?: string | null;
+  /** Default locale of the user's current branch tenant. */
+  tenantDefaultLocale?: string | null;
+  /** Effective UI locale: preferredLocale ?? tenantDefaultLocale ?? en-GB. */
+  effectiveLocale?: string;
   onboardingSeenToursModal?: boolean;
   roles?: UserRoleDto[];
   branches?: BranchSummaryDto[];
@@ -21,4 +29,3 @@ export class UserResponseDto {
     Object.assign(this, partial);
   }
 }
-

@@ -3,49 +3,73 @@
 import { useRouter } from 'next/navigation';
 import { Menu, Button, Stack, Text } from '@mantine/core';
 import { IconLanguage, IconCheck } from '@tabler/icons-react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useMediaQuery } from '@mantine/hooks';
 import { useMantineTheme } from '@mantine/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { supabase } from '@/lib/supabase/client';
-import { normalizeUiLocale, setUiLocaleCookieOnDocument } from '@/lib/ui-locale';
+import {
+  normalizeUiLocale,
+  reconcileUiLocaleCookie,
+  resolveEffectiveLocale,
+  setUiLocaleCookieOnDocument,
+  SYSTEM_DEFAULT_LOCALE,
+} from '@/lib/ui-locale';
+import { useAuth } from '@/hooks/useAuth';
 
 const LANGUAGES = [
-  { code: 'en-US', nativeName: 'English (US)', name: 'English (US)' },
-  { code: 'en-GB', nativeName: 'English (UK)', name: 'English (UK)' },
-  { code: 'ar', nativeName: 'العربية', name: 'Arabic' },
+  { code: 'en-US', nativeName: 'English (US)', nameKey: 'languageEnglishUs' as const },
+  { code: 'en-GB', nativeName: 'English (UK)', nameKey: 'languageEnglishUk' as const },
+  { code: 'ar', nativeName: 'العربية', nameKey: 'languageArabic' as const },
 ];
 
 export function LanguageSwitcher() {
   const router = useRouter();
   const locale = useLocale();
+  const t = useTranslations('common');
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const hasPersonalOverride =
+    typeof user?.preferredLocale === 'string' && user.preferredLocale.trim() !== '';
+  const schoolDefault = normalizeUiLocale(
+    user?.tenantDefaultLocale ?? SYSTEM_DEFAULT_LOCALE,
+  );
 
   // Backward compatibility: older profiles/cookies may still store `en`.
-  const normalizedLocale = locale === 'en' ? 'en-US' : locale;
+  const normalizedLocale = locale === 'en' ? SYSTEM_DEFAULT_LOCALE : locale;
   const currentLanguage =
-    LANGUAGES.find((l) => l.code === normalizedLocale) ?? LANGUAGES[0];
+    LANGUAGES.find((l) => l.code === normalizedLocale) ?? LANGUAGES[1];
 
-  const handleChange = async (value: string) => {
-    const next = normalizeUiLocale(value);
-    setUiLocaleCookieOnDocument(next);
+  const applyLocale = async (next: string | null) => {
     try {
-      // Avoid noisy 401s during logout/expired sessions: only persist to backend when authenticated.
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (!session?.access_token) {
+        const cookieLocale = next ?? SYSTEM_DEFAULT_LOCALE;
+        setUiLocaleCookieOnDocument(cookieLocale);
         router.refresh();
         return;
       }
+
       await apiClient.patch('/api/v1/users/me/preferences', {
         preferred_locale: next,
       });
+
+      const effective = resolveEffectiveLocale(
+        next,
+        user?.tenantDefaultLocale ?? schoolDefault,
+      );
+      reconcileUiLocaleCookie(effective);
+      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
       router.refresh();
     } catch {
-      // Not logged in or API failed: full reload so server layout sees new cookie
       if (typeof window !== 'undefined') {
         window.location.reload();
       }
@@ -55,16 +79,17 @@ export function LanguageSwitcher() {
   return (
     <Menu
       shadow="md"
-      width={isMobile ? 160 : 200}
+      width={isMobile ? 180 : 220}
       position={isMobile ? 'bottom' : 'bottom-end'}
       zIndex={2000}
     >
       <Menu.Target>
         {isMobile ? (
           <Button
+            id="language-switcher-trigger"
             size="sm"
             px="xs"
-            aria-label="Change language"
+            aria-label={t('changeLanguage')}
             style={{
               backgroundColor: DEFAULT_THEME_COLOR,
               color: 'white',
@@ -74,6 +99,7 @@ export function LanguageSwitcher() {
           </Button>
         ) : (
           <Button
+            id="language-switcher-trigger"
             leftSection={<IconLanguage size={16} />}
             size="sm"
             style={{
@@ -87,29 +113,56 @@ export function LanguageSwitcher() {
       </Menu.Target>
 
       <Menu.Dropdown>
-        <Menu.Label>Select Language</Menu.Label>
-        {LANGUAGES.map((lang) => (
-          <Menu.Item
-            key={lang.code}
-            leftSection={
-              <IconCheck
-                size={16}
-                style={{ visibility: normalizedLocale === lang.code ? 'visible' : 'hidden' }}
-              />
-            }
-            onClick={() => handleChange(lang.code)}
-            style={{ fontWeight: normalizedLocale === lang.code ? 600 : 400 }}
-          >
-            <Stack gap={2}>
-              <Text size="sm" fw={normalizedLocale === lang.code ? 600 : 400}>
-                {lang.nativeName}
-              </Text>
-              <Text size="xs" c="dimmed">
-                {lang.name}
-              </Text>
-            </Stack>
-          </Menu.Item>
-        ))}
+        <Menu.Label>{t('selectLanguage')}</Menu.Label>
+        <Menu.Item
+          id="language-option-school-default"
+          leftSection={
+            <IconCheck
+              size={16}
+              style={{ visibility: !hasPersonalOverride ? 'visible' : 'hidden' }}
+            />
+          }
+          onClick={() => applyLocale(null)}
+          style={{ fontWeight: !hasPersonalOverride ? 600 : 400 }}
+        >
+          <Stack gap={2}>
+            <Text size="sm" fw={!hasPersonalOverride ? 600 : 400}>
+              {t('useSchoolDefault')}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {t('useSchoolDefaultHint', {
+                language:
+                  LANGUAGES.find((l) => l.code === schoolDefault)?.nativeName ?? schoolDefault,
+              })}
+            </Text>
+          </Stack>
+        </Menu.Item>
+        {LANGUAGES.map((lang) => {
+          const selected = hasPersonalOverride && normalizedLocale === lang.code;
+          return (
+            <Menu.Item
+              id={`language-option-${lang.code}`}
+              key={lang.code}
+              leftSection={
+                <IconCheck
+                  size={16}
+                  style={{ visibility: selected ? 'visible' : 'hidden' }}
+                />
+              }
+              onClick={() => applyLocale(lang.code)}
+              style={{ fontWeight: selected ? 600 : 400 }}
+            >
+              <Stack gap={2}>
+                <Text size="sm" fw={selected ? 600 : 400}>
+                  {lang.nativeName}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {t(lang.nameKey)}
+                </Text>
+              </Stack>
+            </Menu.Item>
+          );
+        })}
       </Menu.Dropdown>
     </Menu>
   );

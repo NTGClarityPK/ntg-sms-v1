@@ -79,7 +79,7 @@ function resolveAssessmentTypeName(
   return (t?.[language] ?? t?.en ?? row.name) || row.name;
 }
 
-function mapAssessmentType(row: AssessmentTypeRow, language: string = 'ar'): AssessmentTypeDto {
+function mapAssessmentType(row: AssessmentTypeRow, language: string = 'en-GB'): AssessmentTypeDto {
   const name = resolveAssessmentTypeName(row, language);
   return new AssessmentTypeDto({
     id: row.id,
@@ -162,7 +162,7 @@ export class AssessmentService {
     branchId: string,
   ): Promise<{ data: AssessmentTypeDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
-    const language = query.language ?? 'ar';
+    const language = query.language ?? 'en-GB';
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const from = (page - 1) * limit;
@@ -234,7 +234,7 @@ export class AssessmentService {
         tenantId,
       })
       .catch(() => {});
-    return mapAssessmentType(row, 'ar');
+    return mapAssessmentType(row, 'en-GB');
   }
 
   async updateAssessmentType(
@@ -270,7 +270,7 @@ export class AssessmentService {
     throwIfDbError(fetchError);
     if (!oldRow) throw new NotFoundException('Assessment type not found');
     if (Object.keys(updates).length === 0) {
-      return mapAssessmentType(oldRow as AssessmentTypeRow, 'ar');
+      return mapAssessmentType(oldRow as AssessmentTypeRow, 'en-GB');
     }
     const { data, error } = await supabase
       .from('assessment_types')
@@ -295,7 +295,7 @@ export class AssessmentService {
         { branchId, tenantId },
       )
       .catch(() => {});
-    return mapAssessmentType(data as AssessmentTypeRow, 'ar');
+    return mapAssessmentType(data as AssessmentTypeRow, 'en-GB');
   }
 
   async listGradeTemplates(branchId: string): Promise<{ data: GradeTemplateDto[] }> {

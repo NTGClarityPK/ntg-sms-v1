@@ -20,6 +20,11 @@ import { StudentTokenService } from '../../common/modules/student-token/student-
 import { ProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SystemSettingsService } from '../system-settings/system-settings.service';
+import {
+  normalizeTenantDefaultLocale,
+  resolveEffectiveLocale,
+  SYSTEM_DEFAULT_LOCALE,
+} from '../../common/utils/locale.util';
 
 @Injectable()
 export class AuthService {
@@ -63,6 +68,27 @@ export class AuthService {
       return [];
     }
 
+    const tenantIds = Array.from(
+      new Set(
+        (branches as Array<{ tenant_id: string | null }>)
+          .map((b) => b.tenant_id)
+          .filter((id): id is string => !!id),
+      ),
+    );
+    const { data: tenantsData, error: tenantsError } =
+      tenantIds.length > 0
+        ? await supabase.from('tenants').select('id, default_locale').in('id', tenantIds)
+        : { data: [], error: null };
+    if (tenantsError) {
+      throw new BadRequestException(`Failed to fetch tenants: ${tenantsError.message}`);
+    }
+    const tenantLocaleById = new Map(
+      ((tenantsData || []) as Array<{ id: string; default_locale: string | null }>).map((t) => [
+        t.id,
+        normalizeTenantDefaultLocale(t.default_locale),
+      ]),
+    );
+
     const result = branches.map(
       (b) =>
         new BranchSummaryDto({
@@ -70,6 +96,9 @@ export class AuthService {
           tenantId: b.tenant_id,
           name: b.name,
           code: b.code,
+          tenantDefaultLocale: b.tenant_id
+            ? tenantLocaleById.get(b.tenant_id) ?? SYSTEM_DEFAULT_LOCALE
+            : SYSTEM_DEFAULT_LOCALE,
         }),
     );
     
@@ -248,17 +277,21 @@ export class AuthService {
     const tenantIds = Array.from(new Set(branchesRaw.map((b) => b.tenant_id).filter(Boolean))) as string[];
     const { data: tenantsData, error: tenantsError } =
       tenantIds.length > 0
-        ? await supabase.from('tenants').select('id, is_active').in('id', tenantIds)
+        ? await supabase.from('tenants').select('id, is_active, default_locale').in('id', tenantIds)
         : { data: [], error: null };
 
     if (tenantsError) {
       throw new BadRequestException(`Failed to fetch tenants: ${tenantsError.message}`);
     }
 
-    const activeTenantIds = new Set(
-      ((tenantsData || []) as Array<{ id: string; is_active: boolean }>)
-        .filter((t) => t.is_active)
-        .map((t) => t.id),
+    const tenantRows = (tenantsData || []) as Array<{
+      id: string;
+      is_active: boolean;
+      default_locale: string | null;
+    }>;
+    const activeTenantIds = new Set(tenantRows.filter((t) => t.is_active).map((t) => t.id));
+    const tenantLocaleById = new Map(
+      tenantRows.map((t) => [t.id, normalizeTenantDefaultLocale(t.default_locale)]),
     );
 
     let filteredBranchesRaw = branchesRaw.filter(
@@ -278,6 +311,9 @@ export class AuthService {
           tenantId: b.tenant_id,
           name: b.name ?? '',
           code: b.code,
+          tenantDefaultLocale: b.tenant_id
+            ? tenantLocaleById.get(b.tenant_id) ?? SYSTEM_DEFAULT_LOCALE
+            : SYSTEM_DEFAULT_LOCALE,
         }),
     );
 
@@ -398,12 +434,26 @@ export class AuthService {
       : null;
 
     const profileRow = profile as { preferred_locale?: string | null } | null;
+    const preferredLocaleRaw = profileRow?.preferred_locale ?? null;
+    const preferredLocale =
+      preferredLocaleRaw != null && preferredLocaleRaw.trim() !== ''
+        ? preferredLocaleRaw.trim()
+        : null;
+    const tenantDefaultLocale =
+      currentBranch?.tenantDefaultLocale ??
+      (currentBranch?.tenantId
+        ? tenantLocaleById.get(currentBranch.tenantId) ?? SYSTEM_DEFAULT_LOCALE
+        : SYSTEM_DEFAULT_LOCALE);
+    const effectiveLocale = resolveEffectiveLocale(preferredLocale, tenantDefaultLocale);
+
     const userResponse = new UserResponseDto({
       id: userId,
       email: resolvedEmail,
       fullName: profile?.full_name || resolvedEmail || 'User',
       avatarUrl: profile?.avatar_url || undefined,
-      preferredLocale: profileRow?.preferred_locale ?? 'en-US',
+      preferredLocale,
+      tenantDefaultLocale,
+      effectiveLocale,
       onboardingSeenToursModal:
         (profile as { onboarding_seen_tours_modal?: boolean | null } | null)
           ?.onboarding_seen_tours_modal ?? false,

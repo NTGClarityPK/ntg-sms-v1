@@ -13,6 +13,7 @@ import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { AssignBranchToTenantDto } from './dto/assign-branch-to-tenant.dto';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { resolveContentLanguage, SYSTEM_DEFAULT_LOCALE } from '../../common/utils/locale.util';
 
 /** Caller context for membership-scoped branch endpoints. */
 export type BranchAccessContext = {
@@ -58,16 +59,31 @@ function resolveBranchName(
   language: string,
 ): string {
   const t = row.name_translations;
-  return (t?.[language] ?? t?.en ?? row.name) || row.name;
+  const normalized = resolveContentLanguage(language);
+  const englishKey = normalized === 'ar' ? null : 'en';
+  return (
+    (t?.[normalized] ?? (englishKey ? t?.[englishKey] : undefined) ?? t?.en ?? row.name) || row.name
+  );
 }
 
-function mapBranch(row: BranchRow, language: string = 'ar'): BranchDto {
-  const name = resolveBranchName(row, language);
+function mapBranch(row: BranchRow, language: string = SYSTEM_DEFAULT_LOCALE): BranchDto {
+  const resolvedLanguage = resolveContentLanguage(language);
+  const name = resolveBranchName(row, resolvedLanguage);
+  const translations = row.name_translations ?? null;
   return new BranchDto({
     id: row.id,
     tenantId: row.tenant_id,
     name,
-    nameAr: row.name_ar,
+    nameAr: row.name_ar ?? translations?.ar ?? null,
+    nameTranslations: translations
+      ? {
+          en: translations.en ?? row.name,
+          ar: translations.ar ?? row.name_ar ?? '',
+        }
+      : {
+          en: row.name,
+          ar: row.name_ar ?? '',
+        },
     code: row.code,
     address: row.address,
     phone: row.phone,
@@ -192,7 +208,7 @@ export class BranchesService {
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
     const supabase = this.supabaseConfig.getClient();
-    const language = query.language ?? 'ar';
+    const language = query.language ?? 'en-GB';
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -244,7 +260,7 @@ export class BranchesService {
 
   async getById(
     id: string,
-    language: string = 'ar',
+    language: string = 'en-GB',
     access?: BranchAccessContext,
   ): Promise<BranchDto> {
     if (access) {
@@ -384,7 +400,7 @@ export class BranchesService {
         tenantId: row.tenant_id,
       })
       .catch(() => {});
-    return mapBranch(row, 'ar');
+    return mapBranch(row, 'en-GB');
   }
 
   async update(
@@ -450,7 +466,7 @@ export class BranchesService {
         { branchId: id, tenantId: (existing as BranchRow).tenant_id },
       )
       .catch(() => {});
-    return mapBranch(newRow, 'ar');
+    return mapBranch(newRow, 'en-GB');
   }
 
   async getStorage(id: string): Promise<{
@@ -487,8 +503,13 @@ export class BranchesService {
     };
   }
 
-  async listByTenant(tenantId: string | null, userId: string): Promise<{ data: BranchDto[] }> {
+  async listByTenant(
+    tenantId: string | null,
+    userId: string,
+    language: string = SYSTEM_DEFAULT_LOCALE,
+  ): Promise<{ data: BranchDto[] }> {
     const supabase = this.supabaseConfig.getClient();
+    const resolvedLanguage = resolveContentLanguage(language);
 
     // Get all branches for the tenant that the user has access to
     const { data: userBranches, error: userBranchesError } = await supabase
@@ -514,12 +535,16 @@ export class BranchesService {
     throwIfDbError(branchesError);
 
     return {
-      data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, 'ar')),
+      data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, resolvedLanguage)),
     };
   }
 
-  async listByTenantAdmin(tenantId: string): Promise<{ data: BranchDto[] }> {
+  async listByTenantAdmin(
+    tenantId: string,
+    language: string = SYSTEM_DEFAULT_LOCALE,
+  ): Promise<{ data: BranchDto[] }> {
     const supabase = this.supabaseConfig.getClient();
+    const resolvedLanguage = resolveContentLanguage(language);
 
     // Admin method: get all branches for the tenant without user access filtering
     const { data: branches, error: branchesError } = await supabase
@@ -531,7 +556,7 @@ export class BranchesService {
     throwIfDbError(branchesError);
 
     return {
-      data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, 'ar')),
+      data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, resolvedLanguage)),
     };
   }
 

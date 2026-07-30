@@ -8,6 +8,8 @@ export interface Tenant {
   timezone?: string | null;
   fiscalYearStart?: string | null;
   vatNumber?: string | null;
+  /** School default UI language for users without a personal override. */
+  defaultLocale?: 'en-GB' | 'en-US' | 'ar';
   isActive?: boolean;
   logoUrl?: string | null;
   primaryColor?: string | null;
@@ -18,11 +20,3 @@ export interface Tenant {
   deletionRequestedBy?: string | null;
   preDeletionIsActive?: boolean | null;
 }
-
-
-
-
-
-
-
-

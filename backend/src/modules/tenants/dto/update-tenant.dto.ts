@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { TENANT_DEFAULT_LOCALES, type TenantDefaultLocale } from '../../../common/utils/locale.util';
 
 export class UpdateTenantDto {
   @IsOptional()
@@ -42,6 +43,10 @@ export class UpdateTenantDto {
   @MaxLength(50)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   vatNumber?: string;
+
+  @IsOptional()
+  @IsIn([...TENANT_DEFAULT_LOCALES])
+  defaultLocale?: TenantDefaultLocale;
 
   @IsOptional()
   @IsString()

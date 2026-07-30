@@ -524,7 +524,14 @@
       "parent": "ولي الأمر",
       "student": "الطالب",
       "admin_assistant": "مساعد إداري"
-    }
+    },
+    "changeLanguage": "تغيير اللغة",
+    "selectLanguage": "اختر اللغة",
+    "useSchoolDefault": "استخدام إعداد المدرسة",
+    "useSchoolDefaultHint": "حالياً {language}",
+    "languageEnglishUs": "الإنجليزية (الولايات المتحدة)",
+    "languageEnglishUk": "الإنجليزية (المملكة المتحدة)",
+    "languageArabic": "العربية"
   },
   "dashboard": {
     "welcome": "مرحباً",
@@ -1471,7 +1478,6 @@
       "signatureNameDescription": "يُطبع فوق خط التوقيع على الشهادة. اتركه فارغاً لإخفاء الاسم."
     },
     "fieldPlaceholders": {
-      "certificateNumberOverride": "مثال: CERT-2025-0042 (اتركه فارغاً للتوليد التلقائي عند الإصدار)",
       "certificateNumberOverride": "مثال: CERT-2025-0042 (اتركه فارغاً للتوليد التلقائي عند الإصدار)",
       "customTitle": "مثال: إنجاز رياضي",
       "customSubtitle": "مثال: على مستوى المنطقة أو المدرسة",
@@ -2897,7 +2903,12 @@
     "themeLogoSaved": "تم تحديث الشعار بنجاح",
     "themeLogoUploadError": "فشل رفع الشعار",
     "themeSettingsSaved": "تم حفظ إعدادات المظهر بنجاح",
-    "themeSettingsSaveError": "فشل حفظ إعدادات المظهر"
+    "themeSettingsSaveError": "فشل حفظ إعدادات المظهر",
+    "businessDefaultLanguageLabel": "اللغة الافتراضية",
+    "businessDefaultLanguageDescription": "تُطبَّق على المستخدمين الذين لم يختاروا لغة شخصية.",
+    "localeEnglishUk": "الإنجليزية (المملكة المتحدة)",
+    "localeEnglishUs": "الإنجليزية (الولايات المتحدة)",
+    "localeArabic": "العربية"
   },
   "storage": {
     "pageTitle": "التخزين",

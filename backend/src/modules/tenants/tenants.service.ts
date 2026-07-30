@@ -2,6 +2,11 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
+import {
+  normalizeTenantDefaultLocale,
+  SYSTEM_DEFAULT_LOCALE,
+  type TenantDefaultLocale,
+} from '../../common/utils/locale.util';
 import { TenantDto } from './dto/tenant.dto';
 import { TenantStatisticsDto, TenantAdminInfo } from './dto/tenant-statistics.dto';
 
@@ -20,6 +25,7 @@ type TenantRow = {
   timezone: string | null;
   fiscal_year_start: string | null;
   vat_number: string | null;
+  default_locale: string | null;
   is_active: boolean;
   logo_url: string | null;
   deletion_status: 'none' | 'pending' | 'executing' | null;
@@ -46,6 +52,7 @@ function mapTenant(row: TenantRow, primaryColor?: string | null): TenantDto {
     timezone: row.timezone,
     fiscalYearStart: row.fiscal_year_start,
     vatNumber: row.vat_number,
+    defaultLocale: normalizeTenantDefaultLocale(row.default_locale ?? SYSTEM_DEFAULT_LOCALE),
     isActive: row.is_active,
     logoUrl: row.logo_url,
     primaryColor: primaryColor ?? null,
@@ -59,7 +66,7 @@ function mapTenant(row: TenantRow, primaryColor?: string | null): TenantDto {
 }
 
 const TENANT_SELECT =
-  'id, name, code, domain, email, phone, timezone, fiscal_year_start, vat_number, is_active, logo_url, deletion_status, deletion_requested_at, deletion_execute_at, deletion_cancelled_at, deletion_requested_by, pre_deletion_is_active';
+  'id, name, code, domain, email, phone, timezone, fiscal_year_start, vat_number, default_locale, is_active, logo_url, deletion_status, deletion_requested_at, deletion_execute_at, deletion_cancelled_at, deletion_requested_by, pre_deletion_is_active';
 
 type UploadedLogoFile = {
   originalname: string;
@@ -120,6 +127,7 @@ export class TenantsService {
       timezone?: string;
       fiscalYearStart?: string;
       vatNumber?: string;
+      defaultLocale?: TenantDefaultLocale;
       primaryColor?: string;
     },
     userEmail: string,
@@ -132,7 +140,8 @@ export class TenantsService {
       updates.phone !== undefined ||
       updates.timezone !== undefined ||
       updates.fiscalYearStart !== undefined ||
-      updates.vatNumber !== undefined;
+      updates.vatNumber !== undefined ||
+      updates.defaultLocale !== undefined;
     
     if (!hasTenantUpdates && !updates.primaryColor) {
       throw new BadRequestException('No fields to update');
@@ -156,6 +165,9 @@ export class TenantsService {
       if (updates.timezone !== undefined) updateData.timezone = updates.timezone || null;
       if (updates.fiscalYearStart !== undefined) updateData.fiscal_year_start = updates.fiscalYearStart || null;
       if (updates.vatNumber !== undefined) updateData.vat_number = updates.vatNumber || null;
+      if (updates.defaultLocale !== undefined) {
+        updateData.default_locale = normalizeTenantDefaultLocale(updates.defaultLocale);
+      }
       const { data, error } = await supabase
         .from('tenants')
         .update(updateData)

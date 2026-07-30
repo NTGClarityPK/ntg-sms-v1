@@ -1,4 +1,5 @@
-import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { TENANT_DEFAULT_LOCALES, type TenantDefaultLocale } from '../../../common/utils/locale.util';
 
 export class TenantDto {
   @IsUUID()
@@ -33,6 +34,11 @@ export class TenantDto {
   @IsOptional()
   @IsString()
   vatNumber?: string | null;
+
+  /** School default UI language for users without a personal override. */
+  @IsOptional()
+  @IsIn([...TENANT_DEFAULT_LOCALES])
+  defaultLocale?: TenantDefaultLocale;
 
   @IsOptional()
   @IsBoolean()

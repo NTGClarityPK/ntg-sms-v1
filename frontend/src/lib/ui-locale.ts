@@ -4,26 +4,48 @@
  *
  * Resolution rules (must stay aligned everywhere):
  * - **Authoritative for UI (SSR + refresh)**: `NEXT_LOCALE` — see {@link resolveUiLocaleForRequest}.
- * - **`profiles.preferred_locale`**: the DB preference; used to align the cookie after login/OAuth flows.
+ * - **Effective locale after auth**: `preferredLocale ?? tenantDefaultLocale ?? en-GB`.
+ * - **`profiles.preferred_locale`**: personal override; `null` means inherit tenant default.
  * - **Middleware + next-intl server (`i18n/request.ts`)**: use {@link resolveUiLocaleForRequest} only.
  * - **Browser reads**: use {@link readResolvedUiLocaleFromBrowser} (or next-intl’s `useLocale()` after cookie is canonical).
- * - Low-level helpers ({@link resolveLocaleFromCookieHeader}, etc.) exist for tests and edge cases; prefer the functions above.
  */
 
 export const UI_LOCALE_COOKIE = 'NEXT_LOCALE';
 export const UI_LOCALE_COOKIE_MAX_AGE = 31536000;
+export const SYSTEM_DEFAULT_LOCALE = 'en-GB';
 
 const SUPPORTED = new Set(['en', 'en-US', 'en-GB', 'ar']);
+const TENANT_DEFAULTS = new Set(['en-GB', 'en-US', 'ar']);
 
 export function normalizeUiLocale(raw: string | null | undefined): string {
-  if (raw == null) return 'en';
+  if (raw == null) return SYSTEM_DEFAULT_LOCALE;
   const value = raw.trim();
-  if (!value) return 'en';
-  if (SUPPORTED.has(value)) return value;
+  if (!value) return SYSTEM_DEFAULT_LOCALE;
+  if (SUPPORTED.has(value)) {
+    return value === 'en' ? SYSTEM_DEFAULT_LOCALE : value;
+  }
   const lower = value.toLowerCase();
-  if (lower === 'en') return 'en';
+  if (lower === 'en') return SYSTEM_DEFAULT_LOCALE;
   if (lower === 'ar') return 'ar';
-  return 'en';
+  return SYSTEM_DEFAULT_LOCALE;
+}
+
+export function normalizeTenantDefaultLocale(raw: string | null | undefined): string {
+  const normalized = normalizeUiLocale(raw);
+  return TENANT_DEFAULTS.has(normalized) ? normalized : SYSTEM_DEFAULT_LOCALE;
+}
+
+/**
+ * Effective UI locale: user override wins; otherwise tenant default; otherwise system default.
+ */
+export function resolveEffectiveLocale(
+  preferredLocale: string | null | undefined,
+  tenantDefaultLocale: string | null | undefined,
+): string {
+  if (preferredLocale != null && preferredLocale.trim() !== '') {
+    return normalizeUiLocale(preferredLocale);
+  }
+  return normalizeTenantDefaultLocale(tenantDefaultLocale);
 }
 
 export function isSupportedUiLocale(value: string): boolean {
@@ -31,7 +53,6 @@ export function isSupportedUiLocale(value: string): boolean {
 }
 
 function decodeCookieValue(raw: string): string {
-  // Cookie values may be URL-encoded; decode safely.
   try {
     return decodeURIComponent(raw);
   } catch {
@@ -41,7 +62,6 @@ function decodeCookieValue(raw: string): string {
 
 /**
  * True when the raw Cookie header string actually includes a NEXT_LOCALE=… entry.
- * (Do not conflate "no cookie" with `resolveLocaleFromCookieHeader` defaulting to `en`.)
  */
 export function hasNextLocaleInCookieHeader(cookieHeader: string | null | undefined): boolean {
   if (!cookieHeader?.trim()) return false;
@@ -54,10 +74,10 @@ export function hasNextLocaleInCookieHeader(cookieHeader: string | null | undefi
  * When multiple cookies with the same name exist, take the last occurrence in the header string.
  */
 export function resolveLocaleFromCookieHeader(cookieHeader: string | null | undefined): string {
-  if (!cookieHeader) return 'en';
+  if (!cookieHeader) return SYSTEM_DEFAULT_LOCALE;
   const parts = cookieHeader.split(';').map((p) => p.trim());
   const matches = parts.filter((p) => p.startsWith(`${UI_LOCALE_COOKIE}=`));
-  if (matches.length === 0) return 'en';
+  if (matches.length === 0) return SYSTEM_DEFAULT_LOCALE;
   const last = matches[matches.length - 1];
   const raw = last.substring(UI_LOCALE_COOKIE.length + 1);
   return normalizeUiLocale(decodeCookieValue(raw));
@@ -68,23 +88,16 @@ export function resolveLocaleFromServerCookieValues(values: Iterable<string>): s
   const list = [...values]
     .map((v) => v.trim())
     .filter((v) => v.length > 0);
-  if (list.length === 0) return 'en';
-  // When multiple cookies exist, prefer the last value (most recently set).
+  if (list.length === 0) return SYSTEM_DEFAULT_LOCALE;
   return normalizeUiLocale(decodeCookieValue(list[list.length - 1]));
 }
 
-/**
- * Normalise one raw cookie jar value (Next.js `cookies().getAll` / request store), same rules as the HTTP header path.
- */
 export function normalizedUiLocaleFromCookieJarEntry(raw: string): string {
   return normalizeUiLocale(decodeCookieValue(raw.trim()));
 }
 
 /**
  * Canonical locale for middleware + RSC / `next-intl` server config.
- * Prefer explicit `NEXT_LOCALE` in the raw `Cookie` header (last wins). If the header omits `NEXT_LOCALE`,
- * use the cookie jar (last wins). Never treat {@link resolveLocaleFromCookieHeader}’s default `en` as valid when the header
- * omits `NEXT_LOCALE` (that was causing wrong locale until a full refresh).
  */
 export function resolveUiLocaleForRequest(input: {
   cookieHeader: string | null | undefined;
@@ -99,7 +112,7 @@ export function resolveUiLocaleForRequest(input: {
   if (jar.length > 0) {
     return resolveLocaleFromServerCookieValues(jar);
   }
-  return 'en';
+  return SYSTEM_DEFAULT_LOCALE;
 }
 
 export function getUiLocaleCookieFromDocument(): string | null {
@@ -110,14 +123,9 @@ export function getUiLocaleCookieFromDocument(): string | null {
   const rawValues = found.map((p) => p.substring(UI_LOCALE_COOKIE.length + 1)).filter((v) => v.length > 0);
   if (rawValues.length === 0) return null;
   if (rawValues.length === 1) return rawValues[0];
-  // Duplicate cookie names: browsers can send multiple values. Prefer the last one (most recently set).
   return rawValues[rawValues.length - 1] ?? null;
 }
 
-/**
- * Resolved `NEXT_LOCALE` from `document.cookie` (last occurrence wins). Returns `null` if absent.
- * Matches server-side {@link resolveUiLocaleForRequest} semantics for a single browser cookie string.
- */
 export function readResolvedUiLocaleFromBrowser(): string | null {
   const raw = getUiLocaleCookieFromDocument();
   if (raw == null || raw.trim() === '') return null;
@@ -128,4 +136,16 @@ export function setUiLocaleCookieOnDocument(locale: string): void {
   if (typeof document === 'undefined') return;
   const value = normalizeUiLocale(locale);
   document.cookie = `${UI_LOCALE_COOKIE}=${value}; path=/; max-age=${UI_LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+/**
+ * Reconcile the UI cookie to the server-resolved effective locale.
+ * Returns true when the cookie value changed.
+ */
+export function reconcileUiLocaleCookie(effectiveLocale: string): boolean {
+  const next = normalizeUiLocale(effectiveLocale);
+  const existing = readResolvedUiLocaleFromBrowser();
+  if (existing === next) return false;
+  setUiLocaleCookieOnDocument(next);
+  return true;
 }

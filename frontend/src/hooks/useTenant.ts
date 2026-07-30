@@ -35,6 +35,7 @@ export function useUpdateTenantMe() {
       timezone?: string;
       fiscalYearStart?: string;
       vatNumber?: string;
+      defaultLocale?: 'en-GB' | 'en-US' | 'ar';
       primaryColor?: string;
     }) => {
       const res = await apiClient.patch<Tenant>('/api/v1/tenants/me', payload);
@@ -42,6 +43,7 @@ export function useUpdateTenantMe() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: tenantKeys.me() });
+      await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
     },
   });
 }

@@ -3,6 +3,7 @@ export interface Branch {
   tenantId?: string | null;
   name: string;
   code?: string | null;
+  tenantDefaultLocale?: string | null;
 }
 
 export interface User {
@@ -10,8 +11,15 @@ export interface User {
   email: string;
   fullName: string;
   avatarUrl?: string;
-  /** Server profile preference; drives NEXT_LOCALE reconciliation after /auth/me. */
-  preferredLocale?: string;
+  /**
+   * Personal UI language override.
+   * `null` means inherit the current tenant default.
+   */
+  preferredLocale?: string | null;
+  /** Default locale of the user's current branch tenant. */
+  tenantDefaultLocale?: string | null;
+  /** Effective UI locale: preferredLocale ?? tenantDefaultLocale ?? en-GB. */
+  effectiveLocale?: string;
   onboardingSeenToursModal?: boolean;
   roles?: Array<{
     roleId: string;
@@ -21,4 +29,3 @@ export interface User {
   branches?: Branch[];
   currentBranch?: Branch | null;
 }
-

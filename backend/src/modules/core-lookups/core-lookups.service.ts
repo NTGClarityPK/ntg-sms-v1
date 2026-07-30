@@ -94,7 +94,7 @@ function resolveTranslatedName(
   return (t?.[language] ?? t?.en ?? row.name) || row.name;
 }
 
-function mapSubject(row: SubjectRow, language: string = 'ar'): SubjectDto {
+function mapSubject(row: SubjectRow, language: string = 'en-GB'): SubjectDto {
   const name = resolveTranslatedName(row, language);
   return new SubjectDto({
     id: row.id,
@@ -152,7 +152,7 @@ export class CoreLookupsService {
 
   async listSubjects(query: QuerySubjectsDto, branchId: string): Promise<{ data: SubjectDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
-    const language = query.language ?? 'ar';
+    const language = query.language ?? 'en-GB';
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const from = (page - 1) * limit;
@@ -208,7 +208,7 @@ export class CoreLookupsService {
         .eq('code', code)
         .maybeSingle();
       throwIfDbError(existingError);
-      if (existing) return mapSubject(existing as SubjectRow, 'ar');
+      if (existing) return mapSubject(existing as SubjectRow, 'en-GB');
     }
 
     const nameTranslations = input.name_translations;
@@ -238,7 +238,7 @@ export class CoreLookupsService {
         tenantId,
       })
       .catch(() => {});
-    return mapSubject(row, 'ar');
+    return mapSubject(row, 'en-GB');
   }
 
   async updateSubject(
@@ -269,7 +269,7 @@ export class CoreLookupsService {
     if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
     updates.updated_by = username;
     if (Object.keys(updates).length === 1 && updates.updated_by) {
-      return mapSubject(oldRow as SubjectRow, 'ar');
+      return mapSubject(oldRow as SubjectRow, 'en-GB');
     }
     const { data, error } = await supabase
       .from('subjects')
@@ -292,7 +292,7 @@ export class CoreLookupsService {
         { branchId },
       )
       .catch(() => {});
-    return mapSubject(newRow, 'ar');
+    return mapSubject(newRow, 'en-GB');
   }
 
   async listClasses(query: QueryClassesDto, branchId: string): Promise<{ data: ClassDto[]; meta: Meta }> {

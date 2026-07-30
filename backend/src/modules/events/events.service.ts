@@ -85,7 +85,7 @@ function resolveEventDescription(
   return resolved ?? undefined;
 }
 
-function mapEvent(row: EventRow, language: string = 'ar'): EventDto {
+function mapEvent(row: EventRow, language: string = 'en-GB'): EventDto {
   return new EventDto({
     id: row.id,
     title: resolveEventTitle(row, language),
@@ -151,7 +151,7 @@ export class EventsService {
     academicYearId?: string,
   ): Promise<{ data: EventDto[]; meta: Meta }> {
     const supabase = this.supabaseConfig.getClient();
-    const language = query.language ?? 'ar';
+    const language = query.language ?? 'en-GB';
 
     let activeYearId = academicYearId;
     if (!activeYearId) {
@@ -292,7 +292,7 @@ export class EventsService {
     };
   }
 
-  async getEvent(id: string, branchId: string, language: string = 'ar'): Promise<EventDto> {
+  async getEvent(id: string, branchId: string, language: string = 'en-GB'): Promise<EventDto> {
     const supabase = this.supabaseConfig.getClient();
 
     const { data, error } = await supabase
@@ -431,7 +431,7 @@ export class EventsService {
       )
       .catch(() => {});
 
-    const event = mapEvent(eventData as EventRow, 'ar');
+    const event = mapEvent(eventData as EventRow, 'en-GB');
 
     // Create participants
     const participants: Array<{
@@ -609,7 +609,7 @@ export class EventsService {
     // Send update notifications
     await this.notifyEventUpdated(id, branchId);
 
-    return mapEvent(newRow, 'ar');
+    return mapEvent(newRow, 'en-GB');
   }
 
   async deleteEvent(
@@ -1425,7 +1425,7 @@ export class EventsService {
 
     throwIfDbError(error);
 
-    const events = (data || []).map((row) => mapEvent(row, 'ar'));
+    const events = (data || []).map((row) => mapEvent(row, 'en-GB'));
 
     // For students, attach their latest consent status for each event (when events require consent).
     if (userRoles.includes('student') && currentStudentId) {

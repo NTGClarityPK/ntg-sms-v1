@@ -57,7 +57,7 @@ export function syncLocaleCookieFromStorage(): void {
 
   // Ensure a sane default exists for server rendering when cookie is missing.
   if (cookieRaw == null || cookieRaw.trim() === '') {
-    setUiLocaleCookieOnDocument('en-US');
+    setUiLocaleCookieOnDocument('en-GB');
   }
 }
 

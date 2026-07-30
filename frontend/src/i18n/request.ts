@@ -21,7 +21,7 @@ export default getRequestConfig(async () => {
     }
   };
 
-  const messages = (await loadLocaleMessages(locale)) ?? (await loadLocaleMessages('en')) ?? {};
+  const messages = (await loadLocaleMessages(locale)) ?? (await loadLocaleMessages('en-GB')) ?? {};
 
   return {
     locale,

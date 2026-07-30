@@ -512,7 +512,14 @@
       "parent": "Parent",
       "student": "Student",
       "admin_assistant": "Admin Assistant"
-    }
+    },
+    "changeLanguage": "Change language",
+    "selectLanguage": "Select language",
+    "useSchoolDefault": "Use school default",
+    "useSchoolDefaultHint": "Currently {language}",
+    "languageEnglishUs": "English (US)",
+    "languageEnglishUk": "English (UK)",
+    "languageArabic": "Arabic"
   },
   "dashboard": {
     "welcome": "Welcome",
@@ -2137,7 +2144,12 @@
     "themeLogoSaved": "Logo updated successfully",
     "themeLogoUploadError": "Failed to upload logo",
     "themeSettingsSaved": "Theme settings saved successfully",
-    "themeSettingsSaveError": "Failed to save theme settings"
+    "themeSettingsSaveError": "Failed to save theme settings",
+    "businessDefaultLanguageLabel": "Default language",
+    "businessDefaultLanguageDescription": "Applies to users who have not chosen a personal language.",
+    "localeEnglishUk": "English (UK)",
+    "localeEnglishUs": "English (US)",
+    "localeArabic": "Arabic"
   },
   "storage": {
     "pageTitle": "Storage",

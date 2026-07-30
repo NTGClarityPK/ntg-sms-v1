@@ -935,17 +935,6 @@ function BusinessInformationTabContent() {
   const branchQuery = useBranchById(currentBranchId);
   const updateBranch = useUpdateBranch();
 
-  // Debug: Log current branch info
-  useEffect(() => {
-    if (user?.currentBranch) {
-      console.log('Current Branch:', user.currentBranch);
-      console.log('Current Branch ID:', currentBranchId);
-    } else {
-      console.log('No current branch found in user object');
-      console.log('User object:', user);
-    }
-  }, [user, currentBranchId]);
-
   const [name, setName] = useState<string>('');
   const [code, setCode] = useState<string>('');
   const [domain, setDomain] = useState<string>('');
@@ -954,6 +943,7 @@ function BusinessInformationTabContent() {
   const [timezone, setTimezone] = useState<string>('Asia/Baghdad');
   const [fiscalYearStart, setFiscalYearStart] = useState<string>('');
   const [vatNumber, setVatNumber] = useState<string>('');
+  const [defaultLocale, setDefaultLocale] = useState<'en-GB' | 'en-US' | 'ar'>('en-GB');
 
   // Branch fields
   const [branchNameTranslations, setBranchNameTranslations] = useState<TranslatableValue>({ en: '', ar: '' });
@@ -964,6 +954,26 @@ function BusinessInformationTabContent() {
 
   const [hasInitialised, setHasInitialised] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const applyBranchFields = (branch: {
+    name?: string | null;
+    nameAr?: string | null;
+    nameTranslations?: { en?: string; ar?: string } | null;
+    code?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  }) => {
+    const translations = branch.nameTranslations;
+    setBranchNameTranslations({
+      en: translations?.en ?? branch.name ?? '',
+      ar: translations?.ar ?? branch.nameAr ?? '',
+    });
+    setBranchCode(branch.code || '');
+    setBranchAddress(branch.address || '');
+    setBranchPhone(branch.phone || '');
+    setBranchEmail(branch.email || '');
+  };
 
   // Initialise local state once when tenant and branch load
   useEffect(() => {
@@ -982,15 +992,14 @@ function BusinessInformationTabContent() {
     setTimezone(tenant.timezone || 'Asia/Baghdad');
     setFiscalYearStart(tenant.fiscalYearStart || '');
     setVatNumber(tenant.vatNumber || '');
+    setDefaultLocale(
+      tenant.defaultLocale === 'en-US' || tenant.defaultLocale === 'ar'
+        ? tenant.defaultLocale
+        : 'en-GB',
+    );
 
-    // Branch fields - only initialize if we have branch data
-    // Don't wait for branch to initialize tenant fields
     if (branch) {
-      setBranchNameTranslations({ en: branch.name || '', ar: '' });
-      setBranchCode(branch.code || '');
-      setBranchAddress(branch.address || '');
-      setBranchPhone(branch.phone || '');
-      setBranchEmail(branch.email || '');
+      applyBranchFields(branch);
     }
     
     setHasInitialised(true);
@@ -1000,11 +1009,7 @@ function BusinessInformationTabContent() {
   useEffect(() => {
     const branch = branchQuery.data?.data;
     if (branch && hasInitialised) {
-      setBranchNameTranslations({ en: branch.name || '', ar: '' });
-      setBranchCode(branch.code || '');
-      setBranchAddress(branch.address || '');
-      setBranchPhone(branch.phone || '');
-      setBranchEmail(branch.email || '');
+      applyBranchFields(branch);
     }
   }, [branchQuery.data?.data, hasInitialised]);
 
@@ -1067,6 +1072,7 @@ function BusinessInformationTabContent() {
         timezone: timezone || undefined,
         fiscalYearStart: fiscalYearStart.trim() || undefined,
         vatNumber: vatNumber.trim() || undefined,
+        defaultLocale,
       });
 
       // Update branch if we have a current branch
@@ -1186,6 +1192,24 @@ function BusinessInformationTabContent() {
                 placeholder={tSettings('businessVatNumberPlaceholder')}
                 value={vatNumber}
                 onChange={(e) => setVatNumber(e.currentTarget.value)}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Select
+                id="business-default-locale"
+                label={tSettings('businessDefaultLanguageLabel')}
+                description={tSettings('businessDefaultLanguageDescription')}
+                data={[
+                  { value: 'en-GB', label: tSettings('localeEnglishUk') },
+                  { value: 'en-US', label: tSettings('localeEnglishUs') },
+                  { value: 'ar', label: tSettings('localeArabic') },
+                ]}
+                value={defaultLocale}
+                onChange={(value) =>
+                  setDefaultLocale(
+                    value === 'en-US' || value === 'ar' ? value : 'en-GB',
+                  )
+                }
               />
             </Grid.Col>
           </Grid>

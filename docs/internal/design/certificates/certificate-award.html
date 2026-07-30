@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{certificate_type}} — {{student_name}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ════════════════════════════════════════════════════════
+     THEME — change these 3 vars to retheme the entire cert
+     ════════════════════════════════════════════════════════ */
+  :root {
+    --theme:        #537D5D;   /* primary brand color */
+    --theme-deep:   #2B4728;   /* darker shade for text */
+    --theme-soft:   #E6EFE5;   /* very light tint for bg accents */
+    --gold:         #B8923A;   /* metallic accent */
+    --paper:        #FBF9F4;   /* paper background */
+    --ink:          #1F2A1C;   /* primary text */
+    --ink-soft:     #5A6157;   /* secondary text */
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: #E5E1D8;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── PAGE — A4 landscape ── */
+  .cert {
+    width: 297mm; height: 210mm;
+    margin: 24px auto;
+    background: var(--paper);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  }
+
+  /* Decorative double-border frame */
+  .frame-outer {
+    position: absolute;
+    top: 14mm; right: 14mm; bottom: 14mm; left: 14mm;
+    border: 2px solid var(--theme);
+  }
+  .frame-inner {
+    position: absolute;
+    top: 17mm; right: 17mm; bottom: 17mm; left: 17mm;
+    border: 0.5px solid var(--theme);
+    opacity: 0.5;
+  }
+
+  /* Corner ornaments */
+  .corner {
+    position: absolute;
+    width: 60px; height: 60px;
+    color: var(--gold);
+  }
+  .corner-tl { top: 20mm; left: 20mm; }
+  .corner-tr { top: 20mm; right: 20mm; transform: scaleX(-1); }
+  .corner-bl { bottom: 20mm; left: 20mm; transform: scaleY(-1); }
+  .corner-br { bottom: 20mm; right: 20mm; transform: scale(-1,-1); }
+
+  /* Subtle background pattern */
+  .bg-pattern {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 10%, var(--theme-soft) 0%, transparent 35%),
+      radial-gradient(circle at 80% 95%, var(--theme-soft) 0%, transparent 40%);
+    pointer-events: none;
+  }
+
+  /* ── CONTENT ── */
+  .content {
+    position: absolute; inset: 0;
+    padding: 28mm 32mm;
+    display: flex; flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 8mm;
+  }
+  .header-logo {
+    width: 56px; height: 56px;
+    object-fit: contain;
+  }
+  .header-school {
+    text-align: left;
+  }
+  .header-school-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 600;
+    color: var(--theme-deep);
+    letter-spacing: 0.02em;
+    line-height: 1.1;
+  }
+  .header-school-tagline {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  /* Title */
+  .eyebrow {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.4em; text-transform: uppercase;
+    color: var(--theme);
+    margin-bottom: 6px;
+  }
+  .title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 52px; font-weight: 600;
+    color: var(--theme-deep);
+    letter-spacing: -0.01em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .title-italic {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic; font-weight: 500;
+    font-size: 38px;
+    color: var(--theme);
+    letter-spacing: -0.01em;
+    margin-bottom: 18px;
+  }
+
+  .divider-fancy {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 22px;
+  }
+  .divider-line {
+    width: 80px; height: 1px;
+    background: var(--theme);
+    opacity: 0.5;
+  }
+  .divider-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+  }
+
+  /* Body */
+  .presented-to {
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+  .recipient {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 64px; font-weight: 500;
+    color: var(--ink);
+    line-height: 1;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--theme);
+    padding-bottom: 14px;
+    min-width: 60%;
+  }
+
+  .citation {
+    font-size: 14px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+    max-width: 600px;
+    margin-bottom: 6px;
+  }
+  .citation strong {
+    color: var(--theme-deep);
+    font-weight: 600;
+  }
+
+  /* Footer (signatures + seal) */
+  .footer {
+    margin-top: auto;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 32px;
+    align-items: end;
+  }
+  .sig-block {
+    text-align: center;
+  }
+  .sig-line {
+    border-top: 1px solid var(--ink);
+    padding-top: 6px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    letter-spacing: 0.04em;
+  }
+  .sig-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px; font-weight: 600;
+    color: var(--ink); font-style: italic;
+    margin-bottom: 2px;
+  }
+  .sig-role {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  /* Center seal */
+  .seal {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, var(--theme) 0%, var(--theme-deep) 100%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: var(--paper);
+    box-shadow: 0 6px 20px rgba(43,71,40,0.3);
+    position: relative;
+  }
+  .seal::before {
+    content: '';
+    position: absolute; inset: 6px;
+    border: 1.5px dashed rgba(255,255,255,0.3);
+    border-radius: 50%;
+  }
+  .seal-icon { font-size: 28px; line-height: 1; margin-bottom: 4px; }
+  .seal-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 12px; font-style: italic;
+    text-align: center; line-height: 1.1;
+    padding: 0 8px;
+  }
+
+  /* Cert ID + date row at bottom edge */
+  .meta-row {
+    position: absolute;
+    bottom: 8mm; left: 22mm; right: 22mm;
+    display: flex; justify-content: space-between;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* ── PRINT ── */
+  @page { size: A4 landscape; margin: 0; }
+  @media print {
+    html, body { background: white; }
+    .cert { margin: 0; box-shadow: none; page-break-after: always; }
+    .print-bar { display: none !important; }
+  }
+
+  /* ── PRINT BAR (screen only) ── */
+  .print-bar {
+    position: fixed; bottom: 24px; right: 24px; z-index: 100;
+    display: flex; gap: 8px;
+    background: white; border-radius: 10px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    font-family: 'Inter', sans-serif;
+  }
+  .print-bar button {
+    padding: 8px 14px;
+    border: none; border-radius: 6px;
+    background: var(--theme); color: white;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .print-bar button:hover { background: var(--theme-deep); }
+  .print-bar input[type="color"] {
+    width: 36px; height: 36px;
+    border: 1px solid #ddd; border-radius: 6px;
+    cursor: pointer; padding: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="cert" id="cert">
+  <div class="bg-pattern"></div>
+  <div class="frame-outer"></div>
+  <div class="frame-inner"></div>
+
+  <!-- Corner ornaments -->
+  <svg class="corner corner-tl" viewBox="0 0 60 60" fill="none">
+    <path d="M2 30 Q2 2 30 2" stroke="currentColor" stroke-width="1" fill="none"/>
+    <path d="M8 30 Q8 8 30 8" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+    <path d="M14 22 L14 30 M22 14 L30 14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+  <svg class="corner corner-tr" viewBox="0 0 60 60" fill="none">
+    <path d="M2 30 Q2 2 30 2" stroke="currentColor" stroke-width="1" fill="none"/>
+    <path d="M8 30 Q8 8 30 8" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+    <path d="M14 22 L14 30 M22 14 L30 14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+  <svg class="corner corner-bl" viewBox="0 0 60 60" fill="none">
+    <path d="M2 30 Q2 2 30 2" stroke="currentColor" stroke-width="1" fill="none"/>
+    <path d="M8 30 Q8 8 30 8" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+    <path d="M14 22 L14 30 M22 14 L30 14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+  <svg class="corner corner-br" viewBox="0 0 60 60" fill="none">
+    <path d="M2 30 Q2 2 30 2" stroke="currentColor" stroke-width="1" fill="none"/>
+    <path d="M8 30 Q8 8 30 8" stroke="currentColor" stroke-width="0.5" fill="none" opacity="0.6"/>
+    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+    <path d="M14 22 L14 30 M22 14 L30 14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+
+  <div class="content">
+
+    <!-- School header -->
+    <div class="header">
+      <img class="header-logo" src="../uploads/alma logo.svg" alt="School logo" onerror="this.style.display='none'" />
+      <div class="header-school">
+        <div class="header-school-name">{{school_name}}</div>
+        <div class="header-school-tagline">{{school_tagline}}</div>
+      </div>
+    </div>
+
+    <!-- Title -->
+    <div class="eyebrow">Certificate of</div>
+    <div class="title">{{certificate_type}}</div>
+    <div class="title-italic">{{certificate_subtype}}</div>
+
+    <div class="divider-fancy">
+      <div class="divider-line"></div>
+      <div class="divider-dot"></div>
+      <div class="divider-line"></div>
+    </div>
+
+    <!-- Recipient -->
+    <div class="presented-to">This certificate is proudly presented to</div>
+    <div class="recipient">{{student_name}}</div>
+
+    <p class="citation">
+      For demonstrating <strong>{{achievement_descriptor}}</strong> in
+      <strong>{{achievement_subject}}</strong> during the academic year <strong>{{academic_year}}</strong>.
+      <br />Your dedication, hard work, and remarkable achievement bring great pride to our school community.
+    </p>
+
+    <!-- Footer with signatures and seal -->
+    <div class="footer">
+      <div class="sig-block">
+        <div class="sig-name">{{principal_name}}</div>
+        <div class="sig-line">Principal Signature</div>
+        <div class="sig-role">Principal</div>
+      </div>
+
+      <div class="seal">
+        <div class="seal-icon">★</div>
+        <div class="seal-text">Awarded with<br>Distinction</div>
+      </div>
+
+      <div class="sig-block">
+        <div class="sig-name">{{class_teacher_name}}</div>
+        <div class="sig-line">Class Teacher Signature</div>
+        <div class="sig-role">Class Teacher</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meta-row">
+    <span>Certificate No: {{certificate_no}}</span>
+    <span>Date of Issue: {{issue_date}}</span>
+  </div>
+</div>
+
+<!-- Print/theme bar (hidden on print) -->
+<div class="print-bar">
+  <input type="color" id="theme-picker" value="#537D5D" title="Pick theme color" />
+  <button onclick="window.print()">Print / Save PDF</button>
+</div>
+
+<script>
+  // Live theme color picker (preview only — Cursor will use CSS var)
+  const picker = document.getElementById('theme-picker');
+  picker.addEventListener('input', e => {
+    const c = e.target.value;
+    document.documentElement.style.setProperty('--theme', c);
+    document.documentElement.style.setProperty('--theme-deep', shade(c, -30));
+    document.documentElement.style.setProperty('--theme-soft', shade(c, 85));
+  });
+  function shade(hex, percent) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+    const f = percent < 0 ? 0 : 255;
+    const p = Math.abs(percent) / 100;
+    r = Math.round((f - r) * p + r);
+    g = Math.round((f - g) * p + g);
+    b = Math.round((f - b) * p + b);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+</script>
+
+</body>
+</html>

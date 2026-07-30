@@ -2,9 +2,9 @@ import { apiClient } from '@/lib/api-client';
 import type { Tenant } from '@/types/tenant';
 import { clearLocalSupabaseSession } from '@/lib/auth';
 import {
-  normalizeUiLocale,
-  readResolvedUiLocaleFromBrowser,
-  setUiLocaleCookieOnDocument,
+  reconcileUiLocaleCookie,
+  resolveEffectiveLocale,
+  SYSTEM_DEFAULT_LOCALE,
 } from '@/lib/ui-locale';
 import { queryClient } from '@/lib/query-client';
 import { useAuthStore } from '@/lib/store/auth-store';
@@ -26,6 +26,7 @@ export interface BranchForSelection {
   name: string;
   code: string;
   tenantId?: string | null;
+  tenantDefaultLocale?: string | null;
 }
 
 export type AppRouterForAuth = {
@@ -75,12 +76,25 @@ export async function selectBranchAndGoDashboard(
       (cachedUser.branches || []).find((b) => b.id === branchId) ??
       (cachedUser.currentBranch?.id === branchId ? cachedUser.currentBranch : null) ??
       ({ id: branchId, name: 'Selected branch' } satisfies NonNullable<User['currentBranch']>);
+    const tenantDefaultLocale =
+      selectedBranch.tenantDefaultLocale ??
+      cachedUser.tenantDefaultLocale ??
+      SYSTEM_DEFAULT_LOCALE;
+    const effectiveLocale = resolveEffectiveLocale(
+      cachedUser.preferredLocale,
+      tenantDefaultLocale,
+    );
     const updatedUser: User = {
       ...cachedUser,
       currentBranch: selectedBranch,
+      tenantDefaultLocale,
+      effectiveLocale,
     };
     useAuthStore.getState().setUser(updatedUser);
     queryClient.setQueryData<User>(['auth', 'me'], updatedUser);
+    if (typeof window !== 'undefined') {
+      reconcileUiLocaleCookie(effectiveLocale);
+    }
   }
 
   // Navigate ASAP; do not block on cache-warming/theme.
@@ -105,16 +119,20 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
     // Persist immediately so guards/dashboard can render without waiting for React Query refetch.
     useAuthStore.getState().setUser(userData);
 
-    // Cookie is the source of truth for UI locale.
-    // Only use DB preference as an initial default when the cookie is absent (first-time device / cleared cookies).
+    // Align UI cookie with server-resolved effective locale on every login.
     if (typeof window !== 'undefined') {
-      const existing = readResolvedUiLocaleFromBrowser();
-      if (!existing) {
-        const rawPreferred =
+      const effective =
+        userData.effectiveLocale ??
+        resolveEffectiveLocale(
           userData.preferredLocale ??
-          (userData as { preferred_locale?: string }).preferred_locale ??
-          'en-US';
-        setUiLocaleCookieOnDocument(normalizeUiLocale(rawPreferred));
+            (userData as { preferred_locale?: string | null }).preferred_locale,
+          userData.tenantDefaultLocale ??
+            userData.currentBranch?.tenantDefaultLocale ??
+            SYSTEM_DEFAULT_LOCALE,
+        );
+      const changed = reconcileUiLocaleCookie(effective);
+      if (changed) {
+        router.refresh?.();
       }
     }
 
@@ -164,11 +182,25 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
         }
         // Update local caches instead of evicting (eviction forces a slow refetch during redirect).
         useAuthStore.getState().setBranchId(desiredBranchId);
-        queryClient.setQueryData<User>(['auth', 'me'], {
+        const selectedBranch =
+          userBranches.find((b) => b.id === desiredBranchId) ?? userData.currentBranch ?? null;
+        const tenantDefaultLocale =
+          selectedBranch?.tenantDefaultLocale ??
+          userData.tenantDefaultLocale ??
+          SYSTEM_DEFAULT_LOCALE;
+        const effectiveLocale = resolveEffectiveLocale(
+          userData.preferredLocale,
+          tenantDefaultLocale,
+        );
+        const updatedUser: User = {
           ...userData,
-          currentBranch:
-            userBranches.find((b) => b.id === desiredBranchId) ?? userData.currentBranch ?? null,
-        });
+          currentBranch: selectedBranch,
+          tenantDefaultLocale,
+          effectiveLocale,
+        };
+        queryClient.setQueryData<User>(['auth', 'me'], updatedUser);
+        useAuthStore.getState().setUser(updatedUser);
+        reconcileUiLocaleCookie(effectiveLocale);
       } catch {
         // Non-blocking: user may still be able to continue (e.g. header branch picker).
       }

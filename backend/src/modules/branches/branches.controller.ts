@@ -38,7 +38,10 @@ export class BranchesController {
   }
 
   @Get('by-tenant')
-  async listByTenant(@CurrentUser() user: { id: string }): Promise<{ data: BranchDto[] }> {
+  async listByTenant(
+    @CurrentUser() user: { id: string },
+    @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
+  ): Promise<{ data: BranchDto[] }> {
     // Get user's branches to determine tenant
     const userData = await this.authService.getCurrentUser(user.id);
     const branches = userData.branches ?? [];
@@ -46,7 +49,7 @@ export class BranchesController {
     // Get tenant ID from first branch (all user's branches should be in same tenant)
     const tenantId = branches.length > 0 ? branches[0].tenantId : null;
     
-    return this.branchesService.listByTenant(tenantId, user.id);
+    return this.branchesService.listByTenant(tenantId, user.id, language ?? 'en-GB');
   }
 
   @Put(':id/public-stats')
@@ -91,7 +94,7 @@ export class BranchesController {
     @CurrentUser() user: CurrentUserPayload,
     @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
   ): Promise<{ data: BranchDto }> {
-    const branch = await this.branchesService.getById(id, language ?? 'ar', {
+    const branch = await this.branchesService.getById(id, language ?? 'en-GB', {
       userId: user.id,
       email: user.email ?? '',
       roles: user.roles,
@@ -146,6 +149,7 @@ export class BranchesController {
   async listByTenantId(
     @Param('tenantId') tenantId: string,
     @CurrentUser() user: CurrentUserPayload,
+    @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
   ): Promise<{ data: BranchDto[] }> {
     if (
       !hasPrivilegedAccess({ email: user.email, roles: user.roles }, this.logger)
@@ -154,6 +158,6 @@ export class BranchesController {
     }
 
     // For admin, get all branches for the tenant (not filtered by user access)
-    return this.branchesService.listByTenantAdmin(tenantId);
+    return this.branchesService.listByTenantAdmin(tenantId, language ?? 'en-GB');
   }
 }

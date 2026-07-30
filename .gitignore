@@ -55,9 +55,11 @@ docker-compose.override.yml
 .cursor/
 .cursorignore
 
-# Project documentation (local only — not committed)
-docs/
-README.md
+# Documentation: publish user-guide + developer-guide; keep secrets / bundles out of git
+docs/internal/archive/student-login-credentials.md
+docs/internal/development/importantref.md
+docs/**/*.bundle
+docs/**/*.lnk
 report.md
 
 # Legacy doc paths (removed from root; ignore if recreated)

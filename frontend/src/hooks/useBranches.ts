@@ -14,6 +14,8 @@ export interface BranchDetails {
   id: string;
   tenantId?: string | null;
   name: string;
+  nameAr?: string | null;
+  nameTranslations?: { en?: string; ar?: string } | null;
   code?: string | null;
   address?: string | null;
   phone?: string | null;
@@ -39,7 +41,9 @@ export function useTenantBranches() {
   return useQuery({
     queryKey: branchesKeys.byTenant(locale),
     queryFn: async () => {
-      const res = await apiClient.get<Branch[]>('/api/v1/branches/by-tenant');
+      const res = await apiClient.get<Branch[]>('/api/v1/branches/by-tenant', {
+        params: { language: locale },
+      });
       return res;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - branches rarely change
@@ -138,11 +142,14 @@ export function useAssignBranchToTenant() {
 
 // Admin hook to get branches by tenant ID
 export function useBranchesByTenantId(tenantId: string | null) {
+  const locale = useLocale();
   return useQuery({
-    queryKey: [...branchesKeys.all, 'admin', 'byTenant', tenantId],
+    queryKey: [...branchesKeys.all, 'admin', 'byTenant', tenantId, locale],
     queryFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
-      const res = await apiClient.get<BranchDetails[]>(`/api/v1/branches/admin/by-tenant/${tenantId}`);
+      const res = await apiClient.get<BranchDetails[]>(`/api/v1/branches/admin/by-tenant/${tenantId}`, {
+        params: { language: locale },
+      });
       return res;
     },
     enabled: !!tenantId,

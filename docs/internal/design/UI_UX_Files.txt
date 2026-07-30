@@ -1,0 +1,15 @@
+Theme & Configuration Files
+themeConfig.ts
+createDynamicTheme.ts
+themeColors.ts
+
+Hooks
+use-theme.ts
+use-theme-color.ts
+use-chart-colors.ts
+use-chart-tooltip.ts
+
+Components
+DynamicThemeProvider.tsx
+Sidebar.tsx
+Header.tsx

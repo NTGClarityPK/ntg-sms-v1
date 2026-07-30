@@ -205,7 +205,7 @@ export class EventsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
   ): Promise<{ data: EventDto }> {
-    const event = await this.eventsService.getEvent(id, branch.branchId, language ?? 'ar');
+    const event = await this.eventsService.getEvent(id, branch.branchId, language ?? 'en-GB');
     return { data: event };
   }
 

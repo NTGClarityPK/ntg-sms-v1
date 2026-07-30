@@ -63,6 +63,7 @@ export class TenantsController {
         timezone: body.timezone,
         fiscalYearStart: body.fiscalYearStart,
         vatNumber: body.vatNumber,
+        defaultLocale: body.defaultLocale,
         primaryColor: body.primaryColor,
       },
       user.email,

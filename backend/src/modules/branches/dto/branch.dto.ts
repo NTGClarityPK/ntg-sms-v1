@@ -3,6 +3,8 @@ export class BranchDto {
   tenantId!: string | null;
   name!: string;
   nameAr?: string | null;
+  /** Raw bilingual translations for settings editors. */
+  nameTranslations?: { en?: string; ar?: string } | null;
   code?: string | null;
   address?: string | null;
   phone?: string | null;
@@ -19,15 +21,3 @@ export class BranchDto {
     Object.assign(this, partial);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-

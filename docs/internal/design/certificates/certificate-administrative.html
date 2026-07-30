@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{certificate_type}} — {{student_name}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ════════════════════════════════════════════════════════
+     THEME — change these vars to retheme the entire cert
+     ════════════════════════════════════════════════════════ */
+  :root {
+    --theme:      #537D5D;
+    --theme-deep: #2B4728;
+    --theme-soft: #E6EFE5;
+    --paper:      #FFFFFF;
+    --ink:        #1F2A1C;
+    --ink-soft:   #5A6157;
+    --rule:       #D9D5CC;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: #E5E1D8;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── PAGE — A4 portrait ── */
+  .cert {
+    width: 210mm; height: 297mm;
+    margin: 24px auto;
+    background: var(--paper);
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    padding: 18mm 20mm 20mm;
+    display: flex; flex-direction: column;
+  }
+
+  /* Top accent band */
+  .top-band {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 8mm;
+    background: var(--theme);
+  }
+  .top-band::after {
+    content: '';
+    position: absolute;
+    bottom: -2mm; left: 0; right: 0;
+    height: 2mm;
+    background: var(--theme-deep);
+  }
+
+  /* Header */
+  .letterhead {
+    display: flex; align-items: center; gap: 16px;
+    padding-top: 10mm;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--theme);
+    position: relative;
+  }
+  .letterhead::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: -5px;
+    height: 1px; background: var(--theme);
+    opacity: 0.4;
+  }
+  .letterhead-logo {
+    width: 72px; height: 72px; object-fit: contain;
+    flex-shrink: 0;
+  }
+  .letterhead-text { flex: 1; }
+  .school-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px; font-weight: 700;
+    color: var(--theme-deep);
+    line-height: 1.05;
+    letter-spacing: -0.005em;
+  }
+  .school-tagline {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--theme); margin-top: 4px;
+  }
+  .school-meta {
+    font-size: 10px; color: var(--ink-soft);
+    margin-top: 6px; line-height: 1.5;
+  }
+
+  /* Certificate number bar */
+  .meta-bar {
+    display: flex; justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.04em;
+  }
+  .meta-bar strong { color: var(--ink); font-weight: 600; }
+
+  /* Title */
+  .cert-title-block {
+    text-align: center;
+    margin: 30px 0 24px;
+  }
+  .cert-title-eyebrow {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.4em; text-transform: uppercase;
+    color: var(--theme); margin-bottom: 8px;
+  }
+  .cert-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 38px; font-weight: 600;
+    color: var(--theme-deep);
+    line-height: 1;
+    letter-spacing: -0.005em;
+  }
+  .cert-title-underline {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; margin-top: 12px;
+  }
+  .cert-title-underline .line { width: 50px; height: 1px; background: var(--theme); }
+  .cert-title-underline .diamond {
+    width: 8px; height: 8px;
+    background: var(--theme);
+    transform: rotate(45deg);
+  }
+
+  /* Body / form area */
+  .body {
+    flex: 1;
+    font-size: 13.5px;
+    line-height: 1.85;
+    color: var(--ink);
+    text-align: justify;
+  }
+  .body p { margin-bottom: 12px; }
+  .body .field {
+    display: inline-block;
+    font-weight: 600;
+    color: var(--theme-deep);
+    border-bottom: 1px dotted var(--ink-soft);
+    padding: 0 6px 1px;
+    min-width: 100px;
+    text-align: center;
+  }
+
+  /* Details table */
+  .details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 13px;
+  }
+  .details-table th, .details-table td {
+    padding: 10px 14px;
+    border: 1px solid var(--rule);
+    text-align: left;
+    vertical-align: top;
+  }
+  .details-table th {
+    background: var(--theme-soft);
+    color: var(--theme-deep);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    width: 38%;
+  }
+  .details-table td {
+    color: var(--ink);
+  }
+
+  /* Conduct / remarks block */
+  .remarks-block {
+    background: var(--theme-soft);
+    border-left: 3px solid var(--theme);
+    padding: 14px 18px;
+    margin: 18px 0;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  .remarks-block strong {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--theme);
+    margin-bottom: 6px;
+  }
+
+  /* Footer — signatures + seal */
+  .footer {
+    margin-top: 20mm;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    align-items: end;
+  }
+  .sig-block { text-align: center; }
+  .sig-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px; font-style: italic; font-weight: 600;
+    color: var(--ink);
+    height: 28px;
+    display: flex; align-items: end; justify-content: center;
+  }
+  .sig-line {
+    border-top: 1px solid var(--ink);
+    padding-top: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.04em;
+  }
+  .sig-role {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 3px;
+  }
+
+  /* Round seal */
+  .footer .seal {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    border: 2px solid var(--theme);
+    background: var(--paper);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    color: var(--theme-deep);
+    position: relative;
+    margin: 0 auto;
+  }
+  .footer .seal::before {
+    content: '';
+    position: absolute; inset: 4px;
+    border: 1px dashed var(--theme);
+    border-radius: 50%;
+    opacity: 0.5;
+  }
+  .seal-school {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 10px; font-weight: 600;
+    line-height: 1.05;
+    padding: 0 6px;
+  }
+  .seal-est { font-size: 8px; color: var(--ink-soft); margin-top: 2px; }
+
+  /* Bottom note */
+  .bottom-note {
+    text-align: center;
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    font-size: 10px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── PRINT ── */
+  @page { size: A4; margin: 0; }
+  @media print {
+    html, body { background: white; }
+    .cert { margin: 0; box-shadow: none; page-break-after: always; }
+    .print-bar { display: none !important; }
+  }
+
+  /* ── PRINT BAR ── */
+  .print-bar {
+    position: fixed; bottom: 24px; right: 24px; z-index: 100;
+    display: flex; gap: 8px;
+    background: white; border-radius: 10px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    font-family: 'Inter', sans-serif;
+  }
+  .print-bar button {
+    padding: 8px 14px;
+    border: none; border-radius: 6px;
+    background: var(--theme); color: white;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .print-bar button:hover { background: var(--theme-deep); }
+  .print-bar input[type="color"] {
+    width: 36px; height: 36px;
+    border: 1px solid #ddd; border-radius: 6px;
+    cursor: pointer; padding: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="cert">
+  <div class="top-band"></div>
+
+  <!-- Letterhead -->
+  <div class="letterhead">
+    <img class="letterhead-logo" src="../uploads/alma logo.svg" alt="School logo" onerror="this.style.display='none'" />
+    <div class="letterhead-text">
+      <div class="school-name">{{school_name}}</div>
+      <div class="school-tagline">{{school_tagline}}</div>
+      <div class="school-meta">
+        {{school_address}} &nbsp;·&nbsp; {{school_phone}} &nbsp;·&nbsp; {{school_email}}
+      </div>
+    </div>
+  </div>
+
+  <!-- Meta info -->
+  <div class="meta-bar">
+    <span>Reference No: <strong>{{certificate_no}}</strong></span>
+    <span>Date of Issue: <strong>{{issue_date}}</strong></span>
+  </div>
+
+  <!-- Title -->
+  <div class="cert-title-block">
+    <div class="cert-title-eyebrow">To Whom It May Concern</div>
+    <h1 class="cert-title">{{certificate_type}}</h1>
+    <div class="cert-title-underline">
+      <div class="line"></div>
+      <div class="diamond"></div>
+      <div class="line"></div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+    <p>
+      This is to certify that <span class="field">{{student_name}}</span>,
+      <!-- relation block — keep or remove as needed -->
+      son/daughter of <span class="field">{{parent_name}}</span>,
+      was a bonafide student of this institution.
+    </p>
+
+    <!-- Student details table -->
+    <table class="details-table">
+      <tr><th>Student Name</th><td>{{student_name}}</td></tr>
+      <tr><th>Parent / Guardian Name</th><td>{{parent_name}}</td></tr>
+      <tr><th>Date of Birth</th><td>{{date_of_birth}}</td></tr>
+      <tr><th>Admission Number</th><td>{{admission_number}}</td></tr>
+      <tr><th>Date of Admission</th><td>{{admission_date}}</td></tr>
+      <tr><th>Class / Grade Last Attended</th><td>{{class_last_attended}}</td></tr>
+      <tr><th>Academic Session</th><td>{{academic_session}}</td></tr>
+      <tr><th>Date of Leaving</th><td>{{leaving_date}}</td></tr>
+      <tr><th>Reason for Leaving</th><td>{{reason_for_leaving}}</td></tr>
+    </table>
+
+    <!-- Conduct / Remarks -->
+    <div class="remarks-block">
+      <strong>Conduct &amp; Character</strong>
+      During the period of study at our institution, the conduct and character of
+      the student remained <span class="field">{{conduct}}</span>.
+      {{remarks_paragraph}}
+    </div>
+
+    <p>
+      To the best of our knowledge, no dues are outstanding against the student at the
+      time of issuance of this certificate. We wish them all the very best in their
+      future endeavours.
+    </p>
+  </div>
+
+  <!-- Footer with seal and signatures -->
+  <div class="footer">
+    <div class="sig-block">
+      <div class="sig-name">{{registrar_name}}</div>
+      <div class="sig-line">Registrar</div>
+      <div class="sig-role">Office of the Registrar</div>
+    </div>
+
+    <div class="sig-block">
+      <div class="seal">
+        <div class="seal-school">{{school_name}}</div>
+        <div class="seal-est">EST. {{school_established}}</div>
+      </div>
+    </div>
+
+    <div class="sig-block">
+      <div class="sig-name">{{principal_name}}</div>
+      <div class="sig-line">Principal</div>
+      <div class="sig-role">{{school_name}}</div>
+    </div>
+  </div>
+
+  <div class="bottom-note">
+    This is a digitally generated certificate. Any unauthorised alteration or duplication is strictly prohibited.<br />
+    Verify authenticity at {{verification_url}}
+  </div>
+</div>
+
+<!-- Print/theme bar -->
+<div class="print-bar">
+  <input type="color" id="theme-picker" value="#537D5D" title="Pick theme color" />
+  <button onclick="window.print()">Print / Save PDF</button>
+</div>
+
+<script>
+  const picker = document.getElementById('theme-picker');
+  picker.addEventListener('input', e => {
+    const c = e.target.value;
+    document.documentElement.style.setProperty('--theme', c);
+    document.documentElement.style.setProperty('--theme-deep', shade(c, -30));
+    document.documentElement.style.setProperty('--theme-soft', shade(c, 88));
+  });
+  function shade(hex, percent) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+    const f = percent < 0 ? 0 : 255;
+    const p = Math.abs(percent) / 100;
+    r = Math.round((f - r) * p + r);
+    g = Math.round((f - g) * p + g);
+    b = Math.round((f - b) * p + b);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+</script>
+
+</body>
+</html>
