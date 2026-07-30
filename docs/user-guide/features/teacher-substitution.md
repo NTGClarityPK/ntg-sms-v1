@@ -1,4 +1,4 @@
-# Teacher substitution — user guide
+# 🔄 Teacher Substitution
 
 Short guide for staff who arrange cover when a teacher is absent.
 

@@ -1,10 +1,10 @@
-# Assessments
+# 📝 Assessments
 
-Complete guide to assessment workflows in the NTG School Management System (SMS).
+Complete guide to assessment workflows in NTG Alma.
 
 ## 📋 Overview
 
-Assessments in SMS include:
+Assessments in NTG Alma include:
 
 - Assessment listing
 - Assessment creation and editing (role-based)

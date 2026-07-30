@@ -1,4 +1,4 @@
-﻿# CI/CD Deployement
+# 🚢 CI/CD Deployment
 
 This document provides comprehensive deployment instructions for the NTG Alma School Management System using Docker and GitHub Actions.
 

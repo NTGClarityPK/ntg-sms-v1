@@ -1,6 +1,6 @@
-# Early Departure
+# 🚶 Early Departure
 
-Complete guide to early departure request workflows in the NTG School Management System (SMS).
+Complete guide to early departure request workflows in NTG Alma.
 
 ## 📋 Overview
 

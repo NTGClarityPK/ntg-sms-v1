@@ -1,4 +1,4 @@
-# ID Cards
+# 🪪 ID Cards
 
 Generate student (and related) ID cards for printing.
 

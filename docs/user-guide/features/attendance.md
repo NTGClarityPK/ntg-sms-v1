@@ -1,10 +1,10 @@
-# Attendance
+# ✅ Attendance
 
-Complete guide to attendance workflows in the NTG School Management System (SMS).
+Complete guide to attendance workflows in NTG Alma.
 
 ## 📋 Overview
 
-Attendance in SMS supports:
+Attendance in NTG Alma supports:
 
 - Attendance overview (by permitted scope)
 - Attendance marking (role-based)

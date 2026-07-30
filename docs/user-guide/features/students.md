@@ -1,6 +1,6 @@
-# Students
+# 🎓 Students
 
-Complete guide to student management in the NTG School Management System (SMS).
+Complete guide to student management in NTG Alma.
 
 ## 📋 Overview
 
@@ -32,7 +32,7 @@ A --> G[Uniform Requests (if enabled)]" %}
 
 ## 🧾 Bulk Import
 
-SMS includes a bulk import entry under Students for importing student data (where enabled).
+NTG Alma includes a bulk import entry under Students for importing student data (where enabled).
 
 ### Importing students
 

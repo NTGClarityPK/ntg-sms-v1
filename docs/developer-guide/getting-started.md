@@ -1,4 +1,4 @@
-﻿# 🚀 Getting Started
+# 🚀 Getting Started
 
 Welcome to NTG Alma! This guide will help you get the system up and running on your local machine.
 

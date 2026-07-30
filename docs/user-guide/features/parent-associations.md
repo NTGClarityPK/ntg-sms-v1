@@ -1,6 +1,6 @@
-# Parent Associations
+# 👨‍👩‍👧 Parent Associations
 
-Complete guide to linking parents/guardians to student records in the NTG School Management System (SMS).
+Complete guide to linking parents/guardians to student records in NTG Alma.
 
 ## 📋 Overview
 

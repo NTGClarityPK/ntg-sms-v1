@@ -1,13 +1,13 @@
-﻿# Google Classroom (Developer)
+# 🏫 Google Classroom
 
 **Product:** NTG Alma
 **Audience:** Developers / DevOps
 
 User-facing steps live in the User Guide. This page covers implementation, environment variables, sync behaviour, and production OAuth.
 
-## 3. Developer guide
+## 🧱 Implementation overview
 
-### 3.1 Architecture overview
+### Architecture overview
 
 ```
 Frontend (Next.js)
@@ -29,7 +29,7 @@ Supabase PostgreSQL
 
 **Rule:** Frontend never talks to Supabase for this feature (except normal auth). All Classroom and rubric data goes through Nest.
 
-### 3.2 Environment variables
+### Environment variables
 
 From `backend/.env.example`:
 
@@ -43,7 +43,7 @@ From `backend/.env.example`:
 
 Also requires normal Supabase / Nest config. Tokens are **never** returned to the frontend.
 
-### 3.3 OAuth scopes
+### OAuth scopes
 
 ```
 https://www.googleapis.com/auth/classroom.courses.readonly
@@ -58,11 +58,11 @@ openid email profile
 - `classroom.profile.emails` is required to match students by email.  
 - Rubrics API uses `classroom.coursework.students.readonly` (not the submissions-only scope).
 
-All five Classroom scopes are **sensitive** (not restricted), so the app needs Google verification but no CASA security assessment — see [§3.13.2](#3132-scope-classification--we-need-verification-not-a-security-assessment) before adding any scope.
+All five Classroom scopes are **sensitive** (not restricted), so the app needs Google verification but no CASA security assessment — see see the production section before adding any scope.
 
 If scopes change in code, users must **Disconnect and Connect again** — and the new scope must also be declared under **Data access** on the Google Auth Platform, or verified users will start seeing the unverified-app warning.
 
-### 3.4 Backend modules & key files
+### Backend modules & key files
 
 | Area | Path |
 |------|------|
@@ -78,7 +78,7 @@ If scopes change in code, users must **Disconnect and Connect again** — and th
 
 Both modules are registered in `app.module.ts`. `GoogleWorkspaceModule` imports `RubricsModule`.
 
-### 3.5 API reference
+### API reference
 
 Base path: `/api/v1/google-workspace`  
 Envelope: `{ data: T }` or `{ data, meta }` for paginated sync history.
@@ -125,7 +125,7 @@ Envelope: `{ data: T }` or `{ data, meta }` for paginated sync history.
 | GET | `/assessments/:id/rubric-scores` |
 | PUT | `/student-grades/:id/rubric-scores` |
 
-### 3.6 Database
+### Database
 
 Migrations (in order of relevance):
 
@@ -161,7 +161,7 @@ Migrations (in order of relevance):
 
 Feature codes: `google_classroom_integration`, `assessment_rubrics`.
 
-### 3.7 Frontend map
+### Frontend map
 
 | Path / area | Role |
 |-------------|------|
@@ -186,7 +186,7 @@ Hooks / types:
 
 **Present in API/hooks but little/no UI yet:** unlink assessment, sync history list.
 
-### 3.8 Link assessment behaviour
+### Link assessment behaviour
 
 1. Resolve active mapping for assessment’s `class_section_id` + `subject_id`.  
 2. Verify coursework belongs to mapped Google course.  
@@ -195,7 +195,7 @@ Hooks / types:
 5. Compare **fingerprint** to Alma’s stored rubric.  
 6. If different → `importGoogleRubric` (deletes existing Alma assessment rubric, inserts Google criteria with `google_criterion_id`).
 
-### 3.9 Pull grades behaviour (optimised)
+### Pull grades behaviour (optimised)
 
 Google calls on a typical pull:
 
@@ -226,7 +226,7 @@ Grades:
 - If category scores were written, overall mark may be replaced by **sum of category scores**.  
 - Write `google_sync_audit_log` and update assessment `google_last_synced_at`.
 
-### 3.10 Alma rubrics vs Google rubrics
+### Alma rubrics vs Google rubrics
 
 | Topic | Behaviour |
 |-------|-----------|
@@ -237,13 +237,13 @@ Grades:
 | Statistics `isGraded` | Driven by `student_grades.graded_at` (set on pull) |
 | Statistics `isRead` | Independent portal engagement flag |
 
-### 3.11 Access control notes
+### Access control notes
 
 - Settings / connect / mappings: **school_admin** or **principal**.  
 - Coursework / link / pull / sync-status / history: admin/principal **or** feature `edit` on `google_classroom_integration`.  
 - There is **no** extra check that the caller is the assigned subject teacher for that assessment (any user with feature edit can pull).
 
-### 3.12 Extending safely
+### Extending safely
 
 When changing behaviour:
 
@@ -254,7 +254,7 @@ When changing behaviour:
 5. Use Mantine only on the frontend; British English in user-facing copy where the product standard applies.  
 6. Keep API responses in `{ data }` / `{ data, meta }` shape.
 
-### 3.13 Going to production — OAuth publishing, verification & quota
+### Going to production — OAuth publishing, verification & quota
 
 > Validated against Google's current documentation (July 2026): [OAuth app state overview](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview), [Sensitive scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification), [Restricted scopes](https://support.google.com/cloud/answer/13464325), [Classroom usage limits](https://developers.google.com/workspace/classroom/reference/limits), [Rubrics limitations](https://developers.google.com/workspace/classroom/rubrics/limitations).
 
@@ -365,8 +365,7 @@ Two related caveats:
 ---
 
 
-## 4. Troubleshooting
-
+## 🆘 Troubleshooting
 | Symptom | Likely cause | What to do |
 |---------|--------------|------------|
 | Connect fails / no refresh token | Google omitted refresh token | Revoke Alma app access in Google Account → Connect again |
@@ -378,19 +377,18 @@ Two related caveats:
 | Rubric not updating after Classroom edit | Structure unchanged or pull skipped fetch | Change criteria in Classroom; Pull again; check fingerprint / criterion IDs in submissions |
 | Statistics shows Not started but Graded | Expected | Graded comes from grades; Status/Read from portal engagement |
 | 403 on Google APIs | Feature off or role lacks permission | Enable feature; check role_permissions |
-| “Access blocked: this app is not verified” / danger screen | OAuth app not Published + Verified, or requesting an undeclared scope | Publish and verify the app; ensure every requested scope is declared under Data access ([§3.13.1](#3131-publishing-states-and-what-each-one-costs-us), [§3.13.2](#3132-scope-classification--we-need-verification-not-a-security-assessment)) |
+| “Access blocked: this app is not verified” / danger screen | OAuth app not Published + Verified, or requesting an undeclared scope | Publish and verify the app; ensure every requested scope is declared under Data access (see the production section, see the production section) |
 | “Access blocked: authorisation error” for one school only, others fine | School’s Workspace administrator has blocked or limited the app | School admin allows/trusts Alma in Admin console → Security → API controls |
-| Connection dies roughly every 7 days; “Please reconnect Google Classroom” | App is in Google’s **Testing** state, where refresh tokens expire after 7 days | Publish + verify the app; as a stopgap, ask the school admin to mark Alma **Trusted** ([§3.13.3](#3133-the-7-day-refresh-token-trap-why-testing-state-breaks-alma)) |
+| Connection dies roughly every 7 days; “Please reconnect Google Classroom” | App is in Google’s **Testing** state, where refresh tokens expire after 7 days | Publish + verify the app; as a stopgap, ask the school admin to mark Alma **Trusted**  |
 | Only the first ~100 accounts can connect | Testing-state test-user cap, or Published-but-Unverified lifetime cap | Complete verification — the cap does not exist for verified apps |
 | `redirect_uri_mismatch` after deploying | Production redirect URI not registered, or differs by port / trailing slash | Register the exact `GOOGLE_CLASSROOM_REDIRECT_URI` value in the OAuth client |
 | Every branch shows disconnected after a deployment | `GOOGLE_TOKEN_ENCRYPTION_KEY` changed, so stored tokens cannot be decrypted | Restore the original key; there is no re-encryption path, otherwise all branches must reconnect |
-| HTTP 429 / `RESOURCE_EXHAUSTED` during pull | Quota burst (often the per-student profile fallback) | Retry after a pause; see the backoff gap in [§3.13.7](#3137-known-gaps-to-address-before-heavy-production-load) |
+| HTTP 429 / `RESOURCE_EXHAUSTED` during pull | Quota burst (often the per-student profile fallback) | Retry after a pause; see the backoff gap in see the production section |
 
 ---
 
 
-## 5. Limitations & design choices
-
+## ⚠️ Limitations & design choices
 1. **Read-only** — Alma never writes grades or rubrics back to Classroom.  
 2. **Manual pull only** — no cron auto-sync (by design, to control API usage and teacher timing).  
 3. **One Google connection per branch** — not per-teacher OAuth.  
@@ -400,14 +398,14 @@ Two related caveats:
 7. **No teacher-assignment gate** on link/pull beyond feature ACL.  
 8. **Turning the feature off** hides/blocks Google APIs but does not delete mappings, tokens, or existing grades.  
 9. **Auto-suggest** is heuristic (name similarity); always verify mappings.  
-10. **One shared vendor Google Cloud project** for all tenants — isolation comes from per-branch encrypted tokens, not separate projects. Per-school Cloud projects are deliberately avoided because each would need its own Google verification ([§3.13.5](#3135-multi-tenant-topology-one-shared-project-default)).  
+10. **One shared vendor Google Cloud project** for all tenants — isolation comes from per-branch encrypted tokens, not separate projects. Per-school Cloud projects are deliberately avoided because each would need its own Google verification .  
 11. **Production requires a verified OAuth app.** In Google's Testing state the app is limited to 100 allowlisted test users and refresh tokens expire after 7 days, so schools cannot be onboarded until verification completes.  
-12. **No quota backoff yet** — `RESOURCE_EXHAUSTED` surfaces as a generic pull failure ([§3.13.7](#3137-known-gaps-to-address-before-heavy-production-load)).  
+12. **No quota backoff yet** — `RESOURCE_EXHAUSTED` surfaces as a generic pull failure .  
 
 ---
 
 
-## Appendix A — End-to-end sequence
+## 📎 Appendix A — End-to-end sequence
 
 ```text
 Admin: enable → connect OAuth → map class/subject → Google course
@@ -424,7 +422,7 @@ Teacher: Pull grades in Alma
 Teacher: review Grade Entry + Statistics (Graded column)
 ```
 
-## Appendix B — Related repo paths
+## 📎 Appendix B — Related repo paths
 
 ```text
 backend/src/modules/google-workspace/
@@ -445,4 +443,4 @@ backend/.env.example
 
 ---
 
-*This guide reflects the implemented behaviour as of the July 2026 Google Classroom + rubrics workstream. Update this file when scopes, endpoints, or sync rules change. Google's OAuth publishing, verification and quota policies in [§3.13](#313-going-to-production--oauth-publishing-verification--quota) were validated against Google's documentation in July 2026 and should be re-checked before each verification submission.*
+*This guide reflects the implemented behaviour as of the July 2026 Google Classroom + rubrics workstream. Update this file when scopes, endpoints, or sync rules change. Google's OAuth publishing, verification and quota policies in see the production section were validated against Google's documentation in July 2026 and should be re-checked before each verification submission.*

@@ -1,4 +1,4 @@
-# Billing & Subscription (Developer)
+# 💳 Billing & Subscription
 
 ## Overview
 

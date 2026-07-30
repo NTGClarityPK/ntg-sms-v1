@@ -1,4 +1,4 @@
-﻿# 🗄️ Database Schema
+# 🗄️ Database Schema
 
 Complete database schema documentation for the NTG Alma School Management System.
 

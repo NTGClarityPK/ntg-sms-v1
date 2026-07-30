@@ -1,10 +1,10 @@
-# Inventory (Uniforms)
+# 👕 Inventory (Uniforms)
 
-Complete guide to inventory and uniform-related workflows in the NTG School Management System (SMS).
+Complete guide to inventory and uniform-related workflows in NTG Alma.
 
 ## 📋 Overview
 
-Inventory in SMS focuses on uniform-related inventory management and requests:
+Inventory in NTG Alma focuses on uniform-related inventory management and requests:
 
 - Inventory dashboard entry
 - Items list

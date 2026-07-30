@@ -1,4 +1,4 @@
-# Certificates
+# 🏆 Certificates
 
 Generate and manage student certificates from templates configured for your school.
 

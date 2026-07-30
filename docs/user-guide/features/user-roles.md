@@ -1,10 +1,10 @@
-# Users & Roles
+# 👥 User Roles
 
-Complete guide to users, roles, and permissions-driven access in the NTG School Management System (SMS).
+Complete guide to users, roles, and permissions-driven access in NTG Alma.
 
 ## 📋 Overview
 
-SMS uses role-based access control:
+NTG Alma uses role-based access control:
 
 - Users can have one or more roles
 - Feature visibility (including sidebar items) depends on permissions

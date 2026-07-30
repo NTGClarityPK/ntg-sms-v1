@@ -1,6 +1,6 @@
-# Staff
+# 👨‍🏫 Staff
 
-Complete guide to staff management and schedules in the NTG School Management System (SMS).
+Complete guide to staff management and schedules in NTG Alma.
 
 ## 📋 Overview
 

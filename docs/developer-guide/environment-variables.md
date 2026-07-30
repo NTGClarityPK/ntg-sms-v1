@@ -1,4 +1,4 @@
-# Environment Variables
+# 🔑 Environment Variables
 
 Canonical examples live in `backend/.env.example`. Never commit real `.env` files.
 

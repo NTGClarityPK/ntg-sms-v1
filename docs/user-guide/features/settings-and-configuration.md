@@ -1,4 +1,4 @@
-# Settings & Configuration
+# ⚙️ Settings & Configuration
 
 Complete guide to configuring **NTG Alma**.
 

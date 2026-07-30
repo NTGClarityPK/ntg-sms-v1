@@ -1,4 +1,4 @@
-# Billing & Subscription
+# 💳 Billing & Subscription
 
 Manage your school's Alma subscription plan, invoices, and payment status.
 

@@ -1,10 +1,10 @@
-# User Manual
+# 📖 User Manual
 
-Complete user manual for school administrators, staff, parents, and students using the **NTG School Management System (SMS)**.
+Complete user manual for school administrators, staff, parents, and students using the **NTG Alma**.
 
 ## 🎯 Introduction
 
-Welcome to the NTG School Management System! This manual will guide you through using the portal for day-to-day school operations and stakeholder workflows.
+Welcome to the NTG Alma! This manual will guide you through using the portal for day-to-day school operations and stakeholder workflows.
 
 ### Who This Manual Is For
 
@@ -48,7 +48,7 @@ The system helps you manage:
 
 #### Creating Your School Account
 
-The SMS supports creating a new school (tenant) from the **Signup** page.
+NTG Alma supports creating a new school (tenant) from the **Signup** page.
 
 **Steps:**
 
@@ -85,7 +85,7 @@ F --> G[Portal Ready]"
 
 ### 🏗️ Initial Setup
 
-This section describes the recommended setup order using the SMS settings and academic structure pages.
+This section describes the recommended setup order using NTG Alma settings and academic structure pages.
 
 #### Step 1: School Information (Tenant / Business Information)
 
@@ -179,7 +179,7 @@ Use the Settings area to manage school-level business information and global con
 
 #### Managing Branches
 
-The SMS is multi-branch. Users can belong to one or more branches, and the branch context affects all operational data.
+NTG Alma is multi-branch. Users can belong to one or more branches, and the branch context affects all operational data.
 
 Key concepts:
 
@@ -693,7 +693,7 @@ Your personal choice is saved to your profile, so it applies on any device or br
 If the issue persists:
 
 * Capture the page name and what you were trying to do
-* Contact the school administrator or SMS support team
+* Contact the school administrator or NTG Alma support team
 
 ***
 

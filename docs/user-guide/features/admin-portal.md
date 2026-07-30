@@ -1,4 +1,4 @@
-# Admin Portal
+# 🛠️ Admin Portal
 
 Operations console for **NTG platform administrators** (super-admin), not day-to-day school staff.
 

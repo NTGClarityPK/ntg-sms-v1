@@ -1,6 +1,6 @@
-# Behavioural
+# ⭐ Behavioural
 
-Complete guide to the behavioural module in the NTG School Management System (SMS).
+Complete guide to the behavioural module in NTG Alma.
 
 ## 📋 Overview
 

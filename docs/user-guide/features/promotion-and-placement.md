@@ -1,4 +1,4 @@
-# Promotion & Placement
+# 🎯 Promotion & Placement
 
 Move students between classes/sections at year-end or mid-year, and manage placement decisions.
 

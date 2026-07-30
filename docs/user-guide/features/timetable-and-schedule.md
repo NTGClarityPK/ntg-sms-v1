@@ -1,6 +1,6 @@
-# Timetable & Schedule
+# 🕐 Timetable & Schedule
 
-Complete guide to timetable and schedule pages in the NTG School Management System (SMS).
+Complete guide to timetable and schedule pages in NTG Alma.
 
 ## 📋 Overview
 

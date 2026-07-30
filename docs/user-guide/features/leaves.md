@@ -1,6 +1,6 @@
-# Leaves
+# 🌴 Leaves
 
-Complete guide to leave request workflows in the NTG School Management System (SMS).
+Complete guide to leave request workflows in NTG Alma.
 
 ## 📋 Overview
 

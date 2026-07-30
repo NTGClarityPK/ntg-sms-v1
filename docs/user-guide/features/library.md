@@ -1,6 +1,6 @@
-# Library
+# 📚 Library
 
-Complete guide to the Library module entry in the NTG School Management System (SMS).
+Complete guide to the Library module entry in NTG Alma.
 
 ## 📋 Overview
 

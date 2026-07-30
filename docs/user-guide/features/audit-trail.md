@@ -1,6 +1,6 @@
-# Audit Trail
+# 🧾 Audit Trail
 
-Complete guide to audit trail visibility in the NTG School Management System (SMS).
+Complete guide to audit trail visibility in NTG Alma.
 
 ## 📋 Overview
 

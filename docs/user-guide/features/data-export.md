@@ -1,4 +1,4 @@
-# Alma — School data backup (user guide)
+# 💾 Data Export
 
 A short guide for school administrators who export a secure backup of their school’s data from Alma.
 

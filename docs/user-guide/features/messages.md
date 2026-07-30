@@ -1,6 +1,6 @@
-# Messages
+# 📨 Messages
 
-Complete guide to the Messages module entry in the NTG School Management System (SMS).
+Complete guide to the Messages module entry in NTG Alma.
 
 ## 📋 Overview
 

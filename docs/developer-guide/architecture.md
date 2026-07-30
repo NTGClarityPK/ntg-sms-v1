@@ -1,4 +1,4 @@
-﻿# 🏗️ Architecture
+# 🏗️ Architecture
 
 This document provides a comprehensive overview of the NTG Alma School Management System architecture.
 

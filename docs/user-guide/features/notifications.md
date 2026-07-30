@@ -1,6 +1,6 @@
-# Notifications
+# 🔔 Notifications
 
-Complete guide to notifications in the NTG School Management System (SMS).
+Complete guide to notifications in NTG Alma.
 
 ## 📋 Overview
 

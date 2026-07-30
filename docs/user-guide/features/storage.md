@@ -1,6 +1,6 @@
-# Storage
+# 🗄️ Storage
 
-Complete guide to the Storage admin page in the NTG School Management System (SMS).
+Complete guide to the Storage admin page in NTG Alma.
 
 ## 📋 Overview
 

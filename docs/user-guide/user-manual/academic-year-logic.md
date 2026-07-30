@@ -1,4 +1,4 @@
-# Academic Year Logic (Lock + Rollover)
+# 📅 Academic Year Logic
 
 ## Purpose
 

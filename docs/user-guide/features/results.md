@@ -1,4 +1,4 @@
-﻿# Results
+# 🥇 Results
 
 **What you can do:**
 

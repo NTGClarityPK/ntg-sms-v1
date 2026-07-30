@@ -1,6 +1,6 @@
-# Reports & Results
+# 📊 Reports
 
-Complete guide to reports and results pages in the NTG School Management System (SMS).
+Complete guide to reports and results pages in NTG Alma.
 
 ## 📋 Overview
 
@@ -51,7 +51,7 @@ Administrative reports are available to authorised roles only.
 
 ## 🌍 Public Reports / Statistics
 
-SMS includes a public statistics route that is accessed by a branch code.
+NTG Alma includes a public statistics route that is accessed by a branch code.
 
 **Use cases:**
 

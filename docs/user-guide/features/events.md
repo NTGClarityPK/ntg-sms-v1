@@ -1,10 +1,10 @@
-# Events
+# 📅 Events
 
-Complete guide to the events module in the NTG School Management System (SMS).
+Complete guide to the events module in NTG Alma.
 
 ## 📋 Overview
 
-Events in SMS include:
+Events in NTG Alma include:
 
 - Events list
 - Create event (role-based)

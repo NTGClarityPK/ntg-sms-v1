@@ -1,6 +1,6 @@
-# Offline Documents (PWA)
+# 📴 Offline Documents
 
-Complete guide to Offline Documents in the NTG School Management System (SMS).
+Complete guide to Offline Documents in NTG Alma.
 
 ## 📋 Overview
 

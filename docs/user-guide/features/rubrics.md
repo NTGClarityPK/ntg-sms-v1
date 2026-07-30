@@ -1,4 +1,4 @@
-# Rubrics
+# 📐 Rubrics
 
 Rubrics help mark assessments with structured criteria (for example Knowledge, Thinking, Application, Communication).
 

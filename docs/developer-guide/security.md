@@ -1,6 +1,6 @@
-﻿# 🔐 Security
+# 🔐 Security
 
-This document covers security implementation, best practices, and known security issues in the NTG Alma School Management System.
+This document covers security implementation, best practices, and known security issues in NTG Alma School Management System.
 
 ## 🔐 Security Overview
 

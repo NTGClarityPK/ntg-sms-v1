@@ -1,10 +1,10 @@
-# Authentication & Access
+# 🔐 Authentication & Access
 
-Complete guide to authentication and access flows in the NTG School Management System (SMS).
+Complete guide to authentication and access flows in NTG Alma.
 
 ## 📋 Overview
 
-SMS authentication is handled through **Supabase Auth** (email/password), with additional flows supported in the portal:
+NTG Alma authentication is handled through **Supabase Auth** (email/password), with additional flows supported in the portal:
 
 - Email/password login
 - Google login (via backend OAuth endpoint)
@@ -114,7 +114,7 @@ The portal decides your language every time you log in, so you get the same lang
 - If you belong to branches in more than one school, selecting a branch also switches the language to that school's default — unless you have set a personal language.
 - Arabic switches the portal to a right-to-left layout.
 
-See [Settings & Configuration → Default language](settings-configuration.md) for how to change the school default or your own language.
+See [⚙️ Settings & Configuration](settings-and-configuration.md) for how to change the school default or your own language.
 
 ## 🔢 PIN Authentication (Device)
 
@@ -137,7 +137,7 @@ PIN authentication is an optional convenience mode intended for quick logins on 
 
 **Google login sends me to signup:**
 
-- This typically indicates the Google account isn’t linked to an existing SMS user in the system.
+- This typically indicates the Google account isn’t linked to an existing NTG Alma user in the system.
 
 **I can login but can’t see modules:**
 

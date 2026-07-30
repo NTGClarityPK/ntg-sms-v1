@@ -1,6 +1,6 @@
-﻿# Student Lifecycle
+# 🎓 Student Lifecycle
 
-This document explains the key workflows and state machines in the NTG Alma School Management System, focusing on student-centric processes.
+This document explains the key workflows and state machines in NTG Alma School Management System, focusing on student-centric processes.
 
 ## 📊 Overview
 
