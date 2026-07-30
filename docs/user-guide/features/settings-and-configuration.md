@@ -1,132 +1,150 @@
 # ⚙️ Settings & Configuration
 
-Complete guide to configuring **NTG Alma**.
+School-wide setup for NTG Alma — two rows of category and section tabs (not a sidebar list).
 
-## Overview
+## 📋 Overview
 
-Settings configure school structures and behaviour that drive other modules (attendance, assessments, timetable, fees, reporting, and more).
+**Path:** Sidebar → **Settings**
 
-Typically managed by:
+Typically managed by school admin, principal, or academic coordinator (section-dependent).
 
-- School Admin
-- Principal / Academic Coordinator (depending on permissions)
+| Category | Sections (exact labels) |
+| --- | --- |
+| **School setup** | **Business Info**, **Communication**, **General** |
+| **Academic** | **Academic**, **Schedule**, **Result reports** * |
+| **Operations** | **Inventory**, **Integrations**, **Data export** * |
+| **Finance** | **Fee settings** |
+| **Appearance** | **Theme**, **Stats** * |
+| **Access control** | **Permissions** |
 
-Settings are organised into **categories** in the sidebar:
+\* **Result reports** — school admin / principal / super admin only (not plan-gated).
+\* **Data export** — school admin / super admin only. See [💾 Data Export](data-export.md).
+\* **Stats** — school admin only (public statistics password and URL).
 
-| Category | Sections |
-|----------|----------|
-| **School setup** | Business Information, Communication, General |
-| **Academic** | Academic Years, Schedule, Result & Reports |
-| **Operations** | Inventory Management, Integrations, Data Export |
-| **Finance** | Fees |
-| **Appearance** | Theme Settings, Public Statistics |
-| **Access control** | Permissions |
+Certificate branding lives on [🏆 Certificates](certificates.md) → **Settings**, not here.
 
-Some sections are gated by role or plan (for example Data Export, Public Statistics, Result & Reports).
+---
 
-## Business Information
+## 🚀 First-time setup
 
-Holds school identity and school-wide behaviour: school name, school code, domain, contact email and phone, timezone, fiscal year start, VAT number, and **default language**.
+New branches may see **Start school setup**:
 
-**Steps:**
+- **Setup wizard** — guided first-run configuration
+- **Copy settings from other branch** — when your school admin account has more than one branch
 
-1. Go to **Settings → Business Information**
-2. Edit **Basic Details** and **Business Settings**
-3. Click **Save**
+---
 
-### Default language
+## 🏫 Business Info
 
-**Where:** Settings → Business Information → **Business Settings → Default language**
+School identity: name, code, domain, contact email/phone, timezone, fiscal year start, VAT, **Default language** (English UK / US / Arabic).
 
-Options: **English (UK)**, **English (US)**, and **Arabic**.
+Users without a personal language follow this default after login. See [🔐 Authentication & Access](authentication-and-access.md).
 
-- New schools start on **English (UK)**.
-- The default applies to every user who has **not** chosen a personal language.
-- Users with a personal language keep it until they choose **Use school default**.
+---
 
-**Choosing your own language (any user):** use the language control in the top bar (globe).
+## 💬 Communication
 
-| Option | Effect |
-|--------|--------|
-| **Use school default** | Follow the school default now and in future |
-| English (UK) / English (US) / Arabic | Personal override on every device after login |
+Messaging direction rules (teacher–student, teacher–parent both ways) and **branch broadcast** delegation for principals / admin assistants. Affects [📨 Messages](messages.md).
 
-**Arabic** also switches the portal to a right-to-left layout. Proper nouns (names, class codes) are not translated.
+---
 
-Platform operators can also set organisation default locale from the [Admin Portal](admin-portal.md) tenant form.
+## ⚙️ General
 
-## Academic Years
+**Not** classes or subjects — those sit under **Academic** (below).
 
-1. Go to **Settings → Academic Years**
-2. Create the year and mark the correct one **Active**
-3. Use **Locked** only when the year is finalised
+| Block | Purpose |
+| --- | --- |
+| Leave quota | School-day quota for [🌴 Leaves](leaves.md) |
+| Library categories | Used by [📚 Library](library.md) |
+| Behavioural assessment | Enable / mandatory toggle and attributes — see [⭐ Behavioural](behavioural.md) |
 
-## Schedule
+---
 
-School days, timing templates, class timing assignments, and public holidays.
+## 🎓 Academic (section tab)
 
-1. Go to **Settings → Schedule**
-2. Configure school days and timing templates
-3. Add holidays as needed
+This one section stacks three areas:
 
-## Result & Reports
+1. **Academic years** — create years, mark **Active**, **Locked** when finalised; rollover rules apply at year-end
+2. **Academic Settings** — inner tabs: **Subjects**, **Classes**, **Sections**, **Levels**, **Subject templates**
+3. **Assessment Settings** — **Assessment types** and **Grade templates**
 
-Configure result/report related options where enabled for your plan.
+Use **Class** ([🧩 Class](class-sections.md)) after classes and sections exist.
 
-## Inventory Management
+---
 
-Uniform/inventory operational settings used by inventory workflows.
+## 🕐 Schedule
 
-## Integrations
+School days, timing templates, class timing assignments, public holidays, and **vacations**. Feeds timetable and early-departure time dropdowns.
 
-Google Classroom connection, course mappings, and **Rubric presets**. See [Google Classroom](google-classroom.md) and [Rubrics](rubrics.md).
+---
 
-## Data Export
+## 📄 Result reports
 
-Export school data for backup/offboarding. See [Data Export](data-export.md).
+Default PDF style (Minimal / Modern) and progress report window settings. Used by [🥇 Results](results.md).
 
-## Fees (Fee Settings)
+---
 
-Challan appearance and fee templates. Day-to-day challan generation lives under the Fees module — see [Fee Management](fee-management.md).
+## 📦 Inventory
 
-## Theme Settings
+Uniform/inventory categories and sizes for [👕 Inventory (Uniforms)](inventory-uniforms.md).
 
-Portal appearance (colours and presentation).
+---
 
-## Public Statistics
+## 🔌 Integrations
 
-Branch public statistics configuration (typically school-admin).
+Google Classroom and **Rubrics** presets — see [🏫 Google Classroom](google-classroom.md) and [📐 Rubrics](rubrics.md).
 
-## Communication
+---
 
-Allowed messaging directions between stakeholders.
+## 💵 Fee settings
 
-## General
+Challan appearance and fee templates — see [💵 Fee Management](fee-management.md).
 
-General school operational switches that are not covered by the sections above (including academic structure helpers such as subjects/classes where surfaced here in your build).
+---
 
-## Permissions
+## 🎨 Theme
 
-1. Go to **Settings → Permissions**
-2. Select a role
-3. Configure feature access
-4. Save
+Portal colours and presentation.
 
-The portal sidebar is permission-driven (and may also respect subscription plan entitlements).
+---
 
-## Troubleshooting
+## 📊 Stats
 
-**Changes don’t appear elsewhere**
+Public statistics **password** and branch URL for `/public/statistics/[branchCode]`. See [📊 Reports](reports.md).
 
-- Refresh the page
-- Confirm branch context
-- Confirm you can edit the setting
+---
 
-**School default language changed but some users still see the old one**
+## 🛡️ Permissions
 
-- Those users have a **personal** language — ask them to choose **Use school default**
+Two inner tabs:
 
-**Wrong language for me**
+| Tab | Purpose |
+| --- | --- |
+| **Assign Access** | Matrix: roles × features with **None**, **View**, **Edit** (per branch) |
+| **Role Access View** | Read-only summary counts per role |
 
-- Check the top-bar language control
-- If set to school default, check **Business Information → Default language**
+School admin and super admin bypass the matrix and are not listed as rows.
+
+Also on **Assign Access**: **student leave request** class picker — which classes may raise their own leave requests.
+
+**Student + Assessment** cell is disabled (students use **My Assessments**, not staff Assessments).
+
+Sidebar visibility = permissions + role checks + plan features (`hasFeeManagement`, `hasLibraryManagement`, etc.).
+
+See [👥 User Roles](user-roles.md).
+
+---
+
+## 💡 Tips & Best Practices
+
+- Use **Copy settings from other branch** when opening a new campus with the same structure.
+- Lock academic years only after promotion decisions are complete.
+- Change fee templates before generating next month’s challans.
+
+---
+
+## 🆘 Troubleshooting
+
+**Section missing:** Check role (Result reports, Stats, Data export are restricted).
+**Classes not on General:** Open **Academic** → Academic Settings → **Classes**.
+**Certificate logo missing:** Use **Certificates → Settings**, not Settings nav.

@@ -1,53 +1,58 @@
 # 🚶 Early Departure
 
-Complete guide to early departure request workflows in NTG Alma.
+Parent requests and staff **authorisation** for leaving school before the normal end time.
 
 ## 📋 Overview
 
-Early departure requests support:
+**Path:** Sidebar → **Early Departure**
 
-- Parent raising an early departure request for a child
-- Staff reviewing and approving/rejecting requests (role-based)
+| Tab | Purpose |
+| --- | --- |
+| **Operational** | Raise requests (parents) or **authorise** departures (staff) |
+| **All requests** | History and review |
 
-{% @mermaid/diagram content="graph TB
-A[Early Departure Request] --> B[Create (Parent)]
-B --> C[Pending]
-C --> D{Review (Staff)}
-D -->|Approve| E[Approved]
-D -->|Reject| F[Rejected]" %}
+Statuses include **Pending**, **Approved**, **Rejected**, **Cancelled**.
 
-## ➕ Create an Early Departure Request (Parent)
+---
 
-**Steps:**
+## 👪 Parent: raise a request
 
-1. Go to **Early Departure**
-2. Select your child (if prompted)
-3. Click to raise a request
-4. Enter:
-   * Date
-   * Departure time
-   * Reason
-   * Attachment (if enabled)
-5. Submit
+1. **Operational** tab — select child if needed.
+2. Enter date, departure time, reason (attachment UI not offered on standard form).
+3. Submit.
 
-## ✅ Review an Early Departure Request (Staff)
+Departure times use a dropdown built from the branch **timing template** (school start–end in **Settings → Schedule**).
 
-**Steps:**
+---
 
-1. Go to **Early Departure**
-2. Filter to **Pending** (where available)
-3. Open the request
-4. Choose **Approve** or **Reject**
-5. Add review notes (if available) and confirm
+## 👩‍🏫 Staff: authorise departure
+
+**Operational** tab → **Authorise early departure** (edit permission):
+
+1. Select student.
+2. Pick date and departure time (5-minute steps within school hours).
+3. Enter reason and contact details as prompted.
+4. Submit — authorised departures can mark attendance as **excused** for that window.
+
+A **conflict check** runs against existing requests (advisory — may warn but still allow submit).
+
+---
+
+## 📋 All requests
+
+Filter and review past parent requests and staff authorisations. Approve or reject pending parent requests when your role allows.
+
+---
+
+## 💡 Tips & Best Practices
+
+- Keep timing templates accurate so departure dropdowns match real school hours.
+- Use authorisation when the office releases a student without a prior parent request.
+
+---
 
 ## 🆘 Troubleshooting
 
-**I can’t raise a request:**
-
-- Confirm your child is linked and selected
-- Confirm branch context
-
-**Approve/Reject missing:**
-
-- Your role may not have permission to review requests
-
+**Time list empty:** Add or fix a timing template under **Settings → Schedule**.
+**Approve/Reject missing:** Early departure **Edit** permission required.
+**Excused on attendance but not marked early:** Staff authorisation flow sets excused — ordinary P/A/L marking does not.

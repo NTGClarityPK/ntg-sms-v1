@@ -1,29 +1,53 @@
 # 📚 Library
 
-Complete guide to the Library module entry in NTG Alma.
+Browse and download school resource files (PDF, Word, text).
 
 ## 📋 Overview
 
-The Library module provides access to school resources made available to your role.
+**Path:** Sidebar → **Library**
 
-{% @mermaid/diagram content="graph TB
-A[Library] --> B[Browse]
-A --> C[Search]
-A --> D[Open Resource]
-D --> E[Offline Documents (where enabled)]" %}
+Requires plan feature **Library management** (**Pro** and **Enterprise**). Free/Starter schools do not get this module.
 
-## 📚 Accessing Library
+Default access: many teaching and parent/student roles can **view**; admin assistant typically **edit**. School admin is privileged.
 
-**Steps:**
+| View | Use |
+| --- | --- |
+| **Grid** | Card layout |
+| **List** | Table layout |
 
-1. Go to **Library**
-2. Browse or search for available resources
-3. Open a resource to view details/content
+Search and filter by category, subject, and class.
+
+---
+
+## ⬆️ Upload (edit permission)
+
+1. Click **Upload Item**.
+2. File: **PDF**, **DOC**, **DOCX**, or **TXT** (max **20 MB**).
+3. Fill **Title**, **Author**, **Description**, **Category**; optional **Subject** and **Class**.
+4. Save.
+
+Editors can edit metadata or delete items.
+
+---
+
+## 👁️ Open and download
+
+- **View** opens an in-page modal — PDFs preview in place; other types download.
+- **Download** opens the stored file.
+
+There is **no** Library detail page and **no** Save for offline action in the current UI.
+
+---
+
+## 💡 Tips & Best Practices
+
+- Use clear titles and categories so parents and students can filter quickly.
+- Keep files under 20 MB; split large packs if needed.
+
+---
 
 ## 🆘 Troubleshooting
 
-**Library is empty:**
+**Library missing from the menu:** Plan may not include Library management, or your role has no access.
 
-- Confirm resources have been uploaded/configured for the current branch/year
-- Confirm your role has access to Library
-
+**Upload rejected:** Check type and size (PDF/DOC/DOCX/TXT, ≤ 20 MB) and edit permission.

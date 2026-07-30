@@ -6,60 +6,64 @@ Detailed guides for each module of the NTG Alma portal. One page per feature.
 
 | Feature | What it covers |
 | --- | --- |
-| [🔐 Authentication & Access](authentication-and-access.md) | Login, Google sign-in, password reset, branch selection, PIN |
-| [⚙️ Settings & Configuration](settings-and-configuration.md) | School setup, academic years, schedule, fees, integrations, permissions |
-| [👥 User Roles](user-roles.md) | Users, roles, and permission-driven access |
+| [🏠 Dashboard](dashboard.md) | Role overviews, role switcher, shortcut cards |
+| [🔐 Authentication & Access](authentication-and-access.md) | Login, signup, invitations, Google, branch/child context, PIN |
+| [👤 Profile & Account](profile-and-account.md) | Name, email (read-only), teaching assignments |
+| [⚙️ Settings & Configuration](settings-and-configuration.md) | Two-row tabs: 13 sections, wizard, permissions matrix |
+| [👥 User Roles](user-roles.md) | Users, None/View/Edit, statuses, My-* views, `/setup` |
 
-## 👨‍👩‍👧 People
+## 👨‍👩‍👧 People & setup
 
 | Feature | What it covers |
 | --- | --- |
-| [🎓 Students](students.md) | Student records, enrolment, bulk import |
-| [👨‍🏫 Staff](staff.md) | Staff records and schedules |
-| [👨‍👩‍👧 Parent Associations](parent-associations.md) | Linking parents and guardians to students |
+| [🎓 Students](students.md) | List modal, filters, bulk import, statuses |
+| [👨‍🏫 Staff](staff.md) | Users for staff admin, Mapping assignments, My Schedule |
+| [🔀 Mapping](mapping.md) | Parent–Student and Teacher–Class tabs |
+| [👨‍👩‍👧 Parent Associations](parent-associations.md) | Pointer to Mapping; My Child for parents |
+| [🧩 Class](class-sections.md) | Class × section matrix, Create All, class teacher |
 
 ## 📚 Academic Operations
 
 | Feature | What it covers |
 | --- | --- |
-| [✅ Attendance](attendance.md) | Marking, history, and child views |
-| [📝 Assessments](assessments.md) | Creating assessments, grade entry, statistics |
-| [📐 Rubrics](rubrics.md) | Rubric presets and criterion-based marking |
+| [✅ Attendance](attendance.md) | Mark / Child / History tabs; P/A/L; Excel export |
+| [📝 Assessments](assessments.md) | Create modes, grades, schedule PDF; My Assessments |
+| [📐 Rubrics](rubrics.md) | Presets under Integrations; Grade Entry criterion scores |
 | [🏫 Google Classroom](google-classroom.md) | Read-only grade and rubric sync |
-| [🕐 Timetable & Schedule](timetable-and-schedule.md) | Timetables, my schedule, conflict management |
+| [🕐 Timetable & Schedule](timetable-and-schedule.md) | Generate/copy, My Schedule, Children Timetable |
 | [🔄 Teacher Substitution](teacher-substitution.md) | Arranging cover for absent teachers |
-| [⭐ Behavioural](behavioural.md) | Behavioural tracking and assessment entry |
-| [🎯 Promotion & Placement](promotion-and-placement.md) | Year-end promotion and class placement |
-| [🥇 Results](results.md) | Report cards, comments, publishing, delivery |
-| [📊 Reports](reports.md) | Student, class, administrative, and public reports |
+| [⭐ Behavioural](behavioural.md) | 1–5 star matrix, Pending this month, settings |
+| [🎯 Promotion & Placement](promotion-and-placement.md) | Six outcomes; Save is immediate |
+| [🥇 Results](results.md) | Report cards, remarks, publish, PDF/ZIP; parent My Child |
+| [📊 Reports](reports.md) | Student, class, public, administrative, revenue; fee reports URL |
 
 ## 📨 Requests & Communication
 
 | Feature | What it covers |
 | --- | --- |
-| [🌴 Leaves](leaves.md) | Leave request workflow |
-| [🚶 Early Departure](early-departure.md) | Early departure requests and approvals |
-| [📅 Events](events.md) | School events and my events |
-| [🔔 Notifications](notifications.md) | Notification centre, bell, unread counts |
-| [📨 Messages](messages.md) | Internal messaging |
+| [🌴 Leaves](leaves.md) | Quota (school days), student class picker, review |
+| [🚶 Early Departure](early-departure.md) | Parent request; staff authorise → excused |
+| [📅 Events](events.md) | Consent workflow, My Events; search unwired |
+| [🔔 Notifications](notifications.md) | Bell, All notifications filters, push settings |
+| [📨 Messages](messages.md) | One-to-one, class/school broadcast, read filters |
 
 ## 💵 Finance & Documents
 
 | Feature | What it covers |
 | --- | --- |
-| [💵 Fee Management](fee-management.md) | Fee templates, challans, payment tracking |
-| [💳 Billing & Subscription](billing.md) | Plan, invoices, and payment status |
-| [🏆 Certificates](certificates.md) | Certificate templates and generation |
-| [🪪 ID Cards](id-cards.md) | Student ID card generation |
+| [💵 Fee Management](fee-management.md) | Templates, challans, proof review, My Fees |
+| [💳 Billing & Subscription](billing.md) | School-admin plans, usage, Stripe Pay now |
+| [🏆 Certificates](certificates.md) | Seven types, issue wizard, Settings on Certificates page |
+| [🪪 ID Cards](id-cards.md) | Generate / Students / Staff; draft→issued; ZIP |
 | [💾 Data Export](data-export.md) | Secure school data backup |
-| [👕 Inventory (Uniforms)](inventory-uniforms.md) | Uniform items, requests, history |
-| [📚 Library](library.md) | Library module |
-| [🗄️ Storage](storage.md) | Storage administration |
-| [📴 Offline Documents](offline-documents.md) | Offline access to documents |
+| [👕 Inventory (Uniforms)](inventory-uniforms.md) | pending→approved→issued; Request uniform tab |
+| [📚 Library](library.md) | Upload PDF/DOC/TXT; Pro/Enterprise plan |
+| [🗄️ Storage](storage.md) | Usage, largest files, alerts, offline Cache |
+| [📴 Offline Documents](offline-documents.md) | Redirects to Storage → Cache (no separate page) |
 
 ## 🛠️ Administration
 
 | Feature | What it covers |
 | --- | --- |
-| [🧾 Audit Trail](audit-trail.md) | Reviewing sensitive administrative actions |
-| [🛠️ Admin Portal](admin-portal.md) | Tenants, payment models, academic year unlock |
+| [🧾 Audit Trail](audit-trail.md) | Super-admin Admin Portal only |
+| [🛠️ Admin Portal](admin-portal.md) | Tenants, Payment Model override, unlock year, audit |

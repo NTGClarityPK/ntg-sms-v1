@@ -32,7 +32,7 @@ user-guide/
     ├── google-classroom.md            # Read-only Classroom grade and rubric sync
     ├── timetable-and-schedule.md      # Timetable + my timetable + conflicts
     ├── teacher-substitution.md        # Cover for absent teachers
-    ├── behavioural.md                 # Behavioural overview + assess flow
+    ├── behavioural.md                 # Star-rating matrix + pending view
     ├── promotion-and-placement.md     # Year-end promotion and placement
     ├── results.md                     # Report cards, comments, publishing
     ├── reports.md                     # Student/class/admin reports + public statistics

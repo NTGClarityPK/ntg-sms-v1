@@ -1,292 +1,155 @@
 # 💵 Fee Management
 
-## Guide
+Short guide for configuring fee templates, generating challans, and verifying parent payment proofs.
 
-### There are two main sections:
+## 📋 Overview
 
-1. **Fee Settings** - Configure challan appearance and create templates
-2. **Fees** - Generate challans and track payments
+| Who | Where | What |
+| --- | --- | --- |
+| School admin / Principal / Super admin | **Fees** → **Challan management** / **Payment history** | Generate challans, review proofs, export |
+| Parents / students | **Fees** (My Fees) | Download challan PDF, submit proof, view receipts |
+| School admin / Principal / Super admin | **Settings → Fee settings** | Bank details, templates, challan style |
+| School admin / Principal / Super admin | **Fee reports** (`/reports/fees`) | Collected / pending / under review / overdue, defaulters |
 
-***
+Fee Management requires the school plan feature **Fee management** (Starter and above; not on Free).
 
-### Part 1: Fee Settings
+There is **no “Mark as Paid”** button. Payments move through **proof upload → Review → Verify or Reject**.
 
-**Location:** Settings → Fee Settings tab
+---
 
-#### Section A: Challan Settings
+## ⚙️ Part 1: Fee settings
+
+**Path:** **Settings → Fee settings**
+
+### Challan settings
 
 Configure what appears on printed challans:
 
-* **Bank Details** - Bank name, account number, branch
-* **Payment Instructions** - How parents should pay
-* **Footer Text** - Additional notes or terms
+- Bank name, account title, account number, branch code
+- Payment instructions
+- Footer notice
+- Challan template style (**Minimal** / **Modern**)
 
-**Example:**
+### Fee templates
 
-```
-Bank: Meezan Bank
-Account: 01234567890
-Payment Instructions: Pay before due date to avoid late fees
-Footer: For queries, contact accounts@school.edu.pk
-```
+Templates define charges and discounts.
 
-***
+| Field | Options |
+| --- | --- |
+| **Type** | **Fee** or **Discount** |
+| **Scope** | Levels, Class, Class-Section, Individual |
+| **Metrics** | Named line items — absolute amount or percentage |
+| **Auto-apply** | On Individual templates — e.g. staff-parent discount (`parent has staff role`) |
 
-#### Section B: Fee Templates
+When more than one fee template could apply, the **most specific** wins: Individual → Class-Section → Class → Level.
 
-Templates define the fees you charge (tuition, transport, library, etc.) and who they apply to.
+Discount templates marked **Auto** can be included automatically when you generate challans. Sibling auto-discount may exist in calculation rules for linked siblings in the same branch; the create-template UI currently exposes staff-parent auto-apply, not a sibling checkbox.
 
-**Creating a Template**
+---
 
-**Template Name**\
-Give it a clear, descriptive name\
-*Example:* "Class II Monthly Fees" or "Transport Fee - Senior Level"
+## 📄 Part 2: Challan management
 
-**Type**
+**Path:** **Fees → Challan management**
 
-* **Fee** - Charges to collect (tuition, transport, library)
-* **Discount** - Reductions to apply (sibling discount, scholarship)
+### Generate for a class and month
 
-**Scope** (Who this applies to)
+1. Choose **class section** and **month**.
+2. Click **Generate challans**.
+3. Confirm the pre-selected template and any auto discounts.
+4. Confirm & generate for the roster.
 
-* **Level** - All students in Primary/Junior/Senior level
-* **Class** - All students in Class II (all sections)
-* **Class-Section** - Only students in Class II-C
-* **Individual** - Specific students only
+### One-off individual challan
 
-**Currency**\
-Select PKR, USD, SAR, or IQD (displays on challan)
+Use **Generate** on a student row when you need mid-month joins or temporary changes:
 
-**Metrics (The actual fees)**
+- Optional start date and due date override
+- Exclude a metric or override an amount for **this challan only**
+- Next month uses the normal template again
 
-**Name:** What you're charging\
-*Examples:* Tuition Fee, Transport Fee, Library Fee, Lab Fee
+### Download
 
-**Type:**
+- Per student: **Download PDF**
+- There is **no** bulk ZIP of challan PDFs in Fee Management today
 
-* **Absolute** - Fixed amount (e.g., 10,000 PKR)
-* **Percentage** - % of other fees (e.g., 5% processing fee)
+### Challan roster statuses
 
-**Amount:** Enter the value
+| Status | Meaning |
+| --- | --- |
+| **No challan** | Not generated for that month |
+| **Pending payment** | Issued; waiting for proof |
+| **Under review** | Parent submitted proof; staff must verify |
+| **Verified** | Payment accepted; receipt available |
+| **Rejected** | Proof rejected (reason recorded) |
+| **Cancelled** | Challan cancelled |
 
-***
+---
 
-#### Template Specificity (How they apply)
+## 💳 Part 3: Payment history (admin)
 
-When multiple templates could apply to a student, **the most specific one wins:**
+**Path:** **Fees → Payment history**
 
-```
-Individual Template (highest priority)
-    ↓
-Class-Section Template
-    ↓
-Class Template
-    ↓
-Level Template (lowest priority)
-```
+### Filters
 
-**Example:**
+- **Class** (class section; All)
+- **Status** — All / Under review / Verified / Rejected
+- **Date range** (defaults to last 30 days)
+- **Search student**
 
-* **Level Template:** "Junior Level Fee" = 15,000 PKR tuition
-* **Class Template:** "Class II Fee" = 12,000 PKR tuition
-* Student in Class II-C gets 12,000 (Class overrides Level)
+Summary badges: **Collected** and **Pending**.
 
-**Discount Templates:** Auto-apply alongside fee templates
+### Review a payment
 
-* Marked as "AUTO" in the system
-* Apply to all students matching the scope
-* Can be excluded individually when needed
+1. Find a row with status **Under review** (or **Pending review** on badges).
+2. Click **Review**.
+3. Open or download the proof.
+4. **Verify** or **Reject** (reject requires a reason).
 
-***
+Verified rows offer **Receipt** (PDF). Payment methods shown in review: **Bank transfer**, **Cash**.
 
-### Part 2: Generating Challans
+### Export
 
-**Location:** Fees → Challan management tab
+**Export** downloads an **Excel (.xlsx)** file (`fee-payments-history.xlsx`) — not CSV.
 
-#### Step 1: Select Class & Month
+---
 
-1. Choose **Class** from dropdown (e.g., Class II-C)
-2. Select **Month** (e.g., May 2026)
-3. The system loads all students with their applicable templates
+## 👨‍👩‍👧 Part 4: My Fees (parents and students)
 
-***
+On **Fees**, parents and students see:
 
-#### Step 2: Generate Challans
+| Tab | Actions |
+| --- | --- |
+| **Fee payment** | Pending challans — **Download PDF**, **Submit proof** (disabled while Under review) |
+| **Payment history** | Past payments — **Receipt** when verified |
 
-**Bulk Generation (Most Common)**
+Submit proof fields: payment date, amount paid, method (Bank transfer / Cash), bank name, transaction reference, proof file (PNG / JPEG / PDF). Parents with several children see a **Student** column.
 
-1. Click **"Generate challans"** (top right)
-2. System shows template selection:
-   * Most specific template is **pre-selected**
-   * Auto-discounts are highlighted
-   * Preview metrics and amounts
-3. Click **"Confirm & generate"**
-4. Challans created for all students at once
+---
 
-**Status after generation:**
+## 📊 Fee reports
 
-* ✅ **VERIFIED** - Ready to collect payment
-* 🟡 **PENDING PAYMENT** - Challan generated, awaiting payment
+**Path:** `/reports/fees` (page title **Fee reports**)
 
-***
+Also documented under [📊 Reports](reports.md). Not a separate sidebar item in all builds — bookmark or navigate directly.
 
-**Individual Generation (For special cases)**
+Cards: **Collected (verified)**, **Pending**, **Under review**, **Overdue**. Table **Defaulters** lists student, challan, due date, amount.
 
-Use this when a student needs different amounts:
+School admin / principal / super admin; requires Fee management plan feature.
 
-**Example:** Student joined mid-month (May 15th)
+---
 
-1. Click **"Generate"** button next to student name
-2. Modal opens showing:
-   * **Start date (optional)** - Leave blank or set to May 15
-   * **Due date** - Override class due date if needed
-   * **Individual template** - Link student-specific template if they have one
-   * **Adjust for this challan (one-time)** section
-3. In "Adjust for this challan" section:
-   * ✅ **Exclude** checkbox - Remove a fee entirely (e.g., no transport this month)
-   * 📝 **Override amount** - Change amount (e.g., 12,000 → 6,000 for half month)
-4. View **Fee breakdown** at bottom (shows calculation)
-5. Click **"Generate challan"**
+## 💡 Tips & Best Practices
 
-**Important:** These adjustments are **one-time only**. Next month, the student gets the full template amounts like everyone else.
+- Set bank details and templates in **Fee settings** before the first month’s generate.
+- Bulk-generate for the class; use individual generate only for exceptions.
+- Process **Under review** rows promptly so parents get a receipt.
+- Export XLSX for accounts reconciliation.
 
-***
+---
 
-#### Step 3: Download & Distribute
+## 🆘 Troubleshooting
 
-**Per Student:**
+**Fees missing from the sidebar:** Check plan includes Fee management, and your role is allowed.
 
-* Click **"Download PDF"** next to any student
-* Challan PDF downloads with all details
-* Share with parents (email, print, WhatsApp)
+**Cannot mark paid:** Upload proof as parent, then verify under **Payment history** — there is no manual “Mark as Paid”.
 
-**Bulk Download:**
-
-* Click **"Download all (ZIP)"** (coming soon)
-* Gets PDFs for entire class
-
-***
-
-### Part 3: Payment Tracking
-
-**Location:** Fees → Payment history tab
-
-#### Recording Payments
-
-**Manual Entry:**
-
-1. Go to student's challan
-2. Click **"Mark as Paid"** or update status
-3. System records payment date and amount
-
-**From Receipt:**
-
-* Click **"Receipt"** button
-* Generate official receipt PDF
-* Prints with payment details
-
-#### Payment Dashboard
-
-**Filters:**
-
-* **Class** - View specific class payments
-* **Status** - VERIFIED / PENDING PAYMENT / OVERDUE
-* **Date range** - Filter by month/term
-* **Search** - Find specific student
-
-**Summary Cards:**
-
-* 💰 **Collected** - Total received (e.g., 12,600 PKR)
-* ⏳ **Pending** - Total outstanding (e.g., 0 PKR)
-
-**Export:**
-
-* Click **"Export"** for Excel/CSV report
-* Contains all payment records with dates and amounts
-
-***
-
-### Common Scenarios
-
-#### Scenario 1: Setting Up Monthly Fees
-
-```
-1. Settings → Fee Settings → Create Template
-   - Name: "Class II Monthly Fees"
-   - Scope: Class → Class II
-   - Metrics:
-     • Tuition Fee: 12,000 PKR
-     • Transport Fee: 3,000 PKR
-     • Library Fee: 500 PKR
-
-2. Fees → Generate challans
-   - Select Class II-C, Month: May 2026
-   - Click "Generate challans" → All students get same fees
-```
-
-#### Scenario 2: Student Joins Mid-Month
-
-```
-Student joins May 15th (half month remaining)
-
-1. Fees → Click "Generate" for that student
-2. Leave "Start date" blank (or set May 15 for records)
-3. In "Adjust for this challan" section:
-   - Tuition Fee: Override 12,000 → 6,000
-   - (Other fees keep original amount or adjust as needed)
-4. Generate → This student gets 6,000
-5. Next month → Student gets full 12,000 like everyone else
-```
-
-#### Scenario 3: Sibling Discount
-
-```
-1. Settings → Create Discount Template
-   - Name: "Sibling Discount"
-   - Type: Discount
-   - Scope: Individual
-   - Metric: "Sibling Discount" → 10% or 1,000 PKR
-
-2. Link to specific students:
-   - When generating challan, use "Individual template" field
-   - Link discount template
-   - Discount auto-applies to that student's challans
-```
-
-#### Scenario 4: Student Doesn't Use Transport This Month
-
-```
-1. Click "Generate" for student
-2. In "Adjust for this challan" section:
-   - Check ✅ "Exclude" next to Transport Fee
-3. Generate → Challan without transport fee
-4. Next month → Generate normally, transport fee returns
-```
-
-***
-
-### Quick Reference
-
-| Task                      | Location                                         |
-| ------------------------- | ------------------------------------------------ |
-| Set up bank details       | Settings → Fee Settings → Challan Settings       |
-| Create fee template       | Settings → Fee Settings → Fee Templates          |
-| Generate monthly challans | Fees → Challan management → Generate challans    |
-| Adjust individual student | Fees → Generate (per student) → Override amounts |
-| Track payments            | Fees → Payment history                           |
-| Export payment report     | Payment history → Export                         |
-
-***
-
-### Tips
-
-✅ **Create templates once** - Use them for all students in that scope\
-✅ **Bulk generate** - Saves time for 30+ students per class\
-✅ **Individual adjustments** - Only for special cases (mid-month, temporary changes)\
-✅ **Discounts auto-apply** - No need to manually add each month\
-✅ **Download PDFs early** - Share with parents before due date
-
-***
-
-**Need Help?**\
-Contact: <support@ntgclarity.com>
+**Submit proof disabled:** Challan is already **Under review** — wait for staff to verify or reject.

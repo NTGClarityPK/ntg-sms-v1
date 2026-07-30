@@ -34,13 +34,13 @@
 **Publishing Results:**
 
 1. Go to **Results** and select the class
-2. Create draft cards
-3. Add teacher comments
-4. Publish, then send to parents
+2. Create each required draft card
+3. Add the class teacher comment
+4. Publish for parents; parents download it under **My Child**
 
 **Raising a Leave Request (Parent):**
 
-1. Go to **Leave Requests**
+1. Go to **Leaves**
 2. Select the child and dates
 3. Add a reason
 4. Submit and track the approval

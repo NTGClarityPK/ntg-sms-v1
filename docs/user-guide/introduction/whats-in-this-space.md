@@ -17,7 +17,7 @@ This documentation space covers:
 
 * 👨‍💼 **Administrative Staff** - Support operational workflows based on assigned permissions
 * 👨‍🏫 **Teachers** - Attendance, assessments, behavioural entries, timetable views
-* 🧑‍⚕️ **Guidance Counsellor** - Behavioural modules and related reporting
+* 🧑‍⚕️ **Guidance Counselor** - Behavioural modules and related reporting
 
 **Parents & Students:**
 

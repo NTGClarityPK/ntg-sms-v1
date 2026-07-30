@@ -1,153 +1,154 @@
 # 🔐 Authentication & Access
 
-Complete guide to authentication and access flows in NTG Alma.
+How people sign in, join a school, reset passwords, and use PIN or branch context in NTG Alma.
 
 ## 📋 Overview
 
-NTG Alma authentication is handled through **Supabase Auth** (email/password), with additional flows supported in the portal:
+| Method | Who it is for |
+| --- | --- |
+| Email / password | Staff, parents, and school admins |
+| Google sign-in | Existing users linked to Google |
+| Google signup | New school registration only |
+| Invitation setup | Invited students, parents, and staff (`/setup?token=…`) |
+| PIN on a device | Students (roll number + PIN) |
 
-- Email/password login
-- Google login (via backend OAuth endpoint)
-- Password reset
-- Branch selection during login (for multi-branch users)
-- Child selection for parents (when multiple children exist)
-- Optional PIN-based login on a device (where configured)
+Child context for parents is chosen from the **header** after login — not during login. The legacy **Select child** login page is not part of the current flow.
 
-{% @mermaid/diagram content="graph TB
-A[Login] --> B{Auth Method}
-B --> C[Email/Password]
-B --> D[Google OAuth]
-B --> E[PIN Mode (Device)]
-C --> F[Fetch User Context]
-D --> F
-E --> F
-F --> G{Multi-branch?}
-G -->|Yes| H[Select Branch]
-G -->|No| I[Continue]
-H --> I
-I --> J{Parent with multiple children?}
-J -->|Yes| K[Select Child]
-J -->|No| L[Portal]
-K --> L" %}
+---
 
-## 🔐 Login (Email/Password)
+## 🔐 Email / password login
 
-### Logging in
+1. Open **Login**.
+2. Enter email and password (minimum **6** characters on this form).
+3. Click **Login**.
 
-**Steps:**
+If the account is inactive, you may see a message that an administrator must reactivate it.
 
-1. Navigate to **Login**
-2. Enter:
-   * **Email**
-   * **Password**
-3. Click **Login**
-4. If prompted, complete **Branch Selection**
-5. If prompted (parent users), complete **Child Selection**
+After a successful login:
 
-### Common outcomes
+- **Super admin** → **Admin portal**
+- **School admin** with more than one branch → **branch picker**, then portal
+- Everyone else → portal with their branch chosen automatically (stored preference or first available branch)
 
-- If credentials are valid, you’ll be taken into the authenticated portal.
-- If you don’t have access to a module, it won’t appear in the sidebar (permissions-driven).
+---
 
-## 🟦 Login (Google)
+## 🟦 Google
 
-Google sign-in is initiated from the portal and redirects to the backend OAuth flow.
+### Sign in
 
-**Steps:**
+**Login → Sign in with Google** → complete Google → return to the portal. Branch picker appears only for multi-branch **school admins**.
 
-1. Navigate to **Login**
-2. Click **Sign in with Google**
-3. Complete Google authentication
-4. Return to the portal and complete branch selection if required
+If Google cannot match an existing Alma user, you are sent toward **signup** with a not-found hint.
 
-## 🔁 Password Reset
+### Sign up (new school)
 
-### Request reset link
+**Sign up → Continue with Google** runs the school registration wizard (school, branch, academic year, admin details), then OAuth. This creates a tenant — it is not the same as everyday Google login.
 
-**Steps:**
+---
 
-1. On **Login**, choose **Forgot password**
-2. Enter your email
-3. Submit to receive a reset link
+## ✍️ Signup (email path)
 
-### Set a new password
+**Sign up** uses a five-step wizard:
 
-**Steps:**
+1. **School information**
+2. **Branch information**
+3. **Academic year**
+4. **Admin account** (email path: password minimum **6** characters)
+5. **Review** → Create account
 
-1. Open the reset link
-2. Enter a new password + confirm
-3. Submit
-4. After success, return to **Login**
+---
 
-## 🏫 Branch Selection
+## ✉️ Invitation setup
 
-If your account is linked to multiple branches, the portal can prompt you to select a branch after login.
+Invited users open **`/setup?token=…`** (from their invitation email). Types include student, parent, and staff. Admins resend from **Users** when status is **Link expired** — see [👥 User Roles](user-roles.md).
 
-**What branch selection affects:**
+1. Token is validated.
+2. Set a password — minimum **8** characters, with at least one letter and one number.
+3. Note the **Login email** shown on success, then **Go to login**.
 
-- Operational data (students, attendance, requests, timetable, reports) is **branch-scoped**
-- Your branch context is used for API calls (e.g. via `X-Branch-Id`)
+---
 
-## 👨‍👩‍👧‍👦 Child Selection (Parents)
+## 🔁 Password reset
 
-Parents with multiple linked children can select the child context for child-specific views.
+1. **Login → Forgot password**.
+2. Enter the email you use for Alma.
+3. Success: reset mail is sent to that address.
+4. If Alma has **no associated email** for the account, you may confirm sending the link to the address you typed.
 
-**Typical places you’ll see child context:**
+Open the link → set a new password → return to **Login**.
 
-- My Children
-- Child timetable views
-- Child attendance views
+---
 
-## 🌐 Portal Language After Login
+## 🏫 Branch context
 
-The portal decides your language every time you log in, so you get the same language on a new device or in an incognito window.
+| Situation | Behaviour |
+| --- | --- |
+| School admin, multiple branches | Picker after login; **Switch Branch** in the user menu anytime |
+| Other roles | Branch selected automatically; header may show a read-only **Current branch** badge |
+| Super admin | Admin portal — no school branch picker |
 
-**Order of precedence:**
+Branch context scopes students, attendance, fees, timetable, and most operational data.
 
-1. **Your personal language**, if you have chosen one from the language button in the top bar
-2. Otherwise, your school's **default language** (Settings → Business Information → Default language)
-3. Otherwise, **English (UK)**
+---
 
-**Notes:**
+## 👨‍👩‍👧 Child context (parents)
 
-- Before you log in (login and password reset screens), the portal shows **English (UK)** unless you have already changed the language on that browser.
-- If you belong to branches in more than one school, selecting a branch also switches the language to that school's default — unless you have set a personal language.
-- Arabic switches the portal to a right-to-left layout.
+Parents with more than one linked child use the **header child switcher** (**Select child** / **Acting as {name}**). That switches the session to the chosen student for child-specific screens.
 
-See [⚙️ Settings & Configuration](settings-and-configuration.md) for how to change the school default or your own language.
+Do **not** rely on `/select-child` — it is a legacy page and is not used after login.
 
-## 🔢 PIN Authentication (Device)
+Typical child-aware areas: **My Child**, child attendance, child timetable.
 
-PIN authentication is an optional convenience mode intended for quick logins on a specific device.
+---
 
-**Key characteristics:**
+## 🔢 PIN Management and PIN login
 
-- PIN data is stored **on the device**
-- Too many incorrect attempts may temporarily lock PIN login on that device
+### PIN Management (parents)
+
+**Path:** Sidebar → **PIN Management**
+
+- Set, change, or remove a **parent PIN** stored on this device
+- For each child: set, change, or remove a **child PIN** (child school credentials may be required first)
+
+### PIN login (students)
+
+On **Login**, if this device has PIN mode enabled:
+
+1. Choose **Log in with PIN**.
+2. Enter **student roll number** and **4–6 digit PIN**.
+
+PIN login is **roll number only** — not parent email. Parent PINs on the device do not replace student roll-number login.
+
+Too many wrong attempts can temporarily lock PIN login on that device.
+
+---
+
+## 🌐 Language after login
+
+Order of preference:
+
+1. Your personal language (language control in the top bar)
+2. Else the school **default language** (**Settings → Business Info**)
+3. Else **English (UK)**
+
+Arabic uses a right-to-left layout. Before login, screens default to English (UK) unless you already changed language on that browser.
+
+---
+
+## 💡 Tips & Best Practices
+
+- Keep invitation passwords to the stricter **8+** rule; everyday login forms still accept **6+**.
+- School admins with several campuses should use **Switch Branch** rather than separate accounts.
+- Parents: set child PINs on shared classroom devices; students still log in with roll number.
+
+---
 
 ## 🆘 Troubleshooting
 
-### Common issues
+**Google sends me to signup:** The Google account is not linked to an existing Alma user — use invitation setup or ask an admin.
 
-**Cannot login (email/password):**
+**I am in the portal but modules are missing:** Check role permissions and branch; parents check child context in the header.
 
-- Confirm email/password
-- Ensure password is at least the required length
-- Use password reset if needed
+**Wrong language:** Turn off “use school default” and pick a language, or ask an admin to change **Business Info → Default language**.
 
-**Google login sends me to signup:**
-
-- This typically indicates the Google account isn’t linked to an existing NTG Alma user in the system.
-
-**I can login but can’t see modules:**
-
-- Confirm your assigned role(s) and permissions
-- Confirm your branch selection (if applicable)
-- Parents: confirm whether you’re in a child context
-
-**The portal logs me in with the wrong language (e.g. Arabic in incognito):**
-
-- Check the language button: if **Use school default** is ticked, the language comes from your school's default language setting
-- To keep one language regardless of the school default, pick it explicitly from the language button
-- Admins can change the school-wide default under **Settings → Business Information → Default language**
-
+**PIN login rejects my email:** Use the student’s **roll number**, not a parent email.

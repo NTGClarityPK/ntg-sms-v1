@@ -1,79 +1,67 @@
 # 🕐 Timetable & Schedule
 
-Complete guide to timetable and schedule pages in NTG Alma.
+Class timetables, teacher weekly slots, and parent/student personal views.
 
 ## 📋 Overview
 
-Timetable and schedule capabilities include:
+| View | Path | Who |
+| --- | --- | --- |
+| **Timetable** | `/timetable` | Staff — pick class section grid |
+| **Class timetable** | `/timetable/class/{id}` | Deep link for one section |
+| **My Schedule** | `/my-schedule` | Teachers — weekly slots |
+| **My Timetable** | `/my-timetable` | Students (teachers redirect to My Schedule) |
+| **Children Timetable** | `/children-timetable` | Parents — **own child selector** on page |
+| **Conflict management** | `/conflict-management` | Admin/coordinator timetable conflicts |
 
-- Timetable viewing (including class-specific views)
-- “My Timetable” and “My Schedule”
-- Children timetable view (parent)
-- Conflict management view
+Schedule settings (days, templates, holidays): **Settings → Schedule**.
 
-{% @mermaid/diagram content="graph TB
-A[Timetable] --> B[School/Class Views]
-A --> C[Class Timetable Page]
-A --> D[My Timetable]
-A --> E[My Schedule]
-A --> F[Children Timetable]
-A --> G[Conflict Management]" %}
+---
 
-## 🗓️ Timetable
+## 🗓️ Timetable (staff)
 
-### Viewing the timetable
+1. Open **Timetable**.
+2. Select **class section** (teachers may see only their class-teacher sections; admins see all).
+3. Review weekly grid.
 
-**Steps:**
+Editors can:
 
-1. Go to **Timetable**
-2. Choose the relevant view (where available)
-3. Review sessions by day and time
+- **Generate from template** — create slots from subject template
+- **Copy** day or **copy from another section**
+- Add/edit/remove slots
+- Show **substitution (SUB)** badges when enabled on the grid
 
-### Class timetable page
+---
 
-Class-specific timetable view is available under the class timetable route.
+## ⏰ My Schedule vs My Timetable
 
-**Steps:**
+- **My Schedule** — teacher period-by-period week linked to [👨‍🏫 Staff](staff.md) assignments.
+- **My Timetable** — student view; linked from [🏠 Dashboard](dashboard.md).
 
-1. Go to **Timetable**
-2. Open a class timetable (where links are available)
+---
 
-## ⏰ My Schedule (Teachers)
+## 👨‍👩‍👧 Children Timetable (parents)
 
-Use **My Schedule** to view your teacher schedule.
+**Path:** **Children Timetable** — includes a **child dropdown** on the page (does not rely on **My Child** alone). Header child switcher still applies for other child-mode pages.
 
-## 🗓️ My Timetable
+---
 
-Use **My Timetable** to view the timetable relevant to your role context.
+## ⚠️ Conflict management
 
-## 👨‍👩‍👧‍👦 Children Timetable (Parents)
+Review timetable clashes surfaced for the branch — use before publishing wide changes.
 
-Parents can use **Children Timetable** after selecting a child context.
+Teacher substitution display: see [🔄 Teacher Substitution](teacher-substitution.md).
 
-**Steps:**
+---
 
-1. Go to **My Children** and select a child
-2. Go to **Children Timetable**
-3. Review timetable for the selected child
+## 💡 Tips & Best Practices
 
-## ⚠️ Conflict Management
+- Generate from template after **Mapping → Teacher–Class** is complete.
+- Copy from a pilot section when rolling out a new year group.
 
-Conflict Management is used to review timetable-related conflicts surfaced in the portal.
-
-**Steps:**
-
-1. Go to **Conflict Management**
-2. Review listed conflicts and related context
+---
 
 ## 🆘 Troubleshooting
 
-**Timetable is empty:**
-
-- Confirm branch context and active academic year
-- Confirm timetable data has been created/configured for the class
-
-**Children timetable not visible:**
-
-- Confirm the parent has linked children (Parent Associations)
-- Confirm a child is selected in My Children
-
+**Empty timetable:** No slots — run generate or copy; confirm active academic year.
+**Teacher sees one section only:** Expected for class teachers without admin timetable scope.
+**Parent timetable wrong child:** Use the selector on **Children Timetable**.

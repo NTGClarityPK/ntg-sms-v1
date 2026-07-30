@@ -1,74 +1,66 @@
 # 📊 Reports
 
-Complete guide to reports and results pages in NTG Alma.
+Student, class, administrative, public, and revenue reports — plus a separate Fee reports page.
 
 ## 📋 Overview
 
-Reports and results provide insights and downloadable outputs (where enabled) across academics and operations.
+**Path:** Sidebar → **Reports** (page title **Report**)
 
-Portal pages include:
+| Tab | Who typically sees it |
+| --- | --- |
+| **Student report** | Permitted staff |
+| **Class report** | Permitted staff |
+| **Public report** | In-portal, authenticated, current branch |
+| **Administrative** | Teachers, school admin, principal, academic coordinator |
+| **Revenue** | School admin and principal only |
 
-- Reports index
-- Student reports (including student-specific route)
-- Class reports (including class-specific route)
-- Administrative reports
-- Public reports/statistics (branch-code based route)
-- Results page
+Report cards / PDF generation for terms live under [🥇 Results](results.md), not here.
 
-{% @mermaid/diagram content="graph TB
-A[Reports] --> B[Student]
-A --> C[Class]
-A --> D[Administrative]
-A --> E[Public Statistics]
-F[Results] --> G[Results Views]" %}
+**Fee reports** (`/reports/fees`) is a **separate** page (collected / pending / under review / overdue / defaulters) — not one of these tabs. See [💵 Fee Management](fee-management.md).
 
-## 📊 Reports (Portal)
+---
 
-### Reports index
+## 👤 Student report
 
-**Steps:**
+Periods: All, Year to date, This week, This month, Custom range. Configurable exports where offered.
 
-1. Go to **Reports**
-2. Select the relevant report category (student/class/administrative)
+---
 
-### Student Reports
+## 🏫 Class report
 
-Student report views can be accessed via:
+Attendance, average grade, assignment viewing, and assignment submission. Choose a class, then export.
 
-- Student reports route
-- Direct student report page (by student id) where permitted
+---
 
-### Class Reports
+## 🗂️ Administrative
 
-Class report views can be accessed via:
+Sub-tabs: **Attendance** and **Academic**. Export **PDF** and **Excel**; some exports can also be saved for offline use.
 
-- Class reports list
-- Direct class report page (by class section) where permitted
+---
 
-### Administrative Reports
+## 💰 Revenue
 
-Administrative reports are available to authorised roles only.
+Fee collection and ID card reprint revenue. Scope: current / combined / chosen branch. Summary or detailed; **PDF** / **Excel** export.
 
-## 🌍 Public Reports / Statistics
+---
 
-NTG Alma includes a public statistics route that is accessed by a branch code.
+## 🌍 Public statistics (external)
 
-**Use cases:**
+- In-portal **Public report** tab: signed-in users, current branch.
+- External URL: `/public/statistics/[branchCode]`.
 
-- Public, anonymised statistics (no login) depending on branch configuration
+External access does **not** use a normal Alma login, but it **is password-gated**. After the password succeeds, Alma issues a **branch token** (about one hour), stored in session storage and sent as a bearer token for statistics.
 
-## 🏅 Results
+Public stats show total / male / female counts and class–section counts — **no** individual student records.
 
-Use **Results** to view results-related pages made available for your role.
+Configure public stats under **Settings → Stats** (public statistics).
+
+---
 
 ## 🆘 Troubleshooting
 
-**I can’t see a report type:**
+**Revenue tab missing:** Restricted to school admin and principal.
 
-- Your role may not have access
-- Confirm branch context and active academic year
+**Public stats “no login” myths:** You still need the configured password (and the temporary token).
 
-**Public statistics not accessible:**
-
-- Confirm the branch code is correct
-
+**Looking for fee defaulters:** Open `/reports/fees`, not the main Reports tabs.

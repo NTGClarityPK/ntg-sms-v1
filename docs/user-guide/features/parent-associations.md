@@ -1,59 +1,59 @@
 # 👨‍👩‍👧 Parent Associations
 
-Complete guide to linking parents/guardians to student records in NTG Alma.
+Parent–student links are managed on **Mapping**. This page summarises what parents see afterwards.
 
 ## 📋 Overview
 
-Parent associations enable parent-facing experiences:
+School staff create and edit associations on:
 
-- Selecting a child (“My Children”)
-- Viewing child-specific attendance/timetable pages
-- Raising leave and early departure requests for a selected child
+**Management → Setup → Mapping → Parent–Student**
 
-{% @mermaid/diagram content="graph TB
-A[Parent] --> B[Link to Student]
-B --> C[My Children]
-C --> D[Child Context]
-D --> E[Child Timetable]
-D --> F[Child Attendance]
-D --> G[Leave Requests]
-D --> H[Early Departure]" %}
+Full steps, two-guardian limit, Primary/Secondary priority, and **Can approve** editing: see [🔀 Mapping](mapping.md).
 
-## 🔗 Linking a Parent to a Student
+Legacy **Parent Associations** menu URLs redirect to Mapping.
 
-### Create or update associations
+---
 
-**Steps:**
+## 👪 What the link enables
 
-1. Go to **Parent Associations**
-2. Search for the parent (or guardian user)
-3. Select the student(s) to link
-4. Save
+Once a parent is linked to a student in the current branch:
 
-### Unlinking
+- **My Child** — linked children, approval badge, published report cards
+- Header **child switcher** — act as a selected child (required for child-mode modules)
+- Leave and early departure for children with **Can approve** (as configured)
 
-**Steps:**
+Parents do **not** create or remove associations on **My Child**.
 
-1. Go to **Parent Associations**
-2. Open the parent record
-3. Remove the student link
-4. Save
+### My-* views (after linking)
 
-## 👨‍👩‍👧‍👦 My Children (Parent View)
+| Sidebar label | Purpose |
+| --- | --- |
+| **My Child** | Children list, published results |
+| **My Assessments** | Child’s assessments (with header child session) |
+| **My Timetable** | Student timetable |
+| **Children Timetable** | Parent timetable with on-page child picker |
+| **My Events** | Events and consent |
+| **My Certificates** | Issued certificates |
+| **Fees** | **My Fees** tabs (payment / history) |
+| **PIN Management** | Parent/child device PINs — [🔐 Authentication & Access](authentication-and-access.md) |
+| **Attendance → Child** | Child attendance tab |
 
-Parents can use **My Children** to view and select a child context.
+---
 
-**Steps:**
+## 👨‍👩‍👧 My Child (parent view)
 
-1. Go to **My Children**
-2. Select a child
-3. Navigate to child-specific modules as needed
+**Path:** Sidebar → **My Child**
+
+1. Open **My Child**.
+2. Review each linked child (relationship, student ID, approval access).
+3. Use the header switcher when you need to act as a specific child in the portal.
+
+Selecting a child on **My Child** alone does not replace the header child session used for child-mode modules.
+
+---
 
 ## 🆘 Troubleshooting
 
-**Parent can’t see My Children or child pages:**
+**Parent cannot see a child:** Confirm the association on **Mapping → Parent–Student** for the correct branch.
 
-- Confirm the parent account has the Parent role
-- Confirm the association exists for the current branch
-- Confirm the parent is not currently in a restricted context
-
+**Cannot approve leave:** Edit the association’s **Can approve requests** on Mapping (edit permission required).

@@ -1,69 +1,64 @@
 # 🌴 Leaves
 
-Complete guide to leave request workflows in NTG Alma.
+Raise, review, and track leave requests — quota uses **school days**, not calendar days.
 
 ## 📋 Overview
 
-Leave requests support:
+**Path:** Sidebar → **Leaves**
 
-- Parent raising a leave request for a child
-- Staff reviewing and approving/rejecting requests (role-based)
-- Parent cancelling a pending leave request (where allowed)
-- Leave quota visibility (configured in Settings)
+| Tab | Audience |
+| --- | --- |
+| **My requests** | Parents and students (when enabled) |
+| **All requests** | Staff reviewers |
 
-{% @mermaid/diagram content="graph TB
-A[Leave Request] --> B[Create (Parent)]
-B --> C[Pending]
-C --> D{Review (Staff)}
-D -->|Approve| E[Approved]
-D -->|Reject| F[Rejected]
-C -->|Cancel (Parent)| G[Cancelled]" %}
+Statuses: **Pending**, **Approved**, **Rejected**, **Cancelled**.
 
-## ➕ Create a Leave Request (Parent)
+Quota is configured under **Settings → General** and counts **school days** (excludes holidays/vacations per schedule settings).
 
-**Steps:**
+There are **no attachment fields** in the leave form UI today.
 
-1. Go to **Leaves**
-2. Select your child (if prompted)
-3. Click **Raise a request**
-4. Enter:
-   * Leave date range
-   * Reason
-   * Attachment (if enabled)
-5. Submit
+---
 
-## ✅ Review a Leave Request (Staff)
+## ➕ Raise a request (parent)
 
-**Steps:**
+1. Open **Leaves → My requests**.
+2. Select child (parents with several children).
+3. Enter start date, end date, and reason.
+4. Submit.
 
-1. Go to **Leaves**
-2. Filter to **Pending** (where available)
-3. Open the request
-4. Choose **Approve** or **Reject**
-5. Add review notes (if available) and confirm
+Quota usage is shown when available. Exceeding quota may block submission.
 
-## ❌ Cancel a Leave Request (Parent)
+---
 
-Cancellation is typically available only for pending, unreviewed requests.
+## 🎓 Students raising leave
 
-**Steps:**
+Students may raise requests only for class sections enabled under **Settings → Permissions → Assign Access** → student leave class picker.
 
-1. Go to **Leaves**
-2. Find the request
-3. Click **Cancel**
+---
 
-## 🧾 Leave Quota
+## ✅ Review (staff)
 
-Leave quota is configured in Settings and can be displayed alongside leave request creation and review.
+**All requests** tab — filter **Pending**, open request, **Approve** or **Reject** with notes where offered.
+
+Parents may **Cancel** pending requests they created.
+
+---
+
+## 🔗 Attendance link
+
+When attendance is marked **Absent**, the system can link an absence record on the leaves side (status **absent**) — separate from an approved leave request.
+
+---
+
+## 💡 Tips & Best Practices
+
+- Configure quota before term start under **Settings → General**.
+- Use **All requests** filters when clearing a backlog after holidays.
+
+---
 
 ## 🆘 Troubleshooting
 
-**I can’t create a leave request:**
-
-- Confirm you have a linked child
-- Confirm you are in the correct branch
-
-**Approve/Reject actions missing:**
-
-- Your role may not have reviewer permissions
-
+**Student cannot raise leave:** Class not enabled in Permissions student-leave picker.
+**Quota seems wrong:** Quota uses school days, not calendar span.
+**No attachments:** Not supported in the current leave form.

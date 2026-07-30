@@ -30,10 +30,10 @@
 
 ## 🥇 Results
 
-* Preview report cards before publishing
-* Use comment templates to save time while keeping remarks personal
-* Publish only when marks are final, since published cards lock
-* Track delivery status and follow up on failures
+* Check **Marks readiness** before publishing a term card
+* Download a sample PDF to review the layout
+* Keep the class teacher comment factual; it cannot be edited after publish
+* Publish only when the card is ready for parents to download under **My Child**
 
 ## 🛡️ Access Control
 

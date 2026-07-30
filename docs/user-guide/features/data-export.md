@@ -1,15 +1,15 @@
 # 💾 Data Export
 
-A short guide for school administrators who export a secure backup of their school’s data from Alma.
+A short guide for school administrators who export a secure backup of their school’s data from NTG Alma.
 
 ---
 
 ## Who can use this?
 
-- **School admin** or **super admin** only  
-- You must be **logged in** and have a **branch selected** in the header  
+- **School admin** or **super admin** only
+- You must be **logged in** and have a **branch selected** in the header
 
-**Where:** **Settings** → **Data export** tab  
+**Where:** **Settings → Operations → Data export**
 
 ---
 
@@ -24,20 +24,22 @@ A **password-protected ZIP file** containing your school’s **database records*
 | Fees, attendance, assessments, results | Push notification tokens |
 | Messages, events, library/inventory records | Automatic cloud backup (you store the ZIP yourself) |
 
+Operational/security records are intentionally excluded, including push subscriptions, temporary assessment uploads, background generation jobs, export/audit logs, and billing payment events. Secret fields (passwords, PINs, tokens, API keys, public-statistics passwords, and Stripe identifiers/URLs) are stripped.
+
 The export is **encrypted twice**: the ZIP is locked with your **backup password**, and the data file inside is encrypted again for extra protection.
 
 ---
 
 ## Before you export
 
-1. Read the **security warning** and tick **I understand**.  
-2. Choose **scope**:  
-   - **Entire school (all branches)** — all active branches in your organisation  
-   - **Current branch only** — only the branch selected in the header  
-3. Enter your **Alma login password** (proves it is really you).  
-4. Choose a strong **backup password** (min. 12 characters, with upper and lower case, a number, and a symbol).  
-   - **Confirm** the backup password.  
-   - **Save this password somewhere safe** — Alma **cannot** reset or recover it.  
+1. Read the **security warning** and tick **I understand**.
+2. Choose **scope**:
+   - **Entire school (all branches)** — all active branches in your organisation
+   - **Current branch only** — only the branch selected in the header
+3. Enter your **Alma login password** (proves it is really you).
+4. Choose a strong **backup password** (min. 12 characters, with upper and lower case, a number, and a symbol).
+   - **Confirm** the backup password.
+   - **Save this password somewhere safe** — Alma **cannot** reset or recover it.
 5. Click **Export school data** and wait for the download (large schools may take a minute or two).
 
 ### Two passwords — do not mix them up
@@ -51,8 +53,9 @@ The export is **encrypted twice**: the ZIP is locked with your **backup password
 
 ## Limits
 
-- **One successful export per school every 24 hours** (across all branches).  
-- If you exported recently, the screen shows when you can export again.  
+- **One successful export per school every 24 hours** (across all branches).
+- After **10 failed attempts in one hour**, wait before trying again.
+- If you exported recently, the screen shows when you can export again.
 - **Single sign-on (Google/Microsoft) accounts** cannot export this way — use an admin account that signs in with email and password.
 
 ---
@@ -73,16 +76,15 @@ You need **both** the `.enc` and `.meta` files to decrypt.
 
 ### Step 1 — Open the ZIP
 
-Use **7-Zip**, **WinRAR**, or **Windows Explorer**.  
+Use **7-Zip**, **WinRAR**, or **Windows Explorer**.
 Password = your **backup password** (not your login password).
 
 ### Step 2 — Decrypt to readable JSON
 
 You need **[Node.js](https://nodejs.org/)** installed once on your computer.
 
-1. Extract the ZIP to a folder.  
-2. Copy the decrypt script from the Alma project:  
-   `backend/scripts/decrypt-school-export.mjs`  
+1. Extract the ZIP to a folder.
+2. Obtain `decrypt-school-export.mjs` from your NTG Alma administrator/support and copy it into that folder.
 3. Open a terminal in that folder and run:
 
 ```bash
@@ -95,16 +97,16 @@ Or with full paths:
 node decrypt-school-export.mjs school-data.json.enc school-data.json.enc.meta school-data.json
 ```
 
-4. Enter your **backup password** when prompted.  
+4. Enter your **backup password** when prompted.
 5. Open **`school-data.json`** in any text editor or JSON viewer.
 
 ---
 
 ## Keep your backup safe
 
-- Store on a **secure drive** or offline backup you control.  
-- **Do not** email the ZIP or put it in a **public** cloud folder.  
-- **Do not** share the backup password.  
+- Store on a **secure drive** or offline backup you control.
+- **Do not** email the ZIP or put it in a **public** cloud folder.
+- **Do not** share the backup password.
 - Your school is responsible for protecting exported personal data (GDPR / local rules may apply).
 
 ---
@@ -130,4 +132,4 @@ Phase 1 is **export only**. There is no **Import / Restore** button in Alma yet.
 
 ## Need help?
 
-Contact your Alma administrator or support if export fails repeatedly or you need the database migration applied on your server (`verify_user_password` for password checks).
+Contact your NTG Alma administrator or support if export fails repeatedly.

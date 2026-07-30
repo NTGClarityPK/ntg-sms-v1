@@ -1,76 +1,63 @@
 # ✅ Attendance
 
-Complete guide to attendance workflows in NTG Alma.
+Mark daily attendance, review history, and view a child’s record — one page with tabs.
 
 ## 📋 Overview
 
-Attendance in NTG Alma supports:
+**Path:** Sidebar → **Attendance**
 
-- Attendance overview (by permitted scope)
-- Attendance marking (role-based)
-- Attendance history
-- Child attendance views for parent/student context
+Single page with tabs (not separate sidebar destinations):
 
-{% @mermaid/diagram content="graph TB
-A[Attendance] --> B[Overview]
-A --> C[Mark Attendance]
-A --> D[History]
-A --> E[Child View (Parent/Student Context)]
-C --> F[Save]
-F --> G[Notifications (if enabled)]
-D --> H[Reports]" %}
+| Tab | Who sees it |
+| --- | --- |
+| **Mark Attendance** | Class/subject teachers with attendance **Edit** |
+| **Child Attendance** | **Parents only** (not students) |
+| **History** | Everyone with attendance access |
 
-## ✅ Attendance Overview
+Default tab: **Mark** for teachers with edit; **Child** for parents; otherwise **History**.
 
-### Viewing attendance
+There is **no Overview** tab.
 
-**Steps:**
-
-1. Go to **Attendance**
-2. Select date/class context (where applicable)
-3. Review attendance status list
+---
 
 ## ✍️ Mark Attendance
 
-Marking is available only to roles with the relevant permission.
+1. Choose **class section** and **date**.
+2. Set each student: **Present (P)**, **Absent (A)**, or **Late (L)** — **Excused** is **not** on the mark grid (it appears in history/stats).
+3. Optional **entry** and **exit** times per student, or bulk apply times to all.
+4. **Save**.
 
-### Marking attendance for a class
+Teachers typically see class sections they teach or own (class teacher scope).
 
-**Steps:**
+Marking **Absent** can create a linked absence record on the leaves side (status **absent** — not the same as an approved leave request).
 
-1. Go to **Attendance → Mark**
-2. Select the class section (if prompted)
-3. Mark attendance for students
-4. Save
+---
 
-## 🕒 Attendance History
+## 🕒 History
 
-### Viewing history
+Filter by class section, student, and date range. **Export** downloads **Excel (.xlsx)**.
 
-**Steps:**
+Stats on history views: **Present**, **Absent**, **Late**, **Excused**.
 
-1. Go to **Attendance → History**
-2. Filter by student/class/date range (where available)
-3. Review historical entries
+---
 
-## 👨‍👩‍👧‍👦 Child Attendance (Parent/Student Context)
+## 👨‍👩‍👧 Child Attendance (parents)
 
-Parents (and student context) can view child attendance via the child-specific attendance page.
+**Child Attendance** tab — does not require visiting **My Child** first; use the header **child switcher** if you act as a child elsewhere.
 
-**Steps:**
+Parents review their linked children’s attendance for selected dates.
 
-1. Ensure the correct child is selected (My Children)
-2. Go to **Attendance → Child**
-3. Review attendance for the selected child
+---
+
+## 💡 Tips & Best Practices
+
+- Apply bulk entry/exit times when the whole class arrives together.
+- Export history before month-end for records.
+
+---
 
 ## 🆘 Troubleshooting
 
-**Mark page not visible:**
-
-- Your role may have view-only access for attendance
-
-**Data doesn’t match expectations:**
-
-- Confirm branch context and active academic year
-- Confirm you’re viewing the correct class section/date
-
+**Mark tab missing:** Need teacher role + attendance **Edit**.
+**Child tab missing:** Parent role only — students use other views if offered.
+**Excused on reports but not when marking:** Excused is applied via other workflows (e.g. authorised early departure), not the P/A/L grid.

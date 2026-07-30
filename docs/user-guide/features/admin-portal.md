@@ -1,41 +1,55 @@
 # 🛠️ Admin Portal
 
-Operations console for **NTG platform administrators** (super-admin), not day-to-day school staff.
+Operations console for **NTG platform administrators** (`super_admin`) — not day-to-day school staff.
 
-## Who this is for
+## 📋 Overview
 
-- Super Admin / NTG operations accounts only
+**Base path:** `/adminportal` (separate shell from the school portal)
 
-## Where to find it
+Navigation: **Dashboard**, **Assign Branch**, **Tenants**, **Unlock Academic Year**, **Payment Model**, **Audit Trail**.
 
-Admin portal routes (separate from the school portal sidebar), including:
+---
 
-- Tenants
-- Payment models
-- Unlock academic year
-- Assign branch
-- Audit trail (also linked from school admin contexts where enabled)
+## 🏫 Tenants
 
-## What you can do
+Lists **Tenant**, **Domain**, **School Admins**, **Status**, **Actions**.
 
-| Area | Purpose |
-|------|---------|
-| **Tenants** | Create/update schools; set organisation fields including **default locale** |
-| **Payment models** | Configure commercial/payment model options used by billing |
-| **Unlock academic year** | Unlock a locked academic year when a school needs corrections |
-| **Assign branch** | Operational branch assignment helpers |
-| **Audit trail** | Review sensitive administrative actions |
+Actions: refresh, deactivate / restore, scheduled hard delete with a short **Undo delete** window.
 
-## Default language (tenants)
+The Tenants UI does **not** create or edit tenant records and has **no** default-locale control. School default language is set in the school portal under **Settings → Business Info**.
 
-Tenant/organisation **default locale** can be set from Admin → Tenants (as well as from the school Settings → Business Information for school admins). Options: English (UK), English (US), Arabic. See [Settings & Configuration](settings-and-configuration.md).
+---
 
-## Security note
+## 💳 Payment Model
 
-Admin portal actions are privileged. Use named ops accounts with `super_admin` roles — do not rely on legacy email-domain elevation flags in production.
+Subscription **override** screen for each school (route may say “payment models”).
 
-## Related
+Shows plan, status, students, branches, period end. **Edit** plan, billing cycle, and notes (saving clears pending subscription changes). **Sync usage** refreshes recorded usage counters.
 
-- [Audit Trail](audit-trail.md)
-- [Billing & Subscription](billing.md)
-- [Settings & Configuration](settings-and-configuration.md)
+School-facing checkout remains on [💳 Billing & Subscription](billing.md).
+
+---
+
+## 🔓 Unlock Academic Year
+
+Unlock a locked academic year when a school needs corrections after rollover locks.
+
+---
+
+## 🧾 Audit Trail
+
+Only here: `/adminportal/audit-trail`. See [🧾 Audit Trail](audit-trail.md).
+
+---
+
+## 🔐 Security note
+
+Use named ops accounts with `super_admin`. Do not rely on legacy email-domain elevation in production.
+
+---
+
+## 🆘 Troubleshooting
+
+**Redirected away from adminportal:** Account is not super admin.
+
+**Looking for default locale on Tenants:** Use the school’s **Settings → Business Info** instead.

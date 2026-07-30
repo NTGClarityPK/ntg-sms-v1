@@ -1,66 +1,59 @@
 # 📅 Events
 
-Complete guide to the events module in NTG Alma.
+School events, optional parent consent, and personal **My Events**.
 
 ## 📋 Overview
 
-Events in NTG Alma include:
+| Path | Audience |
+| --- | --- |
+| **Events** | Staff — list, create, edit, delete |
+| **My Events** | Students, parents, staff — events relevant to you |
 
-- Events list
-- Create event (role-based)
-- View event details
-- Edit event (role-based)
-- My Events view
+List filters: status (All / Upcoming / Past), **Requires consent**, date range.
 
-{% @mermaid/diagram content="graph TB
-A[Events] --> B[List]
-B --> C[Create]
-B --> D[View Details]
-D --> E[Edit]
-A --> F[My Events]" %}
+Status badges: **Upcoming**, **Ongoing**, **Past**. Conflict warnings may appear when events overlap assessments or other events.
 
-## 📅 Events List
+---
 
-### Viewing events
+## 📅 Events list (staff)
 
-**Steps:**
+1. Open **Events**.
+2. Filter by status, consent flag, or dates.
+3. Row actions: view, edit, delete.
 
-1. Go to **Events**
-2. Filter/search (where available)
-3. Open an event to view details
+**Note:** The search box is visible but **not wired** to the API in the current build — use status and date filters instead.
 
-## ➕ Create Event
+---
 
-Creation is available to roles with permission.
+## ➕ Create and edit
 
-**Steps:**
+**Events → Create** (edit permission): title, dates, description, audience, **Requires consent** flag, and related fields on the form.
 
-1. Go to **Events → Create**
-2. Enter event details
-3. Save
+When **Requires consent** is on, parents respond through the consent workflow (approve/decline) tied to **My Events** and notifications.
 
-## ✏️ Edit Event
+**Edit** and **Delete** are available from the event detail/list menus for permitted roles.
 
-Editing is available to roles with permission.
-
-**Steps:**
-
-1. Open an event
-2. Go to **Edit**
-3. Update details
-4. Save
+---
 
 ## 🙋 My Events
 
-Use **My Events** to view events relevant to you (role-based visibility).
+**Path:** Sidebar → **My Events**
+
+Shows events for your role — including consent prompts for parents when required.
+
+Also linked from the [🏠 Dashboard](dashboard.md) parent and teacher panels.
+
+---
+
+## 💡 Tips & Best Practices
+
+- Enable **Requires consent** for trips that need a parental yes/no.
+- Check conflict badges before publishing overlapping exam weeks.
+
+---
 
 ## 🆘 Troubleshooting
 
-**Create/Edit buttons missing:**
-
-- Your role may not have edit permission for events
-
-**Events list is empty:**
-
-- Confirm branch context and active academic year
-
+**Search does nothing:** Known limitation — filter by date/status until search is connected.
+**Create missing:** Events **Edit** permission.
+**Parent sees no consent:** Event may not require consent, or child context is wrong.

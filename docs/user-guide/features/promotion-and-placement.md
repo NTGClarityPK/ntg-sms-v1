@@ -1,37 +1,49 @@
 # 🎯 Promotion & Placement
 
-Move students between classes/sections at year-end or mid-year, and manage placement decisions.
+Record year-end (or mid-cycle) outcomes for students — promote, repeat, graduate, and more.
 
-## Who this is for
+## 📋 Overview
 
-- School Admin / Principal / Academic Coordinator
-- Staff with promotion & placement permissions
+**Path:** Sidebar → **Promotions** (`/promotion-placement`)
 
-## Where to find it
+Visibility follows **Students** permissions (not a separate promotion permission). Parents and students do not get this link by default.
 
-Sidebar → **Promotion & Placement**
+---
 
-## What you can do
+## 📌 Outcomes (six)
 
-- Review eligible students for the active (or target) academic year
-- Promote, retain, or place students into destination class sections
-- Confirm bulk placement results
+| Outcome | Meaning |
+| --- | --- |
+| **Promoted** | Moves to a **target class** and **target section** (required) |
+| **Repeated** | Stays in current class and section (replaces old “Retain” wording) |
+| **Graduated** | Completed schooling path |
+| **Transferred out** | Left for another school |
+| **Withdrawn** | Withdrawn from enrolment |
+| **Inactive** | Marked inactive |
 
-## Typical workflow
+---
 
-1. Ensure the target academic year and destination classes exist in Settings
-2. Open **Promotion & Placement**
-3. Select source class/section and destination
-4. Review the student list
-5. Confirm promotion/placement
+## ✏️ Workflow
 
-## Tips
+1. Select **Academic year** and optional **Class-section**.
+2. Set each student’s outcome (and targets for **Promoted**).
+3. Optional bulk: **Promote all**, **Repeat all**, **Graduate all**.
+4. Click **Save** — decisions write **immediately**. There is **no** confirmation dialog.
 
-- Complete result cards / final marks policies before mass promotion where your school requires them
-- Double-check the **active academic year** before confirming
+Year locking / rollover is blocked while students are still missing decisions.
 
-## Related
+---
 
-- [Students](students.md)
-- [Academic Year Logic](../user-manual/academic-year-logic.md)
-- [Results](results.md)
+## 💡 Tips & Best Practices
+
+- Create destination class sections under **Class** before promoting.
+- Double-check the academic year before **Save** — there is no undo prompt.
+- Use **Repeated** (not “retain”) when documenting hold-back.
+
+---
+
+## 🆘 Troubleshooting
+
+**Cannot lock or roll the year:** Complete outcomes for every student in scope.
+
+**Related:** [🎓 Students](students.md), [🧩 Class](class-sections.md), [📅 Academic Year Logic](../user-manual/academic-year-logic.md)

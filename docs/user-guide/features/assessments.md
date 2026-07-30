@@ -1,85 +1,74 @@
 # 📝 Assessments
 
-Complete guide to assessment workflows in NTG Alma.
+Create assessments, enter grades, view statistics, and export examination schedules.
 
 ## 📋 Overview
 
-Assessments in NTG Alma include:
+| Audience | Path | Purpose |
+| --- | --- | --- |
+| Staff (assessment permission) | **Assessments** | List, create, edit, grades, statistics |
+| Students / parents | **My Assessments** | View class assessments, materials, examination schedule |
 
-- Assessment listing
-- Assessment creation and editing (role-based)
-- Per-assessment grades view
-- Per-assessment statistics view
-- “My Assessments” (teacher-facing view where enabled)
+There is **no** standalone assessment “detail” page — use list actions → **Grades** or **Statistics**.
 
-{% @mermaid/diagram content="graph TB
-A[Assessments] --> B[List]
-B --> C[Create]
-B --> D[Edit]
-B --> E[Grades]
-B --> F[Statistics]
-G[My Assessments] --> B" %}
+Assessment types and grade templates: **Settings → Academic** → Assessment Settings.
 
-## 📄 Assessments List
+---
 
-### Viewing assessments
+## 📄 Assessments list
 
-**Steps:**
+**Tabs:** **All assessments** | **Examination schedule**
 
-1. Go to **Assessments**
-2. Filter/search (where available)
-3. Open an assessment to view details
+Filters: search, class section, subject, published state, assessment type, teacher. Pagination. Row menu: view grades, statistics, edit, delete, export schedule PDF (where offered).
 
-## ➕ Create Assessment
+---
 
-Creation is available only for roles with permission.
+## ➕ Create assessment
 
-**Steps:**
+**Assessments → Create** (edit permission)
 
-1. Go to **Assessments → Create**
-2. Fill assessment details (class/subject/date/marks as required)
-3. Save
+Three creation modes:
 
-## ✏️ Edit Assessment
+| Mode | Use |
+| --- | --- |
+| **Single Class Section** | One class-section + subject |
+| **Class template** | From a subject template across matching sections |
+| **Class Sections** | Pick multiple sections for the same class |
 
-**Steps:**
+Fields include title, type, due date/time, total marks, publish flag, attachments (compressed on create), and Google Classroom link when integrated.
 
-1. Open an assessment
-2. Go to **Edit**
-3. Update details
-4. Save
+---
 
-## 🧮 Grades
+## 🧮 Grades and rubrics
 
-Grades for an assessment can be reviewed on the assessment Grades page.
+**Grades** page: enter marks per student. Attach an Alma rubric from **Settings → Integrations** presets; expand criterion rows **after** saving the base grade. Google Classroom–linked assessments show read-only Classroom rubrics — **Pull grades** to sync.
 
-**Steps:**
-
-1. Open an assessment
-2. Go to **Grades**
-3. Review available grading information
+---
 
 ## 📈 Statistics
 
-Statistics can be reviewed on the assessment Statistics page.
+Per-assessment summary and status indicators for class performance (open from list → **Statistics**).
 
-**Steps:**
+---
 
-1. Open an assessment
-2. Go to **Statistics**
-3. Review summary statistics and indicators shown by the portal
+## 📅 Examination schedule
 
-## 👨‍🏫 My Assessments
+**Examination schedule** tab: filter and **Export PDF** for the branch examination timetable.
 
-Teachers can use **My Assessments** (where enabled) to view assessments relevant to their assignments.
+---
+
+## 👨‍🎓 My Assessments (students / parents)
+
+**Path:** Sidebar → **My Assessments** (or student dashboard links)
+
+Tabs: assessments list and examination schedule. Download attachments, update status where allowed. Parents/students in **child session** see the selected child’s assessments.
+
+Not a teacher workload view — teachers use **Assessments** list and dashboard **Pending grading**.
+
+---
 
 ## 🆘 Troubleshooting
 
-**Create/Edit options are missing:**
-
-- Your role may not have edit permissions for assessments
-
-**Grades/Statistics pages are empty:**
-
-- Confirm assessment data exists for the active academic year and current branch
-
+**Create missing:** Assessment **Edit** permission required.
+**My Assessments empty:** Wrong child context or nothing published for the class.
+**Rubric row won’t expand:** Save base grade first — see [📐 Rubrics](rubrics.md).

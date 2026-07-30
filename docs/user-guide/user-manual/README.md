@@ -16,7 +16,7 @@ Welcome to the NTG Alma! This manual will guide you through using the portal for
 
 * 👨‍💼 **Administrative Staff** - Support operational workflows (students, staff, attendance support, reports) based on assigned permissions
 * 👨‍🏫 **Teachers** - Attendance, assessments, behavioural entries, timetable and schedule views (role-based)
-* 🧑‍⚕️ **Guidance Counsellor** - Behavioural modules and related reporting (role-based)
+* 🧑‍⚕️ **Guidance Counselor** - Behavioural modules and related reporting (role-based)
 
 **Parents & Students:**
 
@@ -261,8 +261,9 @@ Use timetable pages to:
 
 Use behavioural pages to:
 
-* View behavioural overview
-* Support assessment entry workflows (role-limited)
+* Review the class-section × attribute **Matrix**
+* Track **Pending this month**
+* Support 1–5 star assessment entry (role-limited)
 
 ***
 
@@ -509,13 +510,13 @@ Use Conflict Management to review and resolve timetable-related conflicts where 
 
 ## ⭐ Behavioural
 
-### Behavioural Overview
+### Matrix
 
-Use Behavioural pages to view behavioural information accessible to your role.
+Select class section and month, rate configured attributes from 1–5 stars, then save each student row.
 
-### Behavioural Assessment Entry
+### Pending this month
 
-If enabled, use the Behavioural Assess page to submit behavioural assessments.
+Review students in your assigned class sections who have not yet been assessed for the current month.
 
 ***
 

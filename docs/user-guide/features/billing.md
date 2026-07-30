@@ -1,44 +1,61 @@
 # 💳 Billing & Subscription
 
-Manage your school's Alma subscription plan, invoices, and payment status.
+School subscription plan, usage against limits, invoices, and Stripe checkout.
 
-## Who this is for
+## 📋 Overview
 
-- School Admin (primary)
-- Other roles only if granted access
+**Path:** Sidebar → **Billing**
 
-## Where to find it
+**School admin only** — other roles are redirected to the Dashboard.
 
-Sidebar → **Billing** (school-admin gated on many plans)
+| Plan | Typical positioning |
+| --- | --- |
+| **Free** | Entry limits; many modules gated |
+| **Starter** | Includes e.g. Fee management |
+| **Pro** | Adds e.g. Library, behavioural tracking |
+| **Enterprise** | Highest limits — **Contact sales** for commercial path |
 
-## What you can do
+Billing cycle: **Monthly** or **Yearly** (yearly shows about **10%** saving on the UI).
 
-- View current plan and feature entitlements
-- Review invoices and payment status
-- Start checkout / **Pay Now** when online payments are enabled for your deployment
-- Understand which portal modules are included in your plan
+Certificates are **not** hidden by subscription plan entitlements.
 
-## Typical workflow
+---
 
-1. Open **Billing**
-2. Review plan name, period, and outstanding invoices
-3. If payment is due and **Pay Now** is available, complete checkout
-4. After payment succeeds, confirm invoice status updates
+## 📦 What the page shows
 
-## Notes
+- **Current Plan** and any scheduled change
+- Plan cards to compare / upgrade
+- **Current Usage** — Branches, Students, Staff users, Classes vs plan limits
+- **Billing History** — invoices
 
-- Some modules (for example fees, certificates, or advanced reports) may be hidden until included in your plan
-- If **Pay Now** is missing, your organisation may be on manual/offline billing — contact NTG support
+---
 
-## Troubleshooting
+## 💶 Invoices and Pay now
 
-| Problem | What to try |
-|---------|-------------|
-| Billing menu missing | Confirm you are school admin on the current branch |
-| Pay Now missing | Online payments may be disabled for this environment |
-| Features disappeared after plan change | Check plan entitlements; contact support if unexpected |
+| Status | Meaning |
+| --- | --- |
+| **DRAFT** | Not final |
+| **OPEN** | Payable |
+| **PAID** | Settled |
+| **VOID** / **UNCOLLECTIBLE** | Closed without payment |
 
-## Related
+**Pay now** appears for an open, positive-value invoice when Stripe checkout is enabled and the invoice is not already tied to a pending upgrade. Download PDF/hosted invoice where available. **Manage payment methods** opens the Stripe customer portal.
 
-- [Fee Management](fee-management.md) — student challans and collections (school operations)
-- [Settings & Configuration](settings-and-configuration.md)
+If **Pay now** is missing, online payments may be off for this deployment — contact NTG support for manual billing.
+
+---
+
+## 💡 Tips & Best Practices
+
+- Watch **Current Usage** before adding branches or bulk-importing students.
+- Prefer yearly billing when the saving badge matches your budget cycle.
+
+---
+
+## 🆘 Troubleshooting
+
+**Billing menu missing:** Sign in as school admin.
+
+**Features disappeared after a plan change:** Check entitlements on this page; contact support if unexpected.
+
+**Related:** [💵 Fee Management](fee-management.md) (student challans — separate from Alma subscription billing).

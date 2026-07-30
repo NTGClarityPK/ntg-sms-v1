@@ -191,9 +191,9 @@ See [**Features**](features/README.md) for the complete catalogue. Highlights:
 **Publishing Results:**
 
 1. Go to Results and select the class
-2. Create draft cards
-3. Add teacher comments
-4. Publish and send to parents
+2. Create each required draft card
+3. Add the class teacher comment
+4. Publish for parents; parents download it under **My Child**
 
 ## 🆘 Troubleshooting
 

@@ -1,74 +1,105 @@
 # 👥 User Roles
 
-Complete guide to users, roles, and permissions-driven access in NTG Alma.
+Users, roles, and branch-scoped permissions that drive the sidebar and actions.
 
 ## 📋 Overview
 
-NTG Alma uses role-based access control:
+| Concept | Behaviour |
+| --- | --- |
+| **Roles** | One user can hold several roles (except parent + staff mix — not allowed) |
+| **Permissions** | Per **branch**: **None**, **View**, or **Edit** per feature |
+| **Sidebar** | Hidden if None; actions disabled or hidden if View only |
+| **Plan** | Some modules also need subscription features (fees, library, inventory, behavioural) |
 
-- Users can have one or more roles
-- Feature visibility (including sidebar items) depends on permissions
-- Some features are view-only for certain roles and editable for others
+School admin and super admin bypass the permission matrix.
 
-{% @mermaid/diagram content="graph TB
-A[User] --> B[One or more Roles]
-B --> C[Permissions per Feature]
-C --> D[Portal Visibility]
-C --> E[Allowed Actions]
-F[Branch Context] --> D
-F --> E" %}
+Configure under **Settings → Permissions** — tabs **Assign Access** and **Role Access View**.
+
+---
 
 ## 👤 Users
 
-### Viewing users
+**Path:** Sidebar → **Users** (Staff menu redirects here)
 
-**Steps:**
+### Filters and list
 
-1. Go to **Users**
-2. Use search/filter controls (where available)
-3. Open a user to view details
+- Search by name or email
+- **Role** multi-filter
+- Status chips: **All**, **Active**, **Inactive**
+- Sortable columns; paginated (20 per page)
 
-### Common user attributes (typical)
+### Account statuses
 
-- Name / email (as available)
-- Role assignments
-- Branch membership (if applicable)
+| Badge | Meaning |
+| --- | --- |
+| **Active** | Can sign in |
+| **Inactive** | Deactivated |
+| **Pending verification** | Invited, not finished setup |
+| **Link expired** | Invitation expired — use **Resend invitation** |
 
-## 🧩 Roles
+### Login identifiers
 
-Roles represent what type of user someone is within the school context.
+- **Staff** — often `username@school-domain` from invitation setup
+- **Parents** — their own email
+- **Students** — school-issued credentials; parents manage PINs on [🔐 Authentication & Access](authentication-and-access.md) → **PIN Management**
 
-Examples used in the system include:
+Invited users complete account setup at **`/setup?token=…`** (see Authentication guide).
 
-- School Admin, Principal, Academic Coordinator
+### Actions (edit permission)
+
+Create user, edit roles, activate/deactivate, resend invitation, view linked students for parents.
+
+---
+
+## 🧩 Roles in NTG Alma
+
+Examples (UI spelling):
+
+- School Admin, Principal, Academic Coordinator, **Admin Assistant**
 - Class Teacher, Subject Teacher
-- Guidance Counsellor
+- **Guidance Counselor** (US spelling in the portal)
 - Parent, Student
-- Super Admin
+- Super Admin (platform — Admin Portal)
 
-## 🛡️ Permissions
+---
 
-Permissions determine:
+## 🛡️ Permissions matrix
 
-- Which modules appear in the sidebar
-- Which pages/actions a user can access
+**Settings → Permissions → Assign Access**
 
-### If you can’t see a module
+- Rows: roles (except school admin / super admin)
+- Columns: features (Dashboard, Students, Users, Mapping, etc.)
+- Values: **None** / **View** / **Edit**
 
-Check:
+**Role Access View** summarises edit/view/none counts per role with filters.
 
-1. Your assigned role(s)
-2. Your permissions configuration for that role
-3. Your current branch selection/context
-4. For parents: whether you’re in child context
+Special rules:
+
+- **Student** row: **Assessment** cell is disabled — students use **My Assessments**
+- **Student leave requests**: class-section picker on the same tab limits which classes students may raise leaves for
+
+---
+
+## 👪 Parent and child context
+
+Parents switch child session from the **header child switcher**, not from **My Child** alone. See [👨‍👩‍👧 Parent Associations](parent-associations.md).
+
+**My-* portal views** (when permitted):
+
+| View | Path |
+| --- | --- |
+| My Child | `/my-children` |
+| My Assessments | `/my-assessments` |
+| My Timetable | `/my-timetable` |
+| My Events | `/my-events` |
+| My Certificates | `/my-certificates` |
+| My Fees | **Fees** (parent tab) |
+| My Schedule | `/my-schedule` (teachers) |
+
+---
 
 ## 🆘 Troubleshooting
 
-**I can see the module but actions are disabled:**
-
-- Your permission may be **View** rather than **Edit**
-
-**I can’t see Users at all:**
-
-- Users management is restricted to roles that have permissions enabled for that module
-
+**Module visible but buttons missing:** Permission is **View**, not **Edit**.
+**Users page hidden:** No **user_management** access.
+**Cannot mix parent and staff on one account:** Create separate users.

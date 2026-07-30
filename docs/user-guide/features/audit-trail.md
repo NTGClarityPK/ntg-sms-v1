@@ -1,31 +1,27 @@
 # 🧾 Audit Trail
 
-Complete guide to audit trail visibility in NTG Alma.
+Platform-level log of create / update / delete actions for NTG operations.
 
 ## 📋 Overview
 
-Audit trails are used to review system activity and changes for accountability and troubleshooting.
+**Path:** **Admin Portal → Audit Trail** (`/adminportal/audit-trail`)
 
-{% @mermaid/diagram content="graph TB
-A[System Action] --> B[Audit Entry]
-B --> C[Audit Trail Page]
-C --> D[Filter/Search]
-C --> E[Review Details]" %}
+**Super admin only.** Not available to school admins and not in the school portal sidebar.
 
-## 🧾 Viewing Audit Trail
+---
 
-Audit-related pages are available under the admin portal routes.
+## 🔍 Filters and table
 
-**Steps:**
+Filters: **Username**, **Table**, **Action**, **Start Date**, **End Date**.
 
-1. Navigate to the **Admin Portal**
-2. Open **Audit Trail**
-3. Filter/search entries (where available)
-4. Review activity details
+Actions: **Create**, **Update**, **Delete**.
+
+Columns: Timestamp, Action, Table, Record ID, User, Branch, Details.
+
+Detail view may include changed fields, old/new values, IP address, and user agent when recorded.
+
+---
 
 ## 🆘 Troubleshooting
 
-**Audit Trail not visible:**
-
-- Audit trail is restricted to admin-only roles/permissions
-
+**Cannot see Audit Trail:** You need a **super admin** Admin Portal session — school portal roles never unlock this page.

@@ -1,42 +1,58 @@
 # 🪪 ID Cards
 
-Generate student (and related) ID cards for printing.
+Generate student and staff ID cards, move them through draft → issued, and download ZIP packs.
 
-## Who this is for
+## 📋 Overview
 
-- School Admin / staff with ID card permissions
+**Path:** Sidebar → **ID Cards**
 
-## Where to find it
+Supported managers: **School admin**, **Principal**, **Super admin** (backend). Do not rely on other roles even if a nav link appears.
 
-Sidebar → **ID Cards** (generate / view flows)
+Tabs: **Generate**, **Students**, **Staff**.
 
-## What you can do
+---
 
-- Select class or students
-- Generate ID card layouts
-- Download print-ready output
-- Review previously generated cards
+## 🪄 Generate
 
-## Typical workflow
+1. Choose **Student** or **Staff** recipients.
+2. Pick class section, staff role, or individual staff.
+3. Choose **Classic** or **Minimal** design.
+4. Upload optional photos (JPG / PNG / WebP, max **5 MB**) or **Skip**.
+5. Review → **Generate now**.
+6. **Download PDF (ZIP)**.
 
-1. Open **ID Cards**
-2. Choose the class/section or students
-3. Generate cards
-4. Download and print
+Missing photos do not block generation — cards start as **Draft**.
 
-## Tips
+---
 
-- Ensure student photos and required fields are filled before bulk generation
-- Use the active academic year class sections
+## 📌 Statuses
 
-## Troubleshooting
+**Draft → Approved → Printed → Issued** (also **Revoked**). Reprinted cards show **Reissued**.
 
-| Problem | What to try |
-|---------|-------------|
-| Missing photos | Update student profiles, then regenerate |
-| Wrong class list | Confirm active academic year and class section |
+---
 
-## Related
+## 👥 Students / Staff tabs
 
-- [Students](students.md)
-- [Certificates](certificates.md)
+- Search by name or card number
+- Filter by status; filter missing photos
+- Bulk select → **Approve selected**, **Download ZIP**
+- Per card: download PDF or **Edit**
+
+### Detail page
+
+Preview, upload/replace photo, change status, request **reprint** (mandatory reason, optional fee).
+
+---
+
+## 💡 Tips & Best Practices
+
+- Upload photos before bulk issue when print quality matters.
+- Approve in batches, then download ZIP for the print shop.
+
+---
+
+## 🆘 Troubleshooting
+
+**API / access error for coordinator roles:** Card management is limited to school admin, principal, and super admin.
+
+**Cannot reprint:** Provide a reason on the detail page.

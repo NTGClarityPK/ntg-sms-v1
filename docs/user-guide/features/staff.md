@@ -1,56 +1,86 @@
 # 👨‍🏫 Staff
 
-Complete guide to staff management and schedules in NTG Alma.
+How staff accounts, teaching assignments, and schedules work in NTG Alma.
 
 ## 📋 Overview
 
-Staff data is used for:
+There is **no separate Staff list page**. Opening **Staff** sends you to **Users**, where you create and manage staff accounts. Teaching assignments and weekly timetables live elsewhere.
 
-- Teacher mapping / assignments
-- “My Schedule” and staff schedule views
-- Timetable conflict visibility (where applicable)
+| Need | Where |
+| --- | --- |
+| Create / invite / edit staff users | **Users** |
+| Assign teachers to classes and subjects | **Mapping → Teacher–Class** |
+| Weekly timetable for yourself | **My Schedule** (teachers) |
+| Assignment summary for one teacher | `/staff/{id}/schedule` (class teacher of / subject assignments — not a day/time grid) |
 
-{% @mermaid/diagram content="graph TB
-A[Staff] --> B[Roles]
-A --> C[Teacher Mapping]
-C --> D[My Schedule]
-C --> E[Staff Schedule]
-E --> F[Timetable Views]" %}
+---
 
-## 👥 Staff List
+## 👥 Users (staff administration)
 
-### Viewing staff
+**Path:** Sidebar → **Users** (or **Staff**, which redirects here)
 
-**Steps:**
+Use **Users** to:
 
-1. Go to **Staff**
-2. Search/filter (where available)
-3. Open a staff member to view details
+- Invite and manage staff with teaching or admin roles
+- Filter by role and account status
+- Resend invitations when a link has expired
+- Activate or deactivate accounts
 
-## 🗓️ Staff Schedule
+Staff typically sign in with the login email shown after invitation setup (often username@school-domain). Parents use their own email accounts. Mixing parent and staff roles on one account is not allowed.
 
-### Viewing a staff member’s schedule
+For permission levels, see [👥 User Roles](user-roles.md).
 
-**Steps:**
+---
 
-1. Go to **Staff**
-2. Select a staff member
-3. Open **Schedule**
+## 🗺️ Teacher–Class mapping
 
-### My Schedule (Teachers)
+**Path:** **Mapping → Teacher–Class**
 
-Teachers can use **My Schedule** to view their schedule for the current branch context.
+(Legacy **Teacher mapping** and **Parent associations** URLs redirect into **Mapping** tabs.)
 
-**Steps:**
+- **List view** or **Matrix view**
+- **Create assignment** to link a teacher to a subject and class section
+- Matrix: fill teachers across subject × class-section cells
 
-1. Go to **My Schedule**
-2. Review scheduled sessions by day/time
+Class teacher vs subject teacher badges appear on the per-teacher schedule summary page.
+
+---
+
+## 🗓️ Schedules
+
+### My Schedule (teachers)
+
+**Path:** Sidebar → **My Schedule**
+
+Shows your **weekly timetable slots** and free periods for the current branch and academic year. You need a linked staff record; otherwise the page explains that none was found.
+
+Students use **My Timetable** instead (teachers are redirected from that route to **My Schedule**).
+
+### Teacher schedule summary (assignments)
+
+**Path:** `/staff/{id}/schedule` (opened from admin flows as **Teacher Schedule: {name}**)
+
+Lists:
+
+- **Class Teacher Of** — class and section
+- **Subject Assignments** — subject and class section
+
+This is **not** a period-by-period timetable. For day/time grids, use **My Schedule** or the main **Timetable** module.
+
+---
+
+## 💡 Tips & Best Practices
+
+- Invite staff from **Users**, then assign teaching load under **Mapping** before expecting **My Schedule** to fill.
+- Confirm the active academic year and branch when a schedule looks empty.
+- Use timetable admin tools for conflict checks; assignment pages alone do not show period clashes.
+
+---
 
 ## 🆘 Troubleshooting
 
-**My Schedule is empty:**
+**Staff menu opens Users:** Expected — staff records are managed on **Users**.
 
-- Confirm you’re in the correct branch
-- Confirm teacher mapping and timetable data exists for the active academic year
-- Confirm your role has access to My Schedule
+**My Schedule is empty:** Confirm branch, academic year, teacher mapping, and that a timetable exists for your assignments.
 
+**I only see class/subject lists, not times:** You are on the assignment summary (`/staff/.../schedule`). Open **My Schedule** for weekly slots.

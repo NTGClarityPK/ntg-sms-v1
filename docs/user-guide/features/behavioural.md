@@ -1,48 +1,47 @@
 # ⭐ Behavioural
 
-Complete guide to the behavioural module in NTG Alma.
+Star ratings for behavioural attributes by class section and month.
 
 ## 📋 Overview
 
-The behavioural module provides:
+**Path:** Sidebar → **Behavioural** (`/behavioral`)
+Titles: **Behavioural Assessment** (desktop) / **Behavioural** (mobile)
 
-- Behavioural overview page
-- Behavioural assessment entry flow (role-limited)
+Requires plan feature **Behavioural tracking** (**Pro** / **Enterprise**). Sidebar typically for class/subject teachers, guidance counselor, principal, school admin. Recording needs **edit** on the behavioural feature.
 
-{% @mermaid/diagram content="graph TB
-A[Behavioural] --> B[Overview]
-A --> C[Assess Behaviour]
-C --> D[Submit]
-D --> E[Available in Reporting (where enabled)]" %}
+Tabs: **Matrix** and **Pending this month** (there is no Overview tab).
 
-## ⭐ Behavioural Overview
+---
 
-### Viewing behavioural information
+## ⭐ Matrix
 
-**Steps:**
+1. Filter **Class section** and **Month**.
+2. Rows = students; columns = configured attributes.
+3. Rate each cell **1–5 stars**.
+4. **Save** on that student’s row.
 
-1. Go to **Behavioural**
-2. Review behavioural summaries and available views
+Default attributes (configurable): Discipline, Respect & Courtesy, Class Engagement, Work Habits, Extracurriculars.
 
-## ✍️ Behavioural Assessment Entry
+---
 
-Behavioural entry is only available to roles that can assess behaviour.
+## ⏳ Pending this month
 
-**Steps:**
+Lists students in your assigned class sections who still lack an assessment for the current month.
 
-1. Go to **Behavioural → Assess**
-2. Select the scope (class/student) if prompted
-3. Enter behavioural ratings/values as required by the form
-4. Submit
+---
+
+## ⚙️ Settings
+
+**Settings → General → Behavioural assessment**
+
+- **Enable behavioural assessment**
+- **Mandatory** (stored configuration — do not assume extra enforcement beyond what the UI shows)
+- Add / remove assessment attributes
+
+---
 
 ## 🆘 Troubleshooting
 
-**Assess page not visible:**
+**Module missing:** Plan may not include behavioural tracking, or role lacks access.
 
-- Your role may not be permitted to assess behavioural data
-
-**No items to assess:**
-
-- Confirm active academic year and branch context
-- Confirm behavioural settings are enabled/configured
-
+**Pending list empty:** Either everyone is rated for the month, or you have no class-teacher sections assigned.

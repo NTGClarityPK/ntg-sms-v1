@@ -8,9 +8,9 @@ Short guide for staff who arrange cover when a teacher is absent.
 | --- | --- |
 | **School admin / Principal / Academic coordinator** | Create and cancel substitutions, view history, export data |
 | **Any teacher (substitute)** | See **My substitution assignments** and app notifications |
-| **All staff with timetable access** | See **SUB** badges on the class timetable when cover is active |
+| **Staff with substitution view access** | See **SUB** badges on the class timetable when cover is active |
 
-Permissions are set under **Settings → Roles** (`teacher_substitution`).
+Permissions are set under **Settings → Permissions** (`teacher_substitution`).
 
 ---
 
@@ -50,7 +50,7 @@ You will see:
 - **Suggested substitutes** — ranked by fit (subject, free periods, recent load)
 - **Other available teachers** — expand if you need more options
 
-Each teacher row shows availability (available / partial / unavailable) and how many substitutions they already did this month. A **high load** warning appears if they are heavily used.
+Each teacher row shows availability (available / partial / unavailable) and how many substitutions they already did this month. Assignment is blocked when the selected substitute already has **more than 8** substitutions that month.
 
 **Two ways to confirm:**
 
@@ -66,7 +66,7 @@ After success you return to the Substitution page. The substitute receives a not
 - Filter by **this week**, **this month**, or a **custom date range**
 - Table of past substitutions (absent teacher, substitute, period, status)
 - **Export CSV** for records
-- **Substitution load** chart — shows how many times each teacher covered in the range; teachers over **10** substitutions in the month are flagged as overloaded
+- **Substitution load** chart — shows how many times each teacher covered in the range; counts over **10** are flagged as overloaded
 - Remove a row with the bin icon (same 1-hour rule as on the dashboard)
 
 ---
@@ -96,7 +96,7 @@ You see your upcoming cover: date, period, class, and who you are covering for. 
 | --- | --- |
 | **Confirmed** | Cover is set; substitute was notified |
 | **Pending** | Rare in normal flow; may appear for older data |
-| **Completed** | Period has passed |
+| **Completed** | Explicit stored status; it is **not** applied automatically just because the period has passed |
 | **Cancelled** | Removed before the period |
 
 ---

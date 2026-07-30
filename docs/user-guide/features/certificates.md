@@ -1,45 +1,70 @@
 # 🏆 Certificates
 
-Generate and manage student certificates from templates configured for your school.
+Issue branded certificates, review history, and configure branding on the Certificates page.
 
-## Who this is for
+## 📋 Overview
 
-- School Admin / Principal / Academic Coordinator (configuration)
-- Staff with certificate permissions (generation)
-- Students / parents may view **My Certificates** where enabled
+| Path | Audience |
+| --- | --- |
+| **Certificates** (`/certificates`) | Staff with certificate permissions |
+| **My Certificates** (`/my-certificates`) | Students / parents with view access |
 
-## Where to find it
+Tabs on **Certificates**: **Issue certificate**, **Certificate history**, **Settings**.
 
-- Sidebar → **Certificates**
-- **My Certificates** (self-service views where enabled)
-- **Settings →** certificate-related configuration (templates)
+Branding lives on **Certificates → Settings** — not under the main Settings sidebar. `/settings/certificates` redirects to Certificates Settings.
 
-## What you can do
+Defaults: school admin / principal edit; coordinator, admin assistant, class teacher often view.
 
-- Choose a certificate template
-- Select students / class context
-- Generate certificate PDFs
-- Download or share issued certificates
-- Review previously generated certificates
+---
 
-## Typical workflow
+## 📜 Certificate types (seven)
 
-1. Ensure certificate templates are configured in Settings
-2. Open **Certificates**
-3. Select template and students
-4. Generate and download
-5. Students/parents open **My Certificates** if that portal entry is enabled
+1. Sports achievement
+2. Academic excellence
+3. Promotion
+4. Participation
+5. Custom certificate
+6. Leaving certificate
+7. Character certificate
 
-## Troubleshooting
+Leaving certificates list only students marked **Graduated**, **Transferred out**, or **Withdrawn**.
 
-| Problem | What to try |
-|---------|-------------|
-| No templates listed | Ask an admin to configure certificate templates in Settings |
-| Generate fails | Confirm student data (name, class) is complete for the active year |
-| My Certificates empty | Certificate may not be published/shared yet |
+---
 
-## Related
+## 🪄 Issue wizard
 
-- [ID Cards](id-cards.md)
-- [Students](students.md)
-- [Settings & Configuration](settings-and-configuration.md)
+1. Choose type.
+2. Choose class where applicable, then student.
+3. Complete type-specific fields.
+4. Review the live preview.
+5. **Issue certificate**.
+
+Statuses: **Draft**, **Issued**, **Revoked**.
+
+---
+
+## 📁 Certificate history
+
+Filter by type, status, class, and date. Export **CSV**, download **PDF**, revoke (editors).
+
+---
+
+## 👨‍👩‍👧 My Certificates
+
+Defaults to **Issued**. Students see their own; parents see linked children’s certificates.
+
+---
+
+## ⚙️ Settings (on Certificates)
+
+Logo, certificate colour, tagline, and signature defaults.
+
+---
+
+## 🆘 Troubleshooting
+
+**No branding options in Settings menu:** Open **Certificates → Settings**.
+
+**Leaving list empty:** Student enrolment status must be Graduated, Transferred out, or Withdrawn.
+
+**My Certificates empty:** No issued certificate yet, or wrong child context.
