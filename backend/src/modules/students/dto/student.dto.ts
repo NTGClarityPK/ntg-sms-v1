@@ -22,6 +22,8 @@ export class StudentDto {
   invitationRecipientEmail?: string;
   /** When the latest setup invitation was sent (if any). */
   invitationSentAt?: string;
+  /** Optional Google Classroom account email for grade sync matching. */
+  googleAccountEmail?: string;
   // Joined data
   firstName?: string;
   lastName?: string;

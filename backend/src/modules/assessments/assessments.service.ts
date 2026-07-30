@@ -58,6 +58,11 @@ type AssessmentRow = {
   is_published: boolean;
   allow_late_submission: boolean;
   room_number: string | null;
+  grading_source?: string | null;
+  google_coursework_id?: string | null;
+  google_course_id?: string | null;
+  google_last_synced_at?: string | null;
+  has_rubric?: boolean | null;
   branch_id: string;
   academic_year_id: string;
   created_at: string;
@@ -222,6 +227,11 @@ function mapAssessment(row: AssessmentRow): AssessmentDto {
       !Number.isNaN(Number(row.examination_duration_minutes))
         ? Number(row.examination_duration_minutes)
         : undefined,
+    gradingSource: row.grading_source ?? 'manual',
+    googleCourseworkId: row.google_coursework_id ?? undefined,
+    googleCourseId: row.google_course_id ?? undefined,
+    googleLastSyncedAt: row.google_last_synced_at ?? undefined,
+    hasRubric: row.has_rubric ?? false,
     branchId: row.branch_id,
     academicYearId: row.academic_year_id,
     createdAt: row.created_at,
@@ -520,7 +530,7 @@ export class AssessmentsService {
     let dbQuery = supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, grading_source, google_coursework_id, google_course_id, google_last_synced_at, has_rubric, branch_id, academic_year_id, created_at, updated_at',
         { count: 'exact' },
       )
       .eq('branch_id', branchId)
@@ -861,7 +871,7 @@ export class AssessmentsService {
       .from('assessments')
       .insert(assessmentsToInsert)
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, grading_source, google_coursework_id, google_course_id, google_last_synced_at, has_rubric, branch_id, academic_year_id, created_at, updated_at',
       );
     throwIfDbError(error);
 
@@ -917,7 +927,7 @@ export class AssessmentsService {
     const { data: existing, error: existingError } = await supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at, updated_by',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, grading_source, google_coursework_id, google_course_id, google_last_synced_at, has_rubric, branch_id, academic_year_id, created_at, updated_at, updated_by',
       )
       .eq('id', id)
       .eq('branch_id', branchId)
@@ -1015,7 +1025,7 @@ export class AssessmentsService {
       .eq('id', id)
       .eq('branch_id', branchId)
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, grading_source, google_coursework_id, google_course_id, google_last_synced_at, has_rubric, branch_id, academic_year_id, created_at, updated_at',
       )
       .single();
     throwIfDbError(error);
@@ -1090,7 +1100,7 @@ export class AssessmentsService {
     const { data, error } = await supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, grading_source, google_coursework_id, google_course_id, google_last_synced_at, has_rubric, branch_id, academic_year_id, created_at, updated_at',
       )
       .eq('id', id)
       .eq('branch_id', branchId)
@@ -1144,7 +1154,7 @@ export class AssessmentsService {
       .eq('id', id)
       .eq('branch_id', branchId)
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, grading_source, google_coursework_id, google_course_id, google_last_synced_at, has_rubric, branch_id, academic_year_id, created_at, updated_at',
       )
       .maybeSingle();
     throwIfDbError(error);
@@ -1359,6 +1369,23 @@ export class AssessmentsService {
       statusMap.set(dto.studentId, dto);
     }
 
+    // Fetch grading info for these students (for the "Graded" column and last updated fallback).
+    const { data: grades, error: gradesError } = await supabase
+      .from('student_grades')
+      .select('student_id, graded_at')
+      .eq('assessment_id', assessmentId)
+      .eq('branch_id', branchId)
+      .in('student_id', studentIds);
+    throwIfDbError(gradesError);
+
+    const gradeMap = new Map<string, { gradedAt: string }>();
+    for (const row of grades ?? []) {
+      const studentId = (row as { student_id?: string }).student_id;
+      const gradedAt = (row as { graded_at?: string }).graded_at ?? null;
+      if (!studentId || !gradedAt) continue;
+      gradeMap.set(studentId, { gradedAt });
+    }
+
     // Fetch student names from profiles via user_id
     const userIds = (students as any[])
       .map((s) => s.user_id as string | null)
@@ -1379,8 +1406,32 @@ export class AssessmentsService {
 
     return (students as any[]).map((s) => {
       const status = statusMap.get(s.id as string);
+      const grade = gradeMap.get(s.id as string);
+
       const studentUserId = s.user_id as string | undefined;
       const name = studentUserId ? profilesMap.get(studentUserId) : undefined;
+
+      const statusUpdatedTs = status?.updatedAt
+        ? new Date(status.updatedAt).getTime()
+        : null;
+      const gradeUpdatedTs = grade?.gradedAt ? new Date(grade.gradedAt).getTime() : null;
+
+      const hasStatusUpdated =
+        statusUpdatedTs != null && Number.isFinite(statusUpdatedTs);
+      const hasGradeUpdated =
+        gradeUpdatedTs != null && Number.isFinite(gradeUpdatedTs);
+
+      let lastUpdated: string | undefined;
+      if (hasStatusUpdated && hasGradeUpdated) {
+        lastUpdated =
+          statusUpdatedTs! >= gradeUpdatedTs!
+            ? status?.updatedAt
+            : grade?.gradedAt;
+      } else if (hasStatusUpdated) {
+        lastUpdated = status?.updatedAt;
+      } else if (hasGradeUpdated) {
+        lastUpdated = grade?.gradedAt;
+      }
 
       return new AssessmentStudentStatusDto({
         studentId: s.id as string,
@@ -1389,7 +1440,8 @@ export class AssessmentsService {
         studentStudentId: s.student_id as string | undefined,
         status: status?.status,
         isRead: status?.isRead ?? false,
-        updatedAt: status?.updatedAt,
+        isGraded: !!grade?.gradedAt,
+        updatedAt: lastUpdated,
       });
     });
   }
@@ -1718,7 +1770,7 @@ export class AssessmentsService {
     const { data: assessments, error: assessmentsError } = await supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, grading_source, google_coursework_id, google_course_id, google_last_synced_at, has_rubric, branch_id, academic_year_id, created_at, updated_at',
       )
       .eq('class_section_id', classSection.id)
       .eq('branch_id', branchId)
@@ -1932,7 +1984,7 @@ export class AssessmentsService {
     const { data: assessments, error: assessmentsError } = await supabase
       .from('assessments')
       .select(
-        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, branch_id, academic_year_id, created_at, updated_at',
+        'id, title, description, assessment_type_id, subject_id, class_section_id, created_by, total_marks, due_date, examination_duration_minutes, publish_date, is_published, allow_late_submission, room_number, grading_source, google_coursework_id, google_course_id, google_last_synced_at, has_rubric, branch_id, academic_year_id, created_at, updated_at',
       )
       .eq('class_section_id', classSection.id)
       .eq('branch_id', branchId)

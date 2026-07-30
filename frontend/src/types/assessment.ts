@@ -26,6 +26,11 @@ export interface Assessment {
   createdAt: string;
   updatedAt: string;
   attachments?: AssessmentAttachment[];
+  gradingSource?: 'manual' | 'google_classroom';
+  googleCourseworkId?: string;
+  googleCourseId?: string;
+  googleLastSyncedAt?: string;
+  hasRubric?: boolean;
 }
 
 export interface AssessmentAttachment {

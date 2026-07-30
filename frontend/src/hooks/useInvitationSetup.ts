@@ -3,7 +3,7 @@ import { apiClient } from '@/lib/api-client';
 
 export type InvitationSetupInfo = {
   invitationId: string;
-  invitationType: 'student' | 'parent' | 'parent_account';
+  invitationType: 'student' | 'parent' | 'parent_account' | 'staff';
   loginEmail: string;
   name: string;
   expiresAt: string;

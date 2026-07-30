@@ -286,6 +286,7 @@ export default function AssessmentStatisticsPage() {
                       <Table.Tr>
                         <Table.Th>{t('student')}</Table.Th>
                         <Table.Th>{t('status')}</Table.Th>
+                        <Table.Th>{t('graded')}</Table.Th>
                         <Table.Th>{t('read')}</Table.Th>
                         <Table.Th>{t('lastUpdated')}</Table.Th>
                       </Table.Tr>
@@ -312,6 +313,17 @@ export default function AssessmentStatisticsPage() {
                               <Badge color="yellow">{t('inProgress')}</Badge>
                             ) : (
                               <Badge color="gray">{t('notStarted')}</Badge>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            {s.isGraded ? (
+                              <Badge color="green" variant="filled">
+                                {t('graded')}
+                              </Badge>
+                            ) : (
+                              <Badge color="gray" variant="light">
+                                {t('pending')}
+                              </Badge>
                             )}
                           </Table.Td>
                           <Table.Td>

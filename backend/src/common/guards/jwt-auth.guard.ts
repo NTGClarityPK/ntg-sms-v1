@@ -11,9 +11,14 @@ import {
 import { Request } from 'express';
 import { SupabaseConfig } from '../config/supabase.config';
 import {
+  getCachedAuthUser,
+  setCachedAuthUser,
+} from '../utils/auth-user-request-cache.util';
+import {
   isSupabaseConnectivityError,
   SUPABASE_CONNECTIVITY_USER_MESSAGE,
 } from '../utils/supabase-connectivity-error.util';
+import { hasPrivilegedAccess } from '../utils/privileged-access.util';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -32,6 +37,16 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
+      const cached = getCachedAuthUser(token);
+      if (cached) {
+        request['user'] = {
+          id: cached.userId,
+          email: cached.email,
+          roles: cached.roles,
+        };
+        return true;
+      }
+
       const supabase = this.supabaseConfig.getClient();
       const {
         data: { user },
@@ -70,14 +85,23 @@ export class JwtAuthGuard implements CanActivate {
         })
         .filter((name): name is string => !!name);
 
-      // Local/dev super admin shortcut for admin portal access.
-      // This is intentionally email-domain based so the admin portal does not depend on DB role seeding.
-      if (email.endsWith('@superuser.com') && !roles.includes('super_admin')) {
+      // Temporary: inject super_admin only when ALLOW_EMAIL_DOMAIN_PRIVILEGE_ESCALATION=true
+      // and email matches legacy suffixes (logged). Prefer DB super_admin role.
+      if (
+        !roles.includes('super_admin') &&
+        hasPrivilegedAccess({ email, roles: [] }, this.logger)
+      ) {
         roles.push('super_admin');
       }
 
       await this.ensureUserIsActive({
         userId: user.id,
+        roles,
+      });
+
+      setCachedAuthUser(token, {
+        userId: user.id,
+        email,
         roles,
       });
 
@@ -160,4 +184,3 @@ export class JwtAuthGuard implements CanActivate {
     }
   }
 }
-

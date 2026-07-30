@@ -8,6 +8,7 @@ export class AssessmentStudentStatusDto {
   studentStudentId?: string;
   status?: 'not_started' | 'in_progress' | 'submitted';
   isRead!: boolean;
+  isGraded!: boolean;
   updatedAt?: string;
 
   constructor(partial: Partial<AssessmentStudentStatusDto>) {

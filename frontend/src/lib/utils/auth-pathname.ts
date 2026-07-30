@@ -9,6 +9,7 @@ export function isAuthPathname(pathname: string | null | undefined): boolean {
     pathname.startsWith('/signup') ||
     pathname.startsWith('/reset-password') ||
     pathname.startsWith('/select-child') ||
+    pathname.startsWith('/setup') ||
     pathname.startsWith('/auth/')
   );
 }

@@ -26,18 +26,14 @@ export class BranchGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const user = request['user'] as { id?: string } | undefined;
-    const userPayload = request['user'] as { id?: string; email?: string; roles?: string[] } | undefined;
 
     const userId = user?.id;
     if (!userId) {
       throw new BadRequestException('Missing authenticated user context');
     }
 
-    const isPrivileged =
-      (userPayload?.roles || []).includes('super_admin') ||
-      (userPayload?.email || '').endsWith('@ntg.com') ||
-      (userPayload?.email || '').endsWith('@example.com') ||
-      (userPayload?.email || '').endsWith('@ntgclarity.com');
+    // Privileged email-domain bypass removed (scan-section-3). Inactive checks apply to everyone,
+    // including super_admin. Platform privilege is role-based (or temporary env flag elsewhere).
 
     const headerBranchId =
       typeof request.headers['x-branch-id'] === 'string' ? request.headers['x-branch-id'] : undefined;
@@ -116,6 +112,27 @@ export class BranchGuard implements CanActivate {
       await supabase.from('profiles').update({ current_branch_id: newBranchId }).eq('id', userId);
     };
 
+    const fetchBranchRow = async (id: string): Promise<BranchRow> => {
+      const { data: branch, error: branchError } = await supabase
+        .from('branches')
+        .select('id, tenant_id, is_active')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (branchError) {
+        if (isSupabaseConnectivityError(branchError)) {
+          throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
+        }
+        throw new BadRequestException(branchError.message);
+      }
+
+      if (!branch) {
+        throw new BadRequestException('Branch not found');
+      }
+
+      return branch as BranchRow;
+    };
+
     if (!branchId) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -174,39 +191,15 @@ export class BranchGuard implements CanActivate {
       branchId = firstBranchId;
     }
 
-    // Resolve tenantId from branches table
-    const { data: branch, error: branchError } = await supabase
-      .from('branches')
-      .select('id, tenant_id, is_active')
-      .eq('id', branchId)
-      .maybeSingle();
+    let branchRow = await fetchBranchRow(branchId);
 
-    if (branchError) {
-      if (isSupabaseConnectivityError(branchError)) {
-        throw new ServiceUnavailableException(SUPABASE_CONNECTIVITY_USER_MESSAGE);
-      }
-      throw new BadRequestException(branchError.message);
-    }
-
-    if (!branch) {
-      throw new BadRequestException('Branch not found');
-    }
-
-    const branchRow = branch as BranchRow;
-
-    if (isPrivileged) {
-      (request as unknown as Record<string, unknown>)['branch'] = {
-        branchId: branchRow.id,
-        tenantId: branchRow.tenant_id,
-      };
-      return true;
-    }
-
+    // Inactive checks apply to everyone (including super_admin) — no email-domain early exit.
     if (branchRow.is_active === false) {
       const fallback = await selectFirstAccessibleActiveBranch();
       if (fallback && fallback !== branchId) {
         await persistCurrentBranch(fallback);
         branchId = fallback;
+        branchRow = await fetchBranchRow(branchId);
       } else {
         throw new ForbiddenException(
           'This branch has been marked as inactive by an administrator. Please contact your school if you need help.',
@@ -234,6 +227,7 @@ export class BranchGuard implements CanActivate {
         if (fallback && fallback !== branchId) {
           await persistCurrentBranch(fallback);
           branchId = fallback;
+          branchRow = await fetchBranchRow(branchId);
         } else {
           throw new ForbiddenException(
             'Your school has been marked as inactive by an administrator. Please contact support if you need help.',
@@ -242,7 +236,7 @@ export class BranchGuard implements CanActivate {
       }
     }
 
-    // Attach branch context to request
+    // Attach branch context to request (always the resolved active branch row)
     (request as unknown as Record<string, unknown>)['branch'] = {
       branchId: branchRow.id,
       tenantId: branchRow.tenant_id,
@@ -251,5 +245,3 @@ export class BranchGuard implements CanActivate {
     return true;
   }
 }
-
-

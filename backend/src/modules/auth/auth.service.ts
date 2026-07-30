@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -10,6 +11,9 @@ import {
   isSupabaseConnectivityError,
   SUPABASE_CONNECTIVITY_USER_MESSAGE,
 } from '../../common/utils/supabase-connectivity-error.util';
+import {
+  hasPrivilegedAccess,
+} from '../../common/utils/privileged-access.util';
 import { UserResponseDto } from './dto/user-response.dto';
 import { BranchSummaryDto } from './dto/branch-summary.dto';
 import { StudentTokenService } from '../../common/modules/student-token/student-token.service';
@@ -19,6 +23,7 @@ import { SystemSettingsService } from '../system-settings/system-settings.servic
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly studentTokenService: StudentTokenService,
@@ -239,40 +244,31 @@ export class AuthService {
       roles.some((r) => (r.roleName || '').toLowerCase() === 'super_admin') ||
       hintedRoleNames.some((n) => (n || '').toLowerCase() === 'super_admin');
 
-    const isPrivileged =
-      hasSuperAdminRole ||
-      resolvedEmail.endsWith('@ntg.com') ||
-      resolvedEmail.endsWith('@example.com') ||
-      resolvedEmail.endsWith('@ntgclarity.com') ||
-      resolvedEmail.endsWith('@superuser.com');
+    // Always filter inactive branches/tenants — including for super_admin (scan-section-3).
+    const tenantIds = Array.from(new Set(branchesRaw.map((b) => b.tenant_id).filter(Boolean))) as string[];
+    const { data: tenantsData, error: tenantsError } =
+      tenantIds.length > 0
+        ? await supabase.from('tenants').select('id, is_active').in('id', tenantIds)
+        : { data: [], error: null };
 
-    let filteredBranchesRaw = branchesRaw;
-    if (!isPrivileged) {
-      const tenantIds = Array.from(new Set(branchesRaw.map((b) => b.tenant_id).filter(Boolean))) as string[];
-      const { data: tenantsData, error: tenantsError } =
-        tenantIds.length > 0
-          ? await supabase.from('tenants').select('id, is_active').in('id', tenantIds)
-          : { data: [], error: null };
+    if (tenantsError) {
+      throw new BadRequestException(`Failed to fetch tenants: ${tenantsError.message}`);
+    }
 
-      if (tenantsError) {
-        throw new BadRequestException(`Failed to fetch tenants: ${tenantsError.message}`);
-      }
+    const activeTenantIds = new Set(
+      ((tenantsData || []) as Array<{ id: string; is_active: boolean }>)
+        .filter((t) => t.is_active)
+        .map((t) => t.id),
+    );
 
-      const activeTenantIds = new Set(
-        ((tenantsData || []) as Array<{ id: string; is_active: boolean }>)
-          .filter((t) => t.is_active)
-          .map((t) => t.id),
+    let filteredBranchesRaw = branchesRaw.filter(
+      (b) => b.is_active && !!b.tenant_id && activeTenantIds.has(b.tenant_id),
+    );
+
+    if (filteredBranchesRaw.length === 0) {
+      throw new ForbiddenException(
+        'Your school has been marked as inactive by an administrator. Please contact support if you need help.',
       );
-
-      filteredBranchesRaw = branchesRaw.filter(
-        (b) => b.is_active && !!b.tenant_id && activeTenantIds.has(b.tenant_id),
-      );
-
-      if (filteredBranchesRaw.length === 0) {
-        throw new ForbiddenException(
-          'Your school has been marked as inactive by an administrator. Please contact support if you need help.',
-        );
-      }
     }
 
     const branches = filteredBranchesRaw.map(
@@ -285,15 +281,16 @@ export class AuthService {
         }),
     );
 
-    if (resolvedEmail.endsWith('@superuser.com')) {
-      const already = roles.some((r) => (r.roleName || '').toLowerCase() === 'super_admin');
-      if (!already) {
-        roles.push({
-          roleId: '',
-          roleName: 'super_admin',
-          branchId: '',
-        });
-      }
+    // Temporary legacy: inject super_admin into response roles only when env flag is on.
+    if (
+      !hasSuperAdminRole &&
+      hasPrivilegedAccess({ email: resolvedEmail, roles: [] }, this.logger)
+    ) {
+      roles.push({
+        roleId: '',
+        roleName: 'super_admin',
+        branchId: '',
+      });
     }
 
     const isStudentUser = roles.some((r) => (r.roleName || '').toLowerCase() === 'student');

@@ -17,6 +17,7 @@ import { notifications } from '@mantine/notifications';
 import { useTenantMe } from '@/hooks/useTenant';
 import { modals } from '@mantine/modals';
 import { SCHOOL_USERNAME_LOCAL_PART_REGEX } from '@/lib/validation/school-username';
+import { useActiveAcademicYear } from '@/hooks/useAcademicYears';
 
 interface StudentFormProps {
   opened: boolean;
@@ -48,8 +49,8 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     address: z.string().optional(),
     dateOfBirth: z.string().optional(),
     gender: z.enum(['male', 'female']).optional(),
-    classId: z.string().optional(),
-    sectionId: z.string().optional(),
+    classId: z.string().min(1, t('classSectionRequired')),
+    sectionId: z.string().min(1, t('classSectionRequired')),
     bloodGroup: z.string().optional(),
     medicalNotes: z.string().optional(),
     admissionDate: z.string().optional(),
@@ -58,6 +59,9 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     // Parent invite: must be a real email address.
     // Student invite: allow blank/username; we'll auto-build `${username}@${tenantDomain}` on submit.
     invitationRecipientEmail: z.string().optional(),
+    googleAccountEmail: z
+      .union([z.string().email(t('invalidEmail')), z.literal('')])
+      .optional(),
     createParentAccount: z.boolean().optional(),
     // Allow empty string when parent account creation is not enabled
     parentEmail: z.union([z.string().email(t('invalidEmail')), z.literal('')]).optional(),
@@ -116,9 +120,19 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
     medicalNotes: z.string().optional(),
     admissionDate: z.string().optional(),
     isActive: z.boolean().optional(),
+    googleAccountEmail: z
+      .union([z.string().email(t('invalidEmail')), z.literal('')])
+      .optional(),
   });
 
-  const { data: classSectionsData } = useClassSections({ isActive: true, minimal: true, limit: 500 });
+  const { data: activeYearResponse } = useActiveAcademicYear();
+  const activeYear = activeYearResponse?.data;
+  const { data: classSectionsData } = useClassSections({
+    isActive: true,
+    minimal: true,
+    limit: 500,
+    academicYearId: activeYear?.id,
+  });
   const activeClassSections = classSectionsData?.data ?? [];
 
   const form = useForm({
@@ -139,6 +153,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
       subjectTemplateId: '',
       invitationType: 'parent' as 'parent' | 'student',
       invitationRecipientEmail: '',
+      googleAccountEmail: '',
       createParentAccount: false,
       parentEmail: '',
       parentName: '',
@@ -211,21 +226,23 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
   const availableTemplates = templatesData?.data ?? [];
   const currentTemplate = studentTemplateData?.data;
 
-  // Fetch guardians for this student (when editing)
-  // Reset form when student prop changes (for edit mode)
+  // Populate form when editing a student; reset only when switching to create.
+  // Do NOT depend on currentTemplate here — that was wiping class/section during create/edit.
   useEffect(() => {
+    if (!opened) return;
+
     if (student) {
-      // Invalidate student template query when modal opens to ensure fresh data
       if (student.id && branchId) {
         const academicYearId = student.academicYearId || null;
         queryClient.invalidateQueries({
           queryKey: ['subject-templates', 'student', student.id, academicYearId, branchId],
         });
       }
-      
-      // Invalidate templates query when modal opens with a student to ensure fresh data
+
       if (student.classId && branchId) {
-        queryClient.invalidateQueries({ queryKey: ['subject-templates', 'class', student.classId, branchId] });
+        queryClient.invalidateQueries({
+          queryKey: ['subject-templates', 'class', student.classId, branchId],
+        });
       }
 
       form.setValues({
@@ -242,12 +259,29 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         medicalNotes: student.medicalNotes || '',
         admissionDate: student.admissionDate || '',
         isActive: student.isActive ?? true,
-        subjectTemplateId: student.subjectTemplateId || currentTemplate?.id || '',
+        subjectTemplateId: student.subjectTemplateId || '',
+        googleAccountEmail: student.googleAccountEmail || '',
+        invitationType: 'parent',
+        invitationRecipientEmail: '',
+        createParentAccount: false,
+        parentEmail: '',
+        parentName: '',
+        parentPhone: '',
+        parentRelationship: 'guardian',
       });
     } else {
       form.reset();
     }
-  }, [student, currentTemplate, branchId, queryClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- form methods are stable; reset only on open/student change
+  }, [opened, student?.id, branchId, queryClient]);
+
+  // Once template assignment loads in edit mode, fill subjectTemplateId if still empty.
+  useEffect(() => {
+    if (!opened || !student || !currentTemplate?.id) return;
+    if (form.values.subjectTemplateId) return;
+    form.setFieldValue('subjectTemplateId', currentTemplate.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, student?.id, currentTemplate?.id]);
 
   // Generate student ID when class/section/year changes
   const handleSubmit = async (values: typeof form.values) => {
@@ -297,6 +331,9 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
         if (nextTemplateId !== currentTemplateId) {
           updateData.subjectTemplateId = values.subjectTemplateId || undefined;
         }
+        if (normalize(values.googleAccountEmail) !== normalize(student.googleAccountEmail)) {
+          updateData.googleAccountEmail = values.googleAccountEmail?.trim() || null;
+        }
 
         await updateStudent.mutateAsync({ id: student.id, input: updateData });
       } else {
@@ -326,6 +363,7 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           subjectTemplateId: values.subjectTemplateId || undefined,
           invitationType: values.invitationType,
           invitationRecipientEmail: recipientEmail,
+          googleAccountEmail: values.googleAccountEmail?.trim() || undefined,
           createParentAccount: values.createParentAccount || undefined,
           parentEmail: values.createParentAccount ? values.parentEmail?.trim() || undefined : undefined,
           parentName: values.createParentAccount ? values.parentName || undefined : undefined,
@@ -594,8 +632,12 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
           <Group grow>
             <Select
               id="student-form-class-section"
-              label="Class-Section"
-              placeholder={activeClassSections.length === 0 ? 'No active class-sections found' : 'Select class-section'}
+              label={t('classSection')}
+              placeholder={
+                activeClassSections.length === 0
+                  ? t('noActiveClassSections')
+                  : t('selectClassSection')
+              }
               data={classSectionOptions}
               value={selectedClassSectionKey}
               onChange={(v) => {
@@ -609,17 +651,28 @@ export function StudentForm({ opened, onClose, student }: StudentFormProps) {
                 form.setFieldValue('classId', classId ?? '');
                 form.setFieldValue('sectionId', sectionId ?? '');
               }}
-              clearable
+              clearable={!isEdit}
               searchable
+              required={!isEdit}
+              error={form.errors.classId || form.errors.sectionId}
               description={
-                activeClassSections.length === 0
-                  ? 'Go to Academic → Class Sections and activate at least one combination.'
-                  : undefined
+                activeYear
+                  ? t('classSectionsForYear', { year: activeYear.name })
+                  : activeClassSections.length === 0
+                    ? t('activateClassSectionHint')
+                    : undefined
               }
             />
           </Group>
 
           <TextInput id="student-form-phone" label={t('phone')} placeholder={t('phonePlaceholder')} {...form.getInputProps('phone')} />
+          <TextInput
+            id="student-form-google-account-email"
+            label={t('googleAccountEmail')}
+            placeholder={t('googleAccountEmailPlaceholder')}
+            description={t('googleAccountEmailDescription')}
+            {...form.getInputProps('googleAccountEmail')}
+          />
           <TextInput id="student-form-address" label={t('address')} placeholder={t('addressPlaceholder')} {...form.getInputProps('address')} />
           <TextInput id="student-form-date-of-birth" label={t('dateOfBirth')} type="date" {...form.getInputProps('dateOfBirth')} />
 

@@ -30,6 +30,8 @@ export interface Student {
   invitationRecipientEmail?: string;
   /** When the latest setup invitation was sent (if any). */
   invitationSentAt?: string;
+  /** Optional Google Classroom account email for grade sync matching. */
+  googleAccountEmail?: string;
 }
 
 /** Display name for a student (first + second name). */
@@ -79,6 +81,9 @@ export interface CreateStudentWithInvitationInput {
   invitationRecipientEmail: string;
   invitationType: 'parent' | 'student';
 
+  /** Optional Google Classroom account email for grade sync matching. */
+  googleAccountEmail?: string;
+
   createParentAccount?: boolean;
   parentEmail?: string;
   parentName?: string;
@@ -101,5 +106,7 @@ export interface UpdateStudentInput {
   academicYearId?: string;
   isActive?: boolean;
   subjectTemplateId?: string;
+  /** Optional Google Classroom account email for grade sync matching. Pass empty string to clear. */
+  googleAccountEmail?: string | null;
 }
 

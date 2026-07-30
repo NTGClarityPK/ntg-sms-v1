@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
@@ -8,6 +13,15 @@ import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { AssignBranchToTenantDto } from './dto/assign-branch-to-tenant.dto';
 import { SubscriptionService } from '../subscription/subscription.service';
+
+/** Caller context for membership-scoped branch endpoints. */
+export type BranchAccessContext = {
+  userId: string;
+  email: string;
+  roles?: string[];
+};
+
+type BranchAccessAttempt = 'get' | 'update' | 'public-stats';
 
 type BranchRow = {
   id: string;
@@ -80,7 +94,100 @@ export class BranchesService {
     private readonly subscriptionService: SubscriptionService,
   ) {}
 
-  async list(query: QueryBranchesDto): Promise<{
+  private isSuperAdmin(roles?: string[]): boolean {
+    return (roles ?? []).includes('super_admin');
+  }
+
+  private isTenantOwner(roles?: string[]): boolean {
+    return (roles ?? []).includes('tenant_owner');
+  }
+
+  private emptyListMeta(
+    page: number,
+    limit: number,
+  ): { data: BranchDto[]; meta: { total: number; page: number; limit: number; totalPages: number } } {
+    return {
+      data: [],
+      meta: { total: 0, page, limit, totalPages: 1 },
+    };
+  }
+
+  private async getAccessibleBranchIds(userId: string): Promise<string[]> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('user_branches')
+      .select('branch_id')
+      .eq('user_id', userId);
+    throwIfDbError(error);
+    return (data ?? []).map((row: { branch_id: string }) => row.branch_id);
+  }
+
+  private async getTenantIdsForUser(userId: string): Promise<string[]> {
+    const branchIds = await this.getAccessibleBranchIds(userId);
+    if (branchIds.length === 0) {
+      return [];
+    }
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .in('id', branchIds);
+    throwIfDbError(error);
+    const tenantIds = new Set<string>();
+    for (const row of data ?? []) {
+      const tenantId = (row as { tenant_id: string | null }).tenant_id;
+      if (tenantId) {
+        tenantIds.add(tenantId);
+      }
+    }
+    return [...tenantIds];
+  }
+
+  private async assertBranchAccess(params: {
+    userId: string;
+    email: string;
+    roles?: string[];
+    branchId: string;
+    attempted: BranchAccessAttempt;
+  }): Promise<void> {
+    if (this.isSuperAdmin(params.roles)) {
+      return;
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('user_branches')
+      .select('branch_id')
+      .eq('user_id', params.userId)
+      .eq('branch_id', params.branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+
+    if (data) {
+      return;
+    }
+
+    void this.auditLogService
+      .log({
+        tableName: 'branches',
+        recordId: params.branchId,
+        action: 'UPDATE',
+        userEmail: params.email || 'unknown',
+        newValues: {
+          accessDenied: true,
+          attempted: params.attempted,
+          callerUserId: params.userId,
+        },
+      })
+      .catch(() => {});
+
+    throw new ForbiddenException('Access denied');
+  }
+
+  async list(
+    query: QueryBranchesDto,
+    access: Pick<BranchAccessContext, 'userId' | 'roles'>,
+  ): Promise<{
     data: BranchDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
@@ -101,6 +208,22 @@ export class BranchesService {
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
+    if (!this.isSuperAdmin(access.roles)) {
+      if (this.isTenantOwner(access.roles)) {
+        const tenantIds = await this.getTenantIdsForUser(access.userId);
+        if (tenantIds.length === 0) {
+          return this.emptyListMeta(page, limit);
+        }
+        dbQuery = dbQuery.in('tenant_id', tenantIds);
+      } else {
+        const branchIds = await this.getAccessibleBranchIds(access.userId);
+        if (branchIds.length === 0) {
+          return this.emptyListMeta(page, limit);
+        }
+        dbQuery = dbQuery.in('id', branchIds);
+      }
+    }
+
     if (query.search) {
       dbQuery = dbQuery.or(
         `name.ilike.%${query.search}%,code.ilike.%${query.search}%`,
@@ -114,12 +237,26 @@ export class BranchesService {
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     return {
-      data: (data as BranchRow[]).map((row) => mapBranch(row, language)),
+      data: ((data as BranchRow[]) ?? []).map((row) => mapBranch(row, language)),
       meta: { total, page, limit, totalPages },
     };
   }
 
-  async getById(id: string, language: string = 'ar'): Promise<BranchDto> {
+  async getById(
+    id: string,
+    language: string = 'ar',
+    access?: BranchAccessContext,
+  ): Promise<BranchDto> {
+    if (access) {
+      await this.assertBranchAccess({
+        userId: access.userId,
+        email: access.email,
+        roles: access.roles,
+        branchId: id,
+        attempted: 'get',
+      });
+    }
+
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase.from('branches').select('*').eq('id', id).maybeSingle();
     throwIfDbError(error);
@@ -162,7 +299,18 @@ export class BranchesService {
     enabled: boolean,
     password: string | null | undefined,
     userEmail: string,
+    access?: BranchAccessContext,
   ): Promise<void> {
+    if (access) {
+      await this.assertBranchAccess({
+        userId: access.userId,
+        email: access.email,
+        roles: access.roles,
+        branchId,
+        attempted: 'public-stats',
+      });
+    }
+
     const supabase = this.supabaseConfig.getClient();
     const payload: Record<string, unknown> = {
       public_stats_enabled: enabled,
@@ -243,7 +391,18 @@ export class BranchesService {
     id: string,
     input: UpdateBranchDto,
     userEmail: string,
+    access?: BranchAccessContext,
   ): Promise<BranchDto> {
+    if (access) {
+      await this.assertBranchAccess({
+        userId: access.userId,
+        email: access.email,
+        roles: access.roles,
+        branchId: id,
+        attempted: 'update',
+      });
+    }
+
     const supabase = this.supabaseConfig.getClient();
 
     const { data: existing, error: existingError } = await supabase

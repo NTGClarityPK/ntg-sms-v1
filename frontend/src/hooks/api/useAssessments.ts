@@ -24,6 +24,7 @@ export interface AssessmentStudentStatus {
   studentStudentId?: string;
   status?: 'not_started' | 'in_progress' | 'submitted';
   isRead: boolean;
+  isGraded: boolean;
   updatedAt?: string;
 }
 import { notifications } from '@mantine/notifications';

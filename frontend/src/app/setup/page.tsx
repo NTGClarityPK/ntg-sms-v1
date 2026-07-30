@@ -100,12 +100,20 @@ export default function SetupPage() {
             <Alert color={colors.error} title="Missing token">
               <Text size="sm">This setup link is invalid. Please request a new invitation.</Text>
             </Alert>
-          ) : infoQuery.isLoading || !infoQuery.data ? (
+          ) : infoQuery.isPending ? (
             <Stack gap="sm">
               <Skeleton height={18} width="60%" />
               <Skeleton height={14} width="80%" />
               <Skeleton height={120} />
             </Stack>
+          ) : infoQuery.isError || !infoQuery.data ? (
+            <Alert color={colors.error} title="Unable to validate invitation">
+              <Text size="sm">
+                {infoQuery.error instanceof Error
+                  ? infoQuery.error.message
+                  : 'This invitation may be expired or already used.'}
+              </Text>
+            </Alert>
           ) : done ? (
             <Alert color={colors.success} title="Account ready">
               <Text size="sm" mb="sm">
@@ -128,12 +136,6 @@ export default function SetupPage() {
                   <strong>Login email:</strong> {infoQuery.data.loginEmail}
                 </Text>
               </Alert>
-
-              {infoQuery.isError && (
-                <Alert color={colors.error} title="Unable to validate invitation">
-                  <Text size="sm">This invitation may be expired or already used.</Text>
-                </Alert>
-              )}
 
               <PasswordInput
                 id="setup-password"

@@ -1,9 +1,10 @@
-import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Logger, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { hasPrivilegedAccess } from '../../common/utils/privileged-access.util';
 import { AcademicYearsService } from './academic-years.service';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
@@ -15,6 +16,8 @@ import { RolloverAcademicYearDto } from './dto/rollover-academic-year.dto';
 @Controller('api/v1/academic-years')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class AcademicYearsController {
+  private readonly logger = new Logger(AcademicYearsController.name);
+
   constructor(
     private readonly academicYearsService: AcademicYearsService,
     private readonly promotionPlacementService: PromotionPlacementService,
@@ -132,11 +135,9 @@ export class AcademicYearsController {
     @Body() body: { tenantId: string },
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AcademicYearDto }> {
-    // Super admin only access
-    const isSuperAdmin = user.roles?.includes('super_admin');
-    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
-    
-    if (!isSuperAdmin && !isDev) {
+    if (
+      !hasPrivilegedAccess({ email: user.email, roles: user.roles }, this.logger)
+    ) {
       throw new ForbiddenException('This endpoint is only accessible to super admins');
     }
 
@@ -159,11 +160,9 @@ export class AcademicYearsController {
     data: AcademicYearDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
-    // Super admin only access
-    const isSuperAdmin = user.roles?.includes('super_admin');
-    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
-    
-    if (!isSuperAdmin && !isDev) {
+    if (
+      !hasPrivilegedAccess({ email: user.email, roles: user.roles }, this.logger)
+    ) {
       throw new ForbiddenException('This endpoint is only accessible to super admins');
     }
 

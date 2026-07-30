@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   HttpStatus,
+  Logger,
   ParseFilePipeBuilder,
   Patch,
   Post,
@@ -18,6 +19,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, type CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { hasPrivilegedAccess } from '../../common/utils/privileged-access.util';
 import { TenantsService } from './tenants.service';
 import { TenantDto } from './dto/tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -34,6 +36,8 @@ type UploadedLogoFile = {
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/tenants')
 export class TenantsController {
+  private readonly logger = new Logger(TenantsController.name);
+
   constructor(private readonly tenantsService: TenantsService) {}
 
   @Get('me')
@@ -93,16 +97,14 @@ export class TenantsController {
     user: CurrentUserPayload,
     opts?: { allowOwner?: boolean },
   ): void {
-    const isSuperAdmin = user.roles?.includes('super_admin');
-    const isDev =
-      user.email?.endsWith('@ntg.com') ||
-      user.email?.endsWith('@example.com') ||
-      user.email?.endsWith('@ntgclarity.com') ||
-      user.email?.endsWith('@superuser.com');
+    const isPrivileged = hasPrivilegedAccess(
+      { email: user.email, roles: user.roles },
+      this.logger,
+    );
     const isOwner = user.roles?.includes('tenant_owner');
 
     const allowOwner = opts?.allowOwner ?? false;
-    if (!isSuperAdmin && !isDev && !(allowOwner && isOwner)) {
+    if (!isPrivileged && !(allowOwner && isOwner)) {
       throw new ForbiddenException(
         allowOwner
           ? 'This endpoint is only accessible to super admins, developers and owners'

@@ -20,6 +20,12 @@ export class AssessmentDto {
   roomNumber?: string;
   /** Term examinations: duration in minutes (end = `dueDate` start + duration). */
   examinationDurationMinutes?: number;
+  /** `manual` or `google_classroom`. */
+  gradingSource?: string;
+  googleCourseworkId?: string;
+  googleCourseId?: string;
+  googleLastSyncedAt?: string;
+  hasRubric?: boolean;
   branchId!: string;
   academicYearId!: string;
   createdAt!: string;

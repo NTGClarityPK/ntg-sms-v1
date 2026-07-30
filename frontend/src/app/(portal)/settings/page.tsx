@@ -2,13 +2,24 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox } from '@mantine/core';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Box, Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconShield, IconSchool, IconClock, IconMessage, IconPlus, IconRefresh, IconBuilding, IconPalette, IconPackage, IconChartBar, IconFileImport, IconAdjustments, IconCash, IconFileText, IconDownload } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconSchool, IconPlus, IconRefresh, IconFileImport } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
 import { CopySettingsModal } from '@/components/features/settings/CopySettingsModal';
+import {
+  DEFAULT_SETTINGS_SECTION,
+  getFirstVisibleSectionForCategory,
+  getSettingsCategoryForSection,
+  getVisibleSettingsCategories,
+  isSettingsSectionId,
+  isSettingsSectionVisible,
+  type SettingsCategoryId,
+  type SettingsSectionId,
+} from '@/components/features/settings/SettingsSectionNav';
 import { useSaveSetupWizard } from '@/hooks/useSetupWizard';
 import { useThemeColors, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useQueryClient } from '@tanstack/react-query';
@@ -71,6 +82,7 @@ import { BulkSetupTabContent } from '@/components/features/settings/BulkSetupTab
 import { FeeSettingsTabContent } from '@/components/features/settings/FeeSettingsTabContent';
 import { ResultReportsSettingsTabContent } from '@/components/features/settings/ResultReportsSettingsTabContent';
 import { DataExportTabContent } from '@/components/features/settings/DataExportTabContent';
+import { IntegrationsTabContent } from '@/components/features/settings/IntegrationsTabContent';
 
 // Common timezones list with GMT offsets (matching RMS)
 const TIMEZONE_DATA = [
@@ -172,9 +184,15 @@ export default function SettingsPage() {
   const notifyColors = useNotificationColors();
   const tSettings = useTranslations('settings');
   const { user, isLoading: isLoadingAuth } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname() ?? '/settings';
+  const searchParams = useSearchParams();
+  const sectionFromUrl = searchParams?.get('section');
   const [wizardOpened, { open: openWizard, close: closeWizard }] = useDisclosure(false);
   const [copyModalOpened, { open: openCopyModal, close: closeCopyModal }] = useDisclosure(false);
-  const [activeTab, setActiveTab] = useState<string | null>('business-information');
+  const [activeTab, setActiveTab] = useState<string | null>(
+    isSettingsSectionId(sectionFromUrl) ? sectionFromUrl : DEFAULT_SETTINGS_SECTION,
+  );
   const [showBulkImportPanel, setShowBulkImportPanel] = useState(false);
   const statusQuery = useSettingsStatus();
   const branchesQuery = useTenantBranches();
@@ -191,6 +209,63 @@ export default function SettingsPage() {
     user?.roles?.some((r) =>
       ['school_admin', 'super_admin', 'principal'].includes((r.roleName ?? '').toLowerCase()),
     ) || false;
+  const settingsVisibility = useMemo(
+    () => ({
+      canManageResultReports,
+      isSchoolAdmin,
+      canDataExport,
+    }),
+    [canManageResultReports, isSchoolAdmin, canDataExport],
+  );
+  const visibleCategories = useMemo(
+    () => getVisibleSettingsCategories(settingsVisibility),
+    [settingsVisibility],
+  );
+  const activeCategory = isSettingsSectionId(activeTab)
+    ? getSettingsCategoryForSection(activeTab)
+    : getSettingsCategoryForSection(DEFAULT_SETTINGS_SECTION);
+
+  useEffect(() => {
+    if (isSettingsSectionId(sectionFromUrl) && sectionFromUrl !== activeTab) {
+      setActiveTab(sectionFromUrl);
+    }
+  }, [sectionFromUrl]);
+
+  useEffect(() => {
+    if (isSettingsSectionId(activeTab) && !isSettingsSectionVisible(activeTab, settingsVisibility)) {
+      const fallbackSection =
+        getFirstVisibleSectionForCategory(getSettingsCategoryForSection(activeTab), settingsVisibility) ??
+        DEFAULT_SETTINGS_SECTION;
+      setActiveTab(fallbackSection);
+      if (fallbackSection === DEFAULT_SETTINGS_SECTION) {
+        router.replace(pathname, { scroll: false });
+        return;
+      }
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      params.set('section', fallbackSection);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [activeTab, pathname, router, searchParams, settingsVisibility]);
+
+  const handleSectionChange = (value: SettingsSectionId) => {
+    setActiveTab(value);
+    if (value === DEFAULT_SETTINGS_SECTION) {
+      router.replace(pathname, { scroll: false });
+      return;
+    }
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    params.set('section', value);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleCategoryChange = (value: string | null) => {
+    const nextCategory = value as SettingsCategoryId | null;
+    if (!nextCategory) return;
+    const nextSection = getFirstVisibleSectionForCategory(nextCategory, settingsVisibility);
+    if (nextSection) {
+      handleSectionChange(nextSection);
+    }
+  };
   const settingsStatusData = statusQuery.data?.data;
   const isInitialized = settingsStatusData?.isInitialized ?? false;
   const tabbedScreenReady = settingsStatusData?.tabbedScreenReady ?? isInitialized;
@@ -245,7 +320,16 @@ export default function SettingsPage() {
 
       <div className="page-sub-title-bar"></div>
 
-      <div style={{ marginTop: '60px', paddingLeft: 'var(--mantine-spacing-md)', paddingRight: 'var(--mantine-spacing-md)', paddingTop: 'var(--mantine-spacing-sm)', paddingBottom: 'var(--mantine-spacing-xl)' }}>
+      <div
+        style={{
+          marginTop: '60px',
+          paddingLeft: 'clamp(8px, 2vw, 16px)',
+          paddingRight: 'clamp(8px, 2vw, 16px)',
+          paddingTop: 'clamp(4px, 1vw, 8px)',
+          paddingBottom: 'var(--mantine-spacing-xl)',
+          overflowX: 'hidden',
+        }}
+      >
         {hasError && (
           <Alert color={colors.error} title={tSettings('loadStatusErrorTitle')} mb="md">
             <Text size="sm">{tSettings('loadStatusErrorMessage')}</Text>
@@ -279,58 +363,58 @@ export default function SettingsPage() {
           </Stack>
         ) : (
           <>
-            <Tabs value={activeTab} onChange={setActiveTab}>
-              <Tabs.List
-                style={{
-                  overflowX: 'auto',
-                  flexWrap: 'nowrap',
-                  WebkitOverflowScrolling: 'touch',
-                  scrollbarWidth: 'thin',
-                }}
-              >
-                <Tabs.Tab value="business-information" leftSection={<IconBuilding size={16} />}>
-                  {tSettings('tabBusinessInformation')}
-                </Tabs.Tab>
-                <Tabs.Tab value="academic-years" leftSection={<IconSchool size={16} />}>
-                  {tSettings('tabAcademic')}
-                </Tabs.Tab>
-                <Tabs.Tab value="permissions" leftSection={<IconShield size={16} />}>
-                  {tSettings('tabPermissions')}
-                </Tabs.Tab>
-                <Tabs.Tab value="schedule" leftSection={<IconClock size={16} />}>
-                  {tSettings('tabSchedule')}
-                </Tabs.Tab>
-                <Tabs.Tab value="communication" leftSection={<IconMessage size={16} />}>
-                  {tSettings('tabCommunication')}
-                </Tabs.Tab>
-                <Tabs.Tab value="general" leftSection={<IconAdjustments size={16} />}>
-                  {tSettings('tabGeneral')}
-                </Tabs.Tab>
-                <Tabs.Tab value="inventory-management" leftSection={<IconPackage size={16} />}>
-                  {tSettings('tabInventoryManagement')}
-                </Tabs.Tab>
-                <Tabs.Tab value="fees" leftSection={<IconCash size={16} />}>
-                  {tSettings('tabFees')}
-                </Tabs.Tab>
-                {canManageResultReports && (
-                  <Tabs.Tab value="result-reports" leftSection={<IconFileText size={16} />}>
-                    {tSettings('tabResultReports')}
-                  </Tabs.Tab>
-                )}
-                <Tabs.Tab value="theme-settings" leftSection={<IconPalette size={16} />}>
-                  {tSettings('tabThemeSettings')}
-                </Tabs.Tab>
-                {isSchoolAdmin && (
-                  <Tabs.Tab value="public-statistics" leftSection={<IconChartBar size={16} />}>
-                    {tSettings('tabPublicStatistics')}
-                  </Tabs.Tab>
-                )}
-                {canDataExport && (
-                  <Tabs.Tab value="data-export" leftSection={<IconDownload size={16} />}>
-                    {tSettings('tabDataExport')}
-                  </Tabs.Tab>
-                )}
-              </Tabs.List>
+            <Stack gap={0}>
+              <Tabs value={activeCategory} onChange={handleCategoryChange}>
+                <Tabs.List
+                  grow
+                  style={{
+                    width: '100%',
+                    flexWrap: 'wrap',
+                    rowGap: '4px',
+                  }}
+                >
+                  {visibleCategories.map((category) => {
+                    const CategoryIcon = category.icon;
+                    return (
+                      <Tabs.Tab
+                        key={category.id}
+                        value={category.id}
+                        id={`settings-category-${category.id}`}
+                        leftSection={<CategoryIcon size={14} />}
+                        style={{ minHeight: 'clamp(36px, 5vw, 44px)', flex: '1 1 140px' }}
+                      >
+                        {tSettings(category.labelKey)}
+                      </Tabs.Tab>
+                    );
+                  })}
+                </Tabs.List>
+              </Tabs>
+
+              <Tabs value={activeTab} onChange={(value) => {
+                  if (isSettingsSectionId(value)) handleSectionChange(value);
+                }}>
+                <Tabs.List
+                  style={{
+                    width: '100%',
+                    flexWrap: 'wrap',
+                    rowGap: '4px',
+                  }}
+                >
+                  {(visibleCategories.find((category) => category.id === activeCategory)?.items ?? []).map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <Tabs.Tab
+                        key={item.value}
+                        value={item.value}
+                        id={`settings-section-${item.value}`}
+                        leftSection={<ItemIcon size={14} />}
+                        style={{ flex: '1 1 120px' }}
+                      >
+                        {tSettings(item.labelKey)}
+                      </Tabs.Tab>
+                    );
+                  })}
+                </Tabs.List>
 
               {/* Business Information Tab */}
               <Tabs.Panel value="business-information" pt="md" px="md" pb="md">
@@ -376,6 +460,10 @@ export default function SettingsPage() {
                 <FeeSettingsTabContent />
               </Tabs.Panel>
 
+              <Tabs.Panel value="integrations" pt="md" px="md" pb="md">
+                <IntegrationsTabContent />
+              </Tabs.Panel>
+
               {canManageResultReports && (
                 <Tabs.Panel value="result-reports" pt="md" px="md" pb="md">
                   <ResultReportsSettingsTabContent />
@@ -399,7 +487,8 @@ export default function SettingsPage() {
                 </Tabs.Panel>
               )}
 
-            </Tabs>
+              </Tabs>
+            </Stack>
           </>
         )}
       </div>

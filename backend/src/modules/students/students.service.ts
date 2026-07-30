@@ -42,11 +42,17 @@ type StudentRow = {
   account_status?: string | null;
   invitation_recipient_email?: string | null;
   invitation_sent_at?: string | null;
+  google_account_email?: string | null;
 };
 
 function accountStatusFromRow(v: unknown): 'active' | 'pending_verification' | 'link_expired' {
   if (v === 'pending_verification' || v === 'link_expired' || v === 'active') return v;
   return 'active';
+}
+
+function normalizeOptionalEmail(email?: string | null): string | null {
+  const raw = (email ?? '').trim().toLowerCase();
+  return raw || null;
 }
 
 function throwIfDbError(error: PostgrestError | null): void {
@@ -624,6 +630,7 @@ export class StudentsService {
       last_name: string | null;
       invitation_recipient_email?: string | null;
       invitation_sent_at?: string | null;
+      google_account_email?: string | null;
       classes: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
       sections: { name: string } | { name: string }[] | null;
     }>).map((row) => {
@@ -664,6 +671,7 @@ export class StudentsService {
         updatedAt: row.updated_at,
         invitationRecipientEmail: row.invitation_recipient_email ?? undefined,
         invitationSentAt: row.invitation_sent_at ?? undefined,
+        googleAccountEmail: row.google_account_email ?? undefined,
         firstName: row.first_name ?? undefined,
         lastName: row.last_name ?? undefined,
         email: row.user_id ? emailMap.get(row.user_id) : undefined,
@@ -739,6 +747,7 @@ export class StudentsService {
       last_name: string | null;
       invitation_recipient_email?: string | null;
       invitation_sent_at?: string | null;
+      google_account_email?: string | null;
       classes: { name: string; display_name: string } | { name: string; display_name: string }[] | null;
       sections: { name: string } | { name: string }[] | null;
     };
@@ -817,6 +826,7 @@ export class StudentsService {
       updatedAt: row.updated_at,
       invitationRecipientEmail: row.invitation_recipient_email ?? undefined,
       invitationSentAt: row.invitation_sent_at ?? undefined,
+      googleAccountEmail: row.google_account_email ?? undefined,
       firstName: row.first_name ?? undefined,
       lastName: row.last_name ?? undefined,
       email: authUser.user?.email,
@@ -997,6 +1007,7 @@ export class StudentsService {
           academic_year_id: academicYearId,
           is_active: input.isActive ?? true,
           account_status: 'active',
+          google_account_email: normalizeOptionalEmail(input.googleAccountEmail),
           created_by: username,
           updated_by: username,
         })
@@ -1008,6 +1019,14 @@ export class StudentsService {
         if (studentError.code === '23505' && studentError.message.includes('students_student_id_key')) {
           throw new ConflictException(
             'Student ID already exists. Please try again.',
+          );
+        }
+        if (
+          studentError.code === '23505' &&
+          studentError.message.includes('uq_students_branch_google_account_email')
+        ) {
+          throw new ConflictException(
+            'Another student in this branch already uses this Google account email.',
           );
         }
         throwIfDbError(studentError);
@@ -1177,6 +1196,7 @@ export class StudentsService {
           academic_year_id: academicYearId,
           is_active: false,
           account_status: 'pending_verification',
+          google_account_email: normalizeOptionalEmail(input.googleAccountEmail),
           created_by: username,
           updated_by: username,
         })
@@ -1186,6 +1206,14 @@ export class StudentsService {
       if (studentError) {
         if (studentError.code === '23505' && studentError.message.includes('students_student_id_key')) {
           throw new ConflictException('Student ID already exists. Please try again.');
+        }
+        if (
+          studentError.code === '23505' &&
+          studentError.message.includes('uq_students_branch_google_account_email')
+        ) {
+          throw new ConflictException(
+            'Another student in this branch already uses this Google account email.',
+          );
         }
         throwIfDbError(studentError);
       }
@@ -1767,6 +1795,7 @@ export class StudentsService {
       medical_notes?: string | null;
       admission_date?: string | null;
       is_active?: boolean;
+      google_account_email?: string | null;
       updated_at: string;
       updated_by: string;
       academic_year_id?: string | null;
@@ -1782,6 +1811,9 @@ export class StudentsService {
     };
     if (input.firstName !== undefined) updatePayload.first_name = input.firstName.trim();
     if (input.lastName !== undefined) updatePayload.last_name = input.lastName.trim();
+    if (input.googleAccountEmail !== undefined) {
+      updatePayload.google_account_email = normalizeOptionalEmail(input.googleAccountEmail);
+    }
 
     // Update academic_year_id if provided
     if (input.academicYearId !== undefined) {
@@ -1803,6 +1835,11 @@ export class StudentsService {
       .select('*')
       .single();
 
+    if (error?.code === '23505' && error.message.includes('uq_students_branch_google_account_email')) {
+      throw new ConflictException(
+        'Another student in this branch already uses this Google account email.',
+      );
+    }
     throwIfDbError(error);
 
     // Keep student_enrolments in sync for the (possibly updated) academic year.
@@ -1810,10 +1847,46 @@ export class StudentsService {
     const effectiveAcademicYearId =
       input.academicYearId !== undefined ? (input.academicYearId ?? null) : defaultAcademicYearId;
     if (effectiveAcademicYearId) {
+      // If students.class_id was previously cleared (e.g. bad inactive sync), recover from enrolment.
+      let enrolmentClassId: string | null = null;
+      let enrolmentSectionId: string | null = null;
+      if (currentClassId == null || currentSectionId == null) {
+        const { data: existingEnrolment, error: existingEnrolErr } = await supabase
+          .from('student_enrolments')
+          .select('class_id, section_id')
+          .eq('student_id', id)
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', effectiveAcademicYearId)
+          .maybeSingle();
+        throwIfDbError(existingEnrolErr);
+        const enrolRow = existingEnrolment as {
+          class_id?: string | null;
+          section_id?: string | null;
+        } | null;
+        enrolmentClassId = enrolRow?.class_id ?? null;
+        enrolmentSectionId = enrolRow?.section_id ?? null;
+      }
+
       const effectiveClassId =
-        input.classId !== undefined ? (input.classId ?? null) : ((studentData as { class_id?: string | null } | null)?.class_id ?? null);
+        input.classId !== undefined
+          ? (input.classId ?? null)
+          : (currentClassId ?? enrolmentClassId);
       const effectiveSectionId =
-        input.sectionId !== undefined ? (input.sectionId ?? null) : ((oldRow as { section_id?: string | null } | null)?.section_id ?? null);
+        input.sectionId !== undefined
+          ? (input.sectionId ?? null)
+          : (currentSectionId ?? enrolmentSectionId);
+
+      // Pending invite students are is_active=false until password setup, but they are still
+      // placed in a class. Never treat pending_verification as withdrawn placement.
+      const oldAccountStatus = accountStatusFromRow(
+        (oldRow as { account_status?: string | null }).account_status,
+      );
+      const nextIsActive =
+        input.isActive !== undefined
+          ? Boolean(input.isActive)
+          : Boolean((oldRow as { is_active?: boolean | null }).is_active ?? true);
+      const enrolmentStatus =
+        oldAccountStatus === 'pending_verification' || nextIsActive ? 'active' : 'inactive';
 
       await this.studentPlacementService.upsertEnrolment({
         student_id: id,
@@ -1821,10 +1894,7 @@ export class StudentsService {
         academic_year_id: effectiveAcademicYearId,
         class_id: effectiveClassId,
         section_id: effectiveSectionId,
-        status:
-          (input.isActive ?? (oldRow as { is_active?: boolean } | null)?.is_active ?? true)
-            ? 'active'
-            : 'inactive',
+        status: enrolmentStatus,
         updated_by: username,
       });
     }

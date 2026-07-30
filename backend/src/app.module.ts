@@ -59,6 +59,8 @@ import { IdCardsModule } from './modules/id-cards/id-cards.module';
 import { DataExportModule } from './modules/data-export/data-export.module';
 import { SubstitutionsModule } from './modules/substitutions/substitutions.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
+import { RubricsModule } from './modules/rubrics/rubrics.module';
+import { GoogleWorkspaceModule } from './modules/google-workspace/google-workspace.module';
 
 @Module({
   imports: [
@@ -120,6 +122,8 @@ import { CertificatesModule } from './modules/certificates/certificates.module';
     DataExportModule,
     SubstitutionsModule,
     CertificatesModule,
+    RubricsModule,
+    GoogleWorkspaceModule,
   ],
   controllers: [AppController],
   providers: [

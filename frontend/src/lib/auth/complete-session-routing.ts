@@ -60,7 +60,28 @@ export async function selectBranchAndGoDashboard(
   setPrimaryColor?: (color: string) => void,
 ): Promise<void> {
   await apiClient.post('/api/v1/auth/select-branch', { branchId });
-  localStorage.setItem('currentBranchId', branchId);
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('currentBranchId', branchId);
+  }
+
+  // Keep Zustand + React Query in sync with the selected branch.
+  // Without this, useAuth rewrites localStorage from a stale `user.currentBranch`
+  // (often Main) left over from the pre-modal /auth/me response.
+  useAuthStore.getState().setBranchId(branchId);
+  const cachedUser =
+    queryClient.getQueryData<User>(['auth', 'me']) ?? useAuthStore.getState().user;
+  if (cachedUser) {
+    const selectedBranch =
+      (cachedUser.branches || []).find((b) => b.id === branchId) ??
+      (cachedUser.currentBranch?.id === branchId ? cachedUser.currentBranch : null) ??
+      ({ id: branchId, name: 'Selected branch' } satisfies NonNullable<User['currentBranch']>);
+    const updatedUser: User = {
+      ...cachedUser,
+      currentBranch: selectedBranch,
+    };
+    useAuthStore.getState().setUser(updatedUser);
+    queryClient.setQueryData<User>(['auth', 'me'], updatedUser);
+  }
 
   // Navigate ASAP; do not block on cache-warming/theme.
   pushPortalRoute(router, '/dashboard');

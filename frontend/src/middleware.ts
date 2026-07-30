@@ -59,7 +59,14 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  // Only hit Supabase Auth when a session cookie exists (anonymous landing/marketing
+  // traffic must not call getUser on every navigation — Nano-safe).
+  const hasSupabaseSessionCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith('sb-') && c.name.includes('auth-token'));
+  if (hasSupabaseSessionCookie) {
+    await supabase.auth.getUser();
+  }
 
   return response;
 }

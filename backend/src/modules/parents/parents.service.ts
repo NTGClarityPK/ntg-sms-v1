@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
@@ -6,6 +11,14 @@ import { ParentStudentDto } from './dto/parent-student.dto';
 import { LinkChildDto } from './dto/link-child.dto';
 import { SelectChildDto } from './dto/select-child.dto';
 import { UpdateParentAssociationDto } from './dto/update-parent-association.dto';
+
+/** HTTP caller context — when present, student must belong to CurrentBranch (unless super_admin). */
+export type GuardiansAccessContext = {
+  branchId: string;
+  userId: string;
+  email: string;
+  roles?: string[];
+};
 
 type ParentStudentRow = {
   id: string;
@@ -361,10 +374,52 @@ export class ParentsService {
   }
 
   /**
-   * Get all guardians for a student, ordered by priority (1 = Primary, 2 = Secondary)
+   * Get all guardians for a student, ordered by priority (1 = Primary, 2 = Secondary).
+   * When `access` is provided (HTTP), assert student.branch_id matches CurrentBranch
+   * unless the caller is super_admin. Internal callers omit `access`.
    */
-  async getGuardiansForStudent(studentId: string): Promise<ParentStudentDto[]> {
+  async getGuardiansForStudent(
+    studentId: string,
+    access?: GuardiansAccessContext,
+  ): Promise<ParentStudentDto[]> {
     const supabase = this.supabaseConfig.getClient();
+
+    if (access) {
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('id, branch_id')
+        .eq('id', studentId)
+        .maybeSingle();
+      throwIfDbError(studentError);
+
+      if (!student) {
+        throw new NotFoundException('Student not found');
+      }
+
+      const studentBranchId = (student as { branch_id: string | null }).branch_id;
+      const isSuperAdmin = (access.roles ?? []).includes('super_admin');
+
+      if (!isSuperAdmin && studentBranchId !== access.branchId) {
+        void this.auditLogService
+          .log({
+            tableName: 'students',
+            recordId: studentId,
+            action: 'UPDATE',
+            userEmail: access.email || 'unknown',
+            branchId: access.branchId,
+            newValues: {
+              accessDenied: true,
+              attempted: 'get-guardians',
+              callerUserId: access.userId,
+              callerBranchId: access.branchId,
+              studentBranchId: studentBranchId ?? null,
+            },
+          })
+          .catch(() => {});
+
+        throw new ForbiddenException('Access denied');
+      }
+    }
 
     const { data, error } = await supabase
       .from('parent_students')

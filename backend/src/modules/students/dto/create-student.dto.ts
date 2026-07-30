@@ -5,7 +5,9 @@ import {
   MinLength,
   IsUUID,
   Matches,
+  ValidateIf,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateStudentDto {
   /** School login username (without domain). Letters, numbers, full stops and underscores only. */
@@ -76,5 +78,22 @@ export class CreateStudentDto {
   @IsOptional()
   @IsUUID()
   subjectTemplateId?: string;
+
+  /** Optional Google Classroom account email for grade sync matching. */
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value == null) return value;
+    const cleaned = String(value)
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .trim()
+      .toLowerCase();
+    return cleaned || null;
+  })
+  @ValidateIf((_, v) => typeof v === 'string' && v.length > 0)
+  @Matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, {
+    message: 'Invalid Google account email address',
+  })
+  googleAccountEmail?: string | null;
 }
 

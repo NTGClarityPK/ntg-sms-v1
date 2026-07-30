@@ -1,7 +1,8 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Logger, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { hasPrivilegedAccess } from '../../common/utils/privileged-access.util';
 import { BranchesService } from './branches.service';
 import { QueryBranchesDto } from './dto/query-branches.dto';
 import { BranchDto } from './dto/branch.dto';
@@ -15,6 +16,8 @@ import { AuthService } from '../auth/auth.service';
 @Controller('api/v1/branches')
 @UseGuards(JwtAuthGuard)
 export class BranchesController {
+  private readonly logger = new Logger(BranchesController.name);
+
   constructor(
     private readonly branchesService: BranchesService,
     private readonly authService: AuthService,
@@ -23,11 +26,15 @@ export class BranchesController {
   @Get()
   async list(
     @Query() query: QueryBranchesDto,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{
     data: BranchDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
-    return this.branchesService.list(query);
+    return this.branchesService.list(query, {
+      userId: user.id,
+      roles: user.roles,
+    });
   }
 
   @Get('by-tenant')
@@ -61,6 +68,11 @@ export class BranchesController {
       body.enabled,
       body.password,
       user.email ?? '',
+      {
+        userId: user.id,
+        email: user.email ?? '',
+        roles: user.roles,
+      },
     );
     return { data: { success: true } };
   }
@@ -76,9 +88,14 @@ export class BranchesController {
   @Get(':id')
   async getById(
     @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
     @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
   ): Promise<{ data: BranchDto }> {
-    const branch = await this.branchesService.getById(id, language ?? 'ar');
+    const branch = await this.branchesService.getById(id, language ?? 'ar', {
+      userId: user.id,
+      email: user.email ?? '',
+      roles: user.roles,
+    });
     return { data: branch };
   }
 
@@ -97,7 +114,11 @@ export class BranchesController {
     @Body() body: UpdateBranchDto,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: BranchDto }> {
-    const updated = await this.branchesService.update(id, body, user.email);
+    const updated = await this.branchesService.update(id, body, user.email, {
+      userId: user.id,
+      email: user.email ?? '',
+      roles: user.roles,
+    });
     return { data: updated };
   }
 
@@ -106,12 +127,13 @@ export class BranchesController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() body: AssignBranchToTenantDto,
   ): Promise<{ data: BranchDto }> {
-    // Super admin only access
-    const isSuperAdmin = user.roles?.includes('super_admin');
-    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
+    const isPrivileged = hasPrivilegedAccess(
+      { email: user.email, roles: user.roles },
+      this.logger,
+    );
     const isOwner = user.roles?.includes('tenant_owner');
-    
-    if (!isSuperAdmin && !isDev && !isOwner) {
+
+    if (!isPrivileged && !isOwner) {
       throw new ForbiddenException('This endpoint is only accessible to super admins, developers and owners');
     }
 
@@ -125,11 +147,9 @@ export class BranchesController {
     @Param('tenantId') tenantId: string,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: BranchDto[] }> {
-    // Super admin only access
-    const isSuperAdmin = user.roles?.includes('super_admin');
-    const isDev = user.email?.endsWith('@ntg.com') || user.email?.endsWith('@example.com');
-    
-    if (!isSuperAdmin && !isDev) {
+    if (
+      !hasPrivilegedAccess({ email: user.email, roles: user.roles }, this.logger)
+    ) {
       throw new ForbiddenException('This endpoint is only accessible to super admins');
     }
 
@@ -137,7 +157,3 @@ export class BranchesController {
     return this.branchesService.listByTenantAdmin(tenantId);
   }
 }
-
-
-
-

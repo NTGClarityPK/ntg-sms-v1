@@ -170,13 +170,19 @@ class ApiClient {
           const isAuthBootstrap =
             typeof url === 'string' &&
             (url.startsWith('/api/v1/auth/me') || url.startsWith('/api/v1/auth/select-branch'));
+          // Public invitation setup — no JWT required. Skip getSession() so a slow/hung
+          // Supabase client on cold load cannot block the Set up your account page forever.
+          const isPublicInvitationSetup =
+            typeof url === 'string' && url.startsWith('/api/v1/invitations/setup/');
 
           const studentToken =
             typeof window !== 'undefined'
               ? window.localStorage.getItem(STUDENT_TOKEN_STORAGE_KEY)
               : null;
 
-          if (isStudentApi && studentToken) {
+          if (isPublicInvitationSetup) {
+            // Intentionally no Authorization header.
+          } else if (isStudentApi && studentToken) {
             // Student-only APIs: use custom student JWT
             config.headers.Authorization = `Bearer ${studentToken}`;
           } else {

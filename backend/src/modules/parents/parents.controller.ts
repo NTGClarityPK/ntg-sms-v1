@@ -176,9 +176,15 @@ export class ParentsController {
   @UseGuards(BranchGuard)
   async getGuardiansForStudent(
     @Param('studentId') studentId: string,
-    @CurrentBranch() branch?: { branchId: string; tenantId: string },
+    @CurrentBranch() branch: { branchId: string; tenantId: string },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    const data = await this.parentsService.getGuardiansForStudent(studentId);
+    const data = await this.parentsService.getGuardiansForStudent(studentId, {
+      branchId: branch.branchId,
+      userId: user.id,
+      email: user.email ?? '',
+      roles: user.roles,
+    });
     return { data };
   }
 }
