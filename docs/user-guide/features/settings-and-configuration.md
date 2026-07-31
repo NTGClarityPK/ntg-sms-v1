@@ -1,14 +1,19 @@
 # ⚙️ Settings & Configuration
 
-School-wide setup for NTG Alma — two rows of category and section tabs (not a sidebar list).
+School-wide options for NTG Alma — identity, academic structure, timetable timing, fees, look and feel, and who can access what.
 
 ## 📋 Overview
 
 **Path:** Sidebar → **Settings**
 
-Typically managed by school admin, principal, or academic coordinator (section-dependent).
+Usually managed by a school admin, principal, or academic coordinator (some sections are limited to certain roles).
 
-| Category | Sections (exact labels) |
+Settings uses **two rows of tabs**:
+
+1. Choose a **category** (for example **School setup** or **Academic**).
+2. Then choose a **section** inside that category (for example **Business Info** or **Schedule**).
+
+| Category | Sections you will see |
 | --- | --- |
 | **School setup** | **Business Info**, **Communication**, **General** |
 | **Academic** | **Academic**, **Schedule**, **Result reports** * |
@@ -17,46 +22,66 @@ Typically managed by school admin, principal, or academic coordinator (section-d
 | **Appearance** | **Theme**, **Stats** * |
 | **Access control** | **Permissions** |
 
-\* **Result reports** — school admin / principal only (not plan-gated).
-\* **Data export** — school admin only. See [💾 Data Export](data-export.md).
-\* **Stats** — school admin only (public statistics password and URL).
+\* **Result reports** — school admin or principal only (not tied to your subscription plan).  
+\* **Data export** — school admin only. See [💾 Data Export](data-export.md).  
+\* **Stats** — school admin only (password and link for public statistics).
 
-Certificate branding lives on [🏆 Certificates](certificates.md) → **Settings**, not here.
+Certificate branding (logos and layout for certificates) lives on [🏆 Certificates](certificates.md) → **Settings**, not under this Settings menu.
 
 ---
 
 ## 🚀 First-time setup
 
-New branches may see **Start school setup**:
+### When you see this
 
-- **Setup wizard** — guided first-run configuration
-- **Copy settings from other branch** — when your school admin account has more than one branch
+After a new school or campus is created — or when that campus’s essential configuration is still incomplete — Settings may show a prompt such as **Start school setup**.
+
+### What the setup wizard is
+
+The **setup wizard** is a guided, step-by-step checklist. It walks you through the first things a campus needs so you do not have to hunt through every Settings tab alone. Typical steps cover:
+
+- Academic year
+- Subjects, classes, sections, and levels
+- School days and day timing
+- Assessment basics
+- Messaging rules
+- Related essentials (such as behavioural settings, when used)
+
+Think of it as a “getting started” tour that saves your choices as you go.
+
+### Copy settings from another campus
+
+If your school already has another campus set up, and you are a **school admin** on more than one campus, you may see **Copy settings from other branch**. That copies structure from the campus you already configured, instead of building everything from scratch.
+
+### If you do not see the banner
+
+Open **Sidebar → Settings** and configure the sections below in a sensible order. The **Tips** section at the end of this page suggests a practical sequence.
 
 ---
 
 ## 🏫 Business Info
 
-School identity: name, code, domain, contact email/phone, timezone, fiscal year start, VAT, **Default language** (English UK / US / Arabic).
+Your school’s identity on this campus: name, code, domain, contact email and phone, timezone, fiscal year start, VAT, and **Default language** (English UK, English US, or Arabic).
 
-Users without a personal language follow this default after login. See [🔐 Authentication & Access](authentication-and-access.md).
+People who have not chosen a personal language follow this default after login. See [🔐 Authentication & Access](authentication-and-access.md).
 
 ---
 
 ## 💬 Communication
 
-Messaging direction rules (teacher–student, teacher–parent both ways) and **branch broadcast** delegation for principals / admin assistants. Affects [📨 Messages](messages.md).
+Rules for who can message whom (for example teacher–student and teacher–parent in both directions), and whether principals or admin assistants may send **branch broadcasts**. These settings affect [📨 Messages](messages.md).
 
 ---
 
 ## ⚙️ General
 
-**Not** classes or subjects — those sit under **Academic** (below).
+This is **not** where you create classes or subjects — those sit under **Academic** (below).
 
-| Block | Purpose |
+| Block | What it is for |
 | --- | --- |
-| Leave quota | School-day quota for [🌴 Leaves](leaves.md) |
-| Library categories | Used by [📚 Library](library.md) |
-| Behavioural assessment | Enable / mandatory toggle and attributes — see [⭐ Behavioural](behavioural.md) |
+| Leave quota | How many school days of leave apply for [🌴 Leaves](leaves.md) |
+| Library categories | Categories used by [📚 Library](library.md) |
+| Behavioural assessment | Turn behavioural scoring on or off, and manage attributes — see [⭐ Behavioural](behavioural.md) |
 
 ---
 
@@ -64,21 +89,36 @@ Messaging direction rules (teacher–student, teacher–parent both ways) and **
 
 This one section stacks three areas:
 
-1. **Academic years** — create years, mark **Active**, **Locked** when finalised; rollover rules apply at year-end
-2. **Academic Settings** — inner tabs: **Subjects**, **Classes**, **Sections**, **Levels**, **Subject templates**
+1. **Academic years** — create years, mark one **Active**, and **Lock** a year when it is finalised; year-end rollover rules then apply
+2. **Academic Settings** — inner tabs for structure (explained next)
 3. **Assessment Settings** — **Assessment types** and **Grade templates**
 
-Use **Class** ([🧩 Class](class-sections.md)) after classes and sections exist.
+After classes and sections exist, day-to-day class lists also appear under [🧩 Class](class-sections.md).
+
+### Words used under Academic Settings
+
+| Term | Plain meaning |
+| --- | --- |
+| **Subject** | What is taught (for example Mathematics or English) |
+| **Class** | A year group or form label (for example Grade 5 or Year 8) |
+| **Section** | A split of a class (for example Grade 5-A and Grade 5-B) |
+| **Level** | A **stage group** that bundles related classes — for example Primary, Secondary, or Foundation. Levels make it easier to apply the same subjects, fees, or templates across several classes at once |
+
+Create subjects, classes, sections, and levels before you rely on subject templates that point at them.
 
 ### Subject templates
 
 **Path:** **Settings → Academic** → Academic Settings → **Subject templates**
 
-A **subject template** is a named group of subjects for a stream or track (for example Science Group vs Commerce Group). It tells Alma which subjects belong together for timetable generation, class-template assessments, and optional per-student assignment.
+#### What and why
+
+A **subject template** is a named group of subjects for a stream or track (for example Science Group vs Commerce Group). It tells Alma which subjects belong together for timetable tools, class-template assessments, and optional per-student stream assignment.
+
+#### Fields
 
 | Field | Purpose |
 | --- | --- |
-| **Template name** | Label shown in timetables and forms (e.g. Science Group) |
+| **Template name** | Label shown in timetables and forms (for example Science Group) |
 | **Description** | Optional note for staff |
 | **Subjects** | Subjects included in this group |
 | **Assign to Classes** *or* **Assign to Levels** | Where the template applies — pick classes **or** levels, not both |
@@ -87,16 +127,16 @@ A **subject template** is a named group of subjects for a stream or track (for e
 
 **Edit / delete:** Use **Edit** or **Delete** on the template card.
 
-#### Where it links
+#### Where it is used
 
 | Place | How it uses the template |
 | --- | --- |
-| [🕐 Timetable](timetable-and-schedule.md) | Optional subject-template selector; **Generate from template** / copy can scope to one group |
+| [🕐 Timetable](timetable-and-schedule.md) | Optional subject-template selector; generate or copy can focus on one group |
 | [🎓 Students](students.md) | Optional **Subject Template** on the student form — places a pupil in a stream |
-| [📝 Assessments](assessments.md) | **Class template** creation mode builds assessments across matching sections |
+| [📝 Assessments](assessments.md) | **Class template** mode can build assessments across matching sections |
 | Student **My Timetable** | Students with no assignment may see **No Subject Template Assigned** |
 
-**Without subject templates:** Stream-based classes can still have manual timetables and single-section assessments, but generate-from-template, class-template assessments, and per-student stream assignment will not work as intended.
+**Without subject templates:** You can still build manual timetables and single-section assessments, but generate-from-template, class-template assessments, and per-student stream assignment will not work as intended.
 
 ---
 
@@ -106,23 +146,27 @@ A **subject template** is a named group of subjects for a stream or track (for e
 
 Blocks on this page:
 
-1. **School days** — which weekdays the branch teaches
-2. **Timing templates** — daily clock structure (see below)
+1. **School days** — which weekdays this campus teaches
+2. **Timing templates** — the daily clock structure (see below)
 3. **Public holidays** — dates for the active academic year
-4. **Vacations** — longer non-teaching ranges for the year
+4. **Vacations** — longer non-teaching date ranges for the year
 
 ### Timing templates
 
+#### What and why
+
 A **timing template** defines the school day clock: start time, end time, default **period duration (minutes)**, and optional non-teaching **slots** (Assembly, Break, Lunch, and similar).
 
-School start and end times live **here**, not on Business Info. Create at least one template before relying on timetable generation or early-departure time lists.
+School start and end times live **here**, not under Business Info. Create at least one template before you rely on timetable generation or early-departure time lists.
+
+#### Fields
 
 | Field | Purpose |
 | --- | --- |
-| **Template name** | e.g. Morning schedule, Primary day |
+| **Template name** | For example Morning schedule or Primary day |
 | **School start time** / **School end time** | Overall day window |
-| **Period duration (minutes)** | Default lesson length used when building grids |
-| **Slots** (optional) | Named blocks with their own start/end (Assembly, Break, Lunch, …) via **Add Slot** |
+| **Period duration (minutes)** | Default lesson length when building grids |
+| **Slots** (optional) | Named blocks with their own start and end (Assembly, Break, Lunch, …) via **Add Slot** |
 
 **Create:** **New template** → set times and period length → add slots if needed → **Save**.
 
@@ -130,12 +174,12 @@ School start and end times live **here**, not on Business Info. Create at least 
 
 A class can belong to **only one** timing template at a time — classes already assigned elsewhere are hidden from other cards’ pickers.
 
-#### Where it links
+#### Where it is used
 
 | Place | How it uses the template |
 | --- | --- |
-| [🕐 Timetable](timetable-and-schedule.md) | Period times and framework for class grids / generate |
-| [🚶 Early Departure](early-departure.md) | Departure-time dropdown from school start–end |
+| [🕐 Timetable](timetable-and-schedule.md) | Period times and framework for class grids and generate |
+| [🚶 Early Departure](early-departure.md) | Departure-time list drawn from school start–end |
 | Setup completeness | Branch setup expects at least one timing template with start and end times |
 
 **Without a timing template (or without assigning classes):** Timetable generate/copy for that class has no day framework; early-departure time lists can be empty (“School hours not configured”).
@@ -144,13 +188,13 @@ A class can belong to **only one** timing template at a time — classes already
 
 ## 📄 Result reports
 
-Default PDF style (Minimal / Modern) and progress report window settings. Used by [🥇 Results](results.md).
+Default PDF style (Minimal / Modern) and progress-report window settings. Used by [🥇 Results](results.md).
 
 ---
 
 ## 📦 Inventory
 
-Uniform/inventory categories and sizes for [👕 Inventory (Uniforms)](inventory-uniforms.md).
+Uniform and inventory categories and sizes for [👕 Inventory (Uniforms)](inventory-uniforms.md).
 
 ---
 
@@ -168,13 +212,13 @@ Challan appearance and fee templates — see [💵 Fee Management](fee-managemen
 
 ## 🎨 Theme
 
-Portal colours and presentation.
+Portal colours and presentation for this school.
 
 ---
 
 ## 📊 Stats
 
-Public statistics **password** and branch URL for `/public/statistics/[branchCode]`. See [📊 Reports](reports.md).
+Password and link for a **public statistics page** for this campus (useful when you want to share high-level figures without full portal login). See [📊 Reports](reports.md).
 
 ---
 
@@ -182,18 +226,18 @@ Public statistics **password** and branch URL for `/public/statistics/[branchCod
 
 Two inner tabs:
 
-| Tab | Purpose |
+| Tab | What it does |
 | --- | --- |
-| **Assign Access** | Matrix: roles × features with **None**, **View**, **Edit** (per branch) |
-| **Role Access View** | Read-only summary counts per role |
+| **Assign Access** | A grid of roles × features. For each cell choose **None**, **View**, or **Edit** (per campus) |
+| **Role Access View** | A simple summary of how much access each role has |
 
-School admin bypasses the matrix and is not listed as a row.
+School admin is not limited by this grid and is not listed as a row.
 
-Also on **Assign Access**: **student leave request** class picker — which classes may raise their own leave requests.
+Also on **Assign Access**: a **student leave request** class picker — which classes may raise their own leave requests.
 
-**Student + Assessment** cell is disabled (students use **My Assessments**, not staff Assessments).
+The **Student + Assessment** cell is disabled (students use **My Assessments**, not the staff Assessments area).
 
-Sidebar visibility = permissions + role checks + plan features (`hasFeeManagement`, `hasLibraryManagement`, etc.).
+What appears in the sidebar depends on permissions, role checks, and your school’s plan (some modules such as fees or library may be hidden if they are not on the plan).
 
 See [👥 User Roles](user-roles.md).
 
@@ -206,15 +250,22 @@ See [👥 User Roles](user-roles.md).
 - Create timing templates early (often one per level or shift), then assign every teaching class.
 - Lock academic years only after promotion decisions are complete.
 - Change fee templates before generating next month’s challans.
+- Sensible first-pass order if you are configuring by hand: **Business Info** → **Academic** (year, then subjects/classes/sections/levels) → **Schedule** → assessments → **Permissions** → fees and other modules as needed.
 
 ---
 
 ## 🆘 Troubleshooting
 
-**Section missing:** Check role (Result reports, Stats, Data export are restricted).
-**Classes not on General:** Open **Academic** → Academic Settings → **Classes**.
-**Certificate logo missing:** Use **Certificates → Settings**, not Settings nav.
+**A Settings section is missing:** Check your role. Result reports, Stats, and Data export are restricted.
+
+**I cannot find Classes under General:** Open **Academic** → Academic Settings → **Classes**.
+
+**Certificate logo missing:** Use **Certificates → Settings**, not this Settings menu.
+
 **Cannot assign a class to a timing template:** That class is already on another template — remove it there first, then assign.
-**Subject template form blocks save:** Assign at least one class **or** one level (classes and levels cannot both be filled).
+
+**Subject template will not save:** Assign at least one class **or** one level (you cannot fill both at once).
+
 **Early departure times empty / school hours not configured:** Create a timing template with start and end under **Schedule**, and assign the student’s class.
+
 **Student timetable: No Subject Template Assigned:** Set **Subject Template** on the student record, or create templates under Academic Settings if none exist.

@@ -1,37 +1,49 @@
 # 👤 Profile & Account
 
-Your name, read-only email, and teaching assignments for the active academic year.
+Your display name, login email, and (for teachers) a quick view of what you teach this year.
 
 ## 📋 Overview
 
-**Path:** User menu → **Account** → **Profile**
+**Path:** User menu (your name or avatar at the top) → **Account** → **Profile**  
 **Page title:** **My Profile**
 
-Any signed-in user with a branch context can open Profile. There is no separate “profile” permission.
+Anyone who is signed in can open Profile. You do not need a special “profile” permission.
 
 ---
 
 ## ✏️ Personal information
 
-| Field | Behaviour |
+| Field | What you can do |
 | --- | --- |
-| **Name** | Editable — **Save** updates your full name |
-| **Email** | Shown, **not** editable |
+| **Name** | Edit it, then **Save** — this updates the name others see |
+| **Email** | Shown for reference — you **cannot** change it here |
 
-Messages you may see: **Name is required**, **Profile updated successfully**.
+You may see short messages such as **Name is required** or **Profile updated successfully**.
 
 ---
 
 ## 👩‍🏫 Teaching (staff only)
 
-If you have a linked staff record, a read-only **Teaching** section lists the active academic year:
+### What this section is
 
-- **Class Teacher of**
-- **Subject Teacher of** (class section with subject in brackets)
+If your account is linked as staff (for example a class teacher or subject teacher), Profile shows a **Teaching** block. It is a simple snapshot of your teaching for the **active academic year** — the year the school is currently running.
 
-Empty state: **No teaching assignments found for the active academic year.**
+You may see:
 
-Change assignments under **Mapping → Teacher–Class**, not on Profile.
+- **Class Teacher of** — classes where you are the main class teacher
+- **Subject Teacher of** — classes and subjects you teach (the subject name appears next to the class)
+
+### Why it is here
+
+So you can confirm your teaching load at a glance. Profile does **not** let you change assignments; it only displays them.
+
+### If the list is empty
+
+You will see that no teaching assignments were found for the active academic year. That usually means nothing has been mapped for you yet, or the wrong year is active.
+
+### How to change assignments
+
+A school admin (or someone with Mapping access) updates who teaches what under **Mapping → Teacher–Class** — not on Profile.
 
 ---
 
@@ -39,27 +51,27 @@ Change assignments under **Mapping → Teacher–Class**, not on Profile.
 
 These are **not** on the Profile form:
 
-| Control | Where |
+| Control | Where to find it |
 | --- | --- |
 | Language | Header language control — **Use school default**, **English (US)**, **English (UK)**, **Arabic** |
-| Current branch (read-only) | Desktop header badge — tooltip **Currently viewing {branch}** |
-| Switch branch | User menu — **school admin** with more than one branch only |
+| Current campus | On desktop, a badge in the header; hovering may show **Currently viewing** followed by that campus’s name (read-only) |
+| Switch campus | User menu → **Switch Branch** — **school admin** with more than one campus only |
 | Password reset | Login → **Forgot password** (see [🔐 Authentication & Access](authentication-and-access.md)) |
-| PIN | **PIN Management** (parents) |
+| PIN | Sidebar → **PIN Management** (parents) |
 
-Profile does **not** support password change, profile photo, email edit, or editing teaching load.
+Profile does **not** support changing your password, adding a profile photo, editing your email, or editing your teaching load.
 
 ---
 
 ## 💡 Tips & Best Practices
 
-- Keep your display name clear for messages, substitutions, and report signatures.
-- Use **Switch Branch** (school admin) when working across campuses — the badge alone is read-only.
+- Keep your display name clear — it appears in messages, substitutions, and some report signatures.
+- School admins working across campuses: use **Switch Branch**. The header badge alone only shows where you are; it does not switch campus.
 
 ---
 
 ## 🆘 Troubleshooting
 
-**Cannot change email:** Contact a school admin; email is fixed on the account.
+**Cannot change email:** Contact a school admin. Email is fixed on the account.
 
-**Teaching section empty:** Confirm Mapping assignments and the active academic year.
+**Teaching section empty:** Ask an admin to check **Mapping → Teacher–Class** and that the correct academic year is active.

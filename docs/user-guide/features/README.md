@@ -7,9 +7,9 @@ Detailed guides for each module of the NTG Alma portal. One page per feature.
 | Feature | What it covers |
 | --- | --- |
 | [🏠 Dashboard](dashboard.md) | Role overviews, role switcher, shortcut cards |
-| [🔐 Authentication & Access](authentication-and-access.md) | Login, signup, invitations, Google, branch/child context, PIN |
-| [👤 Profile & Account](profile-and-account.md) | Name, email (read-only), teaching assignments |
-| [⚙️ Settings & Configuration](settings-and-configuration.md) | Two-row tabs: 13 sections, wizard, permissions matrix |
+| [🔐 Authentication & Access](authentication-and-access.md) | Sign in, signup, invitations, Google, campus and child choice, PIN for students |
+| [👤 Profile & Account](profile-and-account.md) | Display name, read-only email, teaching snapshot for staff |
+| [⚙️ Settings & Configuration](settings-and-configuration.md) | School setup, academic structure, schedule, first-time wizard, permissions |
 | [👥 User Roles](user-roles.md) | Users, None/View/Edit, statuses, My-* views, `/setup` |
 
 ## 👨‍👩‍👧 People & setup
