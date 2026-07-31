@@ -6,7 +6,7 @@ Generate student and staff ID cards, move them through draft → issued, and dow
 
 **Path:** Sidebar → **ID Cards**
 
-Supported managers: **School admin**, **Principal**, **Super admin** (backend). Do not rely on other roles even if a nav link appears.
+Supported managers: **School admin** and **Principal** (backend). Do not rely on other roles even if a nav link appears.
 
 Tabs: **Generate**, **Students**, **Staff**.
 
@@ -53,6 +53,6 @@ Preview, upload/replace photo, change status, request **reprint** (mandatory rea
 
 ## 🆘 Troubleshooting
 
-**API / access error for coordinator roles:** Card management is limited to school admin, principal, and super admin.
+**API / access error for coordinator roles:** Card management is limited to school admin and principal.
 
 **Cannot reprint:** Provide a reason on the detail page.

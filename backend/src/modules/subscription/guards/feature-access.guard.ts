@@ -36,9 +36,6 @@ export class FeatureAccessGuard implements CanActivate {
       branch?: CurrentBranchContext;
     }>();
     const user = request.user;
-    if (user?.roles?.some((r) => r.toLowerCase() === 'super_admin')) {
-      return true;
-    }
     const tenantId = request.branch?.tenantId;
     if (!tenantId) return false;
 

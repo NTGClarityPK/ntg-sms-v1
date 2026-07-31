@@ -20,5 +20,4 @@
 - [Reports & Results](reports-results.md)
 - [Offline Documents (PWA)](offline-documents.md)
 - [Storage](storage.md)
-- [Audit Trail](audit-trail.md)
 

@@ -21,7 +21,7 @@ Statuses include **Pending**, **Approved**, **Rejected**, **Cancelled**.
 2. Enter date, departure time, reason (attachment UI not offered on standard form).
 3. Submit.
 
-Departure times use a dropdown built from the branch **timing template** (school start–end in **Settings → Schedule**).
+Departure times use a dropdown built from the branch **timing template** (school start–end). Create and assign templates under **Settings → Schedule** — see [⚙️ Settings & Configuration](settings-and-configuration.md).
 
 ---
 
@@ -53,6 +53,6 @@ Filter and review past parent requests and staff authorisations. Approve or reje
 
 ## 🆘 Troubleshooting
 
-**Time list empty:** Add or fix a timing template under **Settings → Schedule**.
+**Time list empty:** Add or fix a timing template under **Settings → Schedule**, and ensure the student’s class is assigned to it. See [⚙️ Settings & Configuration](settings-and-configuration.md).
 **Approve/Reject missing:** Early departure **Edit** permission required.
 **Excused on attendance but not marked early:** Staff authorisation flow sets excused — ordinary P/A/L marking does not.

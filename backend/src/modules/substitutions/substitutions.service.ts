@@ -8,7 +8,6 @@ import {
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SuggestSubstitutionsDto } from './dto/suggest-substitutions.dto';
 import { AssignSubstitutionsDto } from './dto/assign-substitutions.dto';
@@ -122,7 +121,6 @@ export class SubstitutionsService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
     private readonly notificationsService: NotificationsService,
-    private readonly auditLogService: AuditLogService,
   ) {}
 
   async suggest(
@@ -387,14 +385,6 @@ export class SubstitutionsService {
       });
     }
 
-    if (userEmail) {
-      for (const row of rows) {
-        this.auditLogService
-          .logCreate('teacher_substitutions', row.id, userEmail, { ...row } as Record<string, unknown>)
-          .catch(() => undefined);
-      }
-    }
-
     return {
       data: new AssignSubstitutionsResultDto({
         substitutionIds: rows.map((r) => r.id),
@@ -573,20 +563,6 @@ export class SubstitutionsService {
       )
       .single();
     throwIfDbError(updateError);
-
-    if (userEmail) {
-      const oldRow = row as SubstitutionRow;
-      this.auditLogService
-        .logUpdate(
-          'teacher_substitutions',
-          id,
-          userEmail,
-          { status: oldRow.status },
-          { status: 'cancelled' },
-          ['status'],
-        )
-        .catch(() => undefined);
-    }
 
     const dtos = await this.enrichSubstitutionRows([updated as SubstitutionRow]);
     return { data: dtos[0] };

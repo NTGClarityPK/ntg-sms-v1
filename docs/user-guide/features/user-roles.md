@@ -11,7 +11,7 @@ Users, roles, and branch-scoped permissions that drive the sidebar and actions.
 | **Sidebar** | Hidden if None; actions disabled or hidden if View only |
 | **Plan** | Some modules also need subscription features (fees, library, inventory, behavioural) |
 
-School admin and super admin bypass the permission matrix.
+School admin bypasses the permission matrix.
 
 Configure under **Settings → Permissions** — tabs **Assign Access** and **Role Access View**.
 
@@ -59,7 +59,6 @@ Examples (UI spelling):
 - Class Teacher, Subject Teacher
 - **Guidance Counselor** (US spelling in the portal)
 - Parent, Student
-- Super Admin (platform — Admin Portal)
 
 ---
 
@@ -67,7 +66,7 @@ Examples (UI spelling):
 
 **Settings → Permissions → Assign Access**
 
-- Rows: roles (except school admin / super admin)
+- Rows: roles (except school admin)
 - Columns: features (Dashboard, Students, Users, Mapping, etc.)
 - Values: **None** / **View** / **Edit**
 

@@ -382,12 +382,6 @@ export function Sidebar({
   const navbarConfig = themeConfig?.components?.navbar;
   const navButtonConfig = themeConfig?.components?.navButton;
 
-  // Check if user is super admin (should see everything)
-  const isSuperAdmin = user?.roles?.some((r) => {
-    const roleName = r.roleName?.toLowerCase();
-    return roleName === 'super_admin';
-  }) || false;
-
   const isSchoolAdmin =
     user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'school_admin') ?? false;
 
@@ -439,13 +433,10 @@ export function Sidebar({
   }) || false;
   const canManageStorage = user?.roles?.some((r) => {
     const roleName = r.roleName?.toLowerCase();
-    return roleName === 'school_admin' || roleName === 'principal' || roleName === 'super_admin';
+    return roleName === 'school_admin' || roleName === 'principal';
   }) || false;
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
-    // Super admin sees everything - bypass all filters
-    if (isSuperAdmin) return true;
-
     // Hide dashboard in child mode — students use My Assessments as home
     if (item.href === '/dashboard' && isActingAsStudent) return false;
 
@@ -456,7 +447,7 @@ export function Sidebar({
 
     // ID Cards — before permission-matrix check (matrix may not be seeded yet)
     if (item.href === '/id-cards') {
-      if (isSchoolAdmin || isSuperAdmin) return true;
+      if (isSchoolAdmin) return true;
       const canManageIdCards = user?.roles?.some((r) => {
         const roleName = r.roleName?.toLowerCase();
         return (
@@ -470,7 +461,7 @@ export function Sidebar({
 
     if (item.href === '/certificates') {
       if (isStudent || isParent) return false;
-      if (isSchoolAdmin || isSuperAdmin) return true;
+      if (isSchoolAdmin) return true;
       return canView('certificates') || canEdit('certificates');
     }
 
@@ -533,7 +524,7 @@ export function Sidebar({
       if (item.href === '/behavioral') {
         return canAssessBehavioral;
       }
-      // Storage: school_admin, principal, super_admin only
+      // Storage: school_admin, principal only
       if (item.href === '/admin/storage') {
         return canManageStorage;
       }
@@ -541,7 +532,7 @@ export function Sidebar({
         return isSchoolAdmin;
       }
       const subFeature = subscriptionNavFeatures[item.href];
-      if (subFeature && planFeatures && !isSuperAdmin) {
+      if (subFeature && planFeatures) {
         if (!planFeatures[subFeature]) return false;
       }
       // Parent-facing view only page

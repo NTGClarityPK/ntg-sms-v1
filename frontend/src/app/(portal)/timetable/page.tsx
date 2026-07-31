@@ -36,16 +36,12 @@ export default function TimetablePage() {
   const activeYear = activeYearResponse?.data ?? null;
   const activeYearId = activeYear?.id;
 
-  const isSuperAdmin =
-    user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'super_admin') ?? false;
   /** Same roles as Sidebar `canManageTimetable` — sees every class-section in the dropdown. */
   const seesAllBranchClassSections =
-    isSuperAdmin ||
-    (user?.roles?.some((r) => {
+    user?.roles?.some((r) => {
       const n = (r.roleName ?? '').toLowerCase();
       return n === 'school_admin' || n === 'principal' || n === 'academic_coordinator';
-    }) ??
-      false);
+    }) ?? false;
   const isTeachingStaff =
     user?.roles?.some((r) => {
       const n = (r.roleName ?? '').toLowerCase();

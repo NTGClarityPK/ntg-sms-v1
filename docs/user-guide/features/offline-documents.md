@@ -4,26 +4,15 @@ Offline document browsing is **not a separate portal page**.
 
 ## 📋 Overview
 
-The old **Offline Documents** menu destination now **redirects to Storage**. Client-side offline copies (for example report PDFs saved in the browser) are managed under the Storage **Cache** tab for super administrators.
+The old **Offline Documents** menu destination now **redirects to Storage**. There is no dedicated offline-documents screen or cache-management tab in the portal.
 
 | Old path | What happens |
 | --- | --- |
-| **Offline Documents** / `/offline-documents` | Redirects to **Admin → Storage** |
+| **Offline Documents** / `/offline-documents` | Redirects to **Admin → Storage** (Overview) |
 
-There is no standalone list of offline files for everyday teachers or parents in the current portal.
+Offline copies saved by the browser or PWA (for example report PDFs cached on a device) remain **device-local**. School administrators cannot browse or clear them from NTG Alma — users manage storage through their browser or device settings if needed.
 
----
-
-## 🗄️ Where to manage offline cache
-
-**Path:** **Admin → Storage → Cache** (super admin only)
-
-On **Cache** you can see:
-
-- **Offline storage used** (size of documents held in the browser’s offline store)
-- **Clear documents older than 30 days**
-
-For usage quotas, largest files, and alerts, see [🗄️ Storage](storage.md).
+For cloud file usage, quotas, largest files, and alerts, see [🗄️ Storage](storage.md).
 
 ---
 

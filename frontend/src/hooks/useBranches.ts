@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
-import type { ApiResponse } from '@/types/api';
 import type { Branch } from '@/types/auth';
 
 const branchesKeys = {
@@ -107,53 +106,6 @@ export function useUpdatePublicStats() {
     onSuccess: async (_, variables) => {
       await qc.invalidateQueries({ queryKey: branchesKeys.byId(variables.branchId) });
     },
-  });
-}
-
-export interface AssignBranchToTenantPayload {
-  tenantId: string;
-  name: string;
-  nameAr?: string;
-  code?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  storageQuotaGb?: number;
-  isActive?: boolean;
-}
-
-export function useAssignBranchToTenant() {
-  const qc = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (payload: AssignBranchToTenantPayload) => {
-      const res = await apiClient.post<ApiResponse<BranchDetails>>(
-        '/api/v1/branches/assign-to-tenant',
-        payload,
-      );
-      return res.data.data;
-    },
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: branchesKeys.all });
-      await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
-    },
-  });
-}
-
-// Admin hook to get branches by tenant ID
-export function useBranchesByTenantId(tenantId: string | null) {
-  const locale = useLocale();
-  return useQuery({
-    queryKey: [...branchesKeys.all, 'admin', 'byTenant', tenantId, locale],
-    queryFn: async () => {
-      if (!tenantId) throw new Error('Tenant ID is required');
-      const res = await apiClient.get<BranchDetails[]>(`/api/v1/branches/admin/by-tenant/${tenantId}`, {
-        params: { language: locale },
-      });
-      return res;
-    },
-    enabled: !!tenantId,
-    staleTime: 5 * 60 * 1000,
   });
 }
 

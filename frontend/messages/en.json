@@ -503,7 +503,6 @@
     "sidebarManage": "Manage",
     "roleName": {
       "school_admin": "School Admin",
-      "super_admin": "Super Admin",
       "principal": "Principal",
       "academic_coordinator": "Academic Coordinator",
       "class_teacher": "Class Teacher",
@@ -1709,7 +1708,7 @@
     "academicYearStatusActive": "Active",
     "academicYearStatusInactive": "Inactive",
     "academicYearLockActiveTitle": "Lock active academic year",
-    "academicYearLockActiveMessage": "You are about to lock the active academic year. This will make it read-only and prevent all modifications. Once locked, this action cannot be undone. If you need to revert this change, please contact Super Admin Support.",
+    "academicYearLockActiveMessage": "You are about to lock the active academic year. This will make it read-only and prevent all modifications. Once locked, this action cannot be undone. If you need to revert this change, please contact your school administrator.",
     "academicYearLockConfirm": "Lock year",
     "businessLoadSchoolErrorTitle": "Failed to load school information",
     "businessBasicDetailsTitle": "Basic Details",

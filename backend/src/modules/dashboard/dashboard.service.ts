@@ -42,11 +42,6 @@ const ROLE_WIDGETS: Record<string, DashboardWidgetDto[]> = {
   guidance_counselor: [
     new DashboardWidgetDto({ id: 'schedule_today', title: "Today's schedule", description: 'Your timetable for today', role: 'guidance_counselor' }),
   ],
-  super_admin: [
-    new DashboardWidgetDto({ id: 'branch_overview', title: 'Branch overview', description: 'Key statistics', role: 'super_admin' }),
-    new DashboardWidgetDto({ id: 'pending_approvals', title: 'Pending approvals', description: 'Leaves and early departures to review', role: 'super_admin' }),
-    new DashboardWidgetDto({ id: 'storage', title: 'Storage', description: 'Storage usage', role: 'super_admin' }),
-  ],
   student: [
     new DashboardWidgetDto({ id: 'today_schedule', title: "Today's schedule", description: 'Your classes today', role: 'student' }),
     new DashboardWidgetDto({ id: 'upcoming_assessments', title: 'Upcoming assessments', description: 'Due dates', role: 'student' }),

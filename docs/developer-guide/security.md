@@ -136,11 +136,10 @@ Returns: { accessToken, refreshToken }
 
 ### User Roles
 
-From `user_role` enum (10 roles):
+From `user_role` enum (9 roles):
 
 | Role                 | Code                   | Typical Users         | Scope            |
 | -------------------- | ---------------------- | --------------------- | ---------------- |
-| Super Admin          | `super_admin`          | System administrators | System-wide      |
 | Principal            | `principal`            | School principals     | Branch-wide      |
 | School Admin         | `school_admin`         | School administrators | Branch-wide      |
 | Academic Coordinator | `academic_coordinator` | Academic heads        | Branch-wide      |
@@ -231,13 +230,6 @@ private async ensureFeatureEditAccess(
 
 ### Special Role Privileges
 
-**Super Admin:**
-
-* System-wide access
-* Can view audit logs
-* Can manage any tenant/branch
-* Can access all data regardless of RLS
-
 **School Admin:**
 
 * Bypasses most permission checks within branch
@@ -320,7 +312,7 @@ CREATE POLICY user_owns_rows ON notifications
 Admin-only tables:
 
 ```sql
-CREATE POLICY super_admin_only ON audit_logs
+CREATE POLICY school_admin_branch ON sensitive_table
   FOR SELECT
   USING (
     EXISTS (
@@ -328,7 +320,8 @@ CREATE POLICY super_admin_only ON audit_logs
       FROM user_roles ur
       JOIN roles r ON ur.role_id = r.id
       WHERE ur.user_id = auth.uid()
-        AND r.name = 'super_admin'
+        AND ur.branch_id = sensitive_table.branch_id
+        AND r.name IN ('school_admin', 'principal')
     )
   );
 ```
@@ -499,10 +492,8 @@ export class StudentsController {
    * First branch in `user_branches` (last resort)
 2. Verifies user is member of branch
 3. Loads tenant ID from branch
-4. Checks if branch/tenant is active
-5. **Privileged bypass**: `@ntg.com`, `@ntgclarity.com`, `@example.com` emails skip inactive checks
-6. **Super admin bypass**: `super_admin` role skips inactive checks
-7. Attaches to `request.branch = { branchId, tenantId }`
+4. Checks if branch/tenant is active (inactive branches and tenants are blocked for all users)
+5. Attaches to `request.branch = { branchId, tenantId }`
 
 **3. Permission Checks (Custom per controller)**
 
@@ -591,7 +582,6 @@ const allowedOrigins = [
 **Protection:**
 
 * RLS policies restrict access
-* Audit logging for changes
 * Export restrictions (could be improved)
 
 ### File Storage Security
@@ -620,59 +610,6 @@ CREATE POLICY "Branch members can upload" ON storage.objects
         AND branch_id = (storage.foldername(name))[1]::uuid
     )
   );
-```
-
-***
-
-## 📝 Audit Logging
-
-### Audit Trail
-
-**`audit_logs` table:**
-
-```sql
-CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY,
-    table_name TEXT,
-    record_id UUID,
-    action TEXT,               -- INSERT, UPDATE, DELETE
-    user_email TEXT,
-    username TEXT,
-    branch_id UUID,
-    tenant_id UUID,
-    old_values JSONB,          -- Before state
-    new_values JSONB,          -- After state
-    changed_fields TEXT[],     -- What changed
-    ip_address TEXT,
-    user_agent TEXT,
-    created_at TIMESTAMPTZ
-);
-```
-
-**What's logged:**
-
-* User management changes
-* Student record modifications
-* Grade changes
-* Settings changes
-* Sensitive data access (could be improved)
-
-**RLS:** Super admin SELECT only
-
-**Usage:**
-
-```typescript
-// Example from AuditLogModule
-await this.auditLogService.log({
-  tableName: 'students',
-  recordId: studentId,
-  action: 'UPDATE',
-  oldValues: oldStudent,
-  newValues: newStudent,
-  changedFields: ['class_id', 'section_id'],
-  userEmail: user.email,
-  branchId: branch.branchId,
-});
 ```
 
 ***
@@ -763,14 +700,6 @@ await this.auditLogService.log({
 {% stepper %}
 {% step %}
 
-### Limited audit logging
-
-* **Risk:** Incomplete audit trail
-* **Action:** Expand logging coverage
-  {% endstep %}
-
-{% step %}
-
 ### No file upload size limits visible
 
 * **Risk:** Storage exhaustion
@@ -796,14 +725,13 @@ await this.auditLogService.log({
 * [x] RBAC implemented
 * [x] Permission checks in controllers
 * [ ] Consistent permission checks across all endpoints
-* [ ] Regular permission audit
+* [ ] Regular permission review
 
 **Database:**
 
 * [x] RLS enabled on most tables
 * [ ] RLS policies reviewed and tested
 * [ ] Fix critical RLS issues (invitations, result\_cards)
-* [x] Audit logging implemented
 
 **API:**
 
@@ -873,11 +801,10 @@ app.use(helmet({
 
 {% step %}
 
-### Regular security audits
+### Regular security reviews
 
 * Quarterly permission review
 * Monthly RLS policy review
-* Weekly audit log review
   {% endstep %}
   {% endstepper %}
 
@@ -914,7 +841,6 @@ app.use(helmet({
 * **Supabase Dashboard** - Built-in monitoring
 * **Sentry** - Error tracking
 * **DataDog / New Relic** - Application monitoring
-* **Custom alerts** - Via audit logs
 
 ***
 

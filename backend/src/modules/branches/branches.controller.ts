@@ -1,14 +1,12 @@
-import { Body, Controller, ForbiddenException, Get, Logger, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
-import { hasPrivilegedAccess } from '../../common/utils/privileged-access.util';
 import { BranchesService } from './branches.service';
 import { QueryBranchesDto } from './dto/query-branches.dto';
 import { BranchDto } from './dto/branch.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
-import { AssignBranchToTenantDto } from './dto/assign-branch-to-tenant.dto';
 import { UpdatePublicStatsDto } from './dto/update-public-stats.dto';
 import { AuthService } from '../auth/auth.service';
 
@@ -16,8 +14,6 @@ import { AuthService } from '../auth/auth.service';
 @Controller('api/v1/branches')
 @UseGuards(JwtAuthGuard)
 export class BranchesController {
-  private readonly logger = new Logger(BranchesController.name);
-
   constructor(
     private readonly branchesService: BranchesService,
     private readonly authService: AuthService,
@@ -42,13 +38,11 @@ export class BranchesController {
     @CurrentUser() user: { id: string },
     @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
   ): Promise<{ data: BranchDto[] }> {
-    // Get user's branches to determine tenant
     const userData = await this.authService.getCurrentUser(user.id);
     const branches = userData.branches ?? [];
-    
-    // Get tenant ID from first branch (all user's branches should be in same tenant)
+
     const tenantId = branches.length > 0 ? branches[0].tenantId : null;
-    
+
     return this.branchesService.listByTenant(tenantId, user.id, language ?? 'en-GB');
   }
 
@@ -61,8 +55,7 @@ export class BranchesController {
     const roleNames = user.roles || [];
     const canEdit =
       roleNames.includes('school_admin') ||
-      roleNames.includes('principal') ||
-      roleNames.includes('super_admin');
+      roleNames.includes('principal');
     if (!canEdit) {
       throw new ForbiddenException('Only school admin or principal can update public statistics');
     }
@@ -123,41 +116,5 @@ export class BranchesController {
       roles: user.roles,
     });
     return { data: updated };
-  }
-
-  @Post('assign-to-tenant')
-  async assignToTenant(
-    @CurrentUser() user: CurrentUserPayload,
-    @Body() body: AssignBranchToTenantDto,
-  ): Promise<{ data: BranchDto }> {
-    const isPrivileged = hasPrivilegedAccess(
-      { email: user.email, roles: user.roles },
-      this.logger,
-    );
-    const isOwner = user.roles?.includes('tenant_owner');
-
-    if (!isPrivileged && !isOwner) {
-      throw new ForbiddenException('This endpoint is only accessible to super admins, developers and owners');
-    }
-
-    const created = await this.branchesService.assignBranchToTenant(body, user.email);
-    return { data: created };
-  }
-
-  // Admin-only endpoint to get branches by tenant ID
-  @Get('admin/by-tenant/:tenantId')
-  async listByTenantId(
-    @Param('tenantId') tenantId: string,
-    @CurrentUser() user: CurrentUserPayload,
-    @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
-  ): Promise<{ data: BranchDto[] }> {
-    if (
-      !hasPrivilegedAccess({ email: user.email, roles: user.roles }, this.logger)
-    ) {
-      throw new ForbiddenException('This endpoint is only accessible to super admins');
-    }
-
-    // For admin, get all branches for the tenant (not filtered by user access)
-    return this.branchesService.listByTenantAdmin(tenantId, language ?? 'en-GB');
   }
 }

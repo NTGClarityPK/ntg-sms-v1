@@ -58,8 +58,7 @@ export class RevenueReportsService {
     const normalized = (roles ?? []).map((r) => r.toLowerCase());
     if (
       normalized.includes('school_admin') ||
-      normalized.includes('principal') ||
-      normalized.includes('super_admin')
+      normalized.includes('principal')
     ) {
       return;
     }

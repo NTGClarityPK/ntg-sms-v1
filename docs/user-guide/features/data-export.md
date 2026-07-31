@@ -6,7 +6,7 @@ A short guide for school administrators who export a secure backup of their scho
 
 ## Who can use this?
 
-- **School admin** or **super admin** only
+- **School admin** only
 - You must be **logged in** and have a **branch selected** in the header
 
 **Where:** **Settings → Operations → Data export**
@@ -24,7 +24,7 @@ A **password-protected ZIP file** containing your school’s **database records*
 | Fees, attendance, assessments, results | Push notification tokens |
 | Messages, events, library/inventory records | Automatic cloud backup (you store the ZIP yourself) |
 
-Operational/security records are intentionally excluded, including push subscriptions, temporary assessment uploads, background generation jobs, export/audit logs, and billing payment events. Secret fields (passwords, PINs, tokens, API keys, public-statistics passwords, and Stripe identifiers/URLs) are stripped.
+Operational/security records are intentionally excluded, including push subscriptions, temporary assessment uploads, background generation jobs, export job logs, and billing payment events. Secret fields (passwords, PINs, tokens, API keys, public-statistics passwords, and Stripe identifiers/URLs) are stripped.
 
 The export is **encrypted twice**: the ZIP is locked with your **backup password**, and the data file inside is encrypted again for extra protection.
 

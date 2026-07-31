@@ -26,7 +26,6 @@ If the account is inactive, you may see a message that an administrator must rea
 
 After a successful login:
 
-- **Super admin** → **Admin portal**
 - **School admin** with more than one branch → **branch picker**, then portal
 - Everyone else → portal with their branch chosen automatically (stored preference or first available branch)
 
@@ -85,7 +84,6 @@ Open the link → set a new password → return to **Login**.
 | --- | --- |
 | School admin, multiple branches | Picker after login; **Switch Branch** in the user menu anytime |
 | Other roles | Branch selected automatically; header may show a read-only **Current branch** badge |
-| Super admin | Admin portal — no school branch picker |
 
 Branch context scopes students, attendance, fees, timetable, and most operational data.
 

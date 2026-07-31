@@ -1,3 +1,5 @@
+> **Historical — removed.** The `super_admin` role, email-domain privilege escalation (`ALLOW_EMAIL_DOMAIN_PRIVILEGE_ESCALATION`), and Admin Portal were removed from NTG Alma. This migration note is kept for reference only.
+
 # Privileged access migration (email-domain → `super_admin` role)
 
 **Related:** Deep scan Phase 2 C5, Phase 3 M7, FIX_PLAN Part A Section 3.

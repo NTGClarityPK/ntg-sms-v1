@@ -1,3 +1,5 @@
+> **Historical — removed.** Platform audit trail (`audit_logs`, `AuditLogModule`, `AuditLogsModule`, Admin Portal `/adminportal/audit-trail`) was removed from NTG Alma. This document is kept for reference only.
+
 # Audit Trail Implementation Guide
 
 ## ✅ What's Been Completed

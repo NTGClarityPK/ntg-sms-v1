@@ -19,7 +19,7 @@ export class LateFeeController {
 
   private ensureFeesAdmin(user: CurrentUserPayload): void {
     const roles = user.roles ?? [];
-    if (roles.includes('school_admin') || roles.includes('super_admin') || roles.includes('principal')) return;
+    if (roles.includes('school_admin') || roles.includes('principal')) return;
     throw new ForbiddenException('Only school admin can manage late fees');
   }
 

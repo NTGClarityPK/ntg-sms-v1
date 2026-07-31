@@ -31,13 +31,13 @@ export class SystemSettingsController {
   ): Promise<{ data: SystemSettingDto }> {
     // Restrict sensitive settings to admins only.
     if (key.startsWith('student_leave_request_class_ids:')) {
-      const isAdmin = user.roles?.includes('school_admin') || user.roles?.includes('super_admin');
+      const isAdmin = user.roles?.includes('school_admin');
       if (!isAdmin) {
         throw new ForbiddenException('Only school admins can update this setting');
       }
     }
     if (key === 'communication_branch_broadcast') {
-      const isAdmin = user.roles?.includes('school_admin') || user.roles?.includes('super_admin');
+      const isAdmin = user.roles?.includes('school_admin');
       if (!isAdmin) {
         throw new ForbiddenException('Only school administrators can update branch broadcast permissions');
       }

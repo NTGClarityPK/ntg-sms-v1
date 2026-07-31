@@ -5,7 +5,6 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { StaffDto } from './dto/staff.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
@@ -43,7 +42,6 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class StaffService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listStaff(query: QueryStaffDto, branchId: string): Promise<{
@@ -479,11 +477,6 @@ export class StaffService {
       }
 
       const staffRow = staff as StaffRow;
-      this.auditLogService
-        .logCreate('staff', staffRow.id, userEmail, { ...staffRow } as Record<string, unknown>, {
-          branchId,
-        })
-        .catch(() => {});
 
       return this.getStaffById(staffRow.id, branchId);
     } catch (error) {
@@ -559,17 +552,6 @@ export class StaffService {
     throwIfDbError(error);
     if (newRow) {
       const changedFields = Object.keys(staffUpdates).filter((k) => k !== 'updated_at');
-      this.auditLogService
-        .logUpdate(
-          'staff',
-          id,
-          userEmail,
-          { ...oldRow } as Record<string, unknown>,
-          { ...newRow } as Record<string, unknown>,
-          changedFields,
-          { branchId },
-        )
-        .catch(() => {});
     }
 
     return this.getStaffById(id, branchId);
@@ -610,17 +592,6 @@ export class StaffService {
 
     throwIfDbError(error);
     if (newRow) {
-      this.auditLogService
-        .logUpdate(
-          'staff',
-          id,
-          userEmail,
-          { ...oldRow } as Record<string, unknown>,
-          { ...newRow } as Record<string, unknown>,
-          ['is_active', 'deactivated_at', 'deactivation_reason', 'updated_at', 'updated_by'],
-          { branchId },
-        )
-        .catch(() => {});
     }
 
     return this.getStaffById(id, branchId);

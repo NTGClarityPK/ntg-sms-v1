@@ -59,19 +59,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // If user is super admin, redirect to admin portal once session is confirmed
-  useEffect(() => {
-    if (!hasSession || !user) return;
-
-    const isSuperAdmin = user.roles?.some(
-      (r) => r.roleName?.toLowerCase() === 'super_admin',
-    );
-
-    if (isSuperAdmin) {
-      router.push('/adminportal');
-    }
-  }, [hasSession, user, router]);
-
   // Don't render the portal until session is known and `/auth/me` has produced a user.
   // After logout, `hasSession` can flip false while persisted store still hydrates — never render children without `user`.
   if (checkingSession || !hasSession || (hasSession && !user)) {

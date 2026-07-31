@@ -32,7 +32,7 @@ Three creation modes:
 | Mode | Use |
 | --- | --- |
 | **Single Class Section** | One class-section + subject |
-| **Class template** | From a subject template across matching sections |
+| **Class template** | From a [subject template](settings-and-configuration.md) across matching sections |
 | **Class Sections** | Pick multiple sections for the same class |
 
 Fields include title, type, due date/time, total marks, publish flag, attachments (compressed on create), and Google Classroom link when integrated.

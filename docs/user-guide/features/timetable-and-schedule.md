@@ -15,6 +15,8 @@ Class timetables, teacher weekly slots, and parent/student personal views.
 
 Schedule settings (days, templates, holidays): **Settings → Schedule**.
 
+Timing templates (school start/end, period length, breaks) and subject templates (subject groups / streams) are explained under [⚙️ Settings & Configuration](settings-and-configuration.md).
+
 ---
 
 ## 🗓️ Timetable (staff)
@@ -25,10 +27,12 @@ Schedule settings (days, templates, holidays): **Settings → Schedule**.
 
 Editors can:
 
-- **Generate from template** — create slots from subject template
-- **Copy** day or **copy from another section**
+- **Generate from template** — create slots from a **subject template** (optional selector on the grid; templates are defined under **Settings → Academic → Subject templates**)
+- **Copy** day or **copy from another section** (copy can also scope to a subject template)
 - Add/edit/remove slots
 - Show **substitution (SUB)** badges when enabled on the grid
+
+Class period times come from the **timing template** assigned to that class on **Settings → Schedule**.
 
 ---
 
@@ -55,6 +59,7 @@ Teacher substitution display: see [🔄 Teacher Substitution](teacher-substituti
 
 ## 💡 Tips & Best Practices
 
+- Configure [timing templates and subject templates](settings-and-configuration.md) before generating grids.
 - Generate from template after **Mapping → Teacher–Class** is complete.
 - Copy from a pilot section when rolling out a new year group.
 
@@ -63,5 +68,7 @@ Teacher substitution display: see [🔄 Teacher Substitution](teacher-substituti
 ## 🆘 Troubleshooting
 
 **Empty timetable:** No slots — run generate or copy; confirm active academic year.
+**Generate fails / no day framework:** Assign a **timing template** to the class under **Settings → Schedule**.
 **Teacher sees one section only:** Expected for class teachers without admin timetable scope.
 **Parent timetable wrong child:** Use the selector on **Children Timetable**.
+**No Subject Template Assigned (student view):** Set the optional subject template on the student, or create templates under **Settings → Academic**.

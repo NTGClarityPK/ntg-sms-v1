@@ -26,7 +26,7 @@ The **active academic year** is the year the school is currently working in.
 The **locked academic year** is finished and becomes **read-only**.
 
 - Staff can still **view** it (reports/history), but cannot **edit** records in that year.
-- Locking is intended to be **final** (unlock only via super admin support).
+- Locking is intended to be **final**. There is no unlock tool in the portal — if a year was locked in error, contact NTG Alma support.
 
 ### Fresh Start (New Year)
 

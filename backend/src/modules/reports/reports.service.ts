@@ -1268,7 +1268,7 @@ export class ReportsService {
 
   /**
    * Get list of class section IDs the user is allowed to see for admin reports.
-   * school_admin, principal, super_admin, admin_assistant → all in branch.
+   * school_admin, principal, admin_assistant → all in branch.
    * academic_coordinator → all in branch.
    * class_teacher → only class sections where they are class_teacher_id.
    * subject_teacher → only class sections from teacher_assignments.
@@ -1284,7 +1284,7 @@ export class ReportsService {
     const roles = (userRoles || []).map((r) => String(r).toLowerCase());
 
     const isFullAccess = roles.some((r) =>
-      ['school_admin', 'principal', 'super_admin', 'admin_assistant', 'academic_coordinator'].includes(r),
+      ['school_admin', 'principal', 'admin_assistant', 'academic_coordinator'].includes(r),
     );
     if (isFullAccess) {
       const { data: list } = await supabase
@@ -1353,7 +1353,7 @@ export class ReportsService {
     const roles = (userRoles || []).map((r) => String(r).toLowerCase());
 
     const isFullAccess = roles.some((r) =>
-      ['school_admin', 'principal', 'super_admin', 'admin_assistant', 'academic_coordinator'].includes(r),
+      ['school_admin', 'principal', 'admin_assistant', 'academic_coordinator'].includes(r),
     );
     if (isFullAccess) {
       const { data: list } = await supabase

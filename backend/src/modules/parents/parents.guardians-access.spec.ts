@@ -1,6 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
 import { ParentsService } from './parents.service';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
 type QueryResult = {
@@ -58,15 +57,12 @@ describe('ParentsService getGuardiansForStudent branch assert', () => {
   const studentId = 'student-1';
   const userA = 'user-a-id';
 
-  let auditLog: { log: jest.Mock };
   let mock: ReturnType<typeof createSupabaseMock>;
 
   function buildService(handlers: Parameters<typeof createSupabaseMock>[0]) {
     mock = createSupabaseMock(handlers);
-    auditLog = { log: jest.fn().mockResolvedValue(undefined) };
     return new ParentsService(
       { getClient: jest.fn(() => mock.client) } as unknown as SupabaseConfig,
-      auditLog as unknown as AuditLogService,
     );
   }
 
@@ -77,28 +73,13 @@ describe('ParentsService getGuardiansForStudent branch assert', () => {
     roles: ['school_admin'],
   };
 
-  it('throws 403 and audits when student is in another branch', async () => {
+  it('throws 403 when student is in another branch', async () => {
     const service = buildService({
       student: { data: { id: studentId, branch_id: branchB }, error: null },
     });
 
     await expect(service.getGuardiansForStudent(studentId, accessA)).rejects.toBeInstanceOf(
       ForbiddenException,
-    );
-
-    expect(auditLog.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tableName: 'students',
-        recordId: studentId,
-        action: 'UPDATE',
-        newValues: expect.objectContaining({
-          accessDenied: true,
-          attempted: 'get-guardians',
-          callerUserId: userA,
-          callerBranchId: branchA,
-          studentBranchId: branchB,
-        }),
-      }),
     );
 
     const parentCalls = mock.calls.filter((c) => c.table === 'parent_students');
@@ -114,23 +95,21 @@ describe('ParentsService getGuardiansForStudent branch assert', () => {
     const result = await service.getGuardiansForStudent(studentId, accessA);
 
     expect(result).toEqual([]);
-    expect(auditLog.log).not.toHaveBeenCalled();
     expect(mock.calls.some((c) => c.table === 'parent_students')).toBe(true);
   });
 
-  it('allows super_admin for student in another branch', async () => {
+  it('denies cross-branch access even for school_admin role in context', async () => {
     const service = buildService({
       student: { data: { id: studentId, branch_id: branchB }, error: null },
       parentStudents: { data: [], error: null },
     });
 
-    const result = await service.getGuardiansForStudent(studentId, {
-      ...accessA,
-      roles: ['super_admin'],
-    });
-
-    expect(result).toEqual([]);
-    expect(auditLog.log).not.toHaveBeenCalled();
+    await expect(
+      service.getGuardiansForStudent(studentId, {
+        ...accessA,
+        roles: ['school_admin'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('skips student branch pre-check when access context is omitted', async () => {

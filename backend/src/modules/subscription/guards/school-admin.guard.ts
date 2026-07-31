@@ -13,8 +13,7 @@ export class SchoolAdminGuard implements CanActivate {
     const user = request.user;
     const roles = user?.roles ?? [];
     const isSchoolAdmin = roles.some((r) => r.toLowerCase() === 'school_admin');
-    const isSuperAdmin = roles.some((r) => r.toLowerCase() === 'super_admin');
-    if (isSchoolAdmin || isSuperAdmin) {
+    if (isSchoolAdmin) {
       return true;
     }
     throw new ForbiddenException('Only school administrators can access billing');

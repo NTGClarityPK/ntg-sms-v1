@@ -9,7 +9,6 @@ import type {
   Subscription,
   SubscriptionInvoice,
   SubscriptionUsageWithLimits,
-  TenantSubscriptionSummary,
   BillingCycle,
   PlanId,
 } from '@/types/subscription';
@@ -19,7 +18,6 @@ export const subscriptionKeys = {
   me: () => [...subscriptionKeys.all, 'me'] as const,
   usage: (refresh?: boolean) => [...subscriptionKeys.all, 'usage', refresh] as const,
   plans: () => [...subscriptionKeys.all, 'plans'] as const,
-  adminList: () => [...subscriptionKeys.all, 'admin'] as const,
   invoices: (page?: number) => [...subscriptionKeys.all, 'invoices', page] as const,
 };
 
@@ -192,55 +190,6 @@ export function useClearPendingPlanChange() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: subscriptionKeys.all });
-    },
-  });
-}
-
-export function useAdminSubscriptions() {
-  return useQuery({
-    queryKey: subscriptionKeys.adminList(),
-    queryFn: async () => {
-      const res = await apiClient.get<TenantSubscriptionSummary[]>(
-        '/api/v1/admin/subscriptions',
-      );
-      return res.data;
-    },
-    staleTime: 60 * 1000,
-  });
-}
-
-export function useAdminUpdateSubscription() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      tenantId: string;
-      planId?: PlanId;
-      billingCycle?: BillingCycle;
-      status?: string;
-      notes?: string;
-      clearPending?: boolean;
-    }) => {
-      const { tenantId, ...body } = input;
-      const res = await apiClient.patch<Subscription>(
-        `/api/v1/admin/subscriptions/${tenantId}`,
-        body,
-      );
-      return res.data;
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: subscriptionKeys.adminList() });
-    },
-  });
-}
-
-export function useAdminSyncSubscriptionUsage() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (tenantId: string) => {
-      await apiClient.post(`/api/v1/admin/subscriptions/${tenantId}/sync-usage`);
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: subscriptionKeys.adminList() });
     },
   });
 }

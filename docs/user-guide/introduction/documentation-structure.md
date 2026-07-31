@@ -49,9 +49,7 @@ user-guide/
     ├── inventory-uniforms.md          # Inventory items/requests/history
     ├── library.md                     # Library module
     ├── storage.md                     # Storage admin page
-    ├── offline-documents.md           # Offline document access
-    ├── audit-trail.md                 # Admin audit trail pages
-    └── admin-portal.md                # Tenants, payment models, year unlock
+    └── offline-documents.md           # Redirects to Storage (legacy route)
 ```
 
 ## How this maps to GitBook

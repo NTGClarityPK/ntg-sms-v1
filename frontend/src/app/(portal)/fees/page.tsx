@@ -25,7 +25,7 @@ export default function FeesPage() {
   const isAdmin = useMemo(() => {
     return roles.some((r) => {
       const name = (r.roleName ?? '').toLowerCase();
-      return name === 'school_admin' || name === 'principal' || name === 'super_admin';
+      return name === 'school_admin' || name === 'principal';
     });
   }, [roles]);
 

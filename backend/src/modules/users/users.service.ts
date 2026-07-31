@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import crypto from 'crypto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { UserDto } from './dto/user.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
@@ -100,7 +99,6 @@ export class UsersService {
 
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly invitationsService: InvitationsService,
     private readonly subscriptionService: SubscriptionService,
   ) {}
@@ -656,15 +654,6 @@ export class UsersService {
         throw new BadRequestException('Failed to create profile');
       }
 
-      this.auditLogService
-        .logCreate(
-          'profiles',
-          (profile as { id: string }).id,
-          adminUser.email,
-          { ...(profile as Record<string, unknown>) },
-          { branchId, tenantId },
-        )
-        .catch(() => {});
 
       const { error: branchError } = await supabase.from('user_branches').insert({
         user_id: user.id,
@@ -688,15 +677,6 @@ export class UsersService {
 
       for (const row of roleAssignments) {
         const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
-        this.auditLogService
-          .logCreate(
-            'user_roles',
-            recordId,
-            adminUser.email,
-            { ...row } as Record<string, unknown>,
-            { branchId, tenantId },
-          )
-          .catch(() => {});
       }
 
       if (userType === 'staff') {
@@ -789,17 +769,6 @@ export class UsersService {
     const changedFields = Object.keys(input).filter(
       (k) => oldProfile[k] !== newProfile[k],
     ) as string[];
-    this.auditLogService
-      .logUpdate(
-        'profiles',
-        id,
-        userEmail,
-        oldProfile,
-        newProfile,
-        changedFields.length ? changedFields : [],
-        { branchId, tenantId },
-      )
-      .catch(() => {});
 
     return this.getUserById(id, branchId);
   }
@@ -836,12 +805,6 @@ export class UsersService {
 
     for (const row of oldRows) {
       const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
-      this.auditLogService
-        .logDelete('user_roles', recordId, userEmail, { ...row } as Record<string, unknown>, {
-          branchId,
-          tenantId,
-        })
-        .catch(() => {});
     }
 
     // Insert new roles
@@ -858,12 +821,6 @@ export class UsersService {
 
       for (const row of roleAssignments) {
         const recordId = `${row.user_id}_${row.role_id}_${row.branch_id}`;
-        this.auditLogService
-          .logCreate('user_roles', recordId, userEmail, { ...row } as Record<string, unknown>, {
-            branchId,
-            tenantId,
-          })
-          .catch(() => {});
       }
 
       // If any of the new roles are staff roles, ensure a staff record exists
@@ -979,17 +936,6 @@ export class UsersService {
     throwIfDbError(error);
     if (!updated) throw new BadRequestException('Update failed');
 
-    this.auditLogService
-      .logUpdate(
-        'profiles',
-        id,
-        userEmail,
-        oldRow as Record<string, unknown>,
-        updated as Record<string, unknown>,
-        ['is_active', 'updated_at'],
-        { branchId, tenantId },
-      )
-      .catch(() => {});
   }
 
   async updatePreferences(userId: string, dto: UpdatePreferencesDto): Promise<void> {

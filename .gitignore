@@ -79,3 +79,6 @@ rmsreference/
 seed-*.sql
 seed-*.ts
 seed-*.js
+
+# Local private backups (audit archives, etc.)
+backups/

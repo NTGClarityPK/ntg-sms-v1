@@ -28,8 +28,7 @@ export class StorageController {
     const roles = user.roles ?? [];
     const allowed =
       roles.includes('school_admin') ||
-      roles.includes('principal') ||
-      roles.includes('super_admin');
+      roles.includes('principal');
     if (!allowed) {
       throw new ForbiddenException('Only school admin or principal can manage storage');
     }

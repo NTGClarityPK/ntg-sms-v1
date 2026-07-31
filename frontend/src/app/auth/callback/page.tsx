@@ -149,7 +149,7 @@ export default function AuthCallbackPage() {
         const userBranches = userData.branches ?? [];
 
         // Sign In with Google: user must exist (have at least one branch). Otherwise redirect to signup.
-        if (userBranches.length === 0 && !roleNames.includes('super_admin')) {
+        if (userBranches.length === 0) {
           router.replace('/signup?google=not_found');
           return;
         }
@@ -164,15 +164,6 @@ export default function AuthCallbackPage() {
               SYSTEM_DEFAULT_LOCALE,
           );
         reconcileUiLocaleCookie(effective);
-
-        if (roleNames.includes('super_admin')) {
-          setStepMsg(2, 'Taking you to admin portal...');
-          if (typeof window !== 'undefined') {
-            window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
-          }
-          router.push('/adminportal');
-          return;
-        }
 
         if (!roleNames.includes('school_admin')) {
           const branchId = userData.currentBranch?.id ?? userBranches[0]?.id;

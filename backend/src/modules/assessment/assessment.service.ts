@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { QueryAssessmentTypesDto } from './dto/query-assessment-types.dto';
 import { AssessmentTypeDto } from './dto/assessment-type.dto';
 import { GradeTemplateDto } from './dto/grade-template.dto';
@@ -154,7 +153,6 @@ function validateRanges(ranges: Array<{ letter: string; minPercentage: number; m
 export class AssessmentService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listAssessmentTypes(
@@ -228,12 +226,6 @@ export class AssessmentService {
       .single();
     throwIfDbError(error);
     const row = data as AssessmentTypeRow;
-    this.auditLogService
-      .logCreate('assessment_types', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
     return mapAssessmentType(row, 'en-GB');
   }
 
@@ -284,17 +276,6 @@ export class AssessmentService {
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Assessment type not found');
     const changedFields = Object.keys(updates) as string[];
-    this.auditLogService
-      .logUpdate(
-        'assessment_types',
-        id,
-        userEmail,
-        oldRow as Record<string, unknown>,
-        data as Record<string, unknown>,
-        changedFields,
-        { branchId, tenantId },
-      )
-      .catch(() => {});
     return mapAssessmentType(data as AssessmentTypeRow, 'en-GB');
   }
 
@@ -346,12 +327,6 @@ export class AssessmentService {
     throwIfDbError(tError);
 
     const templateRow = template as GradeTemplateRow;
-    this.auditLogService
-      .logCreate('grade_templates', templateRow.id, userEmail, { ...templateRow } as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
 
     const payload = input.ranges.map((r) => ({
       grade_template_id: templateRow.id,
@@ -364,12 +339,6 @@ export class AssessmentService {
     const { data: insertedRanges, error: rError } = await supabase.from('grade_ranges').insert(payload).select('*');
     throwIfDbError(rError);
     for (const r of (insertedRanges as GradeRangeRow[]) ?? []) {
-      this.auditLogService
-        .logCreate('grade_ranges', r.id, userEmail, { ...r } as Record<string, unknown>, {
-          branchId,
-          tenantId,
-        })
-        .catch(() => {});
     }
 
     const ranges = ((insertedRanges as GradeRangeRow[]) ?? []).map(mapGradeRange).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -398,17 +367,6 @@ export class AssessmentService {
         .single();
       throwIfDbError(uError);
       if (updated) {
-        this.auditLogService
-          .logUpdate(
-            'grade_templates',
-            id,
-            userEmail,
-            existingRow as Record<string, unknown>,
-            updated as Record<string, unknown>,
-            ['name'],
-            { branchId, tenantId },
-          )
-          .catch(() => {});
       }
     }
 
@@ -481,12 +439,6 @@ export class AssessmentService {
     const { error: delTemplateError } = await supabase.from('grade_templates').delete().eq('id', id);
     throwIfDbError(delTemplateError);
 
-    this.auditLogService
-      .logDelete('grade_templates', id, userEmail, oldRow as Record<string, unknown>, {
-        branchId: branchId ?? null,
-        tenantId: tenantId ?? null,
-      })
-      .catch(() => {});
 
     return { id };
   }
@@ -660,17 +612,6 @@ export class AssessmentService {
 
     if (newRow) {
       const recordId = (newRow as { id?: string; academic_year_id: string }).id ?? academicYearId;
-      this.auditLogService
-        .logUpdate(
-          'leave_settings',
-          recordId,
-          userEmail,
-          (oldRow ?? {}) as Record<string, unknown>,
-          newRow as Record<string, unknown>,
-          ['annual_quota'],
-          { branchId: branchId ?? undefined, tenantId: tenantId ?? undefined },
-        )
-        .catch(() => {});
     }
 
     return { data: { academicYearId, annualQuota } };

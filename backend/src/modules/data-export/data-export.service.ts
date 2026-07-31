@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import {
@@ -38,7 +37,6 @@ export class DataExportService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly collector: SchoolDataCollectorService,
     private readonly reauth: DataExportReauthService,
-    private readonly auditLogService: AuditLogService,
   ) {}
 
   async getStatus(
@@ -124,22 +122,6 @@ export class DataExportService {
         fileSizeBytes: buffer.length,
       });
 
-      void this.auditLogService.logCreate(
-        'school_data_export',
-        tenantId,
-        user.email,
-        {
-          scope: dto.scope,
-          branchIds,
-          fileSizeBytes: buffer.length,
-        },
-        {
-          tenantId,
-          branchId: branch.branchId,
-          ipAddress: this.extractIp(req),
-          userAgent: req.headers['user-agent'],
-        },
-      );
 
       return {
         buffer,

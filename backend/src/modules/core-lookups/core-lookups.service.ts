@@ -1,6 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { QuerySubjectsDto } from './dto/query-subjects.dto';
 import { SubjectDto } from './dto/subject.dto';
@@ -147,7 +146,6 @@ function mapLevel(row: LevelRow, classes: ClassDto[]): LevelDto {
 export class CoreLookupsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listSubjects(query: QuerySubjectsDto, branchId: string): Promise<{ data: SubjectDto[]; meta: Meta }> {
@@ -232,12 +230,6 @@ export class CoreLookupsService {
       .single();
     throwIfDbError(error);
     const row = data as SubjectRow;
-    this.auditLogService
-      .logCreate('subjects', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
     return mapSubject(row, 'en-GB');
   }
 
@@ -281,17 +273,6 @@ export class CoreLookupsService {
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Subject not found');
     const newRow = data as SubjectRow;
-    this.auditLogService
-      .logUpdate(
-        'subjects',
-        id,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        Object.keys(updates).filter((k) => k !== 'updated_by'),
-        { branchId },
-      )
-      .catch(() => {});
     return mapSubject(newRow, 'en-GB');
   }
 
@@ -410,12 +391,6 @@ export class CoreLookupsService {
       .single();
     throwIfDbError(error);
     const row = data as ClassRow;
-    this.auditLogService
-      .logCreate('classes', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
     return mapClass(row);
   }
 
@@ -454,17 +429,6 @@ export class CoreLookupsService {
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Class not found');
     const newRow = data as ClassRow;
-    this.auditLogService
-      .logUpdate(
-        'classes',
-        id,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        Object.keys(updates).filter((k) => k !== 'updated_by'),
-        { branchId },
-      )
-      .catch(() => {});
     return mapClass(newRow);
   }
 
@@ -526,12 +490,6 @@ export class CoreLookupsService {
       .single();
     throwIfDbError(error);
     const row = data as SectionRow;
-    this.auditLogService
-      .logCreate('sections', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
     return mapSection(row);
   }
 
@@ -569,17 +527,6 @@ export class CoreLookupsService {
     throwIfDbError(error);
     if (!data) throw new NotFoundException('Section not found');
     const newRow = data as SectionRow;
-    this.auditLogService
-      .logUpdate(
-        'sections',
-        id,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        Object.keys(updates).filter((k) => k !== 'updated_by'),
-        { branchId },
-      )
-      .catch(() => {});
     return mapSection(newRow);
   }
 
@@ -871,9 +818,6 @@ export class CoreLookupsService {
 
     const { error: delError } = await supabase.from('subjects').delete().eq('id', id).eq('branch_id', branchId);
     throwIfDbError(delError);
-    this.auditLogService
-      .logDelete('subjects', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
-      .catch(() => {});
 
     return { data: new EntityDeletedDto({ deleted: true }) };
   }
@@ -898,9 +842,6 @@ export class CoreLookupsService {
 
     const { error: delError } = await supabase.from('classes').delete().eq('id', id).eq('branch_id', branchId);
     throwIfDbError(delError);
-    this.auditLogService
-      .logDelete('classes', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
-      .catch(() => {});
 
     return { data: new EntityDeletedDto({ deleted: true }) };
   }
@@ -930,9 +871,6 @@ export class CoreLookupsService {
 
     const { error: delError } = await supabase.from('sections').delete().eq('id', id).eq('branch_id', branchId);
     throwIfDbError(delError);
-    this.auditLogService
-      .logDelete('sections', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
-      .catch(() => {});
 
     return { data: new EntityDeletedDto({ deleted: true }) };
   }
@@ -1001,9 +939,6 @@ export class CoreLookupsService {
       .eq('branch_id', branchId);
     throwIfDbError(delError);
 
-    this.auditLogService
-      .logDelete('levels', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
-      .catch(() => {});
 
     return { data: new EntityDeletedDto({ deleted: true }) };
   }
@@ -1155,12 +1090,6 @@ export class CoreLookupsService {
     throwIfDbError(error);
 
     const levelRow = level as LevelRow;
-    this.auditLogService
-      .logCreate('levels', levelRow.id, userEmail, { ...levelRow } as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
 
     if (input.classIds && input.classIds.length > 0) {
       const payload = input.classIds.map((classId) => ({
@@ -1230,17 +1159,6 @@ export class CoreLookupsService {
         .single();
       throwIfDbError(updateError);
       if (newLevel) {
-        this.auditLogService
-          .logUpdate(
-            'levels',
-            id,
-            userEmail,
-            { ...existingLevel } as Record<string, unknown>,
-            { ...newLevel } as Record<string, unknown>,
-            Object.keys(updates).filter((k) => k !== 'updated_by'),
-            { branchId },
-          )
-          .catch(() => {});
       }
     }
 

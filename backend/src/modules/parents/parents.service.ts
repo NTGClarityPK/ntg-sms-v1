@@ -5,14 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { ParentStudentDto } from './dto/parent-student.dto';
 import { LinkChildDto } from './dto/link-child.dto';
 import { SelectChildDto } from './dto/select-child.dto';
 import { UpdateParentAssociationDto } from './dto/update-parent-association.dto';
 
-/** HTTP caller context — when present, student must belong to CurrentBranch (unless super_admin). */
+/** HTTP caller context — when present, student must belong to CurrentBranch. */
 export type GuardiansAccessContext = {
   branchId: string;
   userId: string;
@@ -47,7 +46,6 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class ParentsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
   ) {}
 
   private async hydrateAssociations(
@@ -249,12 +247,6 @@ export class ParentsService {
     }
 
     const row = data as ParentStudentRow;
-    this.auditLogService
-      .logCreate('parent_students', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId: branchId ?? null,
-        tenantId: tenantId ?? null,
-      })
-      .catch(() => {});
     const children = await this.getChildren(parentUserId);
     return children.find((c) => c.id === row.id)!;
   }
@@ -306,17 +298,6 @@ export class ParentsService {
 
       const newRow = data as Record<string, unknown>;
       const changedFields = Object.keys(updateData) as string[];
-      this.auditLogService
-        .logUpdate(
-          'parent_students',
-          (existing as { id: string }).id,
-          userEmail,
-          oldRow,
-          newRow,
-          changedFields,
-          { branchId: branchId ?? null, tenantId: tenantId ?? null },
-        )
-        .catch(() => {});
       const hydrated = await this.hydrateAssociations([data as unknown as ParentStudentRow]);
       return hydrated[0]!;
     }
@@ -353,15 +334,6 @@ export class ParentsService {
     throwIfDbError(error);
 
     if (oldRow) {
-      this.auditLogService
-        .logDelete(
-          'parent_students',
-          (oldRow as { id: string }).id,
-          userEmail,
-          oldRow as Record<string, unknown>,
-          { branchId: branchId ?? null, tenantId: tenantId ?? null },
-        )
-        .catch(() => {});
     }
 
     if (oldRow && (oldRow as { priority: number }).priority === 1) {
@@ -375,8 +347,8 @@ export class ParentsService {
 
   /**
    * Get all guardians for a student, ordered by priority (1 = Primary, 2 = Secondary).
-   * When `access` is provided (HTTP), assert student.branch_id matches CurrentBranch
-   * unless the caller is super_admin. Internal callers omit `access`.
+   * When `access` is provided (HTTP), assert student.branch_id matches CurrentBranch.
+   * Internal callers omit `access`.
    */
   async getGuardiansForStudent(
     studentId: string,
@@ -397,25 +369,8 @@ export class ParentsService {
       }
 
       const studentBranchId = (student as { branch_id: string | null }).branch_id;
-      const isSuperAdmin = (access.roles ?? []).includes('super_admin');
 
-      if (!isSuperAdmin && studentBranchId !== access.branchId) {
-        void this.auditLogService
-          .log({
-            tableName: 'students',
-            recordId: studentId,
-            action: 'UPDATE',
-            userEmail: access.email || 'unknown',
-            branchId: access.branchId,
-            newValues: {
-              accessDenied: true,
-              attempted: 'get-guardians',
-              callerUserId: access.userId,
-              callerBranchId: access.branchId,
-              studentBranchId: studentBranchId ?? null,
-            },
-          })
-          .catch(() => {});
+      if (studentBranchId !== access.branchId) {
 
         throw new ForbiddenException('Access denied');
       }

@@ -58,7 +58,6 @@ const TEACHER_ROLES = [
   'principal',
   'school_admin',
   'admin_assistant',
-  'super_admin',
 ];
 
 const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
@@ -74,7 +73,6 @@ const BROADCASTABLE_ROLE_NAMES = new Set([
   'principal',
   'school_admin',
   'admin_assistant',
-  'super_admin',
 ]);
 
 const PARTICIPANT_INSERT_CHUNK = 500;

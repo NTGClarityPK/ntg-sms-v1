@@ -63,7 +63,7 @@ Bulk ZIP (term report + edit access only): **Download all Interim/Mid-term/Final
 | **Basic report** | One-page summary |
 | **Detailed report** | Assessment breakdown; Final term and Annual detailed PDFs are two pages (mid-term + final combined) |
 
-Layout: **Minimal** (print-friendly) or **Modern** (colour). Branch default lives under **Settings → Result reports** (school admin / principal / super admin).
+Layout: **Minimal** (print-friendly) or **Modern** (colour). Branch default lives under **Settings → Result reports** (school admin / principal).
 
 ### Bulk ZIP
 

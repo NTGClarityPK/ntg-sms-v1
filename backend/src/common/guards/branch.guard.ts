@@ -32,8 +32,7 @@ export class BranchGuard implements CanActivate {
       throw new BadRequestException('Missing authenticated user context');
     }
 
-    // Privileged email-domain bypass removed (scan-section-3). Inactive checks apply to everyone,
-    // including super_admin. Platform privilege is role-based (or temporary env flag elsewhere).
+    // Inactive branch/tenant checks apply to everyone.
 
     const headerBranchId =
       typeof request.headers['x-branch-id'] === 'string' ? request.headers['x-branch-id'] : undefined;
@@ -193,7 +192,7 @@ export class BranchGuard implements CanActivate {
 
     let branchRow = await fetchBranchRow(branchId);
 
-    // Inactive checks apply to everyone (including super_admin) — no email-domain early exit.
+    // Inactive checks apply to everyone.
     if (branchRow.is_active === false) {
       const fallback = await selectFirstAccessibleActiveBranch();
       if (fallback && fallback !== branchId) {

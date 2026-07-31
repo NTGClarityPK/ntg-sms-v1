@@ -58,12 +58,5 @@ Detailed guides for each module of the NTG Alma portal. One page per feature.
 | [💾 Data Export](data-export.md) | Secure school data backup |
 | [👕 Inventory (Uniforms)](inventory-uniforms.md) | pending→approved→issued; Request uniform tab |
 | [📚 Library](library.md) | Upload PDF/DOC/TXT; Pro/Enterprise plan |
-| [🗄️ Storage](storage.md) | Usage, largest files, alerts, offline Cache |
-| [📴 Offline Documents](offline-documents.md) | Redirects to Storage → Cache (no separate page) |
-
-## 🛠️ Administration
-
-| Feature | What it covers |
-| --- | --- |
-| [🧾 Audit Trail](audit-trail.md) | Super-admin Admin Portal only |
-| [🛠️ Admin Portal](admin-portal.md) | Tenants, Payment Model override, unlock year, audit |
+| [🗄️ Storage](storage.md) | Usage, largest files, and alerts |
+| [📴 Offline Documents](offline-documents.md) | Redirects to Storage (no separate page) |

@@ -8,7 +8,7 @@ Role-based home screen after login — cards and panels that deep-link into ever
 
 | Who | What they see |
 | --- | --- |
-| School admin, principal, academic coordinator, admin assistant, super admin | Administrative overview |
+| School admin, principal, academic coordinator, admin assistant | Administrative overview |
 | Class teacher, subject teacher, guidance counselor | Teacher overview |
 | Parent / guardian | Parent overview |
 | Student | Student overview |

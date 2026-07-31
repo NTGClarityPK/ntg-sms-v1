@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ClassSectionsService } from '../class-sections/class-sections.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
@@ -286,7 +285,6 @@ type DraftFileRow = {
 export class AssessmentsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly classSectionsService: ClassSectionsService,
     private readonly teacherAssignmentsService: TeacherAssignmentsService,
@@ -880,12 +878,6 @@ export class AssessmentsService {
     }
 
     for (const row of data as AssessmentRow[]) {
-      this.auditLogService
-        .logCreate('assessments', row.id, userEmail, { ...row } as Record<string, unknown>, {
-          branchId,
-          tenantId,
-        })
-        .catch(() => {});
     }
 
     // If assessment is created as published, notify recipients immediately.
@@ -1032,17 +1024,6 @@ export class AssessmentsService {
 
     const newRow = data as AssessmentRow;
     const changedFields = Object.keys(payload).filter((k) => k !== 'updated_by');
-    this.auditLogService
-      .logUpdate(
-        'assessments',
-        id,
-        userEmail,
-        { ...existing } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        changedFields,
-        { branchId },
-      )
-      .catch(() => {});
     return mapAssessment(newRow);
   }
 
@@ -1086,11 +1067,6 @@ export class AssessmentsService {
       .eq('branch_id', branchId);
     throwIfDbError(error);
 
-    this.auditLogService
-      .logDelete('assessments', id, userEmail, { ...oldRow } as Record<string, unknown>, {
-        branchId,
-      })
-      .catch(() => {});
     return { id };
   }
 
@@ -2737,15 +2713,6 @@ export class AssessmentsService {
       throw new BadRequestException('Failed to create attachment');
     }
 
-    this.auditLogService
-      .logCreate(
-        'assessment_attachments',
-        attachment.id,
-        userEmail,
-        { ...attachment } as Record<string, unknown>,
-        { branchId },
-      )
-      .catch(() => {});
 
     return new AssessmentAttachmentDto({
       id: attachment.id,
@@ -2796,15 +2763,6 @@ export class AssessmentsService {
 
     throwIfDbError(error);
 
-    this.auditLogService
-      .logDelete(
-        'assessment_attachments',
-        attachmentId,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { branchId },
-      )
-      .catch(() => {});
     return { id: attachmentId };
   }
 

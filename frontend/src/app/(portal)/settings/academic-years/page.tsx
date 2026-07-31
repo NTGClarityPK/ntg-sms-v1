@@ -74,7 +74,7 @@ export default function AcademicYearsPage() {
             You are about to lock the <strong>active</strong> academic year. This will make it read-only and prevent all modifications.
             <br />
             <br />
-            <strong>Warning:</strong> Once locked, this action cannot be undone. If you need to revert this change, please contact Super Admin Support.
+            <strong>Warning:</strong> Once locked, this action cannot be undone. If you need to revert this change, please contact your school administrator.
           </Text>
         ),
         labels: { confirm: 'Lock Year', cancel: 'Cancel' },

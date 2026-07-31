@@ -16,7 +16,7 @@ Two-pane layout: conversation list on the left, chat on the right. There are no 
 
 Search filters the conversation list. Opening a chat marks its messages as read. New messages in the open chat arrive in real time; the list refreshes about every 20 seconds.
 
-Staff messaging roles include class/subject teacher, principal, school admin, academic coordinator, guidance counselor, admin assistant, and super admin. Students and parents send or reply only when **Settings → Communication** allows teacher–student or teacher–parent messaging both ways.
+Staff messaging roles include class/subject teacher, principal, school admin, academic coordinator, guidance counselor, and admin assistant. Students and parents send or reply only when **Settings → Communication** allows teacher–student or teacher–parent messaging both ways.
 
 ---
 
@@ -28,7 +28,7 @@ Staff messaging roles include class/subject teacher, principal, school admin, ac
 | **Broadcast to class** | Staff with messaging access |
 | **School broadcast** | School admin (all or specific branches); principal / admin assistant for current branch when delegated in communication settings |
 
-School broadcast recipient roles can include students, parents, teaching roles, coordinators, principal, school admin, admin assistant, and super admin.
+School broadcast recipient roles can include students, parents, teaching roles, coordinators, principal, school admin, and admin assistant.
 
 ---
 

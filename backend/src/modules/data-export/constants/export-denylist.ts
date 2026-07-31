@@ -35,7 +35,6 @@ export const EXCLUDED_TABLES = new Set([
   'fee_challan_generation_jobs',
   'id_card_generation_jobs',
   'school_data_export_logs',
-  'audit_logs',
   'billing_payment_events',
 ]);
 

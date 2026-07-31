@@ -13,7 +13,6 @@ import { useClasses } from '@/hooks/useCoreLookups';
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
 
 const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
-const SUPER_ADMIN_ROLE_NAME = 'super_admin';
 
 interface PermissionMatrixProps {
   roles: Role[];
@@ -27,11 +26,7 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   const branchId = userTyped?.currentBranch?.id;
   const queryClient = useQueryClient();
 
-  const rolesInMatrix = roles.filter(
-    (r) =>
-      r.name !== SCHOOL_ADMIN_ROLE_NAME &&
-      r.name?.toLowerCase() !== SUPER_ADMIN_ROLE_NAME,
-  );
+  const rolesInMatrix = roles.filter((r) => r.name !== SCHOOL_ADMIN_ROLE_NAME);
   const tSettings = useTranslations('settings');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('navigation');

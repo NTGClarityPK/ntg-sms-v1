@@ -6,7 +6,7 @@ Complete database schema documentation for the NTG Alma School Management System
 
 | Metric                  | Value                                      |
 | ----------------------- | ------------------------------------------ |
-| **Total Tables**        | 67                                         |
+| **Total Tables**        | 66                                         |
 | **Indexes**             | 276 (mostly B-tree)                        |
 | **PostgreSQL Enums**    | 7                                          |
 | **Foreign Keys**        | 100+                                       |
@@ -28,7 +28,7 @@ Tables are organized by functional domain:
 9. **Events** (3 tables) - School events, participation, consents
 10. **Library** (1 table) - Digital library
 11. **Uniforms** (5 tables) - Inventory, requests, issuances
-12. **Utilities** (6 tables) - Invitations, audit logs, storage
+12. **Utilities** (5 tables) - Invitations, storage
 
 ***
 
@@ -42,7 +42,7 @@ Tables are organized by functional domain:
 | `leave_status`           | `pending`, `approved`, `rejected`, `cancelled`                                                                                                                       |
 | `timetable_slot_type`    | `class`, `assembly`, `break`, `free`                                                                                                                                 |
 | `uniform_request_status` | `pending`, `approved`, `rejected`, `issued`, `cancelled`                                                                                                             |
-| `user_role`              | `parent`, `student`, `principal`, `school_admin`, `academic_coordinator`, `class_teacher`, `subject_teacher`, `guidance_counselor`, `admin_assistant`, `super_admin` |
+| `user_role`              | `parent`, `student`, `principal`, `school_admin`, `academic_coordinator`, `class_teacher`, `subject_teacher`, `guidance_counselor`, `admin_assistant` |
 
 ***
 
@@ -323,7 +323,6 @@ CREATE TABLE roles (
 
 **Role Values (from enum):**
 
-* `super_admin` - System administrator
 * `principal` - School principal
 * `school_admin` - School administrator
 * `academic_coordinator` - Academic coordinator
@@ -1922,33 +1921,6 @@ CREATE TABLE invitations (
 * Public table exposure risk
 
 **Cleanup:** Cron job runs every 10 minutes to delete expired invitations
-
-***
-
-### `audit_logs`
-
-Immutable audit trail.
-
-```sql
-CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    table_name TEXT,
-    record_id UUID,
-    action TEXT,
-    user_email TEXT,
-    username TEXT,
-    branch_id UUID,
-    tenant_id UUID,
-    old_values JSONB,
-    new_values JSONB,
-    changed_fields TEXT[],
-    ip_address TEXT,
-    user_agent TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-**RLS:** Super admin SELECT only
 
 ***
 

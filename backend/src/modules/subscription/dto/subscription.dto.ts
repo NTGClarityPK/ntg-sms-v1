@@ -49,19 +49,3 @@ export class PlanConfigDto {
   limits!: Record<string, number>;
   features!: Record<string, boolean>;
 }
-
-export class AdminUpdateSubscriptionDto {
-  planId?: PlanId;
-  billingCycle?: BillingCycle;
-  status?: string;
-  notes?: string;
-  clearPending?: boolean;
-}
-
-export class TenantSubscriptionSummaryDto {
-  tenantId!: string;
-  tenantName!: string;
-  tenantCode!: string;
-  subscription!: SubscriptionDto;
-  usage!: SubscriptionUsageDto;
-}

@@ -1,6 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
 import { BranchesService } from './branches.service';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { SubscriptionService } from '../subscription/subscription.service';
 
@@ -88,7 +87,6 @@ describe('BranchesService access scoping', () => {
   const branchB = 'branch-b-id';
   const userA = 'user-a-id';
 
-  let auditLog: { log: jest.Mock };
   let supabaseConfig: { getClient: jest.Mock };
   let subscriptionService: Partial<SubscriptionService>;
   let mock: ReturnType<typeof createSupabaseMock>;
@@ -107,11 +105,9 @@ describe('BranchesService access scoping', () => {
   function buildService(handlers: Parameters<typeof createSupabaseMock>[0]) {
     mock = createSupabaseMock(handlers);
     supabaseConfig = { getClient: jest.fn(() => mock.client) };
-    auditLog = { log: jest.fn().mockResolvedValue(undefined) };
     subscriptionService = {};
     return new BranchesService(
       supabaseConfig as unknown as SupabaseConfig,
-      auditLog as unknown as AuditLogService,
       subscriptionService as SubscriptionService,
     );
   }
@@ -133,23 +129,24 @@ describe('BranchesService access scoping', () => {
     expect(idFilter?.values).toEqual([branchA]);
   });
 
-  it('list for super_admin does not apply membership id filter', async () => {
+  it('list for school_admin without membership still applies id filter', async () => {
     const service = buildService({
+      userBranches: memberUserBranches,
       branchesList: emptyBranchList,
     });
 
     await service.list(
       { page: 1, limit: 20, sortOrder: 'desc' },
-      { userId: userA, roles: ['super_admin'] },
+      { userId: userA, roles: ['school_admin'] },
     );
 
-    const userBranchCalls = mock.calls.filter((c) => c.table === 'user_branches');
-    expect(userBranchCalls).toHaveLength(0);
     const branchesCalls = mock.calls.filter((c) => c.table === 'branches');
-    expect(branchesCalls[0].inFilters.find((f) => f.column === 'id')).toBeUndefined();
+    expect(branchesCalls.length).toBeGreaterThan(0);
+    const idFilter = branchesCalls[0].inFilters.find((f) => f.column === 'id');
+    expect(idFilter?.values).toEqual([branchA]);
   });
 
-  it('getById for non-member throws 403 and writes deny audit', async () => {
+  it('getById for non-member throws 403', async () => {
     const service = buildService({
       userBranches: { data: null, error: null },
     });
@@ -161,19 +158,6 @@ describe('BranchesService access scoping', () => {
         roles: ['school_admin'],
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-
-    expect(auditLog.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tableName: 'branches',
-        recordId: branchB,
-        action: 'UPDATE',
-        newValues: expect.objectContaining({
-          accessDenied: true,
-          attempted: 'get',
-          callerUserId: userA,
-        }),
-      }),
-    );
   });
 
   it('update for non-member throws 403 and does not update branches', async () => {
@@ -196,7 +180,6 @@ describe('BranchesService access scoping', () => {
 
     const updates = mock.calls.filter((c) => c.table === 'branches' && c.didUpdate);
     expect(updates).toHaveLength(0);
-    expect(auditLog.log).toHaveBeenCalled();
   });
 
   it('updatePublicStats for non-member throws 403', async () => {

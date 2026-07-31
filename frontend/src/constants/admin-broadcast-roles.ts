@@ -9,7 +9,6 @@ export const ADMIN_BROADCAST_ROLE_NAMES = [
   'principal',
   'school_admin',
   'admin_assistant',
-  'super_admin',
 ] as const;
 
 export type AdminBroadcastRoleName = (typeof ADMIN_BROADCAST_ROLE_NAMES)[number];

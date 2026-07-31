@@ -1,10 +1,9 @@
-import { Body, Controller, ForbiddenException, Get, Logger, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
-import { hasPrivilegedAccess } from '../../common/utils/privileged-access.util';
 import { AcademicYearsService } from './academic-years.service';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
@@ -16,8 +15,6 @@ import { RolloverAcademicYearDto } from './dto/rollover-academic-year.dto';
 @Controller('api/v1/academic-years')
 @UseGuards(JwtAuthGuard, BranchGuard)
 export class AcademicYearsController {
-  private readonly logger = new Logger(AcademicYearsController.name);
-
   constructor(
     private readonly academicYearsService: AcademicYearsService,
     private readonly promotionPlacementService: PromotionPlacementService,
@@ -59,8 +56,6 @@ export class AcademicYearsController {
     const previousActive = await this.academicYearsService.getActive(branch.tenantId);
     const updated = await this.academicYearsService.activate(id, branch.tenantId, user.email);
 
-    // If switching from one year to another, apply Promotion decisions into enrolments for the newly active year.
-    // This ensures student placement screens and class rosters reflect the active year.
     if (previousActive?.id && previousActive.id !== id) {
       await this.academicYearsService.applyPromotionDecisionsToEnrolments({
         branchId: branch.branchId,
@@ -78,8 +73,6 @@ export class AcademicYearsController {
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: AcademicYearDto }> {
-    // Block year close if Promotion & Placement is incomplete for active students.
-    // (Applies especially to locking the active year.)
     const readiness = await this.promotionPlacementService.getReadiness(branch.branchId, id);
     if (readiness.decisionsMissing > 0) {
       throw new ForbiddenException(
@@ -126,57 +119,4 @@ export class AcademicYearsController {
     });
     return { data };
   }
-
-  // Admin-only endpoint for unlocking academic years
-  @Patch('admin/:id/unlock')
-  @UseGuards(JwtAuthGuard)
-  async unlock(
-    @Param('id') id: string,
-    @Body() body: { tenantId: string },
-    @CurrentUser() user: CurrentUserPayload,
-  ): Promise<{ data: AcademicYearDto }> {
-    if (
-      !hasPrivilegedAccess({ email: user.email, roles: user.roles }, this.logger)
-    ) {
-      throw new ForbiddenException('This endpoint is only accessible to super admins');
-    }
-
-    const updated = await this.academicYearsService.unlock(id, body.tenantId, user.email);
-    return { data: updated };
-  }
-
-  // Admin-only endpoint for listing academic years by tenant
-  @Get('admin/by-tenant')
-  @UseGuards(JwtAuthGuard)
-  async listByTenant(
-    @Query('tenantId') tenantId: string,
-    @CurrentUser() user: CurrentUserPayload,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-    @Query('sortBy') sortBy?: string,
-    @Query('sortOrder') sortOrder?: string,
-  ): Promise<{
-    data: AcademicYearDto[];
-    meta: { total: number; page: number; limit: number; totalPages: number };
-  }> {
-    if (
-      !hasPrivilegedAccess({ email: user.email, roles: user.roles }, this.logger)
-    ) {
-      throw new ForbiddenException('This endpoint is only accessible to super admins');
-    }
-
-    // Build query object manually to avoid DTO validation issues with tenantId
-    const query: QueryAcademicYearsDto = {
-      page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 20,
-      search: search || undefined,
-      sortBy: sortBy as any,
-      sortOrder: sortOrder as any,
-    };
-
-    return this.academicYearsService.list(query, tenantId);
-  }
 }
-
-

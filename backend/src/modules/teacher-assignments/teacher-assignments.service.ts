@@ -5,7 +5,6 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { TeacherAssignmentDto } from './dto/teacher-assignment.dto';
 import { QueryTeacherAssignmentsDto } from './dto/query-teacher-assignments.dto';
@@ -46,7 +45,6 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class TeacherAssignmentsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
   ) {}
 
@@ -286,11 +284,6 @@ export class TeacherAssignmentsService {
 
     throwIfDbError(error);
     const row = data as TeacherAssignmentRow;
-    this.auditLogService
-      .logCreate('teacher_assignments', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId,
-      })
-      .catch(() => {});
     return this.getTeacherAssignmentById(row.id, branchId);
   }
 
@@ -334,17 +327,6 @@ export class TeacherAssignmentsService {
 
     throwIfDbError(error);
     const newRow = data as TeacherAssignmentRow;
-    this.auditLogService
-      .logUpdate(
-        'teacher_assignments',
-        id,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        ['staff_id'],
-        { branchId },
-      )
-      .catch(() => {});
     return this.getTeacherAssignmentById(newRow.id, branchId);
   }
 
@@ -372,15 +354,6 @@ export class TeacherAssignmentsService {
       .eq('branch_id', branchId);
 
     throwIfDbError(error);
-    this.auditLogService
-      .logDelete(
-        'teacher_assignments',
-        id,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { branchId },
-      )
-      .catch(() => {});
   }
 
   async getAssignmentsByTeacher(

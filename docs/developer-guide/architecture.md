@@ -83,7 +83,7 @@ graph TB
 
 #### Modular Architecture
 
-* **Feature Modules**: Each feature is a self-contained NestJS module (51 modules)
+* **Feature Modules**: Each feature is a self-contained NestJS module (49 modules)
 * **Separation of Concerns**: Clear boundaries between layers
 * **Reusability**: Shared services and utilities
 * **Maintainability**: Independent module development and testing
@@ -94,7 +94,7 @@ graph TB
 #### Security First
 
 * **Authentication**: Supabase Auth + JWT-based authentication
-* **Authorization**: Role-based access control (10 user roles)
+* **Authorization**: Role-based access control (9 user roles)
 * **Data Protection**: Row-level security in database
 * **API Security**: Branch guards and permission checks
   {% endstep %}
@@ -143,10 +143,9 @@ graph LR
     
     D --> D1[StorageModule]
     D --> D2[NotificationsModule]
-    D --> D3[AuditLogsModule]
 ```
 
-### Module Catalog (51 Modules)
+### Module Catalog (49 Modules)
 
 Listed by functional area:
 
@@ -233,9 +232,8 @@ Listed by functional area:
 | ------------------- | ------------------------------ | -------------------------- |
 | **ReportsModule**   | PDF/Excel report generation    | Multiple (aggregates data) |
 | **DashboardModule** | Dashboard widgets, preferences | `dashboard_preferences`    |
-| **AuditLogsModule** | Query audit trails             | `audit_logs`               |
 
-#### Utilities & Support (14 modules)
+#### Utilities & Support (13 modules)
 
 | Module                         | Purpose                                | Key Tables                    |
 | ------------------------------ | -------------------------------------- | ----------------------------- |
@@ -248,8 +246,7 @@ Listed by functional area:
 | **SettingsStatusModule**       | Settings readiness checks              | Multiple                      |
 | **PromotionPlacementModule**   | Year-end promotion UI                  | `student_promotion_decisions` |
 | **SetupWizardModule**          | First-run wizard                       | Multiple                      |
-| **AuditLogModule**             | Audit log writer helper                | `audit_logs`                  |
-| Plus 4 more utility modules... |                                        |                               |
+| Plus 3 more utility modules... |                                        |                               |
 
 ### Request Flow
 
@@ -300,7 +297,7 @@ sequenceDiagram
 * Resolves branch from `X-Branch-Id` header or `profiles.current_branch_id`
 * Verifies user membership in `user_branches`
 * Loads `tenant_id` from branch
-* Blocks inactive branch/tenant (with privileged email bypass)
+* Blocks inactive branch/tenant for all users
 * Attaches `request.branch = { branchId, tenantId }`
 
 **4. Permission Checks (Controller Level)**
@@ -320,10 +317,9 @@ graph TB
     B --> B1["(auth)<br/>Login, Signup"]
     B --> B2["(portal)<br/>Main App"]
     B --> B3["(landing)<br/>Marketing"]
-    B --> B4["adminportal<br/>Super Admin"]
-    B --> B5["student<br/>Student Portal"]
-    B --> B6["setup<br/>Wizard"]
-    B --> B7["public<br/>Statistics"]
+    B --> B4["student<br/>Student Portal"]
+    B --> B5["setup<br/>Wizard"]
+    B --> B6["public<br/>Statistics"]
     
     A --> C[Components]
     C --> C1[Layout Components]
@@ -373,11 +369,6 @@ app/
 │   ├── pricing/
 │   ├── contact/
 │   └── about/
-│
-├── adminportal/         # Super admin
-│   ├── tenants/
-│   ├── assign-branch/
-│   └── audit-trail/
 │
 ├── student/             # Student portal
 │   ├── dashboard/

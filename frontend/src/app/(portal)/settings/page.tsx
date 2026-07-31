@@ -203,11 +203,11 @@ export default function SettingsPage() {
   const isSchoolAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
   const canDataExport =
     user?.roles?.some((r) =>
-      ['school_admin', 'super_admin'].includes((r.roleName ?? '').toLowerCase()),
+      ['school_admin'].includes((r.roleName ?? '').toLowerCase()),
     ) || false;
   const canManageResultReports =
     user?.roles?.some((r) =>
-      ['school_admin', 'super_admin', 'principal'].includes((r.roleName ?? '').toLowerCase()),
+      ['school_admin', 'principal'].includes((r.roleName ?? '').toLowerCase()),
     ) || false;
   const settingsVisibility = useMemo(
     () => ({

@@ -6,12 +6,10 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { BranchDto } from './dto/branch.dto';
 import { QueryBranchesDto } from './dto/query-branches.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
-import { AssignBranchToTenantDto } from './dto/assign-branch-to-tenant.dto';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { resolveContentLanguage, SYSTEM_DEFAULT_LOCALE } from '../../common/utils/locale.util';
 
@@ -106,13 +104,8 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class BranchesService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly subscriptionService: SubscriptionService,
   ) {}
-
-  private isSuperAdmin(roles?: string[]): boolean {
-    return (roles ?? []).includes('super_admin');
-  }
 
   private isTenantOwner(roles?: string[]): boolean {
     return (roles ?? []).includes('tenant_owner');
@@ -166,10 +159,6 @@ export class BranchesService {
     branchId: string;
     attempted: BranchAccessAttempt;
   }): Promise<void> {
-    if (this.isSuperAdmin(params.roles)) {
-      return;
-    }
-
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('user_branches')
@@ -182,20 +171,6 @@ export class BranchesService {
     if (data) {
       return;
     }
-
-    void this.auditLogService
-      .log({
-        tableName: 'branches',
-        recordId: params.branchId,
-        action: 'UPDATE',
-        userEmail: params.email || 'unknown',
-        newValues: {
-          accessDenied: true,
-          attempted: params.attempted,
-          callerUserId: params.userId,
-        },
-      })
-      .catch(() => {});
 
     throw new ForbiddenException('Access denied');
   }
@@ -224,20 +199,18 @@ export class BranchesService {
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'asc' });
 
-    if (!this.isSuperAdmin(access.roles)) {
-      if (this.isTenantOwner(access.roles)) {
-        const tenantIds = await this.getTenantIdsForUser(access.userId);
-        if (tenantIds.length === 0) {
-          return this.emptyListMeta(page, limit);
-        }
-        dbQuery = dbQuery.in('tenant_id', tenantIds);
-      } else {
-        const branchIds = await this.getAccessibleBranchIds(access.userId);
-        if (branchIds.length === 0) {
-          return this.emptyListMeta(page, limit);
-        }
-        dbQuery = dbQuery.in('id', branchIds);
+    if (this.isTenantOwner(access.roles)) {
+      const tenantIds = await this.getTenantIdsForUser(access.userId);
+      if (tenantIds.length === 0) {
+        return this.emptyListMeta(page, limit);
       }
+      dbQuery = dbQuery.in('tenant_id', tenantIds);
+    } else {
+      const branchIds = await this.getAccessibleBranchIds(access.userId);
+      if (branchIds.length === 0) {
+        return this.emptyListMeta(page, limit);
+      }
+      dbQuery = dbQuery.in('id', branchIds);
     }
 
     if (query.search) {
@@ -375,14 +348,12 @@ export class BranchesService {
 
       lastError = error;
 
-      // If user provided a code and it's not unique, fail fast with a useful message.
       if (requestedCode !== '' && error?.code === '23505') {
         throw new BadRequestException(
           `Branch code "${requestedCode}" already exists. Please choose a different code.`,
         );
       }
 
-      // Auto-generated codes: retry on unique violation.
       if (requestedCode === '' && error?.code === '23505') {
         continue;
       }
@@ -394,19 +365,13 @@ export class BranchesService {
     if (!row) {
       throw new BadRequestException('Failed to create branch');
     }
-    this.auditLogService
-      .logCreate('branches', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId: row.id,
-        tenantId: row.tenant_id,
-      })
-      .catch(() => {});
     return mapBranch(row, 'en-GB');
   }
 
   async update(
     id: string,
     input: UpdateBranchDto,
-    userEmail: string,
+    _userEmail: string,
     access?: BranchAccessContext,
   ): Promise<BranchDto> {
     if (access) {
@@ -451,22 +416,7 @@ export class BranchesService {
       .single();
 
     throwIfDbError(error);
-    const newRow = data as BranchRow;
-    const changedFields = Object.keys(input).filter(
-      (k) => (existing as Record<string, unknown>)[k] !== (newRow as Record<string, unknown>)[k],
-    ) as string[];
-    this.auditLogService
-      .logUpdate(
-        'branches',
-        id,
-        userEmail,
-        existing as Record<string, unknown>,
-        newRow as Record<string, unknown>,
-        changedFields.length ? changedFields : [],
-        { branchId: id, tenantId: (existing as BranchRow).tenant_id },
-      )
-      .catch(() => {});
-    return mapBranch(newRow, 'en-GB');
+    return mapBranch(data as BranchRow, 'en-GB');
   }
 
   async getStorage(id: string): Promise<{
@@ -511,7 +461,6 @@ export class BranchesService {
     const supabase = this.supabaseConfig.getClient();
     const resolvedLanguage = resolveContentLanguage(language);
 
-    // Get all branches for the tenant that the user has access to
     const { data: userBranches, error: userBranchesError } = await supabase
       .from('user_branches')
       .select('branch_id')
@@ -538,179 +487,4 @@ export class BranchesService {
       data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, resolvedLanguage)),
     };
   }
-
-  async listByTenantAdmin(
-    tenantId: string,
-    language: string = SYSTEM_DEFAULT_LOCALE,
-  ): Promise<{ data: BranchDto[] }> {
-    const supabase = this.supabaseConfig.getClient();
-    const resolvedLanguage = resolveContentLanguage(language);
-
-    // Admin method: get all branches for the tenant without user access filtering
-    const { data: branches, error: branchesError } = await supabase
-      .from('branches')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('name', { ascending: true });
-
-    throwIfDbError(branchesError);
-
-    return {
-      data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, resolvedLanguage)),
-    };
-  }
-
-  async assignBranchToTenant(input: AssignBranchToTenantDto, userEmail: string): Promise<BranchDto> {
-    const supabase = this.supabaseConfig.getClient();
-
-    // Verify tenant exists
-    const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('id', input.tenantId)
-      .maybeSingle();
-
-    throwIfDbError(tenantError);
-    if (!tenant) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    const usagePayload = await this.subscriptionService.getUsageWithLimits(input.tenantId, true);
-    const proposedBranches = usagePayload.usage.branchesUsed + 1;
-    await this.subscriptionService.assertWithinLimit(input.tenantId, 'branches', proposedBranches);
-    if (proposedBranches > 1) {
-      await this.subscriptionService.assertFeature(input.tenantId, 'hasMultiBranch');
-    }
-
-    const requestedCode = (input.code ?? '').trim();
-
-    let lastError: PostgrestError | null = null;
-    let branchRow: BranchRow | null = null;
-
-    for (let attempt = 0; attempt < 7; attempt++) {
-      const generated = generateBranchCodeFromName(input.name);
-      const codeToUse = requestedCode !== '' ? requestedCode : generated;
-
-      const { data: branch, error: branchError } = await supabase
-        .from('branches')
-        .insert({
-          tenant_id: input.tenantId,
-          name: input.name,
-          name_ar: input.nameAr ?? null,
-          name_translations: { en: input.name, ar: input.nameAr ?? input.name },
-          code: codeToUse,
-          address: input.address ?? null,
-          phone: input.phone ?? null,
-          email: input.email ?? null,
-          storage_quota_gb: input.storageQuotaGb ?? 100,
-          is_active: input.isActive ?? true,
-        })
-        .select('*')
-        .single();
-
-      if (!branchError && branch) {
-        branchRow = branch as BranchRow;
-        break;
-      }
-
-      lastError = branchError;
-
-      if (requestedCode !== '' && branchError?.code === '23505') {
-        throw new BadRequestException(
-          `Branch code "${requestedCode}" already exists. Please choose a different code.`,
-        );
-      }
-
-      if (requestedCode === '' && branchError?.code === '23505') {
-        continue;
-      }
-
-      break;
-    }
-
-    throwIfDbError(lastError);
-    if (!branchRow) {
-      throw new BadRequestException('Failed to create branch');
-    }
-
-    const newBranch = mapBranch(branchRow);
-    this.auditLogService
-      .logCreate(
-        'branches',
-        newBranch.id,
-        userEmail,
-        { ...branchRow } as Record<string, unknown>,
-        { branchId: newBranch.id, tenantId: input.tenantId },
-      )
-      .catch(() => {});
-    void this.subscriptionService.syncUsage(input.tenantId).catch(() => {});
-
-    // Find all school_admin users for this tenant (from existing branches)
-    const { data: existingBranches, error: branchesError } = await supabase
-      .from('branches')
-      .select('id')
-      .eq('tenant_id', input.tenantId)
-      .neq('id', newBranch.id);
-
-    throwIfDbError(branchesError);
-    const existingBranchIds = (existingBranches || []).map((b: { id: string }) => b.id);
-
-    if (existingBranchIds.length > 0) {
-      // Get school_admin role ID
-      const { data: adminRole, error: roleError } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('name', 'school_admin')
-        .maybeSingle();
-
-      throwIfDbError(roleError);
-      if (adminRole) {
-        // Find users who have school_admin role in any of the tenant's existing branches
-        const { data: userRoles, error: userRolesError } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('role_id', adminRole.id)
-          .in('branch_id', existingBranchIds);
-
-        throwIfDbError(userRolesError);
-        const adminUserIds = [
-          ...new Set((userRoles || []).map((ur: { user_id: string }) => ur.user_id)),
-        ];
-
-        if (adminUserIds.length > 0) {
-          // Assign these users to the new branch
-          const userBranchInserts = adminUserIds.map((userId: string) => ({
-            user_id: userId,
-            branch_id: newBranch.id,
-            is_primary: false, // Don't set as primary automatically
-          }));
-
-          const { error: userBranchError } = await supabase
-            .from('user_branches')
-            .insert(userBranchInserts);
-
-          throwIfDbError(userBranchError);
-
-          // Assign school_admin role to these users for the new branch
-          const userRoleInserts = adminUserIds.map((userId: string) => ({
-            user_id: userId,
-            role_id: adminRole.id,
-            branch_id: newBranch.id,
-          }));
-
-          const { error: userRoleError } = await supabase
-            .from('user_roles')
-            .insert(userRoleInserts);
-
-          throwIfDbError(userRoleError);
-        }
-      }
-    }
-
-    return newBranch;
-  }
 }
-
-
-
-

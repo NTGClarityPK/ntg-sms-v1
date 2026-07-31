@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { CreateSubjectTemplateDto } from './dto/create-subject-template.dto';
 import { UpdateSubjectTemplateDto } from './dto/update-subject-template.dto';
@@ -74,7 +73,6 @@ function mapSubjectTemplate(
 export class SubjectTemplatesService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
   ) {}
 
@@ -107,15 +105,6 @@ export class SubjectTemplatesService {
     if (!template) throw new BadRequestException('Failed to create subject template');
 
     const templateRow = template as SubjectTemplateRow;
-    this.auditLogService
-      .logCreate(
-        'subject_templates',
-        templateRow.id,
-        userEmail,
-        { ...templateRow } as Record<string, unknown>,
-        { branchId, tenantId },
-      )
-      .catch(() => {});
 
     // Create subject associations if provided
     if (input.subjectIds && input.subjectIds.length > 0) {
@@ -129,12 +118,6 @@ export class SubjectTemplatesService {
       throwIfDbError(subjectsError);
       for (const row of subjectsToInsert) {
         const recordId = `${row.subject_template_id}_${row.subject_id}`;
-        this.auditLogService
-          .logCreate('subject_template_subjects', recordId, userEmail, { ...row } as Record<string, unknown>, {
-            branchId,
-            tenantId,
-          })
-          .catch(() => {});
       }
     }
 
@@ -245,17 +228,6 @@ export class SubjectTemplatesService {
       throwIfDbError(updateError);
       if (updated) {
         const changedFields = Object.keys(updateData) as string[];
-        this.auditLogService
-          .logUpdate(
-            'subject_templates',
-            id,
-            userEmail,
-            oldRow as Record<string, unknown>,
-            updated as Record<string, unknown>,
-            changedFields,
-            { branchId, tenantId },
-          )
-          .catch(() => {});
       }
     }
 
@@ -343,12 +315,6 @@ export class SubjectTemplatesService {
       throw new BadRequestException(rpcError.message);
     }
 
-    this.auditLogService
-      .logDelete('subject_templates', id, userEmail, oldRow as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
 
     return { data: { id } };
   }
@@ -535,11 +501,6 @@ export class SubjectTemplatesService {
 
     for (const row of oldRows) {
       const recordId = `${row.subject_template_id}_${row.class_id}_${row.branch_id}`;
-      this.auditLogService
-        .logDelete('class_subject_template_assignments', recordId, userEmail, {
-          ...row,
-        } as Record<string, unknown>, { branchId, tenantId })
-        .catch(() => {});
     }
 
     // Insert new assignments if any classes provided
@@ -554,11 +515,6 @@ export class SubjectTemplatesService {
       throwIfDbError(insertError);
       for (const row of assignmentsToInsert) {
         const recordId = `${row.subject_template_id}_${row.class_id}_${row.branch_id}`;
-        this.auditLogService
-          .logCreate('class_subject_template_assignments', recordId, userEmail, {
-            ...row,
-          } as Record<string, unknown>, { branchId, tenantId })
-          .catch(() => {});
       }
     }
 
@@ -623,11 +579,6 @@ export class SubjectTemplatesService {
 
     for (const row of oldRows) {
       const recordId = `${row.subject_template_id}_${row.level_id}_${row.branch_id}`;
-      this.auditLogService
-        .logDelete('level_subject_template_assignments', recordId, userEmail, {
-          ...row,
-        } as Record<string, unknown>, { branchId, tenantId })
-        .catch(() => {});
     }
 
     // Insert new assignments if any levels provided
@@ -642,11 +593,6 @@ export class SubjectTemplatesService {
       throwIfDbError(insertError);
       for (const row of assignmentsToInsert) {
         const recordId = `${row.subject_template_id}_${row.level_id}_${row.branch_id}`;
-        this.auditLogService
-          .logCreate('level_subject_template_assignments', recordId, userEmail, {
-            ...row,
-          } as Record<string, unknown>, { branchId, tenantId })
-          .catch(() => {});
       }
     }
 
@@ -915,15 +861,6 @@ export class SubjectTemplatesService {
 
     if (assignment) {
       const row = assignment as StudentSubjectTemplateAssignmentRow;
-      this.auditLogService
-        .logCreate(
-          'student_subject_template_assignments',
-          row.id,
-          userEmail,
-          { ...row } as Record<string, unknown>,
-          { branchId, tenantId },
-        )
-        .catch(() => {});
     }
 
     // Return full template
@@ -981,15 +918,6 @@ export class SubjectTemplatesService {
     throwIfDbError(deleteError);
 
     if (oldRow) {
-      this.auditLogService
-        .logDelete(
-          'student_subject_template_assignments',
-          (oldRow as { id: string }).id,
-          userEmail,
-          oldRow as Record<string, unknown>,
-          { branchId, tenantId },
-        )
-        .catch(() => {});
     }
 
     return { data: { studentId, academicYearId } };

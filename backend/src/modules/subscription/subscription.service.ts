@@ -31,14 +31,12 @@ import {
   SubscriptionDto,
   SubscriptionUsageDto,
   SubscriptionUsageWithLimitsDto,
-  TenantSubscriptionSummaryDto,
 } from './dto/subscription.dto';
 import {
   DowngradeNotAllowedException,
   SubscriptionFeatureForbiddenException,
   SubscriptionLimitForbiddenException,
 } from './subscription.errors';
-import type { AdminUpdateSubscriptionDto } from './dto/subscription.dto';
 import { SubscriptionInvoiceService } from './subscription-invoice.service';
 import { SubscriptionStripeService } from './subscription-stripe.service';
 import { isStripeConfigured } from './stripe-config';
@@ -531,10 +529,8 @@ export class SubscriptionService {
     tenantId: string,
     metric: keyof PlanLimits,
     proposedValue: number,
-    userRoles?: string[],
+    _userRoles?: string[],
   ): Promise<void> {
-    if (userRoles?.some((r) => r.toLowerCase() === 'super_admin')) return;
-
     const subscription = await this.getByTenantId(tenantId);
     const planId = parsePlanId(subscription.planId) ?? PlanId.FREE;
     if (!exceedsLimit(planId, metric, proposedValue)) return;
@@ -556,10 +552,8 @@ export class SubscriptionService {
   async assertFeature(
     tenantId: string,
     feature: keyof PlanFeatures,
-    userRoles?: string[],
+    _userRoles?: string[],
   ): Promise<void> {
-    if (userRoles?.some((r) => r.toLowerCase() === 'super_admin')) return;
-
     const subscription = await this.getByTenantId(tenantId);
     const planId = parsePlanId(subscription.planId) ?? PlanId.FREE;
     if (!planHasFeature(planId, feature)) {
@@ -665,84 +659,6 @@ export class SubscriptionService {
     for (const row of due ?? []) {
       await this.processEndOfPeriod((row as { tenant_id: string }).tenant_id);
     }
-  }
-
-  async listAllForAdmin(): Promise<{ data: TenantSubscriptionSummaryDto[] }> {
-    const supabase = this.supabaseConfig.getClient();
-    const { data: tenants, error: tenantsError } = await supabase
-      .from('tenants')
-      .select('id, name, code')
-      .order('name');
-    throwIfDbError(tenantsError);
-
-    const summaries: TenantSubscriptionSummaryDto[] = [];
-    for (const t of tenants ?? []) {
-      const tenant = t as { id: string; name: string; code: string };
-      await this.syncUsage(tenant.id);
-      const subscription = await this.getByTenantId(tenant.id);
-      const usagePayload = await this.getUsageWithLimits(tenant.id);
-      summaries.push({
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        tenantCode: tenant.code,
-        subscription,
-        usage: usagePayload.usage,
-      });
-    }
-    return { data: summaries };
-  }
-
-  async adminUpdateSubscription(
-    tenantId: string,
-    dto: AdminUpdateSubscriptionDto,
-  ): Promise<{ data: SubscriptionDto }> {
-    const supabase = this.supabaseConfig.getClient();
-    const updates: Record<string, unknown> = {};
-
-    if (dto.planId) updates.plan_id = dto.planId;
-    if (dto.billingCycle) updates.billing_cycle = dto.billingCycle;
-    if (dto.status) updates.status = dto.status;
-    if (dto.notes !== undefined) updates.notes = dto.notes;
-    if (dto.clearPending) {
-      updates.pending_plan_id = null;
-      updates.pending_billing_cycle = null;
-    }
-
-    if (dto.planId) {
-      const now = new Date();
-      const cycle = dto.billingCycle ?? BillingCycle.MONTHLY;
-      updates.current_period_start = now.toISOString();
-      updates.current_period_end = this.calculatePeriodEnd(now, cycle).toISOString();
-    }
-
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .update(updates)
-      .eq('tenant_id', tenantId)
-      .select(
-        'id, tenant_id, plan_id, billing_cycle, status, current_period_start, current_period_end, trial_ends_at, pending_plan_id, pending_billing_cycle, cancelled_at, notes',
-      )
-      .single();
-
-    throwIfDbError(error);
-    if (!data) throw new NotFoundException('Subscription not found');
-
-    const mapped = this.mapSubscription(data as SubscriptionRow);
-    if (dto.planId) {
-      const usage = await this.getUsageWithLimits(tenantId, true);
-      await this.subscriptionInvoiceService.ensurePeriodInvoice({
-        tenantId,
-        subscriptionId: mapped.id,
-        planId: dto.planId,
-        billingCycle: (dto.billingCycle ?? mapped.billingCycle) as BillingCycle,
-        periodStart: new Date(mapped.currentPeriodStart),
-        periodEnd: new Date(mapped.currentPeriodEnd),
-        studentsUsed: usage.usage.studentsUsed,
-        reason: 'admin',
-      });
-    }
-
-    return { data: mapped };
   }
 
   private calculatePeriodEnd(start: Date, cycle: BillingCycle): Date {

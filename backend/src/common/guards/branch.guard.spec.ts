@@ -132,11 +132,11 @@ describe('BranchGuard inactive checks (no email bypass)', () => {
     profileBranchId: branchInactive,
   };
 
-  it('super_admin against inactive branch with no fallback is Forbidden', async () => {
+  it('school_admin against inactive branch with no fallback is Forbidden', async () => {
     const client = createClientMock(baseState);
     const guard = buildGuard(client);
     const ctx = makeContext(
-      { id: 'user-1', email: 'admin@school.com', roles: ['super_admin'] },
+      { id: 'user-1', email: 'admin@school.com', roles: ['school_admin'] },
       branchInactive,
     );
 
@@ -154,7 +154,7 @@ describe('BranchGuard inactive checks (no email bypass)', () => {
     await expect(guard.canActivate(ctx as never)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('@ntg.com without super_admin still hits inactive checks (no early bypass)', async () => {
+  it('legacy ops email still hits inactive checks (no early bypass)', async () => {
     const client = createClientMock(baseState);
     const guard = buildGuard(client);
     const ctx = makeContext(

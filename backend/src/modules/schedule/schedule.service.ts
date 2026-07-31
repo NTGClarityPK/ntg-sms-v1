@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { QueryTimingTemplatesDto } from './dto/query-timing-templates.dto';
 import { TimingTemplateDto } from './dto/timing-template.dto';
 import { PublicHolidayDto } from './dto/public-holiday.dto';
@@ -125,7 +124,6 @@ function mapVacation(row: VacationRow): VacationDto {
 export class ScheduleService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
   ) {}
 
   async getSchoolDays(): Promise<{ data: number[] }> {
@@ -282,12 +280,6 @@ export class ScheduleService {
     throwIfDbError(error);
 
     const template = data as TimingTemplateRow;
-    this.auditLogService
-      .logCreate('timing_templates', template.id, userEmail, { ...template } as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
     const createdSlots: TimingSlotDto[] = [];
 
     // Create slots if provided
@@ -412,12 +404,6 @@ export class ScheduleService {
     throwIfDbError(error);
 
     const row = data as PublicHolidayRow;
-    this.auditLogService
-      .logCreate('public_holidays', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId,
-        tenantId,
-      })
-      .catch(() => {});
     return mapPublicHoliday(row);
   }
 
@@ -473,17 +459,6 @@ export class ScheduleService {
 
     const newRow = data as PublicHolidayRow;
     const changedFields = Object.keys(input) as string[];
-    this.auditLogService
-      .logUpdate(
-        'public_holidays',
-        id,
-        userEmail,
-        current as Record<string, unknown>,
-        newRow as Record<string, unknown>,
-        changedFields.length ? changedFields : [],
-        { branchId: branchId ?? ((current as Record<string, unknown>).branch_id as string), tenantId },
-      )
-      .catch(() => {});
     return mapPublicHoliday(newRow);
   }
 
@@ -498,15 +473,6 @@ export class ScheduleService {
     const { error } = await supabase.from('public_holidays').delete().eq('id', id);
     throwIfDbError(error);
     if (oldRow) {
-      this.auditLogService
-        .logDelete(
-          'public_holidays',
-          id,
-          userEmail,
-          oldRow as Record<string, unknown>,
-          { branchId: branchId ?? ((oldRow as Record<string, unknown>).branch_id as string), tenantId },
-        )
-        .catch(() => {});
     }
     return { data: { id } };
   }
@@ -565,9 +531,6 @@ export class ScheduleService {
     throwIfDbError(error);
 
     const row = data as VacationRow;
-    this.auditLogService
-      .logCreate('vacations', row.id, userEmail, { ...row } as Record<string, unknown>, {})
-      .catch(() => {});
     return mapVacation(row);
   }
 
@@ -621,17 +584,6 @@ export class ScheduleService {
 
     const newRow = data as VacationRow;
     const changedFields = Object.keys(input) as string[];
-    this.auditLogService
-      .logUpdate(
-        'vacations',
-        id,
-        userEmail,
-        current as Record<string, unknown>,
-        newRow as Record<string, unknown>,
-        changedFields.length ? changedFields : [],
-        {},
-      )
-      .catch(() => {});
     return mapVacation(newRow);
   }
 
@@ -641,9 +593,6 @@ export class ScheduleService {
     const { error } = await supabase.from('vacations').delete().eq('id', id);
     throwIfDbError(error);
     if (oldRow) {
-      this.auditLogService
-        .logDelete('vacations', id, userEmail, oldRow as Record<string, unknown>, {})
-        .catch(() => {});
     }
     return { data: { id } };
   }

@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { BranchesService } from '../branches/branches.service';
 import { SystemSettingsService } from '../system-settings/system-settings.service';
 import { LibraryItemDto } from './dto/library-item.dto';
@@ -75,7 +74,6 @@ function mapLibraryItem(row: LibraryItemRow): LibraryItemDto {
 export class LibraryService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly branchesService: BranchesService,
     private readonly systemSettingsService: SystemSettingsService,
   ) {}
@@ -238,15 +236,6 @@ export class LibraryService {
     const libraryItem = mapLibraryItem(data as LibraryItemRow);
 
     // Audit log
-    this.auditLogService
-      .logCreate(
-        'library_items',
-        libraryItem.id,
-        userEmail,
-        libraryItem as unknown as Record<string, unknown>,
-        { branchId },
-      )
-      .catch(() => {});
 
     return libraryItem;
   }
@@ -332,17 +321,6 @@ export class LibraryService {
     const updated = mapLibraryItem(data as LibraryItemRow);
 
     // Audit log
-    this.auditLogService
-      .logUpdate(
-        'library_items',
-        id,
-        userEmail,
-        existing as unknown as Record<string, unknown>,
-        updated as unknown as Record<string, unknown>,
-        Object.keys(updateData),
-        { branchId },
-      )
-      .catch(() => {});
 
     return updated;
   }
@@ -395,15 +373,6 @@ export class LibraryService {
     }
 
     // Audit log
-    this.auditLogService
-      .logDelete(
-        'library_items',
-        id,
-        userEmail,
-        existing as unknown as Record<string, unknown>,
-        { branchId },
-      )
-      .catch(() => {});
   }
 
   async incrementViewCount(id: string, branchId: string): Promise<void> {

@@ -5,7 +5,6 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { StudentDto } from './dto/student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
@@ -68,7 +67,6 @@ export class StudentsService {
 
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly invitationsService: InvitationsService,
     private readonly parentsService: ParentsService,
@@ -1036,11 +1034,6 @@ export class StudentsService {
       }
 
       const studentRow = student as StudentRow;
-      this.auditLogService
-        .logCreate('students', studentRow.id, userEmail, { ...studentRow } as Record<string, unknown>, {
-          branchId,
-        })
-        .catch(() => {});
 
       // Maintain year-scoped placement for attendance/results/etc.
       // Without this, class-section rosters (which read student_enrolments) can appear empty.
@@ -1901,17 +1894,6 @@ export class StudentsService {
 
     if (newRow) {
       const changedFields = Object.keys(filteredPayload).filter((k) => k !== 'updated_at');
-      this.auditLogService
-        .logUpdate(
-          'students',
-          id,
-          userEmail,
-          { ...oldRow } as Record<string, unknown>,
-          { ...newRow } as Record<string, unknown>,
-          changedFields,
-          { branchId },
-        )
-        .catch(() => {});
     }
 
     // Determine academic year to use for template assignment

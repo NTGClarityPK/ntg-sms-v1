@@ -11,9 +11,6 @@ import {
   isSupabaseConnectivityError,
   SUPABASE_CONNECTIVITY_USER_MESSAGE,
 } from '../../common/utils/supabase-connectivity-error.util';
-import {
-  hasPrivilegedAccess,
-} from '../../common/utils/privileged-access.util';
 import { UserResponseDto } from './dto/user-response.dto';
 import { BranchSummaryDto } from './dto/branch-summary.dto';
 import { StudentTokenService } from '../../common/modules/student-token/student-token.service';
@@ -152,10 +149,8 @@ export class AuthService {
     const supabase = this.supabaseConfig.getClient();
 
     let resolvedEmail = (hint?.email ?? '').trim();
-    const hintedRoleNames = hint?.roleNames ?? [];
 
     // Fallback: some internal code paths may call `getCurrentUser()` without going through JwtAuthGuard.
-    // In that case, we still need the email for privileged checks and the response payload.
     if (!resolvedEmail) {
       let adminResult;
       try {
@@ -269,11 +264,7 @@ export class AuthService {
       }));
     }
 
-    const hasSuperAdminRole =
-      roles.some((r) => (r.roleName || '').toLowerCase() === 'super_admin') ||
-      hintedRoleNames.some((n) => (n || '').toLowerCase() === 'super_admin');
-
-    // Always filter inactive branches/tenants — including for super_admin (scan-section-3).
+    // Always filter inactive branches/tenants.
     const tenantIds = Array.from(new Set(branchesRaw.map((b) => b.tenant_id).filter(Boolean))) as string[];
     const { data: tenantsData, error: tenantsError } =
       tenantIds.length > 0
@@ -316,18 +307,6 @@ export class AuthService {
             : SYSTEM_DEFAULT_LOCALE,
         }),
     );
-
-    // Temporary legacy: inject super_admin into response roles only when env flag is on.
-    if (
-      !hasSuperAdminRole &&
-      hasPrivilegedAccess({ email: resolvedEmail, roles: [] }, this.logger)
-    ) {
-      roles.push({
-        roleId: '',
-        roleName: 'super_admin',
-        branchId: '',
-      });
-    }
 
     const isStudentUser = roles.some((r) => (r.roleName || '').toLowerCase() === 'student');
     const isSchoolAdminUser = roles.some((r) => (r.roleName || '').toLowerCase() === 'school_admin');

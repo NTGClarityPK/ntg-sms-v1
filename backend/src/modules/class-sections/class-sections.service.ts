@@ -5,7 +5,6 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { ClassSectionDto } from './dto/class-section.dto';
 import { QueryClassSectionsDto } from './dto/query-class-sections.dto';
@@ -47,7 +46,6 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class ClassSectionsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly subscriptionService: SubscriptionService,
     private readonly studentPlacementService: StudentPlacementService,
@@ -334,9 +332,6 @@ export class ClassSectionsService {
 
     throwIfDbError(error);
     const row = data as ClassSectionRow;
-    this.auditLogService
-      .logCreate('class_sections', row.id, userEmail, { ...row } as Record<string, unknown>, { branchId })
-      .catch(() => {});
     return this.getClassSectionById(row.id, branchId);
   }
 
@@ -446,9 +441,6 @@ export class ClassSectionsService {
     }
 
     for (const row of insertedRows as ClassSectionRow[]) {
-      this.auditLogService
-        .logCreate('class_sections', row.id, userEmail, { ...row } as Record<string, unknown>, { branchId })
-        .catch(() => {});
     }
 
     // 6. Batch hydrate: fetch class and section names for all inserted rows
@@ -540,17 +532,6 @@ export class ClassSectionsService {
     throwIfDbError(error);
     const newRow = data as ClassSectionRow;
     const changedFields = Object.keys(updateData).filter((k) => k !== 'updated_by');
-    this.auditLogService
-      .logUpdate(
-        'class_sections',
-        id,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        changedFields,
-        { branchId },
-      )
-      .catch(() => {});
     return this.getClassSectionById(newRow.id, branchId);
   }
 
@@ -582,9 +563,6 @@ export class ClassSectionsService {
       .eq('branch_id', branchId);
 
     throwIfDbError(error);
-    this.auditLogService
-      .logDelete('class_sections', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
-      .catch(() => {});
   }
 
   async getStudentsInClassSection(
@@ -799,17 +777,6 @@ export class ClassSectionsService {
 
     throwIfDbError(error);
     const newRow = data as ClassSectionRow;
-    this.auditLogService
-      .logUpdate(
-        'class_sections',
-        classSectionId,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        ['class_teacher_id', 'updated_by'],
-        { branchId },
-      )
-      .catch(() => {});
     return this.getClassSectionById(newRow.id, branchId);
   }
 }

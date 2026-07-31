@@ -56,7 +56,6 @@ export class IdCardsController {
     const roles = (user.roles || []).map((r) => r.toLowerCase());
     if (
       roles.includes('school_admin') ||
-      roles.includes('super_admin') ||
       roles.includes('principal')
     ) {
       return;

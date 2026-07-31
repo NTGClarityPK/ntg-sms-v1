@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ClassSectionsService } from '../class-sections/class-sections.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -139,7 +138,6 @@ function mapEventConsent(row: EventConsentRow): EventConsentDto {
 export class EventsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly classSectionsService: ClassSectionsService,
     private readonly notificationsService: NotificationsService,
@@ -421,15 +419,6 @@ export class EventsService {
       throw new BadRequestException('Failed to create event');
     }
 
-    this.auditLogService
-      .logCreate(
-        'events',
-        (eventData as EventRow).id,
-        userEmail,
-        { ...eventData } as Record<string, unknown>,
-        { branchId },
-      )
-      .catch(() => {});
 
     const event = mapEvent(eventData as EventRow, 'en-GB');
 
@@ -545,17 +534,6 @@ export class EventsService {
 
     const newRow = data as EventRow;
     const changedFields = Object.keys(payload);
-    this.auditLogService
-      .logUpdate(
-        'events',
-        id,
-        userEmail,
-        { ...existing } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        changedFields,
-        { branchId },
-      )
-      .catch(() => {});
 
     // Update participants if provided
     if (input.classSectionIds !== undefined || input.studentIds !== undefined) {
@@ -643,9 +621,6 @@ export class EventsService {
 
     throwIfDbError(error);
 
-    this.auditLogService
-      .logDelete('events', id, userEmail, { ...oldRow } as Record<string, unknown>, { branchId })
-      .catch(() => {});
     return { id };
   }
 

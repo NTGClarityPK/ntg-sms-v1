@@ -13,7 +13,6 @@ Canonical examples live in `backend/.env.example`. Never commit real `.env` file
 | `PORT` | No | Default `3001` |
 | `NODE_ENV` | No | `development` / `production` |
 | `FRONTEND_URL` | Yes | CORS + OAuth/email redirects (must be public HTTPS in production) |
-| `ALLOW_EMAIL_DOMAIN_PRIVILEGE_ESCALATION` | No | Temporary legacy elevation; keep `false` in production |
 | `GOOGLE_CLASSROOM_CLIENT_ID` | No | Google OAuth client for Classroom |
 | `GOOGLE_CLASSROOM_CLIENT_SECRET` | No | Google OAuth secret |
 | `GOOGLE_CLASSROOM_REDIRECT_URI` | No | Must match Google Cloud OAuth client exactly |

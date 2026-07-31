@@ -141,17 +141,10 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
       .map((r) => r.roleName?.toLowerCase())
       .filter((name): name is string => !!name);
 
-    const isSuperAdmin = normalisedRoleNames.includes('super_admin');
-    if (isSuperAdmin) {
-      pushPortalRoute(router, '/adminportal');
-      setLoading?.(false);
-      return;
-    }
-
     const isSchoolAdmin = normalisedRoleNames.includes('school_admin');
 
     // IMPORTANT: Portal routes assume a branch exists (many queries are branch-gated).
-    // Ensure a branch is selected before navigating to /dashboard for any non-super-admin user.
+    // Ensure a branch is selected before navigating to /dashboard.
     const userBranches = (userData.branches || []) as BranchForSelection[];
     if (userBranches.length === 0) {
       setError('No branches assigned to your account. Please contact your administrator.');

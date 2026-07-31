@@ -49,5 +49,3 @@
   * [📚 Library](features/library.md)
   * [🗄️ Storage](features/storage.md)
   * [📴 Offline Documents](features/offline-documents.md)
-  * [🧾 Audit Trail](features/audit-trail.md)
-  * [🛠️ Admin Portal](features/admin-portal.md)

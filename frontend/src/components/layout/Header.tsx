@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { Group, Text, Badge, Tooltip, Box, Image, Menu, useMantineColorScheme } from '@mantine/core';
-import { IconCircle, IconSchool, IconCrown } from '@tabler/icons-react';
+import { IconCircle, IconSchool } from '@tabler/icons-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { UserMenu } from './UserMenu';
@@ -52,9 +52,6 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  
-  // Check if user is super admin
-  const isSuperAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'super_admin') || false;
   
   // Check if user is a student and get class name
   const isStudent = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'student') || false;
@@ -150,40 +147,6 @@ export function Header() {
 
       {/* Right: actions - hide non-essential on mobile so bar stays readable */}
       <Group gap={isMobileNav ? 'xs' : 'md'} align="center" style={{ flexShrink: 0 }} wrap="nowrap">
-        {/* Super Admin Badge - desktop only */}
-        {isSuperAdmin && (
-          <Box visibleFrom="sm">
-            <Menu shadow="md" width={200}>
-              <Menu.Target>
-                <Badge
-                  variant="filled"
-                  color="yellow"
-                  size="lg"
-                  leftSection={<IconCrown size={14} />}
-                  style={{
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '0 12px',
-                    background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
-                    color: '#000',
-                    border: '1px solid #FFD700',
-                  }}
-                >
-                  SUPER USER
-                </Badge>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Item id="header-link-assign-branch" onClick={() => router.push('/admin/assign-branch')}>
-                  Assign Branch to Tenant
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-          </Box>
-        )}
-
         {/* NTG Alma brand - desktop only */}
         <Box
           visibleFrom="sm"
@@ -347,7 +310,7 @@ export function Header() {
           </Menu>
         )}
 
-        {isSchoolAdmin && !isSuperAdmin && (
+        {isSchoolAdmin && (
           <Box visibleFrom="sm" style={{ flexShrink: 0 }}>
             <SubscriptionBadge />
           </Box>

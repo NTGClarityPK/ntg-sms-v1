@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { ScheduleService } from '../schedule/schedule.service';
 import { TeacherAssignmentsService } from '../teacher-assignments/teacher-assignments.service';
@@ -190,7 +189,6 @@ function computeClassSectionOverlapGroupKey(
 export class TimetableService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly scheduleService: ScheduleService,
     private readonly teacherAssignmentsService: TeacherAssignmentsService,
@@ -922,17 +920,6 @@ export class TimetableService {
       const changedFields = Object.keys(updateData).filter(
         (k) => (oldRow as Record<string, unknown>)[k] !== (row as Record<string, unknown>)[k],
       );
-      this.auditLogService
-        .logUpdate(
-          'timetable_slots',
-          row.id,
-          userEmail,
-          oldRow as Record<string, unknown>,
-          row as Record<string, unknown>,
-          changedFields,
-          { branchId, tenantId },
-        )
-        .catch(() => {});
     } else {
       // Upsert using unique constraint (with subject_template_id)
       const { data, error } = await supabase
@@ -944,12 +931,6 @@ export class TimetableService {
         .single();
       throwIfDbError(error);
       row = data as TimetableSlotRow;
-      this.auditLogService
-        .logCreate('timetable_slots', row.id, userEmail, { ...row } as Record<string, unknown>, {
-          branchId,
-          tenantId,
-        })
-        .catch(() => {});
     }
     
     // Automatically renumber periods based on chronological order
@@ -1082,15 +1063,6 @@ export class TimetableService {
     const { error } = await supabase.from('timetable_slots').delete().eq('id', id);
     throwIfDbError(error);
 
-    this.auditLogService
-      .logDelete(
-        'timetable_slots',
-        id,
-        userEmail,
-        slotToDelete as Record<string, unknown>,
-        { branchId, tenantId },
-      )
-      .catch(() => {});
 
     await this.renumberPeriodsForClassSection(
       slotToDelete.class_section_id,
@@ -1203,15 +1175,6 @@ export class TimetableService {
     throwIfDbError(insertError);
     if (insertedRows) {
       for (const row of insertedRows) {
-        this.auditLogService
-          .logCreate(
-            'timetable_slots',
-            (row as TimetableSlotRow).id,
-            userEmail,
-            row as Record<string, unknown>,
-            { branchId, tenantId },
-          )
-          .catch(() => {});
       }
     }
 
@@ -1331,15 +1294,6 @@ export class TimetableService {
     throwIfDbError(insertError);
     if (insertedRows) {
       for (const row of insertedRows) {
-        this.auditLogService
-          .logCreate(
-            'timetable_slots',
-            (row as TimetableSlotRow).id,
-            userEmail,
-            row as Record<string, unknown>,
-            { branchId, tenantId },
-          )
-          .catch(() => {});
       }
     }
 
@@ -1454,15 +1408,6 @@ export class TimetableService {
     throwIfDbError(insertError);
     if (insertedRows) {
       for (const row of insertedRows) {
-        this.auditLogService
-          .logCreate(
-            'timetable_slots',
-            (row as TimetableSlotRow).id,
-            userEmail,
-            row as Record<string, unknown>,
-            { branchId, tenantId },
-          )
-          .catch(() => {});
       }
     }
 
@@ -1753,15 +1698,6 @@ export class TimetableService {
     throwIfDbError(insertError);
     if (insertedRows) {
       for (const row of insertedRows) {
-        this.auditLogService
-          .logCreate(
-            'timetable_slots',
-            (row as TimetableSlotRow).id,
-            userEmail,
-            row as Record<string, unknown>,
-            { branchId, tenantId },
-          )
-          .catch(() => {});
       }
     }
 

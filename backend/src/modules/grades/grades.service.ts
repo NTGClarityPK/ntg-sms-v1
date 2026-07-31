@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { AssessmentsService } from '../assessments/assessments.service';
 import { StudentsService } from '../students/students.service';
@@ -41,7 +40,6 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class GradesService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly academicYearsService: AcademicYearsService,
     private readonly assessmentsService: AssessmentsService,
     private readonly studentsService: StudentsService,
@@ -168,11 +166,6 @@ export class GradesService {
     throwIfDbError(error);
 
     const row = data as StudentGradeRow;
-    this.auditLogService
-      .logCreate('student_grades', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        branchId,
-      })
-      .catch(() => {});
     return this.mapGradeRowToDto(row);
   }
 
@@ -455,17 +448,6 @@ export class GradesService {
 
     const newRow = data as StudentGradeRow;
     const oldRow = existing as StudentGradeRow & { assessments?: unknown };
-    this.auditLogService
-      .logUpdate(
-        'student_grades',
-        id,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        Object.keys(updateData).filter((k) => k !== 'updated_at'),
-        { branchId },
-      )
-      .catch(() => {});
     return this.mapGradeRowToDto(newRow);
   }
 
@@ -494,15 +476,6 @@ export class GradesService {
     const { error } = await supabase.from('student_grades').delete().eq('id', id).eq('branch_id', branchId);
     throwIfDbError(error);
 
-    this.auditLogService
-      .logDelete(
-        'student_grades',
-        id,
-        userEmail,
-        { ...oldRow } as Record<string, unknown>,
-        { branchId },
-      )
-      .catch(() => {});
     return { id };
   }
 

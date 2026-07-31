@@ -25,7 +25,6 @@ const ADMIN_ROLES = [
   'principal',
   'academic_coordinator',
   'admin_assistant',
-  'super_admin',
 ];
 
 const TEACHER_ROLES = ['class_teacher', 'subject_teacher', 'guidance_counselor'];

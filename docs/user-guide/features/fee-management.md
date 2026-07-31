@@ -6,10 +6,10 @@ Short guide for configuring fee templates, generating challans, and verifying pa
 
 | Who | Where | What |
 | --- | --- | --- |
-| School admin / Principal / Super admin | **Fees** → **Challan management** / **Payment history** | Generate challans, review proofs, export |
+| School admin / Principal | **Fees** → **Challan management** / **Payment history** | Generate challans, review proofs, export |
 | Parents / students | **Fees** (My Fees) | Download challan PDF, submit proof, view receipts |
-| School admin / Principal / Super admin | **Settings → Fee settings** | Bank details, templates, challan style |
-| School admin / Principal / Super admin | **Fee reports** (`/reports/fees`) | Collected / pending / under review / overdue, defaulters |
+| School admin / Principal | **Settings → Fee settings** | Bank details, templates, challan style |
+| School admin / Principal | **Fee reports** (`/reports/fees`) | Collected / pending / under review / overdue, defaulters |
 
 Fee Management requires the school plan feature **Fee management** (Starter and above; not on Free).
 
@@ -133,7 +133,7 @@ Also documented under [📊 Reports](reports.md). Not a separate sidebar item in
 
 Cards: **Collected (verified)**, **Pending**, **Under review**, **Overdue**. Table **Defaulters** lists student, challan, due date, amount.
 
-School admin / principal / super admin; requires Fee management plan feature.
+School admin / principal; requires Fee management plan feature.
 
 ---
 

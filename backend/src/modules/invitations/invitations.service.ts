@@ -13,7 +13,6 @@ import { CRON_JOB_ENV_KEYS } from '../../common/config/cron-job-env-keys';
 import crypto from 'crypto';
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import { MailjetService } from '../../common/services/email/mailjet.service';
 import { parentSetsStudentPasswordTemplate } from '../../common/email/templates/parent-sets-student-password';
 import { studentSetsOwnPasswordTemplate } from '../../common/email/templates/student-sets-own-password';
@@ -54,9 +53,7 @@ export class InvitationsService {
   private readonly expireUnusedInvitationsEnabled: boolean;
 
   constructor(
-    private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
-    private readonly mailjetService: MailjetService,
+    private readonly supabaseConfig: SupabaseConfig,    private readonly mailjetService: MailjetService,
     private readonly configService: ConfigService,
   ) {
     const configured = Number(this.configService.get<string>('INVITATIONS_RATE_LIMIT_PER_MINUTE'));
@@ -297,14 +294,6 @@ export class InvitationsService {
         );
       }
 
-      this.auditLogService
-        .logCreate(
-          'invitations',
-          input.invitation.id,
-          input.userEmailForAudit,
-          { ...input.invitation, invitation_link: link } as unknown as Record<string, unknown>,
-        )
-        .catch(() => {});
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown email error';
       throw new BadRequestException(`Failed to send invitation email: ${message}`);

@@ -11,7 +11,7 @@ import { useThemeColor } from '@/lib/hooks/use-theme-color';
 const canManageSetup = (roles: { roleName?: string }[] = []): boolean =>
   roles.some((r) => {
     const n = r.roleName?.toLowerCase();
-    return n === 'school_admin' || n === 'principal' || n === 'super_admin';
+    return n === 'school_admin' || n === 'principal';
   });
 
 export function SetupBanner() {

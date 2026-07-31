@@ -55,7 +55,6 @@ export class PaymentController {
     const roles = user.roles ?? [];
     if (
       roles.includes('school_admin') ||
-      roles.includes('super_admin') ||
       roles.includes('principal')
     ) {
       return;

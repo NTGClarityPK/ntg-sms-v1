@@ -97,7 +97,6 @@ async function bootstrap() {
     { name: 'Setup wizard', description: 'Initial branch setup wizard' },
     { name: 'Student self-service', description: 'Endpoints for the signed-in student role' },
     { name: 'Promotion & placement', description: 'Year-end promotion and class placement' },
-    { name: 'Audit logs', description: 'Audit trail queries' },
     { name: 'Storage', description: 'File upload and signed URLs' },
   ];
 

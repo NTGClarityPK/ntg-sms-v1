@@ -35,6 +35,8 @@ Row actions (edit permission): edit modal, **Emergency contacts**, re-invitation
 
 **Create student** opens the modal form: identity, class section, contacts, enrolment fields, and invitation options as shown.
 
+**Subject Template (optional)** on the form places the pupil in a stream/group (e.g. Science vs Commerce). Templates are created under **Settings → Academic → Subject templates** — see [⚙️ Settings & Configuration](settings-and-configuration.md). Leave blank when the class does not use streams.
+
 Enrolment outcomes used elsewhere (e.g. leaving certificates, promotion): **Graduated**, **Transferred out**, **Withdrawn**, **Inactive**, etc.
 
 ---
@@ -59,6 +61,7 @@ Not a separate permission flag in the UI — requires students **Edit** and the 
 - Parent view: [👨‍👩‍👧 Parent Associations](parent-associations.md) → **My Child**
 - PIN for student login: [🔐 Authentication & Access](authentication-and-access.md) → **PIN Management**
 - Class placement: [🧩 Class](class-sections.md), [🎯 Promotion & Placement](promotion-and-placement.md)
+- Subject streams: [⚙️ Settings & Configuration](settings-and-configuration.md) → Subject templates
 
 ---
 
@@ -67,3 +70,4 @@ Not a separate permission flag in the UI — requires students **Edit** and the 
 **Empty list:** Wrong branch or no active academic year.
 **Bulk import missing:** Need students **Edit** permission.
 **Parent cannot see child:** Confirm Mapping association for this branch.
+**Subject template dropdown empty:** Create templates under **Settings → Academic → Subject templates** and assign them to the student’s class or level.

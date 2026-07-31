@@ -9,4 +9,4 @@ export function formatStaffRoleLabel(roleName: string, displayName?: string): st
     .join(' ');
 }
 
-export const STAFF_ID_CARD_ROLE_EXCLUDE = new Set(['student', 'parent', 'super_admin']);
+export const STAFF_ID_CARD_ROLE_EXCLUDE = new Set(['student', 'parent']);

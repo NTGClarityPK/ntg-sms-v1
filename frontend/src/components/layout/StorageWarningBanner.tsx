@@ -10,7 +10,7 @@ import { useTranslations } from 'next-intl';
 const canManageStorage = (roles: { roleName?: string }[] = []): boolean =>
   roles.some((r) => {
     const n = r.roleName?.toLowerCase();
-    return n === 'school_admin' || n === 'principal' || n === 'super_admin';
+    return n === 'school_admin' || n === 'principal';
   });
 
 export function StorageWarningBanner() {

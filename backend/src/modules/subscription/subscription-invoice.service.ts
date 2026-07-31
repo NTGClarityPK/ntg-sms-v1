@@ -17,7 +17,6 @@ import {
 } from './plan-pricing';
 import { SubscriptionInvoicePdfService } from './subscription-invoice-pdf.service';
 import type {
-  AdminUpdateInvoiceDto,
   InvoiceStatus,
   SubscriptionInvoiceDto,
   SubscriptionInvoiceLineItemDto,
@@ -333,90 +332,6 @@ export class SubscriptionInvoiceService {
       .single();
 
     return refreshed ? this.mapInvoice(refreshed as InvoiceRow) : invoice;
-  }
-
-  async adminGenerateForTenant(tenantId: string): Promise<{ data: SubscriptionInvoiceDto }> {
-    const supabase = this.supabaseConfig.getClient();
-    const { data: sub, error: subError } = await supabase
-      .from('subscriptions')
-      .select('id, plan_id, billing_cycle, current_period_start, current_period_end')
-      .eq('tenant_id', tenantId)
-      .single();
-    throwIfDbError(subError);
-    if (!sub) throw new NotFoundException('Subscription not found');
-
-    const { data: usage } = await supabase
-      .from('subscription_usage')
-      .select('students_used')
-      .eq('subscription_id', (sub as { id: string }).id)
-      .maybeSingle();
-
-    const studentsUsed =
-      (usage as { students_used?: number } | null)?.students_used ?? 0;
-
-    const planId = parsePlanId((sub as { plan_id: string }).plan_id) ?? PlanId.FREE;
-    const billingCycle =
-      (sub as { billing_cycle: string }).billing_cycle === 'yearly'
-        ? BillingCycle.YEARLY
-        : BillingCycle.MONTHLY;
-
-    const invoice = await this.ensurePeriodInvoice({
-      tenantId,
-      subscriptionId: (sub as { id: string }).id,
-      planId,
-      billingCycle,
-      periodStart: new Date((sub as { current_period_start: string }).current_period_start),
-      periodEnd: new Date((sub as { current_period_end: string }).current_period_end),
-      studentsUsed,
-      reason: 'admin',
-    });
-
-    if (!invoice) {
-      throw new BadRequestException(
-        'No billable invoice for this tenant (free/enterprise plan or zero amount)',
-      );
-    }
-
-    return { data: invoice };
-  }
-
-  async adminUpdateInvoice(
-    invoiceId: string,
-    dto: AdminUpdateInvoiceDto,
-  ): Promise<{ data: SubscriptionInvoiceDto }> {
-    const supabase = this.supabaseConfig.getClient();
-    const updates: Record<string, unknown> = {};
-
-    if (dto.status) {
-      updates.status = dto.status;
-      if (dto.status === 'paid') {
-        updates.paid_at = new Date().toISOString();
-      }
-    }
-    if (dto.notes !== undefined) updates.notes = dto.notes;
-
-    const { data, error } = await supabase
-      .from('subscription_invoices')
-      .update(updates)
-      .eq('id', invoiceId)
-      .select(INVOICE_SELECT)
-      .single();
-
-    throwIfDbError(error);
-    if (!data) throw new NotFoundException('Invoice not found');
-
-    if (dto.status === 'paid') {
-      await this.logPaymentEvent({
-        provider: 'manual',
-        eventType: 'invoice.marked_paid',
-        externalEventId: `manual-paid-${invoiceId}-${Date.now()}`,
-        subscriptionInvoiceId: invoiceId,
-        tenantId: (data as InvoiceRow).tenant_id,
-        payload: { status: 'paid' },
-      });
-    }
-
-    return { data: this.mapInvoice(data as InvoiceRow) };
   }
 
   private async generateInvoiceNumber(tenantId: string): Promise<string> {

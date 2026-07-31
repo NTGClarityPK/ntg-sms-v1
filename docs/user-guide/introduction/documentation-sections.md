@@ -55,10 +55,4 @@ Complete guide for all users:
 * Student, class, and administrative reports
 * Public statistics
 
-### [🛠️ Admin Portal](../features/admin-portal.md)
-
-* Tenants and organisation defaults
-* Payment models
-* Academic year unlock and audit trail
-
 For the full catalogue, see [Features](../features/README.md).

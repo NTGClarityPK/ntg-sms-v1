@@ -387,7 +387,6 @@ export default function MessagesPage() {
         'academic_coordinator',
         'guidance_counselor',
         'admin_assistant',
-        'super_admin',
       ]),
     [],
   );
@@ -401,12 +400,7 @@ export default function MessagesPage() {
     );
   }, [user?.roles, currentBranchId, messagingStaffRoleNames]);
 
-  const isSuperAdminUser = useMemo(
-    () => user?.roles?.some((r) => (r.roleName ?? '').toLowerCase() === 'super_admin') ?? false,
-    [user?.roles],
-  );
-
-  const hasMessagingPrivilegedStaff = hasStaffMessagingRoleOnBranch || isSuperAdminUser;
+  const hasMessagingPrivilegedStaff = hasStaffMessagingRoleOnBranch;
 
   const isStudentOnBranch = useMemo(() => {
     if (!currentBranchId || !user?.roles?.length) return false;
@@ -589,8 +583,6 @@ export default function MessagesPage() {
           return tCommon('roleName.school_admin');
         case 'admin_assistant':
           return tCommon('roleName.admin_assistant');
-        case 'super_admin':
-          return tCommon('roleName.super_admin');
         default:
           return role;
       }

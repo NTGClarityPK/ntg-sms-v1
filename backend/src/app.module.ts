@@ -36,8 +36,6 @@ import { EventsModule } from './modules/events/events.module';
 import { BehavioralModule } from './modules/behavioral/behavioral.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ResultsModule } from './modules/results/results.module';
-import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
-import { AuditLogModule } from './common/modules/audit-log/audit-log.module';
 import { StudentPlacementModule } from './common/modules/student-placement/student-placement.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { LibraryModule } from './modules/library/library.module';
@@ -70,7 +68,6 @@ import { GoogleWorkspaceModule } from './modules/google-workspace/google-workspa
     }),
     NestCronScheduleModule.forRoot(),
     GlobalJwtModule,
-    AuditLogModule,
     StudentPlacementModule,
     AuthModule,
     AcademicYearsModule,
@@ -101,7 +98,6 @@ import { GoogleWorkspaceModule } from './modules/google-workspace/google-workspa
     BehavioralModule,
     ReportsModule,
     ResultsModule,
-    AuditLogsModule,
     MessagesModule,
     LibraryModule,
     UniformsModule,

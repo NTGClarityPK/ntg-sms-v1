@@ -5,7 +5,6 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { AuditLogService } from '../../common/services/audit-log.service';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { AcademicYearDto } from './dto/academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
@@ -52,7 +51,6 @@ function throwIfDbError(error: PostgrestError | null): void {
 export class AcademicYearsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
-    private readonly auditLogService: AuditLogService,
     private readonly studentPlacementService: StudentPlacementService,
   ) {}
 
@@ -584,11 +582,6 @@ export class AcademicYearsService {
 
     throwIfDbError(error);
     const row = data as AcademicYearRow;
-    this.auditLogService
-      .logCreate('academic_years', row.id, userEmail, { ...row } as Record<string, unknown>, {
-        tenantId,
-      })
-      .catch(() => {});
     return mapAcademicYear(row);
   }
 
@@ -624,17 +617,6 @@ export class AcademicYearsService {
 
     throwIfDbError(error);
     const newRow = data as AcademicYearRow;
-    this.auditLogService
-      .logUpdate(
-        'academic_years',
-        id,
-        userEmail,
-        { ...existing } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        ['is_active', 'updated_by'],
-        { tenantId },
-      )
-      .catch(() => {});
     return mapAcademicYear(newRow);
   }
 
@@ -792,17 +774,6 @@ export class AcademicYearsService {
 
     throwIfDbError(error);
     const newRow = data as AcademicYearRow;
-    this.auditLogService
-      .logUpdate(
-        'academic_years',
-        id,
-        userEmail,
-        { ...existing } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        ['is_locked', 'updated_by'],
-        { tenantId },
-      )
-      .catch(() => {});
 
     // Automatically activate the next available year after locking.
     const nextYearId = (nextYear as { id: string }).id;
@@ -817,45 +788,6 @@ export class AcademicYearsService {
       userEmail,
     });
 
-    return mapAcademicYear(newRow);
-  }
-
-  async unlock(id: string, tenantId: string | null, userEmail: string): Promise<AcademicYearDto> {
-    const supabase = this.supabaseConfig.getClient();
-    const username = extractUsernameFromEmail(userEmail);
-
-    const { data: existing, error: existingError } = await supabase
-      .from('academic_years')
-      .select('*')
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .single();
-    if (existingError || !existing) throw new NotFoundException('Academic year not found');
-    if (!(existing as AcademicYearRow).is_locked) {
-      throw new BadRequestException('Academic year is not locked');
-    }
-
-    const { data, error } = await supabase
-      .from('academic_years')
-      .update({ is_locked: false, updated_by: username })
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .select('*')
-      .single();
-
-    throwIfDbError(error);
-    const newRow = data as AcademicYearRow;
-    this.auditLogService
-      .logUpdate(
-        'academic_years',
-        id,
-        userEmail,
-        { ...existing } as Record<string, unknown>,
-        { ...newRow } as Record<string, unknown>,
-        ['is_locked', 'updated_by'],
-        { tenantId },
-      )
-      .catch(() => {});
     return mapAcademicYear(newRow);
   }
 }

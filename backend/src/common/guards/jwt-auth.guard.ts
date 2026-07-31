@@ -18,7 +18,6 @@ import {
   isSupabaseConnectivityError,
   SUPABASE_CONNECTIVITY_USER_MESSAGE,
 } from '../utils/supabase-connectivity-error.util';
-import { hasPrivilegedAccess } from '../utils/privileged-access.util';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -84,15 +83,6 @@ export class JwtAuthGuard implements CanActivate {
           return null;
         })
         .filter((name): name is string => !!name);
-
-      // Temporary: inject super_admin only when ALLOW_EMAIL_DOMAIN_PRIVILEGE_ESCALATION=true
-      // and email matches legacy suffixes (logged). Prefer DB super_admin role.
-      if (
-        !roles.includes('super_admin') &&
-        hasPrivilegedAccess({ email, roles: [] }, this.logger)
-      ) {
-        roles.push('super_admin');
-      }
 
       await this.ensureUserIsActive({
         userId: user.id,

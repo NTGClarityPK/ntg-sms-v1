@@ -515,7 +515,6 @@
     "sidebarManage": "الإدارة",
     "roleName": {
       "school_admin": "مسؤول المدرسة",
-      "super_admin": "المسؤول الأعلى",
       "principal": "المدير",
       "academic_coordinator": "المنسق الأكاديمي",
       "class_teacher": "معلم الصف",
@@ -2468,7 +2467,7 @@
     "academicYearStatusActive": "نشطة",
     "academicYearStatusInactive": "غير نشطة",
     "academicYearLockActiveTitle": "قفل السنة الدراسية النشطة",
-    "academicYearLockActiveMessage": "أنت على وشك قفل السنة الدراسية النشطة. سيصبح تعديلها غير ممكن، ولن يمكن إجراء أي تغييرات عليها. بعد القفل لا يمكن التراجع عن هذا الإجراء. إذا احتجت إلى إلغاء القفل، يرجى التواصل مع مسؤول النظام الأعلى.",
+    "academicYearLockActiveMessage": "أنت على وشك قفل السنة الدراسية النشطة. سيصبح تعديلها غير ممكن، ولن يمكن إجراء أي تغييرات عليها. بعد القفل لا يمكن التراجع عن هذا الإجراء. إذا احتجت إلى إلغاء القفل، يرجى التواصل مع مسؤول مدرستك.",
     "academicYearLockConfirm": "قفل السنة",
     "businessLoadSchoolErrorTitle": "فشل تحميل معلومات المدرسة",
     "businessBasicDetailsTitle": "البيانات الأساسية",
