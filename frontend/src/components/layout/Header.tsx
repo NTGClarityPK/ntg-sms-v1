@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Group, Text, Badge, Tooltip, Box, Image, Menu, useMantineColorScheme } from '@mantine/core';
+import { Group, Text, Badge, Tooltip, Box, Image, Menu } from '@mantine/core';
 import { IconCircle, IconSchool } from '@tabler/icons-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { UserMenu } from './UserMenu';
 import { CurrentBranchBadge } from '@/components/features/branches/CurrentBranchBadge';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
+import { ThemeModeToggle } from '@/components/common/ThemeModeToggle';
 import { NotificationBell } from './NotificationBell';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
@@ -37,8 +38,6 @@ const headerBadgeStyle = {
 export function Header() {
   const theme = useMantineTheme();
   const isMobileNav = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
-  const { colorScheme } = useMantineColorScheme();
-  const isDark = colorScheme === 'dark';
   const themeConfig = (theme.other ?? {}) as ThemeConfig | undefined;
   const onlineBadgeColor = themeConfig?.components?.statusOnline?.badgeColor ?? '#22c55e';
   const offlineBadgeColor = themeConfig?.components?.statusOffline?.badgeColor ?? '#868e96';
@@ -315,6 +314,7 @@ export function Header() {
             <SubscriptionBadge />
           </Box>
         )}
+        <ThemeModeToggle />
         <LanguageSwitcher />
         <Group gap="xs" align="center" wrap="nowrap" visibleFrom="sm">
           {/* Online/Offline Status Badge (green when online, gray when offline) */}

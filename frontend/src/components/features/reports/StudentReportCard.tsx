@@ -5,6 +5,7 @@ import { AcademicSection } from './AcademicSection';
 import { AttendanceSection } from './AttendanceSection';
 import { BehavioralSectionReport } from './BehavioralSection';
 import { AssignmentEngagementSection } from './AssignmentEngagementSection';
+import { CombinedBehavioralHistory } from '@/components/features/behavioral/CombinedBehavioralHistory';
 import { useTranslations } from 'next-intl';
 import type { StudentReport as StudentReportType } from '@/types/reports';
 
@@ -25,9 +26,7 @@ export function StudentReportCard({ report, isLoading }: StudentReportCardProps)
   }
 
   if (!report) {
-    return (
-      <Text c="dimmed">{t('studentNoReportData')}</Text>
-    );
+    return <Text c="dimmed">{t('studentNoReportData')}</Text>;
   }
 
   return (
@@ -39,12 +38,8 @@ export function StudentReportCard({ report, isLoading }: StudentReportCardProps)
         </Text>
       </div>
 
-      {report.academic && (
-        <AcademicSection data={report.academic} isLoading={false} />
-      )}
-      {report.attendance && (
-        <AttendanceSection data={report.attendance} isLoading={false} />
-      )}
+      {report.academic && <AcademicSection data={report.academic} isLoading={false} />}
+      {report.attendance && <AttendanceSection data={report.attendance} isLoading={false} />}
       {report.behavioral && (
         <BehavioralSectionReport
           data={report.behavioral}
@@ -52,6 +47,10 @@ export function StudentReportCard({ report, isLoading }: StudentReportCardProps)
           assignmentStatistics={report.assignmentStatistics}
         />
       )}
+      <CombinedBehavioralHistory
+        studentId={report.studentId}
+        academicYearId={report.academicYearId}
+      />
       {report.assignmentEngagement && report.assignmentEngagement.length > 0 && (
         <AssignmentEngagementSection data={report.assignmentEngagement} />
       )}

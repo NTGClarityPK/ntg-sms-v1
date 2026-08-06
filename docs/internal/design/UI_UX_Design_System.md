@@ -412,7 +412,7 @@ Location: `lib/theme/themeConfig.ts`
 
 ┌─────────────────────────────────────────────────────────┐
 
-│ \[Burger] \[Logo] \[Name]  ... \[NTG Logo] \[Status] \[Lang] \[User] │
+│ \[Burger] \[Logo] \[Name]  ... \[NTG] \[Theme] \[Status] \[Lang] \[User] │
 
 └─────────────────────────────────────────────────────────┘
 
@@ -435,6 +435,8 @@ Location: `lib/theme/themeConfig.ts`
 \#### Right Side
 
 \- \*\*NTG Logo:\*\* 64px × 32px (width: 2× height)
+
+\- \*\*Theme Mode Toggle:\*\* ActionIcon (`variant="light"`, primary colour) with sun/moon icons; persists via `localStorage` key `theme`
 
 \- \*\*Online Status Badge:\*\* 
 

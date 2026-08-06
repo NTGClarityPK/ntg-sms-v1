@@ -1,14 +1,17 @@
 'use client';
 
 import { Group, Title } from '@mantine/core';
+import { useTranslations } from 'next-intl';
 import { BehaviorSettings } from '@/components/features/settings/BehaviorSettings';
 
 export default function BehaviorSettingsPage() {
+  const t = useTranslations('settings');
+
   return (
     <>
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
-          <Title order={1}>Behavior Settings</Title>
+          <Title order={1}>{t('behaviorSettingsPageTitle')}</Title>
         </Group>
       </div>
 
@@ -26,5 +29,3 @@ export default function BehaviorSettingsPage() {
     </>
   );
 }
-
-

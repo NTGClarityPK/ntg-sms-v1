@@ -34,6 +34,7 @@ import { TimetableModule } from './modules/timetable/timetable.module';
 import { SubjectTemplatesModule } from './modules/subject-templates/subject-templates.module';
 import { EventsModule } from './modules/events/events.module';
 import { BehavioralModule } from './modules/behavioral/behavioral.module';
+import { BehavioralFrameworkModule } from './modules/behavioral-framework/behavioral-framework.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ResultsModule } from './modules/results/results.module';
 import { StudentPlacementModule } from './common/modules/student-placement/student-placement.module';
@@ -96,6 +97,7 @@ import { GoogleWorkspaceModule } from './modules/google-workspace/google-workspa
     SubjectTemplatesModule,
     EventsModule,
     BehavioralModule,
+    BehavioralFrameworkModule,
     ReportsModule,
     ResultsModule,
     MessagesModule,

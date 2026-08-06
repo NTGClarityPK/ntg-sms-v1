@@ -1468,6 +1468,88 @@ CREATE TABLE behavioral_scores (
 
 ***
 
+### Behavioural framework tables
+
+Alternative rating system (Ontario Learning Skills style). Coexists with star-based `behavioral_assessments` / `behavioral_scores`. Branch picks one active system via `branch_behavioral_config`; historical data from both systems is preserved.
+
+```sql
+CREATE TABLE behavioral_framework_presets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    branch_id UUID REFERENCES branches(id), -- NULL when is_global
+    preset_code TEXT UNIQUE,
+    preset_name TEXT NOT NULL,
+    description TEXT,
+    is_global BOOLEAN NOT NULL DEFAULT false,
+    default_rating_scale JSONB NOT NULL DEFAULT '[]',
+    comments_required BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE behavioral_framework_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    preset_id UUID NOT NULL REFERENCES behavioral_framework_presets(id) ON DELETE CASCADE,
+    category_name TEXT NOT NULL,
+    description TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    indicators JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE branch_behavioral_config (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    branch_id UUID NOT NULL UNIQUE REFERENCES branches(id),
+    active_system TEXT NOT NULL DEFAULT 'star_based'
+      CHECK (active_system IN ('star_based', 'framework_based')),
+    framework_preset_id UUID REFERENCES behavioral_framework_presets(id),
+    switched_at TIMESTAMPTZ,
+    switched_by UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE student_framework_ratings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id),
+    branch_id UUID NOT NULL REFERENCES branches(id),
+    academic_year_id UUID NOT NULL REFERENCES academic_years(id),
+    preset_id UUID NOT NULL REFERENCES behavioral_framework_presets(id),
+    rating_period TEXT NOT NULL DEFAULT 'monthly',
+    period_label TEXT NOT NULL,
+    assessment_month DATE NOT NULL,
+    rated_by UUID NOT NULL,
+    rated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (student_id, rated_by, assessment_month)
+);
+
+CREATE TABLE student_framework_category_scores (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    rating_id UUID NOT NULL REFERENCES student_framework_ratings(id) ON DELETE CASCADE,
+    category_id UUID NOT NULL REFERENCES behavioral_framework_categories(id) ON DELETE RESTRICT,
+    category_name TEXT NOT NULL, -- snapshot at rating time
+    rating_code TEXT NOT NULL,
+    teacher_comment TEXT,
+    branch_id UUID NOT NULL REFERENCES branches(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (rating_id, category_id)
+);
+```
+
+**Notes:**
+
+* Global preset seed: `ontario_learning_skills` (6 Learning Skills, E/G/S/N scale)
+* Branches clone a global preset before activating framework mode (branch-owned copy only)
+* v1 ratings are monthly only (`assessment_month` first-of-month, same axis as star assessments)
+* API: `/api/v1/behavioral-framework` (`BehavioralFrameworkModule`)
+
+**RLS:** Global presets readable by all; branch rows via `user_branches`
+
+***
+
 ## 🗓️ Timetable & Schedule Tables
 
 ### Entity Relationship Diagram

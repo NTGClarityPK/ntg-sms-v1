@@ -1,11 +1,16 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Group, Title } from '@mantine/core';
+import { Group, Title, Skeleton } from '@mantine/core';
 import { BehavioralAssessContent } from '@/components/features/behavioral/BehavioralAssessContent';
+import { FrameworkBehavioralAssessContent } from '@/components/features/behavioral/FrameworkBehavioralAssessContent';
+import { useBehavioralFrameworkConfig } from '@/hooks/useBehavioralFramework';
 
 export default function BehavioralAssessPage() {
   const t = useTranslations('behavioral');
+  const configQuery = useBehavioralFrameworkConfig();
+  const isFramework = (configQuery.data?.activeSystem ?? 'star_based') === 'framework_based';
+
   return (
     <>
       <div className="page-title-bar">
@@ -24,7 +29,13 @@ export default function BehavioralAssessPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <BehavioralAssessContent />
+        {configQuery.isLoading ? (
+          <Skeleton height={200} radius="sm" />
+        ) : isFramework ? (
+          <FrameworkBehavioralAssessContent />
+        ) : (
+          <BehavioralAssessContent />
+        )}
       </div>
     </>
   );

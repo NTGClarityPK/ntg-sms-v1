@@ -81,7 +81,7 @@ This is **not** where you create classes or subjects — those sit under **Acade
 | --- | --- |
 | Leave quota | How many school days of leave apply for [🌴 Leaves](leaves.md) |
 | Library categories | Categories used by [📚 Library](library.md) |
-| Behavioural assessment | Turn behavioural scoring on or off, and manage attributes — see [⭐ Behavioural](behavioural.md) |
+| Behavioural assessment | Turn scoring on or off, choose star-based or framework-based rating, and manage attributes or framework categories — see [⭐ Behavioural](behavioural.md) |
 
 ---
 
@@ -213,6 +213,10 @@ Challan appearance and fee templates — see [💵 Fee Management](fee-managemen
 ## 🎨 Theme
 
 Portal colours and presentation for this school.
+
+- **Colour mode** — choose **Light** or **Dark** for your portal. Click **Save changes** to keep the preference on this device. You can also switch quickly with the sun/moon button in the top bar.
+- **Logo** — upload the school logo shown in the header.
+- **Theme colour** — set the school brand colour used across the portal.
 
 ---
 

@@ -205,12 +205,13 @@ Listed by functional area:
 | **MessagesModule**      | Internal messaging system     | `conversations`, `messages`, `message_reads` |
 | **NotificationsModule** | In-app and push notifications | `notifications`, `push_subscriptions`        |
 
-#### Events & Behavior (2 modules)
+#### Events & Behavior (3 modules)
 
-| Module               | Purpose                                | Key Tables                                       |
-| -------------------- | -------------------------------------- | ------------------------------------------------ |
-| **EventsModule**     | School events, participation, consents | `events`, `event_participants`, `event_consents` |
-| **BehavioralModule** | Behavioral assessments                 | `behavioral_assessments`, `behavioral_scores`    |
+| Module                         | Purpose                                         | Key Tables                                                                 |
+| ------------------------------ | ----------------------------------------------- | -------------------------------------------------------------------------- |
+| **EventsModule**               | School events, participation, consents          | `events`, `event_participants`, `event_consents`                           |
+| **BehavioralModule**           | Star-based behavioural assessments              | `behavioral_assessments`, `behavioral_scores`                              |
+| **BehavioralFrameworkModule**  | Framework-based ratings (e.g. Ontario Learning Skills) | `behavioral_framework_presets`, `behavioral_framework_categories`, `branch_behavioral_config`, `student_framework_ratings`, `student_framework_category_scores` |
 
 #### Library & Resources (1 module)
 

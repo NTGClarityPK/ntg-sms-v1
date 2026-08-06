@@ -10,15 +10,18 @@ import {
   Group,
   Image,
   Paper,
+  SegmentedControl,
   Stack,
   Text,
   Title,
 } from '@mantine/core';
-import { IconCheck, IconSchool, IconUpload } from '@tabler/icons-react';
+import { IconCheck, IconMoon, IconSchool, IconSun, IconUpload } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useNotificationColors } from '@/lib/hooks/use-theme-colors';
+import { useTheme } from '@/lib/hooks/use-theme';
+import type { ColorSchemeMode } from '@/lib/store/color-scheme-store';
 import { useTenantMe, useUpdateTenantMe, useUploadTenantLogo } from '@/hooks/useTenant';
 import { useTenantBrandingStore } from '@/lib/store/tenant-branding-store';
 import { useTranslations } from 'next-intl';
@@ -43,17 +46,23 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
   const tSettings = useTranslations('settings');
   const tCommon = useTranslations('common');
   const { primaryColor, setPrimaryColor } = useThemeStore();
+  const { theme: colorScheme, setTheme } = useTheme();
   const { setBranding } = useTenantBrandingStore();
   const tenantQuery = useTenantMe();
   const updateTenantMutation = useUpdateTenantMe();
   const uploadLogoMutation = useUploadTenantLogo();
   const [draftColor, setDraftColor] = useState<string>(primaryColor || DEFAULT_THEME_COLOR);
+  const [draftMode, setDraftMode] = useState<ColorSchemeMode>(colorScheme);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setDraftColor(primaryColor || DEFAULT_THEME_COLOR);
   }, [primaryColor]);
+
+  useEffect(() => {
+    setDraftMode(colorScheme);
+  }, [colorScheme]);
 
   useEffect(() => {
     const data = tenantQuery.data?.data;
@@ -96,6 +105,8 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Colour mode is a personal device preference (localStorage)
+      setTheme(draftMode);
       const response = await updateTenantMutation.mutateAsync({ primaryColor: draftColor });
       setPrimaryColor(response.data?.primaryColor || draftColor);
       await tenantQuery.refetch();
@@ -115,6 +126,46 @@ export function ThemeSettingsPanel({ showTitle = true }: ThemeSettingsPanelProps
 
   return (
     <Stack gap="lg">
+      <Paper withBorder p="md">
+        <Stack gap="md">
+          <Title order={3}>{tSettings('themeModeTitle')}</Title>
+          <Text c="dimmed" size="sm">
+            {tSettings('themeModeDescription')}
+          </Text>
+          <SegmentedControl
+            id="theme-mode-segmented"
+            value={draftMode}
+            onChange={(value) => setDraftMode(value as ColorSchemeMode)}
+            data={[
+              {
+                value: 'light',
+                label: (
+                  <Group gap="xs" justify="center" wrap="nowrap">
+                    <IconSun size={16} stroke={1.75} />
+                    <span>{tSettings('themeModeLight')}</span>
+                  </Group>
+                ),
+              },
+              {
+                value: 'dark',
+                label: (
+                  <Group gap="xs" justify="center" wrap="nowrap">
+                    <IconMoon size={16} stroke={1.75} />
+                    <span>{tSettings('themeModeDark')}</span>
+                  </Group>
+                ),
+              },
+            ]}
+            fullWidth
+            size="md"
+            radius="md"
+            styles={{
+              root: { maxWidth: 360 },
+            }}
+          />
+        </Stack>
+      </Paper>
+
       <Paper withBorder p="md">
         <Stack gap="md">
           {showTitle && <Title order={3}>{tSettings('themeLogoTitle')}</Title>}

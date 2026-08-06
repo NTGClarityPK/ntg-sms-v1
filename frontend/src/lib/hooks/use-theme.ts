@@ -1,90 +1,63 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  getBrowserPreferredColorScheme,
+  hasSavedColorSchemePreference,
+  useColorSchemeStore,
+  type ColorSchemeMode,
+} from '@/lib/store/color-scheme-store';
 
 /**
- * Hook to manage theme mode (light/dark)
- * Automatically detects browser theme preference
+ * Hook to manage theme mode (light/dark).
+ * Backed by a shared Zustand store so header, settings, and MantineProvider stay in sync.
+ * Persists the user's choice in localStorage (`theme`) when they toggle or save.
  */
 export function useTheme() {
-  const [theme, setThemeState] = useState<'light' | 'dark'>('light');
+  const theme = useColorSchemeStore((s) => s.theme);
+  const setTheme = useColorSchemeStore((s) => s.setTheme);
+  const applyTheme = useColorSchemeStore((s) => s.applyTheme);
+  const toggleTheme = useColorSchemeStore((s) => s.toggleTheme);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    
-    // Function to get browser theme preference
-    const getBrowserTheme = (): 'light' | 'dark' => {
-      if (typeof window === 'undefined') return 'light';
-      
-      // Check if user has a saved preference
-      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-      if (savedTheme) {
-        return savedTheme;
+
+    // Re-sync from storage / browser on mount (covers SSR → client) without locking OS preference
+    if (!hasSavedColorSchemePreference()) {
+      applyTheme(getBrowserPreferredColorScheme());
+    }
+
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const handleThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      // Only follow the OS when the user has not saved a preference
+      if (!hasSavedColorSchemePreference()) {
+        applyTheme(e.matches ? 'dark' : 'light');
       }
-      
-      // If no saved preference, detect browser theme
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark';
-      }
-      
-      return 'light';
     };
 
-    // Set initial theme
-    const initialTheme = getBrowserTheme();
-    setThemeState(initialTheme);
-
-    // Listen for browser theme changes
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      
-      const handleThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
-        // Only update if user hasn't manually set a preference
-        const savedTheme = localStorage.getItem('theme');
-        if (!savedTheme) {
-          setThemeState(e.matches ? 'dark' : 'light');
-        }
-      };
-
-      // Modern browsers
-      if (mediaQuery.addEventListener) {
-        mediaQuery.addEventListener('change', handleThemeChange);
-      } 
-      // Fallback for older browsers
-      else if (mediaQuery.addListener) {
-        mediaQuery.addListener(handleThemeChange);
-      }
-
-      // Initial check
-      handleThemeChange(mediaQuery);
-
-      return () => {
-        if (mediaQuery.removeEventListener) {
-          mediaQuery.removeEventListener('change', handleThemeChange);
-        } else if (mediaQuery.removeListener) {
-          mediaQuery.removeListener(handleThemeChange);
-        }
-      };
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleThemeChange);
+    } else if (mediaQuery.addListener) {
+      mediaQuery.addListener(handleThemeChange);
     }
-  }, []);
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setThemeState(newTheme);
-    localStorage.setItem('theme', newTheme); // Save manual preference
-  };
-
-  const setTheme = (newTheme: 'light' | 'dark') => {
-    setThemeState(newTheme);
-    localStorage.setItem('theme', newTheme); // Save manual preference
-  };
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handleThemeChange);
+      } else if (mediaQuery.removeListener) {
+        mediaQuery.removeListener(handleThemeChange);
+      }
+    };
+  }, [applyTheme]);
 
   return {
     theme,
-    setTheme,
+    setTheme: (newTheme: ColorSchemeMode) => setTheme(newTheme),
     toggleTheme,
     isDark: theme === 'dark',
     resolvedTheme: theme,
     mounted,
   };
 }
-
