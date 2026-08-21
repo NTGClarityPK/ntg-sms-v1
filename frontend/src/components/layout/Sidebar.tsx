@@ -366,6 +366,7 @@ export function Sidebar({
 
   const subscriptionNavFeatures: Partial<Record<string, keyof PlanFeatures>> = {
     '/fees': 'hasFeeManagement',
+    '/reports/fees': 'hasFeeManagement',
     '/behavioral': 'hasBehavioralTracking',
     '/library': 'hasLibraryManagement',
     '/inventory': 'hasInventoryManagement',

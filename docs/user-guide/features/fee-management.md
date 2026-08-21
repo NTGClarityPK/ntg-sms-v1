@@ -1,19 +1,23 @@
 # 💵 Fee Management
 
-Short guide for configuring fee templates, generating challans, and verifying parent payment proofs.
+Short guide for fee packages, monthly fee bills (challans), cash at the desk, and bank proof verification.
 
 ## 📋 Overview
 
 | Who | Where | What |
 | --- | --- | --- |
-| School admin / Principal | **Fees** → **Challan management** / **Payment history** | Generate challans, review proofs, export |
-| Parents / students | **Fees** (My Fees) | Download challan PDF, submit proof, view receipts |
-| School admin / Principal | **Settings → Fee settings** | Bank details, templates, challan style |
-| School admin / Principal | **Fee reports** (`/reports/fees`) | Collected / pending / under review / overdue, defaulters |
+| School admin / Principal | **Fees** → **Monthly bills** / **Payment history** | Create bills, mark cash paid, review proofs, export |
+| Parents / students | **Fees** (My Fees) | Download fee bill PDF, submit bank proof, view receipts |
+| School admin / Principal | **Settings → Fee settings** | Bank details, fee packages, bill PDF style |
+| School admin / Principal | **Reports → Fee reports** (or **Fees → Payment history → Overdue**) | Collected / pending / under review / overdue |
 
 Fee Management requires the school plan feature **Fee management** (Starter and above; not on Free).
 
-There is **no “Mark as Paid”** button. Payments move through **proof upload → Review → Verify or Reject**.
+### How payments work
+
+- **Cash at the school desk:** on **Monthly bills**, use **Mark as paid** for unpaid fee bills. Creates a verified cash payment and receipt — no parent proof upload.
+- **Bank transfer:** parent downloads the bill, pays, uploads proof → office **Verify** or **Reject** in **Payment history**.
+- If a bill is **Under review**, finish verify/reject there before marking cash paid.
 
 ---
 
@@ -21,66 +25,79 @@ There is **no “Mark as Paid”** button. Payments move through **proof upload 
 
 **Path:** **Settings → Fee settings**
 
-### Challan settings
+### Bank / bill settings
 
-Configure what appears on printed challans:
+Configure what appears on printed fee bills (challans):
 
 - Bank name, account title, account number, branch code
 - Payment instructions
 - Footer notice
-- Challan template style (**Minimal** / **Modern**)
+- Bill PDF style (**Minimal** / **Modern**)
 
-### Fee templates
+Save bank details **once** here (they rarely change). They appear on every new bill PDF.
 
-Templates define charges and discounts.
+### Fee packages (templates)
+
+Packages define monthly charges and discounts.
 
 | Field | Options |
 | --- | --- |
 | **Type** | **Fee** or **Discount** |
-| **Scope** | Levels, Class, Class-Section, Individual |
-| **Metrics** | Named line items — absolute amount or percentage |
-| **Auto-apply** | On Individual templates — e.g. staff-parent discount (`parent has staff role`) |
+| **Applies to** | Levels, Class, Class-Section, Individual |
+| **Fee items** | Named line items — absolute amount or percentage |
+| **Auto-apply** | On Individual packages — e.g. staff-parent discount |
 
-When more than one fee template could apply, the **most specific** wins: Individual → Class-Section → Class → Level.
+When more than one fee package could apply, the **most specific** wins: Individual → Class-Section → Class → Level.
 
-Discount templates marked **Auto** can be included automatically when you generate challans. Sibling auto-discount may exist in calculation rules for linked siblings in the same branch; the create-template UI currently exposes staff-parent auto-apply, not a sibling checkbox.
+**Due by day of month** on the fee package sets the payment deadline for **Create monthly bills**: for August fees, **10** means due on **10 August** (not the last day of the month, and not based on when you click generate).
+
+You can **Edit** a fee package later (name, amounts, due-by day of month, etc.). Changes apply to **new** monthly bills; existing bills keep what they already had.
+
+If only one fee package applies, monthly generation confirms without an extra choice screen.
 
 ---
 
-## 📄 Part 2: Challan management
+## 📄 Part 2: Monthly bills
 
-**Path:** **Fees → Challan management**
+**Path:** **Fees → Monthly bills**
 
 ### Generate for a class and month
 
 1. Choose **class section** and **month**.
-2. Click **Generate challans**.
-3. Confirm the pre-selected template and any auto discounts.
-4. Confirm & generate for the roster.
+2. Click **Generate** (creates fee bills / challans).
+3. If several packages could apply, confirm which one; if only one, generation starts immediately.
+4. Bills appear on the roster.
 
-### One-off individual challan
+### Mark as paid (cash)
 
-Use **Generate** on a student row when you need mid-month joins or temporary changes:
+On a student row with **Pending payment** (or **Rejected**), click **Mark as paid** to record cash at the desk and prepare a receipt.
+
+### One-off individual bill
+
+Use **Generate** on a student row for mid-month joins or temporary changes:
 
 - Optional start date and due date override
-- Exclude a metric or override an amount for **this challan only**
-- Next month uses the normal template again
+- Exclude a fee item or override an amount for **this bill only**
+- Next month uses the normal package again
 
 ### Download
 
-- Per student: **Download PDF**
-- There is **no** bulk ZIP of challan PDFs in Fee Management today
+- **Create monthly bills** saves the fee bill records quickly; PDFs are **not** built at that moment.
+- Per student: **Download PDF** — the first click prepares the PDF (may take a few seconds), then opens it; later clicks reuse the cached file.
+- Parents and students can download their own bills the same way from **My Fees**.
+- There is **no** bulk ZIP of bill PDFs today
+- If you regenerate or change a pending bill, the next download builds a fresh PDF
 
-### Challan roster statuses
+### Roster statuses
 
 | Status | Meaning |
 | --- | --- |
-| **No challan** | Not generated for that month |
-| **Pending payment** | Issued; waiting for proof |
-| **Under review** | Parent submitted proof; staff must verify |
+| **No bill** | Not generated for that month |
+| **Pending payment** | Issued; waiting for payment or cash mark-paid |
+| **Under review** | Parent submitted bank proof; staff must verify |
 | **Verified** | Payment accepted; receipt available |
 | **Rejected** | Proof rejected (reason recorded) |
-| **Cancelled** | Challan cancelled |
+| **Cancelled** | Bill cancelled |
 
 ---
 
@@ -91,11 +108,11 @@ Use **Generate** on a student row when you need mid-month joins or temporary cha
 ### Filters
 
 - **Class** (class section; All)
-- **Status** — All / Under review / Verified / Rejected
-- **Date range** (defaults to last 30 days)
+- **Status** — defaults to **Under review** for the daily verify queue (switch to All as needed)
+- **Date range**
 - **Search student**
 
-Summary badges: **Collected** and **Pending**.
+Summary badges: **Collected** and **Pending**. Use **Overdue balances** to open Fee reports.
 
 ### Review a payment
 

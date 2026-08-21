@@ -43,6 +43,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/results': 'results',
   '/reports/public': 'reports',
   '/reports/administrative': 'reports',
+  '/reports/fees': 'reports',
   '/settings': 'settings',
   '/id-cards': 'id_cards',
   '/certificates': 'certificates',

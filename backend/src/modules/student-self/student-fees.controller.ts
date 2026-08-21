@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpStatus,
+  Param,
   ParseFilePipeBuilder,
   Post,
   UploadedFile,
@@ -38,6 +39,14 @@ export class StudentFeesController {
   @Get('challans')
   async myChallans(@CurrentStudent() student: CurrentStudentPayload) {
     return this.challanService.listStudentPending(student.id, student.branchId);
+  }
+
+  @Get('challans/:id/pdf')
+  async ensureChallanPdf(
+    @Param('id') id: string,
+    @CurrentStudent() student: CurrentStudentPayload,
+  ): Promise<{ data: { pdfUrl: string } }> {
+    return this.challanService.ensureChallanPdfForStudent(id, student.id, student.branchId);
   }
 
   @Get('payments')
@@ -76,4 +85,3 @@ export class StudentFeesController {
     });
   }
 }
-

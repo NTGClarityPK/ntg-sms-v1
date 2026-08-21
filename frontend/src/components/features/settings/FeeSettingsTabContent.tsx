@@ -21,7 +21,7 @@ import {
   MultiSelect,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconPlus, IconTrash, IconCash } from '@tabler/icons-react';
+import { IconCash, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { modals } from '@mantine/modals';
 import {
@@ -30,6 +30,7 @@ import {
   useDeleteFeeTemplate,
   useFeeChallanSettings,
   useFeeTemplates,
+  useUpdateFeeTemplate,
   useUpsertFeeChallanSettings,
 } from '@/hooks/api/useFees';
 import type { FeeTemplate } from '@/types/fees';
@@ -48,10 +49,12 @@ export function FeeSettingsTabContent() {
   const tSettings = useTranslations('settings');
   const tCommon = useTranslations('common');
   const [opened, setOpened] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [assignModal, setAssignModal] = useState<null | { templateId: string; templateName: string; templateScope: FeeTemplate['scope'] }>(null);
 
   const { data: templates, isLoading, error } = useFeeTemplates();
   const createMutation = useCreateFeeTemplate();
+  const updateMutation = useUpdateFeeTemplate();
   const deleteMutation = useDeleteFeeTemplate();
   const assignMutation = useCreateFeeTemplateAssignment();
 
@@ -61,6 +64,8 @@ export function FeeSettingsTabContent() {
   const levelsQuery = useLevels();
   const classesQuery = useClasses();
   const classSectionsQuery = useClassSections({ page: 1, limit: 500, minimal: true, isActive: true });
+
+  const isSavingPackage = createMutation.isPending || updateMutation.isPending;
 
   const challanForm = useForm({
     initialValues: {
@@ -105,7 +110,7 @@ export function FeeSettingsTabContent() {
       type: 'Fee' as 'Fee' | 'Discount',
       scope: 'Levels' as 'Levels' | 'Class' | 'Class-Section' | 'Individual',
       currencyCode: 'PKR' as 'PKR' | 'IQD' | 'SAR' | 'USD',
-      daysUntilDue: 30,
+      daysUntilDue: 10,
       autoApply: false,
       metrics: [{ name: '', amountType: 'Absolute' as const, amount: 0 }] as MetricForm[],
     },
@@ -128,6 +133,40 @@ export function FeeSettingsTabContent() {
       },
     },
   });
+
+  const openCreateModal = () => {
+    setEditingTemplateId(null);
+    form.reset();
+    setOpened(true);
+  };
+
+  const openEditModal = (tpl: FeeTemplate) => {
+    setEditingTemplateId(tpl.id);
+    form.setValues({
+      name: tpl.name,
+      type: tpl.type,
+      scope: tpl.scope,
+      currencyCode: tpl.currencyCode ?? 'PKR',
+      daysUntilDue: tpl.daysUntilDue >= 1 ? tpl.daysUntilDue : 10,
+      autoApply: !!tpl.autoApply,
+      metrics:
+        tpl.metrics.length > 0
+          ? tpl.metrics.map((m) => ({
+              name: m.name,
+              amountType: m.amountType,
+              amount: Number(m.amount),
+            }))
+          : [{ name: '', amountType: 'Absolute' as const, amount: 0 }],
+    });
+    form.resetDirty();
+    setOpened(true);
+  };
+
+  const closePackageModal = () => {
+    setOpened(false);
+    setEditingTemplateId(null);
+    form.reset();
+  };
 
   const total = useMemo(
     () => form.values.metrics.reduce((s, m) => s + (Number(m.amount) || 0), 0),
@@ -281,8 +320,8 @@ export function FeeSettingsTabContent() {
           <Button
             id="settings-fees-create-template"
             leftSection={<IconPlus size={16} />}
-            onClick={() => setOpened(true)}
-            disabled={createMutation.isPending}
+            onClick={openCreateModal}
+            disabled={isSavingPackage}
           >
             {tFees('settings.createTemplate')}
           </Button>
@@ -302,7 +341,28 @@ export function FeeSettingsTabContent() {
             {tFees('settings.errorLoading')}
           </Text>
         ) : rows.length === 0 ? (
-          <Text p="md">{tFees('settings.empty')}</Text>
+          <Stack gap="md" p="md">
+            <Alert color="blue" variant="light" title={tFees('settings.firstRun.title')}>
+              <Stack gap="xs">
+                <Text size="sm">{tFees('settings.firstRun.stepBank')}</Text>
+                <Text size="sm">{tFees('settings.firstRun.stepPackage')}</Text>
+                <Text size="sm">{tFees('settings.firstRun.stepAssign')}</Text>
+                <Text size="sm">{tFees('settings.firstRun.stepBills')}</Text>
+                <Group mt="xs">
+                  <Button
+                    id="settings-fees-first-run-create"
+                    leftSection={<IconPlus size={16} />}
+                    onClick={openCreateModal}
+                  >
+                    {tFees('settings.firstRun.createPackage')}
+                  </Button>
+                </Group>
+              </Stack>
+            </Alert>
+            <Text c="dimmed" size="sm">
+              {tFees('settings.empty')}
+            </Text>
+          </Stack>
         ) : (
           <Table.ScrollContainer minWidth={920}>
             <Table
@@ -328,7 +388,7 @@ export function FeeSettingsTabContent() {
                     {tFees('settings.table.total')}
                   </Table.Th>
                   <Table.Th>{tFees('settings.table.assigned')}</Table.Th>
-                  <Table.Th style={{ width: 140, whiteSpace: 'nowrap', textAlign: 'center' }}>
+                  <Table.Th style={{ width: 220, whiteSpace: 'nowrap', textAlign: 'center' }}>
                     {tFees('settings.table.actions')}
                   </Table.Th>
                 </Table.Tr>
@@ -394,6 +454,15 @@ export function FeeSettingsTabContent() {
                       </Table.Td>
                       <Table.Td>
                         <Group justify="flex-end" gap="xs" wrap="nowrap">
+                          <Button
+                            id={`settings-fees-edit-template-${tpl.id}`}
+                            size="xs"
+                            variant="light"
+                            leftSection={<IconPencil size={14} />}
+                            onClick={() => openEditModal(tpl)}
+                          >
+                            {tFees('settings.editTemplate')}
+                          </Button>
                           <Button
                             id={`settings-fees-assign-template-${tpl.id}`}
                             size="xs"
@@ -478,16 +547,23 @@ export function FeeSettingsTabContent() {
                   ? 'Class'
                   : 'Section'; // Class-Section → store class_section_id in scope_id
 
+            const existingIds = new Set(
+              (rows.find((r) => r.id === assignModal.templateId)?.assignments ?? []).map((a) => a.scopeId),
+            );
+            const toCreate = values.scopeIds.filter((id) => !existingIds.has(id));
+
             try {
-              await Promise.all(
-                values.scopeIds.map((scopeId) =>
-                  assignMutation.mutateAsync({
-                    templateId: assignModal.templateId,
-                    scopeType,
-                    scopeId,
-                  }),
-                ),
-              );
+              if (toCreate.length > 0) {
+                await Promise.all(
+                  toCreate.map((scopeId) =>
+                    assignMutation.mutateAsync({
+                      templateId: assignModal.templateId,
+                      scopeType,
+                      scopeId,
+                    }),
+                  ),
+                );
+              }
               notifications.show({
                 title: tFees('settings.assign.successTitle'),
                 message: tFees('settings.assign.successMessage'),
@@ -509,6 +585,7 @@ export function FeeSettingsTabContent() {
             <MultiSelect
               id="settings-fees-assign-scope"
               label={tFees('settings.assign.scopeLabel')}
+              description={tFees('settings.assign.scopeDescription')}
               placeholder={tFees('settings.assign.scopePlaceholder')}
               searchable
               data={
@@ -543,25 +620,49 @@ export function FeeSettingsTabContent() {
         </form>
       </Modal>
 
-      <Modal opened={opened} onClose={() => setOpened(false)} title={tFees('settings.createTemplateTitle')} size="xl">
+      <Modal
+        opened={opened}
+        onClose={closePackageModal}
+        title={editingTemplateId ? tFees('settings.editTemplateTitle') : tFees('settings.createTemplateTitle')}
+        size="xl"
+      >
         <form
           onSubmit={form.onSubmit(async (values) => {
-            await createMutation.mutateAsync({
+            const payload = {
               name: values.name,
               type: values.type,
               scope: values.scope,
               currencyCode: values.currencyCode,
+              daysUntilDue: values.daysUntilDue,
               autoApply: values.scope === 'Individual' ? values.autoApply : false,
-              autoApplyCondition: values.scope === 'Individual' && values.autoApply ? { parent_has_role: 'staff' } : null,
+              autoApplyCondition:
+                values.scope === 'Individual' && values.autoApply ? { parent_has_role: 'staff' } : null,
               metrics: values.metrics.map((m, i) => ({
                 name: m.name,
                 amountType: m.amountType,
                 amount: m.amount,
                 displayOrder: i,
               })),
-            });
-            form.reset();
-            setOpened(false);
+            };
+            try {
+              if (editingTemplateId) {
+                await updateMutation.mutateAsync({ id: editingTemplateId, ...payload });
+                notifications.show({
+                  title: tCommon('success'),
+                  message: tFees('settings.templates.updated'),
+                  color: 'green',
+                });
+              } else {
+                await createMutation.mutateAsync(payload);
+              }
+              closePackageModal();
+            } catch (e: unknown) {
+              notifications.show({
+                title: tCommon('error'),
+                message: e instanceof Error ? e.message : tCommon('errors.generic'),
+                color: 'red',
+              });
+            }
           })}
         >
           <Stack>
@@ -604,6 +705,16 @@ export function FeeSettingsTabContent() {
               ]}
               required
               {...form.getInputProps('currencyCode')}
+            />
+
+            <NumberInput
+              id="settings-fees-template-days-until-due"
+              label={tFees('form.daysUntilDue')}
+              description={tFees('form.daysUntilDueDescription')}
+              min={1}
+              max={365}
+              required
+              {...form.getInputProps('daysUntilDue')}
             />
 
             {form.values.scope === 'Individual' ? (
@@ -682,10 +793,10 @@ export function FeeSettingsTabContent() {
             </Stack>
 
             <Group justify="flex-end">
-              <Button id="settings-fees-cancel" variant="subtle" onClick={() => setOpened(false)}>
+              <Button id="settings-fees-cancel" variant="subtle" onClick={closePackageModal} disabled={isSavingPackage}>
                 {tCommon('cancel')}
               </Button>
-              <Button id="settings-fees-save" type="submit" loading={createMutation.isPending} disabled={createMutation.isPending}>
+              <Button id="settings-fees-save" type="submit" loading={isSavingPackage} disabled={isSavingPackage}>
                 {tFees('common.save')}
               </Button>
             </Group>

@@ -33,6 +33,7 @@ import {
   RejectFeePaymentDto,
   VerifyFeePaymentDto,
 } from './dto/verify-reject-payment.dto';
+import { MarkFeePaidDto } from './dto/mark-fee-paid.dto';
 import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 type UploadedFileType = {
@@ -167,6 +168,23 @@ export class PaymentController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.paymentService.listMyStudentsPayments(user.id, branch.branchId);
+  }
+
+  /** Admin cash desk — record verified payment with no proof. Must be before :id routes. */
+  @Post('mark-paid')
+  async markPaid(
+    @Body() body: MarkFeePaidDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    this.ensureFeesAdmin(user);
+    return this.paymentService.markPaidCash({
+      challanId: body.challanId,
+      paymentDate: body.paymentDate,
+      notes: body.notes,
+      adminUserId: user.id,
+      branchId: branch.branchId,
+    });
   }
 
   @Post(':id/regenerate-receipt')

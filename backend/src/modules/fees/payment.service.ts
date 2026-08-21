@@ -585,6 +585,129 @@ export class PaymentService {
     return { data: { receiptUrl } };
   }
 
+  /**
+   * Admin cash desk: record full payment as Verified with no proof upload.
+   * Blocks when challan is Under_Review (parent proof pending) — use verify/reject instead.
+   */
+  async markPaidCash(input: {
+    challanId: string;
+    adminUserId: string;
+    branchId: string;
+    paymentDate?: string;
+    notes?: string;
+  }): Promise<{ data: { id: string; receiptUrl: string | null } }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: challan, error: cErr } = await supabase
+      .from('fee_challans')
+      .select('id, challan_number, student_id, months_included, payable_amount, status')
+      .eq('id', input.challanId)
+      .eq('branch_id', input.branchId)
+      .maybeSingle();
+    throwIfDbError(cErr);
+    if (!challan) throw new NotFoundException('Challan not found');
+    const c = challan as ChallanRow & { status: string };
+
+    if (c.status === 'Under_Review') {
+      throw new BadRequestException(
+        'This fee bill has a payment under review. Verify or reject it in Payment history first.',
+      );
+    }
+    if (c.status === 'Verified') {
+      throw new BadRequestException('This fee bill is already marked as paid');
+    }
+    if (c.status !== 'Pending_Payment' && c.status !== 'Rejected') {
+      throw new BadRequestException('This fee bill cannot be marked as paid in its current status');
+    }
+
+    const { data: existingPending, error: pendErr } = await supabase
+      .from('fee_payments')
+      .select('id')
+      .eq('challan_id', c.id)
+      .eq('branch_id', input.branchId)
+      .eq('status', 'Pending_Review')
+      .limit(1)
+      .maybeSingle();
+    throwIfDbError(pendErr);
+    if (existingPending) {
+      throw new BadRequestException(
+        'This fee bill has a payment under review. Verify or reject it in Payment history first.',
+      );
+    }
+
+    const paymentDate =
+      (input.paymentDate?.slice(0, 10) || new Date().toISOString().slice(0, 10));
+    const verifiedAt = new Date().toISOString();
+    const payable = Number(c.payable_amount);
+
+    const { data: payRow, error: insErr } = await supabase
+      .from('fee_payments')
+      .insert({
+        branch_id: input.branchId,
+        challan_id: c.id,
+        student_id: c.student_id,
+        amount_paid: payable,
+        payment_date: paymentDate,
+        payment_method: 'Cash',
+        transaction_reference: null,
+        bank_name: null,
+        proof_document_url: null,
+        status: 'Verified',
+        verified_by: input.adminUserId,
+        verified_at: verifiedAt,
+        notes: input.notes?.trim() || null,
+      })
+      .select('id, amount_paid, payment_date, payment_method')
+      .single();
+    throwIfDbError(insErr);
+    if (!payRow) throw new BadRequestException('Failed to record payment');
+
+    await supabase
+      .from('fee_challans')
+      .update({ status: 'Verified' })
+      .eq('id', c.id)
+      .eq('branch_id', input.branchId);
+
+    const p = payRow as {
+      id: string;
+      amount_paid: number;
+      payment_date: string;
+      payment_method: string;
+    };
+
+    const publicUrl = await this.renderAndUploadReceiptPdf({
+      branchId: input.branchId,
+      challan: {
+        id: c.id,
+        challan_number: c.challan_number,
+        student_id: c.student_id,
+        payable_amount: payable,
+      },
+      payment: {
+        amount_paid: Number(p.amount_paid),
+        payment_date: p.payment_date,
+        payment_method: p.payment_method,
+      },
+      verifiedAtIso: verifiedAt,
+    });
+
+    const months =
+      c.months_included && c.months_included.length > 0 ? c.months_included : [];
+    if (months.length > 0) {
+      await supabase.from('fee_challan_month_coverage').upsert(
+        months.map((m) => ({
+          branch_id: input.branchId,
+          challan_id: c.id,
+          student_id: c.student_id,
+          month: m,
+        })),
+        { onConflict: 'student_id,month' },
+      );
+    }
+
+    return { data: { id: p.id, receiptUrl: publicUrl } };
+  }
+
   async verifyPayment(input: {
     paymentId: string;
     adminUserId: string;

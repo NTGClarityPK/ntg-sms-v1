@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -615,14 +616,29 @@ export class ChallanService {
     if (input.dueDate) {
       dueDateIso = input.dueDate.slice(0, 10);
     } else {
-      const daysUntilDue = 30;
-      dueDateIso = isoDate(addDays(monthStart, (input.autoCalculateDueDate ?? true) ? daysUntilDue : daysUntilDue));
+      // Default: Nth day of the fee month (from package days_until_due).
+      // Example: August fees + 10 → due 10 Aug (not month-end, not issue-date + N).
+      const supabaseForDue = this.supabaseConfig.getClient();
+      let dueDayOfMonth = 10;
+      if (input.selectedInheritedTemplateId) {
+        const { data: tplRow, error: tplErr } = await supabaseForDue
+          .from('fee_templates')
+          .select('days_until_due')
+          .eq('id', input.selectedInheritedTemplateId)
+          .eq('branch_id', branchId)
+          .maybeSingle();
+        throwIfDbError(tplErr);
+        const raw = Number((tplRow as { days_until_due?: number } | null)?.days_until_due);
+        if (Number.isFinite(raw) && raw >= 1) {
+          dueDayOfMonth = Math.min(31, Math.floor(raw));
+        }
+      }
+      const lastDay = monthEnd.getDate();
+      const day = Math.min(dueDayOfMonth, lastDay);
+      dueDateIso = isoDate(new Date(year, monthIndex, day));
     }
 
     const supabase = this.supabaseConfig.getClient();
-    const branchName = await this.getBranchName(branchId);
-    const businessInfo = await this.getBranchBusinessInfo(branchId);
-    const challanSettings = await this.getFeeChallanSettings(branchId);
 
     const results: Array<{ studentId: string; challanId: string; challanNumber: string; pdfUrl: string | null }> = [];
 
@@ -674,10 +690,6 @@ export class ChallanService {
             (primaryOverride.templateEdits ?? []).length > 0 ||
             (primaryOverride.metricEdits ?? []).length > 0);
 
-        // Always regenerate PDF for an existing draft challan (same path whether due date or line items changed).
-        const student = await this.getStudent(studentId, branchId);
-        const studentName = [student.first_name, student.last_name].filter(Boolean).join(' ') || '—';
-
         const monthsForPdf =
           Array.isArray(existingRow.months_included) && existingRow.months_included.length > 0
             ? existingRow.months_included
@@ -685,18 +697,6 @@ export class ChallanService {
 
         // If overrides were provided, rebuild challan items/totals from calculation preview and replace existing items.
         // This is still safe because we only ever find existing challans in Pending_Payment / Under_Review.
-        let challanItemsForPdf: Array<{
-          billing_month: string | null;
-          description: string;
-          amount: number;
-          is_discount: boolean;
-        }> = [];
-        let totalsForPdf = {
-          subtotal: Number(existingRow.subtotal ?? 0),
-          totalDiscount: Number(existingRow.total_discount ?? 0),
-          payableAmount: Number(existingRow.payable_amount ?? 0),
-        };
-
         if (hasOverrides) {
           const previews = await Promise.all(
             monthsForPdf.map((m) => {
@@ -723,7 +723,6 @@ export class ChallanService {
           const subtotal = previews.reduce((s, p) => s + p.subtotal, 0);
           const totalDiscount = previews.reduce((s, p) => s + p.totalDiscount, 0);
           const payableAmount = previews.reduce((s, p) => s + p.payableAmount, 0);
-          totalsForPdf = { subtotal, totalDiscount, payableAmount };
 
           const itemsToInsert: ChallanItemInsert[] = [];
           let displayOrder = 0;
@@ -743,7 +742,6 @@ export class ChallanService {
             }
           }
 
-          // Replace existing items
           const { error: delErr } = await supabase
             .from('fee_challan_items')
             .delete()
@@ -755,7 +753,6 @@ export class ChallanService {
             throwIfDbError(insErr);
           }
 
-          // Update totals on challan
           const { error: updTotalsErr } = await supabase
             .from('fee_challans')
             .update({
@@ -766,98 +763,14 @@ export class ChallanService {
             .eq('id', existingRow.id)
             .eq('branch_id', branchId);
           throwIfDbError(updTotalsErr);
-
-          challanItemsForPdf = itemsToInsert.map((i) => ({
-            billing_month: i.billing_month,
-            description: i.description,
-            amount: Math.abs(Number(i.amount ?? 0)),
-            is_discount: Boolean(i.is_discount),
-          }));
-        } else {
-          const { data: challanItems, error: itemsErr } = await supabase
-            .from('fee_challan_items')
-            .select('template_id, billing_month, description, amount, is_discount')
-            .eq('challan_id', existingRow.id)
-            .order('display_order', { ascending: true });
-          throwIfDbError(itemsErr);
-          challanItemsForPdf = (challanItems ?? []) as any[];
         }
 
-        const templateIds = Array.from(
-          new Set(
-            (challanItemsForPdf ?? [])
-              .map((r) => (r as { template_id?: string | null }).template_id)
-              .filter(Boolean) as string[],
-          ),
-        );
-        let currencyCode: 'PKR' | 'IQD' | 'SAR' | 'USD' = 'PKR';
-        if (templateIds.length > 0) {
-          const { data: tplRows, error: tplErr } = await supabase
-            .from('fee_templates')
-            .select('id, currency_code')
-            .eq('branch_id', branchId)
-            .in('id', templateIds)
-            .limit(1);
-          throwIfDbError(tplErr);
-          currencyCode = ((tplRows?.[0] as { currency_code?: 'PKR' | 'IQD' | 'SAR' | 'USD' } | undefined)?.currency_code ??
-            'PKR') as any;
-        }
-
-        const qrPayload = `fee:challan:${existingRow.id}`;
-        const pdfBuffer = await this.feePdfService.generateChallanPdf({
-          branchName,
-          businessInfo,
-          challanSettings,
-          currencyCode,
-          studentName,
-          studentStudentId: student.student_id,
-          challanNumber: existingRow.challan_number,
-          months: monthsForPdf,
-          dueDate: dueDateIso,
-          billingStartDate: billingStartIso,
-          billingEndDate: billingEndIso,
-          items: challanItemsForPdf.map((row) => ({
-            billingMonth: row.billing_month,
-            description: row.description,
-            amount: Math.abs(Number(row.amount ?? 0)),
-            isDiscount: Boolean(row.is_discount),
-          })),
-          totals: totalsForPdf,
-          qrPayload,
-          issuedAt: isoDate(new Date()),
-        });
-
-        const filePath = `challans/${branchId}/${existingRow.id}.pdf`;
-        const { error: uploadError } = await supabase.storage
-          .from('fee-documents')
-          .upload(filePath, pdfBuffer, { contentType: 'application/pdf', upsert: true });
-        if (uploadError) {
-          // Challan exists but PDF failed; still update due date.
-          const { error: updErr } = await supabase
-            .from('fee_challans')
-            .update({ due_date: dueDateIso })
-            .eq('id', existingRow.id)
-            .eq('branch_id', branchId);
-          throwIfDbError(updErr);
-
-          results.push({
-            studentId,
-            challanId: existingRow.id,
-            challanNumber: existingRow.challan_number,
-            pdfUrl: existingRow.pdf_url ?? null,
-          });
-          continue;
-        }
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from('fee-documents').getPublicUrl(filePath);
-
+        // Lazy PDF: clear cached URL so next download regenerates with updated due date / items.
         const { data: updated, error: updErr } = await supabase
           .from('fee_challans')
           .update({
             due_date: dueDateIso,
-            pdf_url: publicUrl,
+            pdf_url: null,
             billing_start_date: billingStartIso,
             billing_end_date: billingEndIso,
           })
@@ -871,13 +784,12 @@ export class ChallanService {
           studentId,
           challanId: (updated as { id: string }).id,
           challanNumber: (updated as { challan_number: string }).challan_number,
-          pdfUrl: (updated as { pdf_url: string | null }).pdf_url,
+          pdfUrl: null,
         });
         continue;
       }
 
       const student = await this.getStudent(studentId, branchId);
-      const studentName = [student.first_name, student.last_name].filter(Boolean).join(' ') || '—';
 
       const previews = await Promise.all(
         months.map((m) => {
@@ -975,80 +887,184 @@ export class ChallanService {
         }
       }
 
-      const qrPayload = `fee:challan:${challanRow.id}`;
-      const templateIds = Array.from(new Set(itemsToInsert.map((i) => i.template_id).filter(Boolean)));
-      let currencyCode: 'PKR' | 'IQD' | 'SAR' | 'USD' = 'PKR';
-      if (templateIds.length > 0) {
-        const { data: tplRows, error: tplErr } = await supabase
-          .from('fee_templates')
-          .select('id, currency_code')
-          .eq('branch_id', branchId)
-          .in('id', templateIds)
-          .limit(1);
-        throwIfDbError(tplErr);
-        currencyCode = ((tplRows?.[0] as { currency_code?: 'PKR' | 'IQD' | 'SAR' | 'USD' } | undefined)?.currency_code ??
-          'PKR') as any;
-      }
-      const pdfBuffer = await this.feePdfService.generateChallanPdf({
-        branchName,
-        businessInfo,
-        challanSettings,
-        currencyCode,
-        studentName,
-        studentStudentId: student.student_id,
-        challanNumber: challanRow.challan_number,
-        months,
-        dueDate: dueDateIso,
-        billingStartDate: billingStartIso,
-        billingEndDate: billingEndIso,
-        items: itemsToInsert.map((i) => ({
-          billingMonth: i.billing_month,
-          description: i.description,
-          amount: Math.abs(i.amount),
-          isDiscount: i.is_discount,
-        })),
-        totals: { subtotal, totalDiscount, payableAmount },
-        qrPayload,
-        issuedAt: isoDate(new Date()),
-      });
-
-      const filePath = `challans/${branchId}/${challanRow.id}.pdf`;
-      const { error: uploadError } = await supabase.storage
-        .from('fee-documents')
-        .upload(filePath, pdfBuffer, { contentType: 'application/pdf', upsert: true });
-      if (uploadError) {
-        // Challan exists but PDF failed; keep pdf_url null for retry.
-        results.push({
-          studentId,
-          challanId: challanRow.id,
-          challanNumber: challanRow.challan_number,
-          pdfUrl: null,
-        });
-        continue;
-      }
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('fee-documents').getPublicUrl(filePath);
-
-      const { data: updated, error: updErr } = await supabase
-        .from('fee_challans')
-        .update({ pdf_url: publicUrl })
-        .eq('id', challanRow.id)
-        .eq('branch_id', branchId)
-        .select('id, challan_number, pdf_url')
-        .single();
-      throwIfDbError(updErr);
-
+      // Lazy PDF: generated on first Download / Preview via ensureChallanPdf.
       results.push({
         studentId,
         challanId: challanRow.id,
-        challanNumber: (updated as { challan_number: string }).challan_number,
-        pdfUrl: (updated as { pdf_url: string | null }).pdf_url,
+        challanNumber: challanRow.challan_number,
+        pdfUrl: null,
       });
     }
 
     return { data: results };
+  }
+
+  /**
+   * Generate challan PDF on demand and cache fee_challans.pdf_url.
+   * Used by admin, parent, and student download buttons.
+   */
+  async ensureChallanPdf(
+    challanId: string,
+    branchId: string,
+  ): Promise<{ data: { pdfUrl: string } }> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: challan, error: cErr } = await supabase
+      .from('fee_challans')
+      .select(
+        'id, challan_number, student_id, month, months_included, due_date, billing_start_date, billing_end_date, subtotal, total_discount, payable_amount, pdf_url, generation_date',
+      )
+      .eq('id', challanId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(cErr);
+    if (!challan) throw new NotFoundException('Challan not found');
+
+    const row = challan as ChallanRow;
+    if (row.pdf_url && row.pdf_url.trim().length > 0) {
+      return { data: { pdfUrl: row.pdf_url } };
+    }
+
+    const student = await this.getStudent(row.student_id, branchId);
+    const studentName = [student.first_name, student.last_name].filter(Boolean).join(' ') || '—';
+
+    const { data: itemRows, error: itemsErr } = await supabase
+      .from('fee_challan_items')
+      .select('template_id, billing_month, description, amount, is_discount')
+      .eq('challan_id', row.id)
+      .order('display_order', { ascending: true });
+    throwIfDbError(itemsErr);
+
+    const items = (itemRows ?? []) as Array<{
+      template_id: string | null;
+      billing_month: string | null;
+      description: string;
+      amount: number;
+      is_discount: boolean;
+    }>;
+
+    const templateIds = Array.from(
+      new Set(items.map((i) => i.template_id).filter((id): id is string => typeof id === 'string' && id.length > 0)),
+    );
+    let currencyCode: 'PKR' | 'IQD' | 'SAR' | 'USD' = 'PKR';
+    if (templateIds.length > 0) {
+      const { data: tplRows, error: tplErr } = await supabase
+        .from('fee_templates')
+        .select('currency_code')
+        .eq('branch_id', branchId)
+        .in('id', templateIds)
+        .limit(1);
+      throwIfDbError(tplErr);
+      const cc = (tplRows?.[0] as { currency_code?: string } | undefined)?.currency_code;
+      if (cc === 'PKR' || cc === 'IQD' || cc === 'SAR' || cc === 'USD') currencyCode = cc;
+    }
+
+    const months =
+      Array.isArray(row.months_included) && row.months_included.length > 0
+        ? row.months_included
+        : [row.month];
+
+    const branchName = await this.getBranchName(branchId);
+    const businessInfo = await this.getBranchBusinessInfo(branchId);
+    const challanSettings = await this.getFeeChallanSettings(branchId);
+
+    const pdfBuffer = await this.feePdfService.generateChallanPdf({
+      branchName,
+      businessInfo,
+      challanSettings,
+      currencyCode,
+      studentName,
+      studentStudentId: student.student_id,
+      challanNumber: row.challan_number,
+      months,
+      dueDate: row.due_date,
+      billingStartDate: row.billing_start_date ?? null,
+      billingEndDate: row.billing_end_date ?? null,
+      items: items.map((i) => ({
+        billingMonth: i.billing_month,
+        description: i.description,
+        amount: Math.abs(Number(i.amount ?? 0)),
+        isDiscount: Boolean(i.is_discount),
+      })),
+      totals: {
+        subtotal: Number(row.subtotal ?? 0),
+        totalDiscount: Number(row.total_discount ?? 0),
+        payableAmount: Number(row.payable_amount ?? 0),
+      },
+      qrPayload: `fee:challan:${row.id}`,
+      issuedAt: (row.generation_date || isoDate(new Date())).slice(0, 10),
+    });
+
+    const filePath = `challans/${branchId}/${row.id}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from('fee-documents')
+      .upload(filePath, pdfBuffer, { contentType: 'application/pdf', upsert: true });
+    if (uploadError) {
+      throw new BadRequestException(`PDF upload failed: ${uploadError.message}`);
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('fee-documents').getPublicUrl(filePath);
+
+    const { error: updErr } = await supabase
+      .from('fee_challans')
+      .update({ pdf_url: publicUrl })
+      .eq('id', row.id)
+      .eq('branch_id', branchId);
+    throwIfDbError(updErr);
+
+    return { data: { pdfUrl: publicUrl } };
+  }
+
+  async ensureChallanPdfForParent(
+    challanId: string,
+    parentUserId: string,
+    branchId: string,
+  ): Promise<{ data: { pdfUrl: string } }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: challan, error } = await supabase
+      .from('fee_challans')
+      .select('id, student_id, branch_id')
+      .eq('id', challanId)
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!challan) throw new NotFoundException('Challan not found');
+
+    const studentId = (challan as { student_id: string }).student_id;
+    const challanBranchId = (challan as { branch_id: string }).branch_id;
+
+    const { data: link, error: linkErr } = await supabase
+      .from('parent_students')
+      .select('id')
+      .eq('parent_user_id', parentUserId)
+      .eq('student_id', studentId)
+      .maybeSingle();
+    throwIfDbError(linkErr);
+    if (!link) throw new ForbiddenException('You do not have access to this fee bill');
+
+    // Parents may have a different "current" branch selected; use the challan's branch.
+    return this.ensureChallanPdf(challanId, challanBranchId || branchId);
+  }
+
+  async ensureChallanPdfForStudent(
+    challanId: string,
+    studentId: string,
+    branchId: string,
+  ): Promise<{ data: { pdfUrl: string } }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: challan, error } = await supabase
+      .from('fee_challans')
+      .select('id, student_id')
+      .eq('id', challanId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    throwIfDbError(error);
+    if (!challan) throw new NotFoundException('Challan not found');
+    if ((challan as { student_id: string }).student_id !== studentId) {
+      throw new ForbiddenException('You do not have access to this fee bill');
+    }
+    return this.ensureChallanPdf(challanId, branchId);
   }
 
   async getById(
