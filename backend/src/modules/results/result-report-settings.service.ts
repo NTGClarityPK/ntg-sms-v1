@@ -11,8 +11,6 @@ type ResultReportSettingsRow = {
   id: string;
   branch_id: string;
   pdf_variant: PdfVariant;
-  progress_max_assessments: number | null;
-  progress_window_days: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -27,8 +25,6 @@ function mapRow(row: ResultReportSettingsRow): ResultReportSettingsDto {
     id: row.id,
     branchId: row.branch_id,
     pdfVariant: row.pdf_variant,
-    progressMaxAssessments: row.progress_max_assessments,
-    progressWindowDays: row.progress_window_days,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -42,9 +38,7 @@ export class ResultReportSettingsService {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('result_report_settings')
-      .select(
-        'id, branch_id, pdf_variant, progress_max_assessments, progress_window_days, created_at, updated_at',
-      )
+      .select('id, branch_id, pdf_variant, created_at, updated_at')
       .eq('branch_id', branchId)
       .maybeSingle();
     throwIfDbError(error);
@@ -56,8 +50,6 @@ export class ResultReportSettingsService {
           id: 'default',
           branchId,
           pdfVariant: 'modern',
-          progressMaxAssessments: 5,
-          progressWindowDays: 14,
           createdAt: now,
           updatedAt: now,
         }),
@@ -72,18 +64,13 @@ export class ResultReportSettingsService {
     const payload = {
       branch_id: branchId,
       pdf_variant: input.pdfVariant ?? current.data.pdfVariant,
-      progress_max_assessments:
-        input.progressMaxAssessments ?? current.data.progressMaxAssessments ?? 5,
-      progress_window_days: input.progressWindowDays ?? current.data.progressWindowDays ?? 14,
       updated_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase
       .from('result_report_settings')
       .upsert(payload, { onConflict: 'branch_id' })
-      .select(
-        'id, branch_id, pdf_variant, progress_max_assessments, progress_window_days, created_at, updated_at',
-      )
+      .select('id, branch_id, pdf_variant, created_at, updated_at')
       .single();
     throwIfDbError(error);
     if (!data) throw new BadRequestException('Failed to save result report settings');

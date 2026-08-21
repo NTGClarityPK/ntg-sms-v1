@@ -8,4 +8,6 @@ export interface NavItem {
   href: string;
   icon: ComponentType<IconProps>;
   showCondition?: () => boolean;
+  /** True when the role may see the item but the current plan does not include it. */
+  planLocked?: boolean;
 }

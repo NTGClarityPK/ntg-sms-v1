@@ -24,13 +24,16 @@ export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
 
   @Get('settings/school-days')
-  async getSchoolDays(): Promise<{ data: number[] }> {
-    return this.scheduleService.getSchoolDays();
+  async getSchoolDays(@CurrentBranch() branch: CurrentBranchContext): Promise<{ data: number[] }> {
+    return this.scheduleService.getSchoolDays(branch.branchId);
   }
 
   @Put('settings/school-days')
-  async updateSchoolDays(@Body() body: UpdateSchoolDaysDto): Promise<{ data: number[] }> {
-    return this.scheduleService.updateSchoolDays(body.activeDays);
+  async updateSchoolDays(
+    @Body() body: UpdateSchoolDaysDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ): Promise<{ data: number[] }> {
+    return this.scheduleService.updateSchoolDays(body.activeDays, branch.branchId, branch.tenantId);
   }
 
   @Get('timing-templates')

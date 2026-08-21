@@ -137,7 +137,7 @@ const COLUMN_MAP: Record<string, string[]> = {
   student_id: [
     'student_id',
     'Student ID',
-    'Student ID (optional, leave blank for auto e.g. 0001)',
+    'Student ID (optional, leave blank for auto e.g. 00001)',
     'StudentID',
     'student_number',
     'Roll Number',

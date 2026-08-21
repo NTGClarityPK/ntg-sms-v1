@@ -27,12 +27,13 @@ export function SubscriptionBadge() {
     [colors.primary],
   );
 
-  if (!subscription || subscription.planId === 'enterprise') {
+  if (!subscription) {
     return null;
   }
 
   const planId = subscription.planId as PlanId;
   const label = planDisplayName(planId);
+  const isEnterprise = planId === 'enterprise';
 
   return (
     <UnstyledButton
@@ -62,34 +63,38 @@ export function SubscriptionBadge() {
           </Text>
         </Group>
 
-        <Box
-          style={{
-            width: 1,
-            alignSelf: 'stretch',
-            margin: '6px 0',
-            backgroundColor: 'rgba(255, 255, 255, 0.35)',
-          }}
-          aria-hidden
-        />
-        <Group
-          gap={6}
-          wrap="nowrap"
-          px="sm"
-          align="center"
-          justify="center"
-          style={{ flexShrink: 0 }}
-        >
-          <IconSparkles size={14} color="#fff" stroke={1.75} />
-          <Text
-            size="sm"
-            fw={700}
-            c="white"
-            lh={1}
-            style={{ letterSpacing: '0.04em', textTransform: 'uppercase' }}
-          >
-            {t('upgrade')}
-          </Text>
-        </Group>
+        {!isEnterprise && (
+          <>
+            <Box
+              style={{
+                width: 1,
+                alignSelf: 'stretch',
+                margin: '6px 0',
+                backgroundColor: 'rgba(255, 255, 255, 0.35)',
+              }}
+              aria-hidden
+            />
+            <Group
+              gap={6}
+              wrap="nowrap"
+              px="sm"
+              align="center"
+              justify="center"
+              style={{ flexShrink: 0 }}
+            >
+              <IconSparkles size={14} color="#fff" stroke={1.75} />
+              <Text
+                size="sm"
+                fw={700}
+                c="white"
+                lh={1}
+                style={{ letterSpacing: '0.04em', textTransform: 'uppercase' }}
+              >
+                {t('upgrade')}
+              </Text>
+            </Group>
+          </>
+        )}
       </Group>
     </UnstyledButton>
   );

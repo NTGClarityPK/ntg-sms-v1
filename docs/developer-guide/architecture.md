@@ -119,6 +119,18 @@ graph TB
   {% endstep %}
   {% endstepper %}
 
+## Module dependency atlas
+
+For a **full-stack dependency map** (backend NestJS modules, frontend features/hooks, access gates, database touchpoints, and troubleshooting guides), see the auto-generated report at [`docs/internal/module-dependencies/README.md`](../internal/module-dependencies/README.md).
+
+Regenerate after adding modules, widgets, plan gates, or significant hook/API changes:
+
+```bash
+npm run docs:module-deps
+```
+
+The report includes fan-in/fan-out metrics, hub modules (e.g. Academic Years), aggregators (e.g. Dashboard), Mermaid graphs, and per-module debugging tables.
+
 ## 🏛️ Backend Architecture
 
 ### Module Structure

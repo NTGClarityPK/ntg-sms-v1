@@ -57,7 +57,7 @@ export function useUniform(id: string | null) {
   });
 }
 
-export function useLowStock() {
+export function useLowStock(enabled = true) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
 
@@ -70,7 +70,7 @@ export function useLowStock() {
       );
       return response.data ?? [];
     },
-    enabled: !!branchId,
+    enabled: enabled && !!branchId,
     staleTime: 1 * 60 * 1000,
   });
 }

@@ -11,6 +11,8 @@ import {
   Box,
   Select,
   Pagination,
+  Chip,
+  Text,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { IconCalendar, IconDownload, IconFilter } from '@tabler/icons-react';
@@ -27,11 +29,40 @@ import '@mantine/dates/styles.css';
 import { apiClient } from '@/lib/api-client';
 import { notifications } from '@mantine/notifications';
 
+type DatePreset = 'today' | 'last7' | 'last30';
+
 function studentToSelectOption(s: Student): { value: string; label: string } {
   const name = `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim();
   const suffix = s.studentId ? ` (${s.studentId})` : '';
   const label = `${name}${suffix}`.trim();
   return { value: s.id, label: label || s.id };
+}
+
+function startOfLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function toLocalIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Inclusive calendar windows ending today. */
+function rangeForPreset(preset: DatePreset): [Date, Date] {
+  const end = startOfLocalDay(new Date());
+  const start = new Date(end);
+  if (preset === 'last7') start.setDate(end.getDate() - 6);
+  else if (preset === 'last30') start.setDate(end.getDate() - 29);
+  return [start, end];
+}
+
+function matchesPreset(range: [Date | null, Date | null], preset: DatePreset): boolean {
+  const [start, end] = range;
+  if (!start || !end) return false;
+  const [pStart, pEnd] = rangeForPreset(preset);
+  return toLocalIsoDate(start) === toLocalIsoDate(pStart) && toLocalIsoDate(end) === toLocalIsoDate(pEnd);
 }
 
 /**
@@ -47,12 +78,8 @@ export function AttendanceHistoryContent() {
   const [studentSearchInput, setStudentSearchInput] = useState('');
   const [debouncedStudentSearch] = useDebouncedValue(studentSearchInput, 300);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 6);
-    return [start, end];
-  });
+  const [datePreset, setDatePreset] = useState<DatePreset | null>('last7');
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>(() => rangeForPreset('last7'));
   const { user } = useAuth();
   const userTyped = user as User | undefined;
   const { data: myStaffData } = useMyStaff();
@@ -130,6 +157,12 @@ export function AttendanceHistoryContent() {
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
   }, [studentsFromQuery, selectedStudentDetail]);
 
+  const applyPreset = (preset: DatePreset) => {
+    setDatePreset(preset);
+    setDateRange(rangeForPreset(preset));
+    setTablePage(1);
+  };
+
   const commonParams = {
     classSectionIds:
       selectedClassSectionIds.length > 0 ? selectedClassSectionIds : undefined,
@@ -138,8 +171,8 @@ export function AttendanceHistoryContent() {
       selectedStatuses.length > 0
         ? (selectedStatuses as ('present' | 'absent' | 'late' | 'excused')[])
         : undefined,
-    startDate: dateRange[0] && dateRange[1] ? dateRange[0].toISOString().split('T')[0] : undefined,
-    endDate: dateRange[0] && dateRange[1] ? dateRange[1].toISOString().split('T')[0] : undefined,
+    startDate: dateRange[0] && dateRange[1] ? toLocalIsoDate(dateRange[0]) : undefined,
+    endDate: dateRange[0] && dateRange[1] ? toLocalIsoDate(dateRange[1]) : undefined,
   };
 
   const { data: tableData, isLoading } = useAttendance({
@@ -169,6 +202,33 @@ export function AttendanceHistoryContent() {
     <Stack gap="md">
       <Paper withBorder p="md">
         <Stack gap="md">
+          <Group gap="xs" wrap="wrap" align="center" className="filter-chip-group">
+            <Text size="sm" fw={500}>
+              {t('periodLabel')}
+            </Text>
+            <Chip.Group
+              value={datePreset ?? ''}
+              onChange={(v) => {
+                const next = (Array.isArray(v) ? v[0] : v) as DatePreset | '' | undefined;
+                if (next === 'today' || next === 'last7' || next === 'last30') {
+                  applyPreset(next);
+                }
+              }}
+            >
+              <Group gap="xs" wrap="wrap">
+                <Chip id="attendance-history-filter-today" value="today" variant="filled">
+                  {t('filterToday')}
+                </Chip>
+                <Chip id="attendance-history-filter-last7" value="last7" variant="filled">
+                  {t('filterLast7Days')}
+                </Chip>
+                <Chip id="attendance-history-filter-last30" value="last30" variant="filled">
+                  {t('filterLast30Days')}
+                </Chip>
+              </Group>
+            </Chip.Group>
+          </Group>
+
           <Group wrap="wrap" align="flex-end" gap="sm">
             <Box style={{ minWidth: 0, flex: '1 1 200px' }}>
               <MultiSelect
@@ -192,11 +252,17 @@ export function AttendanceHistoryContent() {
                 placeholder={t('dateRangePlaceholder')}
                 value={dateRange}
                 onChange={(v) => {
+                  let next: [Date | null, Date | null];
                   if (!v || (Array.isArray(v) && !v[0] && !v[1])) {
-                    setDateRange([null, null]);
+                    next = [null, null];
                   } else {
-                    setDateRange(v as [Date | null, Date | null]);
+                    next = v as [Date | null, Date | null];
                   }
+                  setDateRange(next);
+                  if (matchesPreset(next, 'today')) setDatePreset('today');
+                  else if (matchesPreset(next, 'last7')) setDatePreset('last7');
+                  else if (matchesPreset(next, 'last30')) setDatePreset('last30');
+                  else setDatePreset(null);
                   setTablePage(1);
                 }}
                 leftSection={<IconCalendar size={16} />}
@@ -299,11 +365,7 @@ export function AttendanceHistoryContent() {
                 setSelectedStudentId(null);
                 setStudentSearchInput('');
                 setSelectedStatuses([]);
-                const end = new Date();
-                const start = new Date();
-                start.setDate(end.getDate() - 6);
-                setDateRange([start, end]);
-                setTablePage(1);
+                applyPreset('last7');
               }}
             >
               {t('clear')}

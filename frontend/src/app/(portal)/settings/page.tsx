@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Box, Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox } from '@mantine/core';
+import { Box, Button, Group, Stack, Text, Title, Skeleton, Alert, Tabs, Paper, TextInput, Grid, Select, Modal, Checkbox, Divider, ThemeIcon } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconRocket, IconCopy, IconSchool, IconPlus, IconRefresh, IconFileImport } from '@tabler/icons-react';
+import { IconRocket, IconCopy, IconSchool, IconPlus, IconRefresh, IconFileImport, IconAlertTriangle } from '@tabler/icons-react';
 import { useSettingsStatus } from '@/hooks/useSettingsStatus';
 import { useTenantBranches } from '@/hooks/useBranches';
 import { SetupWizard } from '@/components/features/settings/SetupWizard';
@@ -35,7 +35,6 @@ import { useRoles, useFeatures } from '@/hooks/useRoles';
 import { AcademicYearForm, type AcademicYearFormValues } from '@/components/features/settings/AcademicYearForm';
 import { AcademicYearCard } from '@/components/features/settings/AcademicYearCard';
 import { useAcademicYearsList, useActivateAcademicYear, useCreateAcademicYear, useLockAcademicYear, useRolloverAcademicYear } from '@/hooks/useAcademicYears';
-import { modals } from '@mantine/modals';
 import type { AcademicYear } from '@/types/settings';
 
 import { SubjectList } from '@/components/features/settings/SubjectList';
@@ -80,7 +79,7 @@ import { ThemeSettingsPanel } from '@/components/features/settings/ThemeSettings
 import { PublicStatsSettings } from '@/components/features/settings/PublicStatsSettings';
 import { BulkSetupTabContent } from '@/components/features/settings/BulkSetupTabContent';
 import { FeeSettingsTabContent } from '@/components/features/settings/FeeSettingsTabContent';
-import { ResultReportsSettingsTabContent } from '@/components/features/settings/ResultReportsSettingsTabContent';
+import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
 import { DataExportTabContent } from '@/components/features/settings/DataExportTabContent';
 import { IntegrationsTabContent } from '@/components/features/settings/IntegrationsTabContent';
 
@@ -198,6 +197,7 @@ export default function SettingsPage() {
   const branchesQuery = useTenantBranches();
   const saveWizard = useSaveSetupWizard();
   const qc = useQueryClient();
+  const { data: planFeatures } = useSubscriptionFeatures();
 
   const hasCurrentBranch = !!user?.currentBranch?.id;
   const isSchoolAdmin = user?.roles?.some((r) => r.roleName?.toLowerCase() === 'school_admin') || false;
@@ -205,17 +205,14 @@ export default function SettingsPage() {
     user?.roles?.some((r) =>
       ['school_admin'].includes((r.roleName ?? '').toLowerCase()),
     ) || false;
-  const canManageResultReports =
-    user?.roles?.some((r) =>
-      ['school_admin', 'principal'].includes((r.roleName ?? '').toLowerCase()),
-    ) || false;
   const settingsVisibility = useMemo(
     () => ({
-      canManageResultReports,
       isSchoolAdmin,
       canDataExport,
+      hasFeeManagement: planFeatures?.hasFeeManagement === true,
+      hasInventoryManagement: planFeatures?.hasInventoryManagement === true,
     }),
-    [canManageResultReports, isSchoolAdmin, canDataExport],
+    [isSchoolAdmin, canDataExport, planFeatures?.hasFeeManagement, planFeatures?.hasInventoryManagement],
   );
   const visibleCategories = useMemo(
     () => getVisibleSettingsCategories(settingsVisibility),
@@ -424,9 +421,11 @@ export default function SettingsPage() {
               {/* Academic Years Tab */}
               <Tabs.Panel value="academic-years" pt="md" px="md" pb="md">
                 <Stack gap="xl">
-                  <AcademicYearsTabContent />
                   <AcademicTabContent />
                   <AssessmentTabContent />
+                  <DangerZoneSection>
+                    <AcademicYearsTabContent />
+                  </DangerZoneSection>
                 </Stack>
               </Tabs.Panel>
 
@@ -450,25 +449,21 @@ export default function SettingsPage() {
                 <GeneralTabContent />
               </Tabs.Panel>
 
-              {/* Inventory Management Tab */}
-              <Tabs.Panel value="inventory-management" pt="md" px="md" pb="md">
-                <InventoryManagementTabContent />
-              </Tabs.Panel>
+              {settingsVisibility.hasInventoryManagement && (
+                <Tabs.Panel value="inventory-management" pt="md" px="md" pb="md">
+                  <InventoryManagementTabContent />
+                </Tabs.Panel>
+              )}
 
-              {/* Fee Settings Tab */}
-              <Tabs.Panel value="fees" pt="md" px="md" pb="md">
-                <FeeSettingsTabContent />
-              </Tabs.Panel>
+              {settingsVisibility.hasFeeManagement && (
+                <Tabs.Panel value="fees" pt="md" px="md" pb="md">
+                  <FeeSettingsTabContent />
+                </Tabs.Panel>
+              )}
 
               <Tabs.Panel value="integrations" pt="md" px="md" pb="md">
                 <IntegrationsTabContent />
               </Tabs.Panel>
-
-              {canManageResultReports && (
-                <Tabs.Panel value="result-reports" pt="md" px="md" pb="md">
-                  <ResultReportsSettingsTabContent />
-                </Tabs.Panel>
-              )}
 
               {/* Theme Settings Tab - visible to all users with settings access */}
               <Tabs.Panel value="theme-settings" pt="md" px="md" pb="md">
@@ -662,6 +657,43 @@ function PermissionsTabContent() {
   );
 }
 
+function DangerZoneSection({ children }: { children: React.ReactNode }) {
+  return (
+    <Box
+      style={{
+        border: '1px solid var(--mantine-color-red-6)',
+        borderRadius: 'var(--mantine-radius-md)',
+        padding: 'var(--mantine-spacing-lg)',
+      }}
+    >
+      <Group gap="sm" mb="md">
+        <Divider
+          style={{ flex: 1 }}
+          color="red.6"
+          labelPosition="left"
+          label={
+            <Group gap={6}>
+              <Box
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: 'var(--mantine-color-red-6)',
+                  flexShrink: 0,
+                }}
+              />
+              <Text fw={700} c="red.7" size="sm" style={{ letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                Danger Zone
+              </Text>
+            </Group>
+          }
+        />
+      </Group>
+      {children}
+    </Box>
+  );
+}
+
 function AcademicYearsTabContent() {
   const colors = useThemeColors();
   const tSettings = useTranslations('settings');
@@ -677,6 +709,12 @@ function AcademicYearsTabContent() {
   const [lockingYearId, setLockingYearId] = useState<string | null>(null);
   const [activatingYearId, setActivatingYearId] = useState<string | null>(null);
 
+  // Lock danger-zone modal
+  const [lockModalOpened, lockModalHandlers] = useDisclosure(false);
+  const [lockTargetYear, setLockTargetYear] = useState<AcademicYear | null>(null);
+  const [lockChecks, setLockChecks] = useState({ exams: false, results: false, promotion: false });
+
+  // Rollover modal
   const [rolloverOpened, rolloverHandlers] = useDisclosure(false);
   const [rolloverSourceYear, setRolloverSourceYear] = useState<AcademicYear | null>(null);
   const [targetYearId, setTargetYearId] = useState<string | null>(null);
@@ -685,6 +723,7 @@ function AcademicYearsTabContent() {
     timetableSlots: false,
     leaveSettings: true,
   });
+  const [rolloverChecks, setRolloverChecks] = useState({ exams: false, results: false, promotion: false });
 
   const setCarry = (
     key: 'teacherAssignments' | 'timetableSlots' | 'leaveSettings',
@@ -708,83 +747,43 @@ function AcademicYearsTabContent() {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : tCommon('errors.generic');
-      notifications.show({
-        title: tCommon('error'),
-        message,
-        color: notifyColors.error,
-      });
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
     } finally {
       setActivatingYearId(null);
     }
   };
 
-  const handleLock = async (year: AcademicYear) => {
-    // Check if this is the active year
-    if (year.isActive) {
-      modals.openConfirmModal({
-        title: tSettings('academicYearLockActiveTitle'),
-        children: (
-          <Text size="sm">{tSettings('academicYearLockActiveMessage')}</Text>
-        ),
-        labels: {
-          confirm: tSettings('academicYearLockConfirm'),
-          cancel: tCommon('cancel'),
-        },
-        confirmProps: { color: 'orange' },
-        onConfirm: async () => {
-          try {
-            setLockingYearId(year.id);
-            await lockMutation.mutateAsync(year.id);
-            notifications.show({
-              title: tCommon('success'),
-              message: tSettings('academicYearLocked'),
-              color: notifyColors.success,
-            });
-          } catch (error) {
-            const message = error instanceof Error ? error.message : tCommon('errors.generic');
-            notifications.show({
-              title: tCommon('error'),
-              message,
-              color: notifyColors.error,
-            });
-          } finally {
-            setLockingYearId(null);
-          }
-        },
+  const handleLock = (year: AcademicYear) => {
+    setLockTargetYear(year);
+    setLockChecks({ exams: false, results: false, promotion: false });
+    lockModalHandlers.open();
+  };
+
+  const confirmLock = async () => {
+    if (!lockTargetYear) return;
+    try {
+      setLockingYearId(lockTargetYear.id);
+      lockModalHandlers.close();
+      await lockMutation.mutateAsync(lockTargetYear.id);
+      notifications.show({
+        title: tCommon('success'),
+        message: tSettings('academicYearLocked'),
+        color: notifyColors.success,
       });
-    } else {
-      // For non-active years, proceed directly
-      try {
-        setLockingYearId(year.id);
-        await lockMutation.mutateAsync(year.id);
-        notifications.show({
-          title: tCommon('success'),
-          message: tSettings('academicYearLocked'),
-          color: notifyColors.success,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : tCommon('errors.generic');
-        notifications.show({
-          title: tCommon('error'),
-          message,
-          color: notifyColors.error,
-        });
-      } finally {
-        setLockingYearId(null);
-      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : tCommon('errors.generic');
+      notifications.show({ title: tCommon('error'), message, color: notifyColors.error });
+    } finally {
+      setLockingYearId(null);
+      setLockTargetYear(null);
     }
   };
 
-  // Rollover copies from a *locked* source year into the currently-selected (active) target year.
-  // The "year" passed in is the target year card where the user clicked Rollover.
   const openRollover = (year: AcademicYear) => {
     setRolloverSourceYear(null);
     setTargetYearId(null);
-    setCarryForward({
-      teacherAssignments: false,
-      timetableSlots: false,
-      leaveSettings: true,
-    });
+    setCarryForward({ teacherAssignments: false, timetableSlots: false, leaveSettings: true });
+    setRolloverChecks({ exams: false, results: false, promotion: false });
     setTargetYearId(year.id);
     rolloverHandlers.open();
   };
@@ -860,18 +859,100 @@ function AcademicYearsTabContent() {
         isSubmitting={createMutation.isPending}
       />
 
+      {/* Lock Danger-Zone Modal */}
+      <Modal
+        opened={lockModalOpened}
+        onClose={lockModalHandlers.close}
+        title={
+          <Group gap="xs">
+            <ThemeIcon color="red" variant="light" size="sm">
+              <IconAlertTriangle size={14} />
+            </ThemeIcon>
+            <Text fw={600} c="red">{tSettings('academicYearLockDangerTitle')}</Text>
+          </Group>
+        }
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm">{tSettings('academicYearLockDangerIntro')}</Text>
+          <Paper withBorder p="md" style={{ borderColor: 'var(--mantine-color-red-3)' }}>
+            <Stack gap="sm">
+              <Checkbox
+                id="settings-lock-check-exams"
+                label={tSettings('academicYearLockCheck1')}
+                checked={lockChecks.exams}
+                onChange={(e) => { const v = e.currentTarget.checked; setLockChecks((p) => ({ ...p, exams: v })); }}
+              />
+              <Checkbox
+                id="settings-lock-check-results"
+                label={tSettings('academicYearLockCheck2')}
+                checked={lockChecks.results}
+                onChange={(e) => { const v = e.currentTarget.checked; setLockChecks((p) => ({ ...p, results: v })); }}
+              />
+              <Checkbox
+                id="settings-lock-check-promotion"
+                label={tSettings('academicYearLockCheck3')}
+                checked={lockChecks.promotion}
+                onChange={(e) => { const v = e.currentTarget.checked; setLockChecks((p) => ({ ...p, promotion: v })); }}
+              />
+            </Stack>
+          </Paper>
+          <Alert color="red" icon={<IconAlertTriangle size={16} />}>
+            <Text size="sm">{tSettings('academicYearLockDangerWarning')}</Text>
+          </Alert>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={lockModalHandlers.close}>{tCommon('cancel')}</Button>
+            <Button
+              id="settings-lock-confirm-button"
+              color="red"
+              disabled={!lockChecks.exams || !lockChecks.results || !lockChecks.promotion}
+              loading={!!(lockTargetYear && lockingYearId === lockTargetYear.id)}
+              onClick={confirmLock}
+            >
+              {tSettings('academicYearLockConfirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Rollover Danger-Zone Modal */}
       <Modal
         opened={rolloverOpened}
         onClose={rolloverHandlers.close}
-        title="Rollover to new academic year"
+        title={
+          <Group gap="xs">
+            <ThemeIcon color="orange" variant="light" size="sm">
+              <IconAlertTriangle size={14} />
+            </ThemeIcon>
+            <Text fw={600} c="orange">{tSettings('academicYearRolloverDangerTitle')}</Text>
+          </Group>
+        }
         size="lg"
       >
         <Stack gap="md">
-          <Text size="sm">
-            Copy setup from a locked academic year into your current (active) academic year.
-            This will be blocked if Promotion is incomplete for the selected source year.
-          </Text>
-
+          <Text size="sm">{tSettings('academicYearRolloverDangerIntro')}</Text>
+          <Paper withBorder p="md" style={{ borderColor: 'var(--mantine-color-orange-3)' }}>
+            <Stack gap="sm">
+              <Checkbox
+                id="settings-rollover-check-exams"
+                label={tSettings('academicYearRolloverCheck1')}
+                checked={rolloverChecks.exams}
+                onChange={(e) => { const v = e.currentTarget.checked; setRolloverChecks((p) => ({ ...p, exams: v })); }}
+              />
+              <Checkbox
+                id="settings-rollover-check-results"
+                label={tSettings('academicYearRolloverCheck2')}
+                checked={rolloverChecks.results}
+                onChange={(e) => { const v = e.currentTarget.checked; setRolloverChecks((p) => ({ ...p, results: v })); }}
+              />
+              <Checkbox
+                id="settings-rollover-check-promotion"
+                label={tSettings('academicYearRolloverCheck3')}
+                checked={rolloverChecks.promotion}
+                onChange={(e) => { const v = e.currentTarget.checked; setRolloverChecks((p) => ({ ...p, promotion: v })); }}
+              />
+            </Stack>
+          </Paper>
           <Select
             label="Source academic year (locked)"
             data={(listQuery.data?.data ?? [])
@@ -885,7 +966,6 @@ function AcademicYearsTabContent() {
             placeholder="Select locked source year"
             searchable
           />
-
           <Paper withBorder p="md">
             <Stack gap="xs">
               <Checkbox
@@ -905,15 +985,17 @@ function AcademicYearsTabContent() {
               />
             </Stack>
           </Paper>
-
+          <Alert color="orange" icon={<IconAlertTriangle size={16} />}>
+            <Text size="sm">{tSettings('academicYearRolloverDangerWarning')}</Text>
+          </Alert>
           <Group justify="flex-end">
-            <Button variant="default" onClick={rolloverHandlers.close}>
-              {tCommon('cancel')}
-            </Button>
+            <Button variant="default" onClick={rolloverHandlers.close}>{tCommon('cancel')}</Button>
             <Button
+              id="settings-rollover-confirm-button"
+              color="orange"
               onClick={handleRollover}
               loading={rolloverMutation.isPending}
-              disabled={!targetYearId || !rolloverSourceYear}
+              disabled={!targetYearId || !rolloverSourceYear || !rolloverChecks.exams || !rolloverChecks.results || !rolloverChecks.promotion}
             >
               Run rollover
             </Button>
@@ -1553,12 +1635,13 @@ function ScheduleTabContent() {
 function GeneralTabContent() {
   const activeYearQuery = useActiveAcademicYear();
   const activeYearId = activeYearQuery.data?.data?.id;
+  const { data: features } = useSubscriptionFeatures();
 
   return (
     <Stack gap="xl">
       <LeaveQuotaSetting academicYearId={activeYearId} />
-      <LibraryCategoryEditor />
-      <BehaviorSettings />
+      {features?.hasLibraryManagement ? <LibraryCategoryEditor /> : null}
+      {features?.hasBehavioralTracking ? <BehaviorSettings /> : null}
     </Stack>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * Server-side HTML for result report PDFs (Puppeteer).
- * Markup matches `resultmoduleredsign/htmldesignfilesofreports/*.html` class names
- * so extracted <style> blocks from those files apply correctly.
+ * Markup class names match the built-in Minimal/Modern CSS in `pdf-template-styles.ts`
+ * (optional overlay: `resultmoduleredsign/htmldesignfilesofreports/*.html` if present).
  */
 
 import { existsSync, readFileSync } from 'fs';
@@ -11,6 +11,7 @@ import type { ResultType } from './dto/result-type.enum';
 import type { DetailedStudentResultDto } from './dto/detailed-student-result.dto';
 import type { StudentResultDto } from './dto/student-result.dto';
 import { PDF_PRINT_LAYOUT_CSS } from './pdf-theme';
+import { getBuiltInPdfTemplateStyles } from './pdf-template-styles';
 
 export function escapeHtmlPdf(text: string): string {
   const map: Record<string, string> = {
@@ -49,10 +50,12 @@ export function resolveDesignTemplatePath(fileName: string): string | null {
 
 export function readDesignTemplateStyleBlock(fileName: string): string | null {
   const p = resolveDesignTemplatePath(fileName);
-  if (!p) return null;
-  const template = readFileSync(p, 'utf-8');
-  const styleMatch = template.match(/<style>([\s\S]*?)<\/style>/i);
-  return styleMatch ? styleMatch[1] : null;
+  if (p) {
+    const template = readFileSync(p, 'utf-8');
+    const styleMatch = template.match(/<style>([\s\S]*?)<\/style>/i);
+    if (styleMatch?.[1]) return styleMatch[1];
+  }
+  return getBuiltInPdfTemplateStyles(fileName);
 }
 
 export function composeDesignPdfHtml(

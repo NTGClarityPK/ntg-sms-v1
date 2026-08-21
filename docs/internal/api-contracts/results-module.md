@@ -61,7 +61,7 @@ Existing shapes; comment patch forbidden when published.
 
 ### `GET` / `PUT /api/v1/results/report-settings`
 
-Branch-scoped PDF defaults (`pdfVariant`, `progress_max_assessments`, `progress_window_days`). **Roles:** school admin, super admin, or principal only.
+Branch-scoped PDF defaults (`pdfVariant`). **GET** is available to any authenticated branch user (so Results / My Child can default the layout toggle). **PUT:** school admin or principal only.
 
 ### `GET /api/v1/results/cards/:resultCardId/deliveries`
 
@@ -73,10 +73,6 @@ Body: `deliveryMethod` (`email` \| `sms` \| `portal_download` \| `printed`), opt
 
 - **Letter grades:** `class_grade_assignments` + `grade_ranges` (same path as portal / `getLetterGradeRanges`).
 - **Attendance / behaviour on PDFs:** reuse existing attendance and behavioural services as described in the implementation plan (no duplicate grading tables).
-
-## Progress report defaults
-
-Server-side snapshot selection for `progress_report` follows configured **`progress_max_assessments`** and **`progress_window_days`** on `result_report_settings` when implemented in generation logic; defaults remain as product defaults until overridden per branch.
 
 ## Parent portal vs delivery
 

@@ -6,7 +6,7 @@ Browse and download school resource files (PDF, Word, text).
 
 **Path:** Sidebar → **Library**
 
-Requires plan feature **Library management** (**Pro** and **Enterprise**). Free/Starter schools do not get this module.
+Requires plan feature **Library management** (**Pro** and **Enterprise**). Free/Starter schools do not get this module. The sidebar still shows **Library** (disabled, with an upgrade tooltip). Library categories are omitted from **Settings → General**.
 
 Default access: many teaching and parent/student roles can **view**; admin assistant typically **edit**. School admin is privileged.
 
@@ -48,6 +48,6 @@ There is **no** Library detail page and **no** Save for offline action in the cu
 
 ## 🆘 Troubleshooting
 
-**Library missing from the menu:** Plan may not include Library management, or your role has no access.
+**Library missing from the menu:** If the item is greyed out, your plan does not include Library management. If it is not listed at all, your role has no access.
 
 **Upload rejected:** Check type and size (PDF/DOC/DOCX/TXT, ≤ 20 MB) and edit permission.

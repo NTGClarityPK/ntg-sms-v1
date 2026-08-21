@@ -74,6 +74,14 @@ Important behaviour (**two steps — not “only on lock”**):
 
 From **Settings → Academic Years** (tab inside `/settings`), the admin clicks **Lock** on the active year.
 
+**Danger-zone checklist:** Before the lock can be confirmed, the admin must tick all three pre-conditions in the confirmation modal:
+
+1. All final examinations have been completed
+2. All results and grades have been entered and published
+3. Promotion & Placement decisions have been finalised for all active students
+
+The **Lock year** button stays disabled until every checkbox is ticked. This is a soft gate — the admin self-certifies readiness — designed to prevent accidental early locking while still allowing flexibility for edge cases.
+
 Lock rules:
 
 - Lock is **blocked** if Promotion is incomplete (missing decisions for active students).
@@ -97,6 +105,10 @@ Once the new year is active:
 If the school wants to reuse setup, the admin can run **Rollover** from the active year:
 
 - Click **Rollover** on the active academic year.
+- A **danger-zone confirmation modal** opens. Tick all three pre-conditions before the source year selector appears:
+  1. All final examinations have been completed
+  2. All results and grades have been entered and published
+  3. Promotion & Placement decisions have been finalised for all active students
 - Choose **Source academic year (locked)** to copy from.
 - Select what to copy (recommended):
   - leave settings
@@ -367,21 +379,32 @@ This section is written so QA can test the full feature set delivered in this ch
 - If QA tries to Save with any **Promoted/Repeated** student missing target class/section, Save is blocked with a clear error message.
 - After saving Promotion decisions, the **Students** list and class rosters should reflect the updated placement immediately.
 
-### B) Readiness gate (blocking lock/rollover until grading is complete)
+### B) Readiness gate (danger-zone checklist + backend block)
+
+#### Danger-zone checklist (UI soft gate)
+
+1. Go to **Settings → Academic Years**.
+2. Click **Lock** on the active academic year.
+3. The danger-zone modal opens with three checkboxes and a red warning.
+4. Try to click **Lock year** without ticking any checkbox.
+
+**Expected:** Button is disabled until all three checkboxes are ticked.
+
+5. Tick all three checkboxes.
+
+**Expected:** **Lock year** button becomes enabled (red).
+
+#### Backend hard gate (incomplete Promotion)
 
 1. Ensure at least **one active student** has **no Promotion & Placement decision**.
-2. Go to **Settings → Academic Years**.
-3. Try to **Lock** the active academic year.
+2. Tick all three checkboxes in the Lock modal and click **Lock year**.
 
-#### Expected results
+**Expected:** Lock is **blocked** by the backend. Error message clearly indicates that some students are still missing Promotion & Placement decisions.
 
-- Lock is **blocked**.
-- Error message clearly indicates that some students are still missing Promotion & Placement decisions.
+3. Return to **Promotion**, complete decisions for **all active students** (Promoted/Repeated must have target class/section).
+4. Repeat the Lock modal flow (tick all three checkboxes, confirm).
 
-1. Return to **Promotion**, complete decisions for **all active students** (Promoted/Repeated must have target class/section).
-2. Try **Lock** again.
-
-#### Expected results (after completing Promotion)
+**Expected (after completing Promotion):**
 
 - Lock succeeds.
 - On success, the system automatically **activates the next available (inactive) academic year**.
@@ -394,12 +417,13 @@ This section is written so QA can test the full feature set delivered in this ch
    - An **active** academic year (target year you are working in)
    - A **locked** academic year (source year you will copy from)
 3. Click **Rollover** on the active year card.
-4. Choose a **Source academic year (locked)**.
-5. Toggle carry-forward options (recommended tests):
+4. The danger-zone modal opens. Tick all three pre-condition checkboxes (examinations complete, results published, promotion finalised). The **Run rollover** button stays disabled until all are ticked.
+5. Choose a **Source academic year (locked)**.
+6. Toggle carry-forward options (recommended tests):
    - **Copy leave settings**: ON
    - (Optional) **Copy teacher assignments**: ON
    - (Optional) **Copy timetable slots**: ON
-6. Click **Run rollover**.
+7. Click **Run rollover**.
 
 #### Expected results (rollover)
 

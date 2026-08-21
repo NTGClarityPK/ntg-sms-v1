@@ -15,6 +15,9 @@ interface MatrixCellProps {
   onCreate: (input: CreateTeacherAssignmentInput) => Promise<TeacherAssignment>;
   onDelete: (id: string) => Promise<void>;
   showNameTooltip?: boolean;
+  /** When false, assigning is blocked (subject not on this class's curriculum templates). */
+  canAssign?: boolean;
+  disabledReason?: string;
 }
 
 function AssignMenuContent({
@@ -119,6 +122,8 @@ export function MatrixCell({
   onCreate,
   onDelete,
   showNameTooltip,
+  canAssign = true,
+  disabledReason,
 }: MatrixCellProps) {
   const t = useTranslations('teacher');
   const [assignMenuOpened, setAssignMenuOpened] = useState(false);
@@ -178,8 +183,24 @@ export function MatrixCell({
     </Menu.Dropdown>
   );
 
-  // Empty slot: small green "+" icon only
+  // Empty slot: small green "+" icon only (or disabled when subject not applicable)
   if (assignments.length === 0) {
+    if (!canAssign) {
+      return (
+        <Tooltip label={disabledReason || t('subjectNotOnClassCurriculum')} withArrow>
+          <Button
+            variant="light"
+            size="xs"
+            px={6}
+            disabled
+            data-matrix-assign-button
+            aria-label={disabledReason || t('subjectNotOnClassCurriculum')}
+          >
+            <IconPlus size={14} />
+          </Button>
+        </Tooltip>
+      );
+    }
     return (
       <Menu
         opened={assignMenuOpened}
@@ -211,27 +232,43 @@ export function MatrixCell({
   return (
     <Stack gap={4} align="flex-start">
       <Group gap={4} wrap="nowrap" align="center">
-        <Menu
-          opened={assignMenuOpened}
-          onChange={setAssignMenuOpened}
-          withinPortal
-          zIndex={4000}
-        >
-          <Menu.Target>
-            <Tooltip label={t('assignTeacher')} withArrow>
-              <Button
-                variant="light"
-                size="xs"
-                px={6}
-                style={{ minWidth: 28 }}
-                data-matrix-assign-button
-              >
-                <IconPlus size={14} />
-              </Button>
-            </Tooltip>
-          </Menu.Target>
-          {assignMenuDropdown}
-        </Menu>
+        {canAssign ? (
+          <Menu
+            opened={assignMenuOpened}
+            onChange={setAssignMenuOpened}
+            withinPortal
+            zIndex={4000}
+          >
+            <Menu.Target>
+              <Tooltip label={t('assignTeacher')} withArrow>
+                <Button
+                  variant="light"
+                  size="xs"
+                  px={6}
+                  style={{ minWidth: 28 }}
+                  data-matrix-assign-button
+                >
+                  <IconPlus size={14} />
+                </Button>
+              </Tooltip>
+            </Menu.Target>
+            {assignMenuDropdown}
+          </Menu>
+        ) : (
+          <Tooltip label={disabledReason || t('subjectNotOnClassCurriculum')} withArrow>
+            <Button
+              variant="light"
+              size="xs"
+              px={6}
+              style={{ minWidth: 28 }}
+              disabled
+              data-matrix-assign-button
+              aria-label={disabledReason || t('subjectNotOnClassCurriculum')}
+            >
+              <IconPlus size={14} />
+            </Button>
+          </Tooltip>
+        )}
         <TeacherBadge
           assignment={firstTeacher}
           onUnassign={onDelete}

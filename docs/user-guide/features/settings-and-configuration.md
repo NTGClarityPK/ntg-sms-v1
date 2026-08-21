@@ -16,15 +16,15 @@ Settings uses **two rows of tabs**:
 | Category | Sections you will see |
 | --- | --- |
 | **School setup** | **Business Info**, **Communication**, **General** |
-| **Academic** | **Academic**, **Schedule**, **Result reports** * |
-| **Operations** | **Inventory**, **Integrations**, **Data export** * |
-| **Finance** | **Fee settings** |
+| **Academic** | **Academic**, **Schedule** |
+| **Operations** | **Inventory** \*\*, **Integrations**, **Data export** * |
+| **Finance** | **Fee settings** \*\* |
 | **Appearance** | **Theme**, **Stats** * |
 | **Access control** | **Permissions** |
 
-\* **Result reports** — school admin or principal only (not tied to your subscription plan).  
 \* **Data export** — school admin only. See [💾 Data Export](data-export.md).  
-\* **Stats** — school admin only (password and link for public statistics).
+\* **Stats** — school admin only (password and link for public statistics).  
+\*\* **Inventory** and **Fee settings** only appear when those modules are on your plan. Library categories and behavioural assessment under **General** are also omitted when not on the plan.
 
 Certificate branding (logos and layout for certificates) lives on [🏆 Certificates](certificates.md) → **Settings**, not under this Settings menu.
 
@@ -80,8 +80,8 @@ This is **not** where you create classes or subjects — those sit under **Acade
 | Block | What it is for |
 | --- | --- |
 | Leave quota | How many school days of leave apply for [🌴 Leaves](leaves.md) |
-| Library categories | Categories used by [📚 Library](library.md) |
-| Behavioural assessment | Turn scoring on or off, choose star-based or framework-based rating, and manage attributes or framework categories — see [⭐ Behavioural](behavioural.md) |
+| Library categories | Shown only when your plan includes library management. Categories used by [📚 Library](library.md) |
+| Behavioural assessment | Shown only when your plan includes behavioural tracking. Turn scoring on or off, choose star-based or framework-based rating, and manage attributes or framework categories — see [⭐ Behavioural](behavioural.md) |
 
 ---
 
@@ -186,15 +186,9 @@ A class can belong to **only one** timing template at a time — classes already
 
 ---
 
-## 📄 Result reports
-
-Default PDF style (Minimal / Modern) and progress-report window settings. Used by [🥇 Results](results.md).
-
----
-
 ## 📦 Inventory
 
-Uniform and inventory categories and sizes for [👕 Inventory (Uniforms)](inventory-uniforms.md).
+Shown only when your plan includes inventory management. Uniform and inventory categories and sizes for [👕 Inventory (Uniforms)](inventory-uniforms.md).
 
 ---
 
@@ -206,7 +200,7 @@ Google Classroom and **Rubrics** presets — see [🏫 Google Classroom](google-
 
 ## 💵 Fee settings
 
-Challan appearance and fee templates — see [💵 Fee Management](fee-management.md).
+Shown only when your plan includes fee management. Challan appearance and fee templates — see [💵 Fee Management](fee-management.md).
 
 ---
 
@@ -260,7 +254,7 @@ See [👥 User Roles](user-roles.md).
 
 ## 🆘 Troubleshooting
 
-**A Settings section is missing:** Check your role. Result reports, Stats, and Data export are restricted.
+**A Settings section is missing:** Check your role. Stats and Data export are restricted. Fee settings, Inventory, library categories, and behavioural assessment only appear when they are included in your plan.
 
 **I cannot find Classes under General:** Open **Academic** → Academic Settings → **Classes**.
 

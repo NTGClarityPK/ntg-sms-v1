@@ -11,7 +11,7 @@ Short guide for configuring fee templates, generating challans, and verifying pa
 | School admin / Principal | **Settings → Fee settings** | Bank details, templates, challan style |
 | School admin / Principal | **Fee reports** (`/reports/fees`) | Collected / pending / under review / overdue, defaulters |
 
-Fee Management requires the school plan feature **Fee management** (Starter and above; not on Free).
+Fee Management requires the school plan feature **Fee management** (Starter and above; not on Free). On plans without it, **Fees** stays visible in the sidebar but is disabled; hovering shows an upgrade message. **Settings → Fee settings** is hidden.
 
 There is **no “Mark as Paid”** button. Payments move through **proof upload → Review → Verify or Reject**.
 

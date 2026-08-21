@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Checkbox, Group, Paper, Stack, Switch, Text, TextInput } from '@mantine/core';
+import { Alert, Button, Checkbox, Group, Paper, Skeleton, Stack, Switch, Text, TextInput } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { useEffect, useMemo, useState } from 'react';
 import { notifications } from '@mantine/notifications';
@@ -283,13 +283,11 @@ export function BehaviorSettings({ showHeader = true }: { showHeader?: boolean }
 
   if (!value || configQuery.isLoading) {
     return (
-      <Paper withBorder p="md">
-        <Group justify="center" py="md">
-          <Text size="sm" c="dimmed">
-            {tSettings('behaviorLoading')}
-          </Text>
-        </Group>
-      </Paper>
+      <Stack gap="md">
+        <Skeleton height={120} radius="md" />
+        <Skeleton height={80} radius="md" />
+        <Skeleton height={200} radius="md" />
+      </Stack>
     );
   }
 

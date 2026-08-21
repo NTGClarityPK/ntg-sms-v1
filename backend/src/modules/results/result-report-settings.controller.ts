@@ -27,9 +27,7 @@ export class ResultReportSettingsController {
   @Get()
   async get(
     @CurrentBranch() branch: CurrentBranchContext,
-    @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: ResultReportSettingsDto }> {
-    this.ensureResultsSettingsAdmin(user);
     return this.settingsService.get(branch.branchId);
   }
 

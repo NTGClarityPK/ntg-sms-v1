@@ -11,6 +11,7 @@ import { QueryTeacherAssignmentsDto } from './dto/query-teacher-assignments.dto'
 import { CreateTeacherAssignmentDto } from './dto/create-teacher-assignment.dto';
 import { UpdateTeacherAssignmentDto } from './dto/update-teacher-assignment.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
+import { SubjectTemplatesService } from '../subject-templates/subject-templates.service';
 
 type TeacherAssignmentRow = {
   id: string;
@@ -46,6 +47,7 @@ export class TeacherAssignmentsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly subjectTemplatesService: SubjectTemplatesService,
   ) {}
 
   async listTeacherAssignments(
@@ -245,7 +247,7 @@ export class TeacherAssignmentsService {
 
     const { data: classSectionData, error: classSectionError } = await supabase
       .from('class_sections')
-      .select('id')
+      .select('id, class_id')
       .eq('id', input.classSectionId)
       .eq('branch_id', branchId)
       .maybeSingle();
@@ -253,6 +255,12 @@ export class TeacherAssignmentsService {
     if (!classSectionData) {
       throw new NotFoundException('Class section not found or does not belong to this branch');
     }
+
+    await this.assertSubjectApplicableToClass(
+      (classSectionData as { class_id: string }).class_id,
+      input.subjectId,
+      branchId,
+    );
 
     // Check if this specific teacher is already assigned (unique constraint includes staff_id)
     const { data: existing, error: existingError } = await supabase
@@ -428,6 +436,50 @@ export class TeacherAssignmentsService {
     }
 
     return teacherMap;
+  }
+
+  private async assertSubjectApplicableToClass(
+    classId: string,
+    subjectId: string,
+    branchId: string,
+  ): Promise<void> {
+    const { data: templatesForClass } = await this.subjectTemplatesService.getTemplatesForClass(
+      classId,
+      branchId,
+    );
+
+    if (templatesForClass.length > 0) {
+      const allowed = templatesForClass.some((t) => t.subjectIds.includes(subjectId));
+      if (!allowed) {
+        throw new BadRequestException(
+          'This subject is not part of the curriculum templates assigned to this class',
+        );
+      }
+      return;
+    }
+
+    // Class has no templates: block subjects that belong to any branch template.
+    const supabase = this.supabaseConfig.getClient();
+    const { data: branchTemplates, error: templatesError } = await supabase
+      .from('subject_templates')
+      .select('id')
+      .eq('branch_id', branchId);
+    throwIfDbError(templatesError);
+    const templateIds = ((branchTemplates as { id: string }[]) ?? []).map((t) => t.id);
+    if (templateIds.length === 0) return;
+
+    const { data: links, error: linksError } = await supabase
+      .from('subject_template_subjects')
+      .select('subject_id')
+      .eq('subject_id', subjectId)
+      .in('subject_template_id', templateIds)
+      .limit(1);
+    throwIfDbError(linksError);
+    if ((links ?? []).length > 0) {
+      throw new BadRequestException(
+        'This subject is not part of the curriculum templates assigned to this class',
+      );
+    }
   }
 
   private async getClassSectionDetails(

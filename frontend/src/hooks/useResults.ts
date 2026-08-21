@@ -219,8 +219,6 @@ export function useUpsertResultReportSettings() {
   return useMutation({
     mutationFn: async (input: {
       pdfVariant?: 'minimal' | 'modern';
-      progressMaxAssessments?: number;
-      progressWindowDays?: number;
     }) => {
       const response = await apiClient.put<ResultReportSettings>(
         '/api/v1/results/report-settings',

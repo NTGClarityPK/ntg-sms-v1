@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   alpha,
@@ -38,6 +38,8 @@ interface FlyoutNavLinkProps {
   hoverFg: string;
   navActiveBackground?: string;
   navActiveTextColor?: string;
+  planLocked?: boolean;
+  lockedTooltip?: string;
   onPick: () => void;
 }
 
@@ -51,38 +53,46 @@ function FlyoutNavLink({
   hoverFg,
   navActiveBackground,
   navActiveTextColor,
+  planLocked = false,
+  lockedTooltip,
   onPick,
 }: FlyoutNavLinkProps) {
   const theme = useMantineTheme();
   const [hovered, setHovered] = useState(false);
 
-  const backgroundColor = active
+  const backgroundColor = active && !planLocked
     ? navActiveBackground ?? 'transparent'
-    : hovered
+    : hovered && !planLocked
       ? hoverBg
       : 'transparent';
 
-  const color = active
+  const color = active && !planLocked
     ? navActiveTextColor ?? defaultFg
-    : hovered
+    : hovered && !planLocked
       ? hoverFg
       : defaultFg;
 
-  return (
+  const button = (
     <UnstyledButton
       id={`flyout-nav-${item.href.slice(1).replace(/\//g, '-')}`}
       type="button"
       className="nav-item-button"
-      data-active={active}
+      data-active={active && !planLocked}
       data-collapsed={false}
-      aria-current={active ? 'page' : undefined}
-      onClick={onPick}
+      disabled={planLocked}
+      aria-current={active && !planLocked ? 'page' : undefined}
+      onClick={() => {
+        if (planLocked) return;
+        onPick();
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
         backgroundColor,
         color,
-        fontWeight: active ? 600 : 400,
+        fontWeight: active && !planLocked ? 600 : 400,
+        opacity: planLocked ? 0.55 : 1,
+        width: '100%',
       }}
       styles={{
         root: {
@@ -104,6 +114,16 @@ function FlyoutNavLink({
       </Box>
     </UnstyledButton>
   );
+
+  if (planLocked && lockedTooltip) {
+    return (
+      <Tooltip label={lockedTooltip} position="right" withArrow>
+        <Box style={{ width: '100%' }}>{button}</Box>
+      </Tooltip>
+    );
+  }
+
+  return button;
 }
 
 /** Light navbar + white icon colour made inactive group icons invisible; flyout used dark[6] in all schemes. */
@@ -172,6 +192,7 @@ export function CollapsedNavGroupPopover({
   const router = useRouter();
   const pathname = usePathname();
   const isRtl = useLocale() === 'ar';
+  const tNav = useTranslations('navigation');
 
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -364,7 +385,10 @@ export function CollapsedNavGroupPopover({
                 hoverFg={hoverFg}
                 navActiveBackground={navActiveBackground}
                 navActiveTextColor={navActiveTextColor}
+                planLocked={item.planLocked}
+                lockedTooltip={tNav('planLockedTooltip')}
                 onPick={() => {
+                  if (item.planLocked) return;
                   router.push(item.href);
                   onOpenChange(false);
                   onNavigate?.();

@@ -2,17 +2,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import type { PublicHoliday, TimingTemplate, Vacation } from '@/types/settings';
 
+function currentBranchId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('currentBranchId');
+}
+
 const scheduleKeys = {
-  schoolDays: ['schedule', 'schoolDays'] as const,
-  timingTemplates: ['schedule', 'timingTemplates'] as const,
+  schoolDays: (branchId: string | null) => ['schedule', 'schoolDays', branchId] as const,
+  timingTemplates: (branchId: string | null) => ['schedule', 'timingTemplates', branchId] as const,
   holidays: (academicYearId: string) => ['schedule', 'holidays', academicYearId] as const,
   vacations: (academicYearId: string) => ['schedule', 'vacations', academicYearId] as const,
 };
 
 export function useSchoolDays() {
+  const branchId = currentBranchId();
   return useQuery({
-    queryKey: scheduleKeys.schoolDays,
+    queryKey: scheduleKeys.schoolDays(branchId),
     queryFn: async () => apiClient.get<number[]>('/api/v1/settings/school-days'),
+    enabled: !!branchId,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -23,16 +30,18 @@ export function useUpdateSchoolDays() {
     mutationFn: async (activeDays: number[]) =>
       apiClient.put<number[]>('/api/v1/settings/school-days', { activeDays }),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: scheduleKeys.schoolDays });
+      await qc.invalidateQueries({ queryKey: ['schedule', 'schoolDays'] });
     },
   });
 }
 
 export function useTimingTemplates() {
+  const branchId = currentBranchId();
   return useQuery({
-    queryKey: scheduleKeys.timingTemplates,
+    queryKey: scheduleKeys.timingTemplates(branchId),
     queryFn: async () =>
       apiClient.get<TimingTemplate[]>('/api/v1/timing-templates', { params: { page: 1, limit: 100 } }),
+    enabled: !!branchId,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -48,7 +57,7 @@ export function useCreateTimingTemplate() {
       slots?: Array<{ name: string; startTime?: string; endTime?: string; sortOrder?: number }>;
     }) => apiClient.post<TimingTemplate>('/api/v1/timing-templates', payload),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: scheduleKeys.timingTemplates });
+      await qc.invalidateQueries({ queryKey: ['schedule', 'timingTemplates'] });
     },
   });
 }
@@ -59,7 +68,7 @@ export function useAssignClassesToTimingTemplate() {
     mutationFn: async (payload: { templateId: string; classIds: string[] }) =>
       apiClient.put<string[]>(`/api/v1/timing-templates/${payload.templateId}/assign-classes`, { classIds: payload.classIds }),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: scheduleKeys.timingTemplates });
+      await qc.invalidateQueries({ queryKey: ['schedule', 'timingTemplates'] });
     },
   });
 }

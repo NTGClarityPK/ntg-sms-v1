@@ -19,6 +19,8 @@ Billing cycle: **Monthly** or **Yearly** (yearly shows about **10%** saving on t
 
 Certificates are **not** hidden by subscription plan entitlements.
 
+Modules that are not on the current plan (for example Fees on **Free**, or Library / Inventory / Behavioural on **Free** and **Starter**) still appear in the **sidebar** for roles that would normally see them, but they are **disabled**. Hover shows **Upgrade your plan to access this feature**. Matching Settings sections are **hidden**, not shown as an upgrade banner.
+
 ---
 
 ## 📦 What the page shows

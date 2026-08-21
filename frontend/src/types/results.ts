@@ -60,8 +60,6 @@ export interface ResultReportSettings {
   id: string;
   branchId: string;
   pdfVariant: 'minimal' | 'modern';
-  progressMaxAssessments?: number | null;
-  progressWindowDays?: number | null;
   createdAt: string;
   updatedAt: string;
 }

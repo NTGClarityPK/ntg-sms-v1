@@ -921,7 +921,7 @@ export class LeaveRequestsService {
     const totalQuota =
       quotaRow && typeof quotaRow.annual_quota === 'number' ? quotaRow.annual_quota : 0;
 
-    const { data: activeSchoolDays } = await this.scheduleService.getSchoolDays();
+    const { data: activeSchoolDays } = await this.scheduleService.getSchoolDays(branchId);
     const activeDaySet = activeSchoolDays ?? [];
 
     const [holidaysRes, vacationsRes] = await Promise.all([

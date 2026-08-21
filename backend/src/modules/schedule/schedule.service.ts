@@ -126,11 +126,12 @@ export class ScheduleService {
     private readonly supabaseConfig: SupabaseConfig,
   ) {}
 
-  async getSchoolDays(): Promise<{ data: number[] }> {
+  async getSchoolDays(branchId: string): Promise<{ data: number[] }> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('school_days')
       .select('day_of_week,is_active')
+      .eq('branch_id', branchId)
       .eq('is_active', true)
       .order('day_of_week', { ascending: true });
     throwIfDbError(error);
@@ -139,7 +140,11 @@ export class ScheduleService {
     return { data: activeDays };
   }
 
-  async updateSchoolDays(activeDays: number[]): Promise<{ data: number[] }> {
+  async updateSchoolDays(
+    activeDays: number[],
+    branchId: string,
+    tenantId: string | null,
+  ): Promise<{ data: number[] }> {
     const unique = Array.from(new Set(activeDays)).sort((a, b) => a - b);
     if (unique.some((d) => d < 0 || d > 6)) {
       throw new BadRequestException('activeDays must be between 0 and 6');
@@ -147,27 +152,43 @@ export class ScheduleService {
 
     const supabase = this.supabaseConfig.getClient();
 
-    // Soft approach: ensure rows exist for all 0..6, then update is_active
+    // Soft approach: ensure rows exist for all 0..6 for this branch, then update is_active
     const allDays = [0, 1, 2, 3, 4, 5, 6];
 
     const { data: existingRows, error: existingError } = await supabase
       .from('school_days')
-      .select('day_of_week');
+      .select('day_of_week')
+      .eq('branch_id', branchId);
     throwIfDbError(existingError);
 
     const existing = new Set(((existingRows as Pick<SchoolDayRow, 'day_of_week'>[]) ?? []).map((r) => r.day_of_week));
-    const toInsert = allDays.filter((d) => !existing.has(d)).map((d) => ({ day_of_week: d, is_active: false }));
+    const toInsert = allDays
+      .filter((d) => !existing.has(d))
+      .map((d) => ({
+        day_of_week: d,
+        is_active: false,
+        branch_id: branchId,
+        tenant_id: tenantId,
+      }));
     if (toInsert.length > 0) {
       const { error: insertError } = await supabase.from('school_days').insert(toInsert);
       throwIfDbError(insertError);
     }
 
-    // Update all to inactive, then set selected to active
-    const { error: setInactiveError } = await supabase.from('school_days').update({ is_active: false }).in('day_of_week', allDays);
+    // Update all to inactive for this branch, then set selected to active
+    const { error: setInactiveError } = await supabase
+      .from('school_days')
+      .update({ is_active: false })
+      .eq('branch_id', branchId)
+      .in('day_of_week', allDays);
     throwIfDbError(setInactiveError);
 
     if (unique.length > 0) {
-      const { error: setActiveError } = await supabase.from('school_days').update({ is_active: true }).in('day_of_week', unique);
+      const { error: setActiveError } = await supabase
+        .from('school_days')
+        .update({ is_active: true })
+        .eq('branch_id', branchId)
+        .in('day_of_week', unique);
       throwIfDbError(setActiveError);
     }
 

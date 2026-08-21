@@ -75,6 +75,7 @@ export default function ResultsPage() {
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [downloadPdfVariant, setDownloadPdfVariant] = useState<'minimal' | 'modern'>('modern');
+  const [pdfVariantHydrated, setPdfVariantHydrated] = useState(false);
   const [workflowHintDismissed, setWorkflowHintDismissed] = useState(false);
 
   const t = useTranslations('results');
@@ -137,9 +138,13 @@ export default function ResultsPage() {
   }, [classSectionId, classSectionsQuery.data]);
 
   useEffect(() => {
+    if (pdfVariantHydrated) return;
     const v = resultReportSettingsQuery.data?.pdfVariant;
-    if (v === 'minimal' || v === 'modern') setDownloadPdfVariant(v);
-  }, [resultReportSettingsQuery.data?.pdfVariant]);
+    if (v === 'minimal' || v === 'modern') {
+      setDownloadPdfVariant(v);
+      setPdfVariantHydrated(true);
+    }
+  }, [pdfVariantHydrated, resultReportSettingsQuery.data?.pdfVariant]);
 
   const visibleClassSections = (classSectionsQuery.data?.data as ClassSection[] | undefined) ?? [];
   const classOptions = visibleClassSections
@@ -482,6 +487,7 @@ export default function ResultsPage() {
                     <Tooltip label={t('tooltipPdfLayoutChoice')} withArrow position="top">
                       <div>
                         <SegmentedControl
+                          id="results-pdf-layout"
                           value={downloadPdfVariant}
                           onChange={(v) => setDownloadPdfVariant(v as 'minimal' | 'modern')}
                           data={[

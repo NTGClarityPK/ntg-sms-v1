@@ -46,6 +46,7 @@ import { useUnreadCount } from '@/hooks/useNotifications';
 import { useConflicts } from '@/hooks/useTimetable';
 import { useAttendanceSummary } from '@/hooks/useReports';
 import { useUpcomingEventsConflictCount } from '@/hooks/api/useEvents';
+import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
 import { DashboardStatCard } from './DashboardStatCard';
 import type { User } from '@/types/auth';
 
@@ -75,12 +76,14 @@ interface AdminDashboardOverviewProps {
 export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
   const t = useTranslations('dashboard');
   const colors = useThemeColors();
+  const { data: planFeatures, isLoading: planFeaturesLoading } = useSubscriptionFeatures();
+  const hasInventoryManagement = planFeatures?.hasInventoryManagement === true;
   const studentsQuery = useStudents({ limit: 1, page: 1 });
   const staffQuery = useStaff({ limit: 1, page: 1 });
   const leavePendingQuery = useLeaveRequests({ status: 'pending', page: 1, limit: 1 });
   const earlyPendingQuery = useEarlyDepartures({ status: 'pending', page: 1, limit: 1 });
   const storageQuery = useStorageOverview();
-  const lowStockQuery = useLowStock();
+  const lowStockQuery = useLowStock(hasInventoryManagement);
   const { data: unreadCount = 0 } = useUnreadCount();
   const { data: conflictsResponse } = useConflicts();
   const upcomingConflictQuery = useUpcomingEventsConflictCount();
@@ -219,49 +222,50 @@ export function AdminDashboardOverview({ user }: AdminDashboardOverviewProps) {
           </Paper>
         </Grid.Col>
 
-        {/* Low stock alerts */}
-        <Grid.Col span={{ base: 12, md: 4 }}>
-          <Paper
-            component={Link}
-            href="/inventory"
-            id="dashboard-panel-low-stock"
-            p="md"
-            withBorder
-            h="100%"
-            styles={linkPaperStyles}
-          >
-            <Stack gap="md">
-              <Group gap="xs">
-                <IconAlertTriangle size={24} style={{ color: colors.primary }} />
-                <Title order={3}>{t('lowStockAlerts')}</Title>
-              </Group>
-              {lowStockQuery.isLoading ? (
-                <Skeleton height={200} />
-              ) : lowStockItems.length > 0 ? (
-                <Stack gap="xs">
-                  {lowStockItems.slice(0, 5).map((item) => {
-                    const totalQty =
-                      item.stock?.reduce((s, e) => s + (e?.quantity ?? 0), 0) ?? 0;
-                    return (
-                      <Card key={item.id} p="sm" withBorder>
-                        <Text fw={500} size="sm">
-                          {item.name}
-                        </Text>
-                        <Badge variant="light" color={colors.warning} size="sm" mt="xs">
-                          {t('stock')}: {totalQty}
-                        </Badge>
-                      </Card>
-                    );
-                  })}
-                </Stack>
-              ) : (
-                <Text c="dimmed" ta="center" py="xl" size="sm">
-                  {t('noLowStockAlerts')}
-                </Text>
-              )}
-            </Stack>
-          </Paper>
-        </Grid.Col>
+        {planFeaturesLoading || hasInventoryManagement ? (
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <Paper
+              component={Link}
+              href="/inventory"
+              id="dashboard-panel-low-stock"
+              p="md"
+              withBorder
+              h="100%"
+              styles={linkPaperStyles}
+            >
+              <Stack gap="md">
+                <Group gap="xs">
+                  <IconAlertTriangle size={24} style={{ color: colors.primary }} />
+                  <Title order={3}>{t('lowStockAlerts')}</Title>
+                </Group>
+                {planFeaturesLoading || lowStockQuery.isLoading ? (
+                  <Skeleton height={200} />
+                ) : lowStockItems.length > 0 ? (
+                  <Stack gap="xs">
+                    {lowStockItems.slice(0, 5).map((item) => {
+                      const totalQty =
+                        item.stock?.reduce((s, e) => s + (e?.quantity ?? 0), 0) ?? 0;
+                      return (
+                        <Card key={item.id} p="sm" withBorder>
+                          <Text fw={500} size="sm">
+                            {item.name}
+                          </Text>
+                          <Badge variant="light" color={colors.warning} size="sm" mt="xs">
+                            {t('stock')}: {totalQty}
+                          </Badge>
+                        </Card>
+                      );
+                    })}
+                  </Stack>
+                ) : (
+                  <Text c="dimmed" ta="center" py="xl" size="sm">
+                    {t('noLowStockAlerts')}
+                  </Text>
+                )}
+              </Stack>
+            </Paper>
+          </Grid.Col>
+        ) : null}
 
         {/* Upcoming events & conflicts */}
         <Grid.Col span={{ base: 12, md: 6 }}>

@@ -19,8 +19,16 @@ import { useTranslations } from 'next-intl';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
 import { MatrixCell } from './MatrixCell';
 import { useClassSections } from '@/hooks/useClassSections';
-import { useSubjects } from '@/hooks/useCoreLookups';
+import { useSubjects, useLevels } from '@/hooks/useCoreLookups';
 import { useCreateTeacherAssignment, useDeleteTeacherAssignment } from '@/hooks/useTeacherAssignments';
+import { useAuth } from '@/hooks/useAuth';
+import { useSubjectTemplates } from '@/hooks/useSubjectTemplates';
+import {
+  buildSubjectApplicabilityIndex,
+  isSubjectApplicableToClass,
+} from '@/lib/utils/subject-eligibility';
+import type { Level } from '@/types/settings';
+import type { SubjectTemplate } from '@/types/subject-templates';
 
 interface TeacherMappingMatrixProps {
   assignments: TeacherAssignment[];
@@ -28,12 +36,20 @@ interface TeacherMappingMatrixProps {
 
 export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps) {
   const t = useTranslations('teacher');
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id ?? null;
   // Fetch all class sections (no pagination) for proper sorting
   const { data: classSectionsData, isLoading: isLoadingClassSections } = useClassSections({
     limit: 500, // Maximum allowed limit - fetch all class sections
     minimal: true, // Skip student counts for performance
   });
   const { data: subjectsData, isLoading: isLoadingSubjects } = useSubjects();
+  const { data: levelsResponse, isLoading: isLoadingLevels } = useLevels();
+  const { data: templatesResponse, isLoading: isLoadingTemplates } = useSubjectTemplates(
+    branchId,
+    1,
+    100,
+  );
   const createAssignment = useCreateTeacherAssignment();
   const deleteAssignment = useDeleteTeacherAssignment();
 
@@ -45,6 +61,13 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
 
   const classSections = classSectionsData?.data || [];
   const subjects = subjectsData?.data || [];
+  const levels = (levelsResponse?.data ?? []) as Level[];
+  const templates = (templatesResponse?.data ?? []) as SubjectTemplate[];
+
+  const subjectApplicability = useMemo(
+    () => buildSubjectApplicabilityIndex(templates, levels),
+    [templates, levels],
+  );
 
   // Create a map of assignments by class-section and subject (supporting multiple teachers)
   const assignmentMap = useMemo(() => {
@@ -201,7 +224,14 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
   const subjectOptions = uniqueSubjects.map((s) => ({ value: s.id, label: s.name }));
 
   // Show skeleton while loading class sections or subjects
-  if (isLoadingClassSections || isLoadingSubjects || !classSectionsData || !subjectsData) {
+  if (
+    isLoadingClassSections ||
+    isLoadingSubjects ||
+    isLoadingLevels ||
+    isLoadingTemplates ||
+    !classSectionsData ||
+    !subjectsData
+  ) {
     return (
       <Paper p="md" withBorder>
         <Stack gap="md">
@@ -341,6 +371,11 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
                   {visibleSubjects.map((subject) => {
                     const key = `${classSection.id}-${subject.id}`;
                     const cellAssignments = assignmentMap.get(key) || [];
+                    const canAssign = isSubjectApplicableToClass(
+                      subjectApplicability,
+                      classSection.classId,
+                      subject.id,
+                    );
                     return (
                       <Table.Td key={subject.id} style={{ whiteSpace: 'nowrap', verticalAlign: 'top' }}>
                         <MatrixCell
@@ -348,6 +383,8 @@ export function TeacherMappingMatrix({ assignments }: TeacherMappingMatrixProps)
                           classSectionId={classSection.id}
                           subjectId={subject.id}
                           showNameTooltip={showTeacherNameTooltip}
+                          canAssign={canAssign}
+                          disabledReason={t('subjectNotOnClassCurriculum')}
                           onCreate={async (input) => {
                             const result = await createAssignment.mutateAsync(input);
                             return result.data;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Modal, Select, Button, Stack, Group } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
@@ -12,8 +12,16 @@ import {
 } from '@/hooks/useTeacherAssignments';
 import type { TeacherAssignment } from '@/types/teacher-assignments';
 import { useClassSections } from '@/hooks/useClassSections';
-import { useSubjects } from '@/hooks/useCoreLookups';
+import { useSubjects, useLevels } from '@/hooks/useCoreLookups';
 import { useStaff } from '@/hooks/useStaff';
+import { useAuth } from '@/hooks/useAuth';
+import { useSubjectTemplates } from '@/hooks/useSubjectTemplates';
+import {
+  buildSubjectApplicabilityIndex,
+  isSubjectApplicableToClass,
+} from '@/lib/utils/subject-eligibility';
+import type { Level } from '@/types/settings';
+import type { SubjectTemplate } from '@/types/subject-templates';
 
 const createAssignmentSchema = (t: (key: string) => string) =>
   z.object({
@@ -35,14 +43,24 @@ export function CreateAssignmentModal({
 }: CreateAssignmentModalProps) {
   const t = useTranslations('teacher');
   const isEdit = !!assignment;
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id ?? null;
   const createAssignment = useCreateTeacherAssignment();
   const updateAssignment = useUpdateTeacherAssignment();
   const { data: classSectionsData } = useClassSections();
   const { data: subjectsData } = useSubjects();
+  const { data: levelsResponse } = useLevels();
+  const { data: templatesResponse } = useSubjectTemplates(branchId, 1, 100);
   const { data: staffData } = useStaff();
 
   const classSections = classSectionsData?.data || [];
   const subjects = subjectsData?.data || [];
+  const levels = (levelsResponse?.data ?? []) as Level[];
+  const templates = (templatesResponse?.data ?? []) as SubjectTemplate[];
+  const subjectApplicability = useMemo(
+    () => buildSubjectApplicabilityIndex(templates, levels),
+    [templates, levels],
+  );
   const staffResponse = staffData as
     | {
         data?: Array<{
@@ -79,6 +97,28 @@ export function CreateAssignmentModal({
     }
   }, [assignment]);
 
+  // Clear subject when class-section changes and current subject is not applicable
+  useEffect(() => {
+    if (isEdit || !form.values.classSectionId || !form.values.subjectId) return;
+    const classSection = classSections.find((cs) => cs.id === form.values.classSectionId);
+    if (!classSection) return;
+    if (
+      !isSubjectApplicableToClass(
+        subjectApplicability,
+        classSection.classId,
+        form.values.subjectId,
+      )
+    ) {
+      form.setFieldValue('subjectId', '');
+    }
+  }, [
+    form.values.classSectionId,
+    form.values.subjectId,
+    classSections,
+    subjectApplicability,
+    isEdit,
+  ]);
+
   const handleSubmit = async (values: typeof form.values) => {
     if (isEdit) {
       await updateAssignment.mutateAsync({
@@ -103,10 +143,20 @@ export function CreateAssignmentModal({
     label: `${cs.classDisplayName || cs.className || t('unknown')} - ${cs.sectionName || t('unknown')}`,
   }));
 
-  const subjectOptions = subjects.map((s) => ({
-    value: s.id,
-    label: s.name,
-  }));
+  const selectedClassSection = classSections.find((cs) => cs.id === form.values.classSectionId);
+  const subjectOptions = subjects
+    .filter((s) => {
+      if (!selectedClassSection) return true;
+      return isSubjectApplicableToClass(
+        subjectApplicability,
+        selectedClassSection.classId,
+        s.id,
+      );
+    })
+    .map((s) => ({
+      value: s.id,
+      label: s.name,
+    }));
 
   // Filter to only include active staff with teacher roles (class_teacher or subject_teacher)
   const staffOptions = staff
@@ -145,9 +195,15 @@ export function CreateAssignmentModal({
               <Select
                 label={t('subject')}
                 placeholder={t('selectSubject')}
+                description={
+                  selectedClassSection && subjectOptions.length === 0
+                    ? t('subjectNotOnClassCurriculum')
+                    : undefined
+                }
                 data={subjectOptions}
                 required
                 searchable
+                disabled={!form.values.classSectionId}
                 {...form.getInputProps('subjectId')}
               />
             </>

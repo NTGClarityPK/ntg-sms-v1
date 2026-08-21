@@ -31,17 +31,17 @@ export function Footer() {
             <h3 className="mb-4 text-lg font-bold">Product</h3>
             <ul className="space-y-3 text-gray-400">
               <li>
-                <Link href="/features" className={footerLinkClass}>
+                <Link href="/features" id="footer-link-features" className={footerLinkClass}>
                   Features
                 </Link>
               </li>
               <li>
-                <Link href="/pricing" className={footerLinkClass}>
+                <Link href="/pricing" id="footer-link-pricing" className={footerLinkClass}>
                   Pricing
                 </Link>
               </li>
               <li>
-                <Link href="/home#case-studies" className={footerLinkClass}>
+                <Link href="/home#case-studies" id="footer-link-case-studies" className={footerLinkClass}>
                   Case Studies
                 </Link>
               </li>
@@ -52,22 +52,17 @@ export function Footer() {
             <h3 className="mb-4 text-lg font-bold">Company</h3>
             <ul className="space-y-3 text-gray-400">
               <li>
-                <Link href="/about" className={footerLinkClass}>
+                <Link href="/about" id="footer-link-about" className={footerLinkClass}>
                   About Us
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className={footerLinkClass}>
+                <Link href="/contact" id="footer-link-contact" className={footerLinkClass}>
                   Contact
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className={footerLinkClass}>
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className={footerLinkClass}>
+                <Link href="/terms" id="footer-link-terms" className={footerLinkClass}>
                   Terms of Service
                 </Link>
               </li>
@@ -77,13 +72,35 @@ export function Footer() {
           <div>
             <h3 className="mb-4 text-lg font-bold">Contact</h3>
             <ul className="space-y-3 text-gray-400">
-              <li>📧 alma@ntgclarity.com</li>
+              <li>
+                <a href="mailto:alma@ntgclarity.com" id="footer-link-email" className={footerLinkClass}>
+                  alma@ntgclarity.com
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://alma.ntgapps.com"
+                  id="footer-link-website"
+                  className={footerLinkClass}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  alma.ntgapps.com
+                </a>
+              </li>
+              <li className="leading-relaxed">
+                2820 Fourteenth Avenue, Suite 202
+                <br />
+                Markham, Ontario L3R 0S9
+                <br />
+                Canada
+              </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-gray-800 pt-8 text-center text-gray-400">
-          <p>&copy; 2026 NTG Alma. All rights reserved.</p>
+          <p>&copy; 2026 NTG Clarity Networks Inc. All rights reserved.</p>
         </div>
       </div>
     </footer>

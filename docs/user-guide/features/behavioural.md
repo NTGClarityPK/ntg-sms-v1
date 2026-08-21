@@ -7,7 +7,7 @@ Star ratings or framework-based category ratings by class section and month.
 **Path:** Sidebar → **Behavioural** (`/behavioral`)
 Titles: **Behavioural Assessment** (desktop) / **Behavioural** (mobile)
 
-Requires plan feature **Behavioural tracking** (**Pro** / **Enterprise**). Sidebar typically for class/subject teachers, guidance counselor, principal, school admin. Recording needs **edit** on the behavioural feature.
+Requires plan feature **Behavioural tracking** (**Pro** / **Enterprise**). On plans without it, **Behavioural** stays in the sidebar for eligible roles but is disabled (upgrade tooltip). Behavioural settings are not shown under **Settings → General**. Recording needs **edit** on the behavioural feature.
 
 Tabs: **Matrix**, **Pending this month**, and **History**.
 
@@ -84,7 +84,7 @@ Global templates are read-only; only the branch-owned copy can be edited.
 
 ## 🆘 Troubleshooting
 
-**Module missing:** Plan may not include behavioural tracking, or role lacks access.
+**Module missing:** If **Behavioural** is greyed out, the plan does not include behavioural tracking. If it is not listed, the role lacks access. Behavioural settings are not shown under **Settings → General** on those plans.
 
 **Pending list empty (star):** Either everyone is rated for the month, or you have no class-teacher sections assigned.
 

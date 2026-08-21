@@ -56,7 +56,12 @@ export class SettingsStatusService {
 
     // Check Schedule: school days configured and at least one timing template exists
     const [schoolDaysResult, timingTemplatesResult] = await Promise.all([
-      supabase.from('school_days').select('id').eq('is_active', true).limit(1),
+      supabase
+        .from('school_days')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('is_active', true)
+        .limit(1),
       supabase.from('timing_templates').select('id').eq('branch_id', branchId).limit(1),
     ]);
 

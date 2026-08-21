@@ -66,6 +66,8 @@ Use row actions to remove a link when the association is no longer valid.
 
 Matrix: use **+** to add another eligible teacher to a cell; remove to unassign. Filters include showing only rows/columns that already have an assignment.
 
+**Curriculum control:** A subject can only be mapped for a class when it belongs to a [subject template](settings-and-configuration.md) assigned to that class or its level. Cells for subjects outside that curriculum show a disabled **+** (for example Accounting on a Primary class that only has a Primary Core template). **Create Mapping** lists only subjects that apply to the class-section you choose.
+
 **Edit** on a list row changes the assigned teacher only.
 
 View-only users may still see action buttons; the server rejects mutations without **edit** permission.
@@ -97,5 +99,7 @@ View-only users may still see action buttons; the server rejects mutations witho
 **Cannot save a third guardian:** Limit is two per student — remove or replace an existing link.
 
 **Teacher missing from picker:** User must be active staff with a teaching role on **Users**.
+
+**Cannot assign a subject on Matrix / Create Mapping:** Check **Settings → Academic → Subject templates** — the subject must be in a template assigned to that class or its level.
 
 **Parent cannot see a child:** Confirm the association on **Parent–Student** for the current branch.

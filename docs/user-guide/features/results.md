@@ -63,7 +63,7 @@ Bulk ZIP (term report + edit access only): **Download all Interim/Mid-term/Final
 | **Basic report** | One-page summary |
 | **Detailed report** | Assessment breakdown; Final term and Annual detailed PDFs are two pages (mid-term + final combined) |
 
-Layout: **Minimal** (print-friendly) or **Modern** (colour). Branch default lives under **Settings → Result reports** (school admin / principal).
+Layout: **Minimal** (print-friendly) or **Modern** (colour). Choose it on the Results page before downloading.
 
 ### Bulk ZIP
 
@@ -106,15 +106,6 @@ Parents do not use the staff Results page for viewing.
 
 ---
 
-## ⚙️ Settings: Result reports
-
-**Settings → Result reports** (Appearance / Academic area in Settings):
-
-- Default **PDF style** (Minimal / Modern)
-- Progress — max assessments and window (days) — stored for the school; generation still uses the full class assessment set unless your school process limits what is entered
-
----
-
 ## 💡 Tips & Best Practices
 
 - Check **Marks readiness** before publishing a term card.
@@ -132,4 +123,4 @@ Parents do not use the staff Results page for viewing.
 
 **ZIP button missing:** Only for **Term report**, with edit access, and within the 60-student limit.
 
-**Wrong layout:** Change **PDF layout** on the Results page, or the school default under **Settings → Result reports**.
+**Wrong layout / Minimal and Modern look the same:** Choose **PDF layout** on the Results page *before* downloading. Refresh if the toggle snaps back.

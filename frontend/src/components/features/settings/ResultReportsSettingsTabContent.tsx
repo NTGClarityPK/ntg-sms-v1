@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { Alert, Button, Group, NumberInput, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
+import { Alert, Button, Group, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useResultReportSettings, useUpsertResultReportSettings } from '@/hooks/useResults';
@@ -15,8 +15,6 @@ export function ResultReportsSettingsTabContent() {
   const form = useForm({
     initialValues: {
       pdfVariant: 'modern' as 'minimal' | 'modern',
-      progressMaxAssessments: 5,
-      progressWindowDays: 14,
     },
   });
 
@@ -25,8 +23,6 @@ export function ResultReportsSettingsTabContent() {
     if (!s) return;
     form.setValues({
       pdfVariant: s.pdfVariant,
-      progressMaxAssessments: s.progressMaxAssessments ?? 5,
-      progressWindowDays: s.progressWindowDays ?? 14,
     });
     form.resetDirty();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,22 +58,6 @@ export function ResultReportsSettingsTabContent() {
           ]}
           {...form.getInputProps('pdfVariant')}
         />
-        <Group grow>
-          <NumberInput
-            label={t('resultReports.progressMaxLabel')}
-            description={t('resultReports.progressMaxDescription')}
-            min={1}
-            max={50}
-            {...form.getInputProps('progressMaxAssessments')}
-          />
-          <NumberInput
-            label={t('resultReports.progressWindowLabel')}
-            description={t('resultReports.progressWindowDescription')}
-            min={1}
-            max={365}
-            {...form.getInputProps('progressWindowDays')}
-          />
-        </Group>
         <Group justify="flex-end">
           <Button
             loading={upsert.isPending}
@@ -86,8 +66,6 @@ export function ResultReportsSettingsTabContent() {
               try {
                 await upsert.mutateAsync({
                   pdfVariant: form.values.pdfVariant,
-                  progressMaxAssessments: form.values.progressMaxAssessments,
-                  progressWindowDays: form.values.progressWindowDays,
                 });
                 form.resetDirty();
                 notifications.show({ title: t('resultReports.saveSuccessTitle'), message: t('resultReports.saveSuccessBody'), color: 'green' });

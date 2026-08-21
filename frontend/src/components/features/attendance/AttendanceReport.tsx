@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Paper,
   Stack,
@@ -26,6 +26,54 @@ interface AttendanceReportProps {
   endDate?: string;
 }
 
+function parseLocalIsoDate(isoDate: string): Date {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function englishOrdinal(day: number): string {
+  const mod100 = day % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${day}th`;
+  switch (day % 10) {
+    case 1:
+      return `${day}st`;
+    case 2:
+      return `${day}nd`;
+    case 3:
+      return `${day}rd`;
+    default:
+      return `${day}th`;
+  }
+}
+
+/** e.g. weekday "Friday" + rest "21st August 2026" (locale-aware month/weekday). */
+function formatPeriodDateParts(
+  isoDate: string,
+  locale: string,
+): { weekday: string; rest: string } {
+  const date = parseLocalIsoDate(isoDate);
+  const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(date);
+  const month = new Intl.DateTimeFormat(locale, { month: 'long' }).format(date);
+  const year = date.getFullYear();
+  const day = date.getDate();
+  const rest = locale.startsWith('ar')
+    ? `${day} ${month} ${year}`
+    : `${englishOrdinal(day)} ${month} ${year}`;
+  return { weekday, rest };
+}
+
+function PeriodDateText({ isoDate, locale }: { isoDate: string; locale: string }) {
+  const { weekday, rest } = formatPeriodDateParts(isoDate, locale);
+  return (
+    <Text span size="sm" c="dimmed">
+      <Text span fw={700} c="inherit">
+        {weekday}
+      </Text>{' '}
+      {rest}
+    </Text>
+  );
+}
+
 export function AttendanceReport({
   attendance,
   isLoading,
@@ -35,6 +83,7 @@ export function AttendanceReport({
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('attendance');
+  const locale = useLocale();
   if (isLoading) {
     return (
       <Paper withBorder p="xl">
@@ -86,6 +135,8 @@ export function AttendanceReport({
     window.URL.revokeObjectURL(url);
   };
 
+  const sameDay = !!startDate && !!endDate && startDate === endDate;
+
   return (
     <Paper withBorder p="md">
       <Stack gap="md">
@@ -105,9 +156,24 @@ export function AttendanceReport({
         </Group>
 
         {startDate || endDate ? (
-          <Text size="sm" c="dimmed">
-            {t('periodLabel')}: {startDate ? new Date(startDate).toLocaleDateString() : t('all')} -{' '}
-            {endDate ? new Date(endDate).toLocaleDateString() : t('all')}
+          <Text size="sm" c="dimmed" component="div">
+            {sameDay && startDate ? (
+              <PeriodDateText isoDate={startDate} locale={locale} />
+            ) : (
+              <>
+                {startDate ? (
+                  <PeriodDateText isoDate={startDate} locale={locale} />
+                ) : (
+                  t('all')
+                )}
+                {' – '}
+                {endDate ? (
+                  <PeriodDateText isoDate={endDate} locale={locale} />
+                ) : (
+                  t('all')
+                )}
+              </>
+            )}
           </Text>
         ) : null}
 

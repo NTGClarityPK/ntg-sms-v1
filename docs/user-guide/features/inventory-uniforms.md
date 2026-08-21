@@ -4,7 +4,7 @@ Uniform items, parent requests, staff approval, and issuance history.
 
 ## 📋 Overview
 
-**Path:** Sidebar → **Inventory** (plan feature **Inventory management** where enabled)
+**Path:** Sidebar → **Inventory** (plan feature **Inventory management** — **Pro** / **Enterprise**). On plans without it, **Inventory** and **Request uniform** stay in the sidebar but are disabled with an upgrade tooltip. **Settings → Inventory** is hidden.
 
 | Tab | Who |
 | --- | --- |
@@ -62,6 +62,6 @@ Audit of what was issued, when, and by whom — filter by student/item/date.
 
 ## 🆘 Troubleshooting
 
-**Inventory missing:** Plan or permission may block the module.
-**Request uniform hidden:** Parent role required; confirm inventory plan feature.
+**Inventory missing:** If the item is greyed out, upgrade the plan. If it is not listed, check permissions.
+**Request uniform hidden:** Parent role required. On plans without inventory, the item is shown disabled with an upgrade tooltip.
 **Stock wrong:** Confirm **Mark issued** was used — approval alone does not deduct stock.

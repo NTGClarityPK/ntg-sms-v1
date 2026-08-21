@@ -4,10 +4,26 @@ import { Stack, Text, Skeleton, Alert } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useLowStock } from '@/hooks/useInventory';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
 
 export function LowStockWidget() {
   const colors = useThemeColors();
-  const { data: items = [], isLoading, error } = useLowStock();
+  const { data: features, isLoading: featuresLoading } = useSubscriptionFeatures();
+  const hasInventory = features?.hasInventoryManagement === true;
+  const { data: items = [], isLoading, error } = useLowStock(hasInventory);
+
+  if (featuresLoading) {
+    return (
+      <Stack gap="sm">
+        <Skeleton height={20} width="70%" />
+        <Skeleton height={40} />
+      </Stack>
+    );
+  }
+
+  if (!hasInventory) {
+    return null;
+  }
 
   if (error) {
     return (

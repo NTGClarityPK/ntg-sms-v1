@@ -1,11 +1,22 @@
 'use client';
 
-import { Group, Title } from '@mantine/core';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Group, Skeleton, Stack, Title } from '@mantine/core';
 import { useTranslations } from 'next-intl';
 import { BehaviorSettings } from '@/components/features/settings/BehaviorSettings';
+import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
 
 export default function BehaviorSettingsPage() {
   const t = useTranslations('settings');
+  const router = useRouter();
+  const { data: features, isLoading: featuresLoading } = useSubscriptionFeatures();
+
+  useEffect(() => {
+    if (features && !features.hasBehavioralTracking) {
+      router.replace('/settings');
+    }
+  }, [features, router]);
 
   return (
     <>
@@ -24,7 +35,15 @@ export default function BehaviorSettingsPage() {
           paddingBottom: 'var(--mantine-spacing-xl)',
         }}
       >
-        <BehaviorSettings />
+        {featuresLoading || !features ? (
+          <Stack gap="md">
+            <Skeleton height={120} radius="md" />
+            <Skeleton height={80} radius="md" />
+            <Skeleton height={200} radius="md" />
+          </Stack>
+        ) : !features.hasBehavioralTracking ? null : (
+          <BehaviorSettings />
+        )}
       </div>
     </>
   );

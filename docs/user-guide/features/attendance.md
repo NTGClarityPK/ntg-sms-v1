@@ -35,7 +35,7 @@ Marking **Absent** can create a linked absence record on the leaves side (status
 
 ## 🕒 History
 
-Filter by class section, student, and date range. **Export** downloads **Excel (.xlsx)**.
+Filter by class section, student, period chips (**Today**, **Last 7 days**, **Last 30 days**), or a custom date range. **Export** downloads **Excel (.xlsx)**.
 
 Stats on history views: **Present**, **Absent**, **Late**, **Excused**.
 

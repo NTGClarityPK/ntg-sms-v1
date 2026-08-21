@@ -5,7 +5,6 @@ import {
   IconChartBar,
   IconClock,
   IconDownload,
-  IconFileText,
   IconMessage,
   IconPackage,
   IconPalette,
@@ -25,7 +24,6 @@ export type SettingsSectionId =
   | 'inventory-management'
   | 'fees'
   | 'integrations'
-  | 'result-reports'
   | 'theme-settings'
   | 'public-statistics'
   | 'data-export';
@@ -40,7 +38,6 @@ type SettingsLabelKey =
   | 'tabInventoryManagement'
   | 'tabFees'
   | 'tabIntegrations'
-  | 'tabResultReports'
   | 'tabThemeSettings'
   | 'tabPublicStatistics'
   | 'tabDataExport'
@@ -59,7 +56,7 @@ export type SettingsCategoryId =
   | 'appearance'
   | 'access-control';
 
-type VisibilityGate = 'always' | 'resultReports' | 'schoolAdmin' | 'dataExport';
+type VisibilityGate = 'always' | 'schoolAdmin' | 'dataExport' | 'feeManagement' | 'inventoryManagement';
 
 export interface SettingsNavItem {
   value: SettingsSectionId;
@@ -76,9 +73,10 @@ export interface SettingsNavCategory {
 }
 
 export interface SettingsVisibilityFlags {
-  canManageResultReports: boolean;
   isSchoolAdmin: boolean;
   canDataExport: boolean;
+  hasFeeManagement: boolean;
+  hasInventoryManagement: boolean;
 }
 
 const SETTINGS_CATEGORIES: SettingsNavCategory[] = [
@@ -99,7 +97,6 @@ const SETTINGS_CATEGORIES: SettingsNavCategory[] = [
     items: [
       { value: 'academic-years', labelKey: 'tabAcademic', icon: IconSchool, gate: 'always' },
       { value: 'schedule', labelKey: 'tabSchedule', icon: IconClock, gate: 'always' },
-      { value: 'result-reports', labelKey: 'tabResultReports', icon: IconFileText, gate: 'resultReports' },
     ],
   },
   {
@@ -107,7 +104,7 @@ const SETTINGS_CATEGORIES: SettingsNavCategory[] = [
     labelKey: 'categoryOperations',
     icon: IconPackage,
     items: [
-      { value: 'inventory-management', labelKey: 'tabInventoryManagement', icon: IconPackage, gate: 'always' },
+      { value: 'inventory-management', labelKey: 'tabInventoryManagement', icon: IconPackage, gate: 'inventoryManagement' },
       { value: 'integrations', labelKey: 'tabIntegrations', icon: IconPlugConnected, gate: 'always' },
       { value: 'data-export', labelKey: 'tabDataExport', icon: IconDownload, gate: 'dataExport' },
     ],
@@ -117,7 +114,7 @@ const SETTINGS_CATEGORIES: SettingsNavCategory[] = [
     labelKey: 'categoryFinance',
     icon: IconCash,
     items: [
-      { value: 'fees', labelKey: 'tabFees', icon: IconCash, gate: 'always' },
+      { value: 'fees', labelKey: 'tabFees', icon: IconCash, gate: 'feeManagement' },
     ],
   },
   {
@@ -170,12 +167,14 @@ function isItemVisible(
   flags: SettingsVisibilityFlags,
 ): boolean {
   switch (gate) {
-    case 'resultReports':
-      return flags.canManageResultReports;
     case 'schoolAdmin':
       return flags.isSchoolAdmin;
     case 'dataExport':
       return flags.canDataExport;
+    case 'feeManagement':
+      return flags.hasFeeManagement;
+    case 'inventoryManagement':
+      return flags.hasInventoryManagement;
     default:
       return true;
   }

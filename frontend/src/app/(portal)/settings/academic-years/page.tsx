@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Alert, Button, Group, Skeleton, Stack, Text, Title, Checkbox, Modal, Select, Paper } from '@mantine/core';
-import { IconPlus, IconRefresh } from '@tabler/icons-react';
+import { Alert, Button, Group, Skeleton, Stack, Text, Title, Checkbox, Modal, Select, Paper, ThemeIcon } from '@mantine/core';
+import { IconPlus, IconRefresh, IconAlertTriangle } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
-import { modals } from '@mantine/modals';
 import { AcademicYearForm, type AcademicYearFormValues } from '@/components/features/settings/AcademicYearForm';
 import { AcademicYearCard } from '@/components/features/settings/AcademicYearCard';
 import { useAcademicYearsList, useActivateAcademicYear, useCreateAcademicYear, useLockAcademicYear, useRolloverAcademicYear } from '@/hooks/useAcademicYears';
@@ -12,6 +11,7 @@ import { useThemeColors, useNotificationColors } from '@/lib/hooks/use-theme-col
 import { notifications } from '@mantine/notifications';
 import type { AcademicYear } from '@/types/settings';
 import axios from 'axios';
+import { useTranslations } from 'next-intl';
 
 function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -28,6 +28,7 @@ function getApiErrorMessage(error: unknown): string {
 export default function AcademicYearsPage() {
   const colors = useThemeColors();
   const notifyColors = useNotificationColors();
+  const t = useTranslations('settings');
   const [opened, { open, close }] = useDisclosure(false);
 
   const listQuery = useAcademicYearsList({ page: 1, limit: 50, search: '' });
@@ -38,6 +39,12 @@ export default function AcademicYearsPage() {
   const [lockingYearId, setLockingYearId] = useState<string | null>(null);
   const [activatingYearId, setActivatingYearId] = useState<string | null>(null);
 
+  // Lock danger-zone modal
+  const [lockModalOpened, lockModalHandlers] = useDisclosure(false);
+  const [lockTargetYear, setLockTargetYear] = useState<AcademicYear | null>(null);
+  const [lockChecks, setLockChecks] = useState({ exams: false, results: false, promotion: false });
+
+  // Rollover modal
   const [rolloverOpened, rolloverHandlers] = useDisclosure(false);
   const [rolloverSourceYear, setRolloverSourceYear] = useState<AcademicYear | null>(null);
   const [targetYearId, setTargetYearId] = useState<string | null>(null);
@@ -46,6 +53,7 @@ export default function AcademicYearsPage() {
     timetableSlots: false,
     leaveSettings: true,
   });
+  const [rolloverChecks, setRolloverChecks] = useState({ exams: false, results: false, promotion: false });
 
   const handleCreate = async (values: AcademicYearFormValues) => {
     await createMutation.mutateAsync(values);
@@ -64,46 +72,25 @@ export default function AcademicYearsPage() {
     }
   };
 
-  const handleLock = async (year: AcademicYear) => {
-    // Check if this is the active year
-    if (year.isActive) {
-      modals.openConfirmModal({
-        title: 'Lock Active Academic Year',
-        children: (
-          <Text size="sm">
-            You are about to lock the <strong>active</strong> academic year. This will make it read-only and prevent all modifications.
-            <br />
-            <br />
-            <strong>Warning:</strong> Once locked, this action cannot be undone. If you need to revert this change, please contact your school administrator.
-          </Text>
-        ),
-        labels: { confirm: 'Lock Year', cancel: 'Cancel' },
-        confirmProps: { color: 'orange' },
-        onConfirm: async () => {
-          try {
-            setLockingYearId(year.id);
-            await lockMutation.mutateAsync(year.id);
-            notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
-          } catch (error) {
-            const message = getApiErrorMessage(error);
-            notifications.show({ title: 'Error', message, color: notifyColors.error });
-          } finally {
-            setLockingYearId(null);
-          }
-        },
-      });
-    } else {
-      // For non-active years, proceed directly
-      try {
-        setLockingYearId(year.id);
-        await lockMutation.mutateAsync(year.id);
-        notifications.show({ title: 'Success', message: 'Academic year locked', color: notifyColors.success });
-      } catch (error) {
-        const message = getApiErrorMessage(error);
-        notifications.show({ title: 'Error', message, color: notifyColors.error });
-      } finally {
-        setLockingYearId(null);
-      }
+  const handleLock = (year: AcademicYear) => {
+    setLockTargetYear(year);
+    setLockChecks({ exams: false, results: false, promotion: false });
+    lockModalHandlers.open();
+  };
+
+  const confirmLock = async () => {
+    if (!lockTargetYear) return;
+    try {
+      setLockingYearId(lockTargetYear.id);
+      lockModalHandlers.close();
+      await lockMutation.mutateAsync(lockTargetYear.id);
+      notifications.show({ title: 'Success', message: t('academicYearLocked'), color: notifyColors.success });
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      notifications.show({ title: 'Error', message, color: notifyColors.error });
+    } finally {
+      setLockingYearId(null);
+      setLockTargetYear(null);
     }
   };
 
@@ -115,6 +102,7 @@ export default function AcademicYearsPage() {
       timetableSlots: false,
       leaveSettings: true,
     });
+    setRolloverChecks({ exams: false, results: false, promotion: false });
     setTargetYearId(year.id);
     rolloverHandlers.open();
   };
@@ -196,17 +184,106 @@ export default function AcademicYearsPage() {
         isSubmitting={createMutation.isPending}
       />
 
+      {/* Lock Danger-Zone Modal */}
+      <Modal
+        opened={lockModalOpened}
+        onClose={lockModalHandlers.close}
+        title={
+          <Group gap="xs">
+            <ThemeIcon color="red" variant="light" size="sm">
+              <IconAlertTriangle size={14} />
+            </ThemeIcon>
+            <Text fw={600} c="red">{t('academicYearLockDangerTitle')}</Text>
+          </Group>
+        }
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm">{t('academicYearLockDangerIntro')}</Text>
+
+          <Paper withBorder p="md" style={{ borderColor: 'var(--mantine-color-red-3)' }}>
+            <Stack gap="sm">
+              <Checkbox
+                id="lock-check-exams"
+                label={t('academicYearLockCheck1')}
+                checked={lockChecks.exams}
+                onChange={(e) => setLockChecks((p) => ({ ...p, exams: e.currentTarget.checked }))}
+              />
+              <Checkbox
+                id="lock-check-results"
+                label={t('academicYearLockCheck2')}
+                checked={lockChecks.results}
+                onChange={(e) => setLockChecks((p) => ({ ...p, results: e.currentTarget.checked }))}
+              />
+              <Checkbox
+                id="lock-check-promotion"
+                label={t('academicYearLockCheck3')}
+                checked={lockChecks.promotion}
+                onChange={(e) => setLockChecks((p) => ({ ...p, promotion: e.currentTarget.checked }))}
+              />
+            </Stack>
+          </Paper>
+
+          <Alert color="red" icon={<IconAlertTriangle size={16} />}>
+            <Text size="sm">{t('academicYearLockDangerWarning')}</Text>
+          </Alert>
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={lockModalHandlers.close}>
+              Cancel
+            </Button>
+            <Button
+              id="lock-confirm-button"
+              color="red"
+              disabled={!lockChecks.exams || !lockChecks.results || !lockChecks.promotion}
+              loading={!!(lockTargetYear && lockingYearId === lockTargetYear.id)}
+              onClick={confirmLock}
+            >
+              {t('academicYearLockConfirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Rollover Danger-Zone Modal */}
       <Modal
         opened={rolloverOpened}
         onClose={rolloverHandlers.close}
-        title="Rollover to new academic year"
+        title={
+          <Group gap="xs">
+            <ThemeIcon color="orange" variant="light" size="sm">
+              <IconAlertTriangle size={14} />
+            </ThemeIcon>
+            <Text fw={600} c="orange">{t('academicYearRolloverDangerTitle')}</Text>
+          </Group>
+        }
         size="lg"
       >
         <Stack gap="md">
-          <Text size="sm">
-            Copy setup from a locked academic year into your current (active) academic year.
-            This will be blocked if Promotion & Placement is incomplete for the selected source year.
-          </Text>
+          <Text size="sm">{t('academicYearRolloverDangerIntro')}</Text>
+
+          <Paper withBorder p="md" style={{ borderColor: 'var(--mantine-color-orange-3)' }}>
+            <Stack gap="sm">
+              <Checkbox
+                id="rollover-check-exams"
+                label={t('academicYearRolloverCheck1')}
+                checked={rolloverChecks.exams}
+                onChange={(e) => setRolloverChecks((p) => ({ ...p, exams: e.currentTarget.checked }))}
+              />
+              <Checkbox
+                id="rollover-check-results"
+                label={t('academicYearRolloverCheck2')}
+                checked={rolloverChecks.results}
+                onChange={(e) => setRolloverChecks((p) => ({ ...p, results: e.currentTarget.checked }))}
+              />
+              <Checkbox
+                id="rollover-check-promotion"
+                label={t('academicYearRolloverCheck3')}
+                checked={rolloverChecks.promotion}
+                onChange={(e) => setRolloverChecks((p) => ({ ...p, promotion: e.currentTarget.checked }))}
+              />
+            </Stack>
+          </Paper>
 
           <Select
             label="Source academic year (locked)"
@@ -242,14 +319,20 @@ export default function AcademicYearsPage() {
             </Stack>
           </Paper>
 
+          <Alert color="orange" icon={<IconAlertTriangle size={16} />}>
+            <Text size="sm">{t('academicYearRolloverDangerWarning')}</Text>
+          </Alert>
+
           <Group justify="flex-end">
             <Button variant="default" onClick={rolloverHandlers.close}>
               Cancel
             </Button>
             <Button
+              id="rollover-confirm-button"
+              color="orange"
               onClick={handleRollover}
               loading={rolloverMutation.isPending}
-              disabled={!targetYearId || !rolloverSourceYear}
+              disabled={!targetYearId || !rolloverSourceYear || !rolloverChecks.exams || !rolloverChecks.results || !rolloverChecks.promotion}
             >
               Run rollover
             </Button>

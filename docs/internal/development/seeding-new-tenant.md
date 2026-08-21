@@ -1,3 +1,11 @@
+> **Ops note (2026-08):** Tenant-specific ABC / Raqqa seed scripts were removed.
+> Prefer general scripts under `backend/src/scripts/`:
+> - `delete-tenant-cleanly.ts` — hard-delete one tenant by code/id
+> - `seed-attendance.ts` — mark/refresh attendance for any tenant (`--tenant-code=…`)
+> - `seed-assessments.ts` — quizzes + marks for school day(s) (`--tenant-code=…`, `--date` / `--days` / `--from`/`--to`)
+>
+> The rest of this file remains a historical prompt for one-off ABC demo seeding ideas.
+
 Hey Cursor, I need you to create a complete database seeding script for our Iraqi school management system. This will create realistic test data for ABC School Networks with two branches in Baghdad, Iraq.
 Important Context
 Before starting:
@@ -238,14 +246,14 @@ Important: Roll Number Sequence
 
 Roll numbers are global (unique across all branches)
 Start from 0056 (existing max is 0055)
-Format: 4-digit zero-padded (0056, 0057, 0058...)
+Format: 5-digit zero-padded (00056, 00057, 00058...)
 Use the students.student_id column for roll number
 
 Student creation (NO auth users for students):
 
 Create student record:
 
-student_id: Sequential roll number (0056, 0057...)
+student_id: Sequential roll number (00056, 00057...)
 first_name, last_name: Iraqi names
 user_id: NULL (students don't log in with email)
 branch_id, class_id, section_id, academic_year_id
@@ -291,10 +299,10 @@ priority: 1 for primary, 2 for secondary
 
 Parent email format: parentname.studentrollnumber@abcschool.edu
 
-Example: Student roll 0056 (Ahmed Al-Baghdadi)
+Example: Student roll 00056 (Ahmed Al-Baghdadi)
 
-Father: hassan.0056@abcschool.edu (Hassan Al-Baghdadi - father's name)
-Mother: layla.0056@abcschool.edu (Layla Al-Baghdadi - mother's name)
+Father: hassan.00056@abcschool.edu (Hassan Al-Baghdadi - father's name)
+Mother: layla.00056@abcschool.edu (Layla Al-Baghdadi - mother's name)
 
 
 
@@ -728,7 +736,7 @@ Final Checklist
 Make sure the script:
 
 ✅ Uses Iraqi names and locations
-✅ Starts roll numbers from 0056
+✅ Starts roll numbers from 00056 (5-digit zero-padded)
 ✅ Creates 1 school admin (tenant-level)
 ✅ Creates ~260 students (5-8 per section)
 ✅ Creates auth users for staff and parents (NOT students)

@@ -25,11 +25,16 @@ export function ChildResultCards({ studentId }: { studentId: string }) {
   const settingsQuery = useResultReportSettings(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadPdfVariant, setDownloadPdfVariant] = useState<'minimal' | 'modern'>('modern');
+  const [pdfVariantHydrated, setPdfVariantHydrated] = useState(false);
 
   useEffect(() => {
+    if (pdfVariantHydrated) return;
     const v = settingsQuery.data?.pdfVariant;
-    if (v === 'minimal' || v === 'modern') setDownloadPdfVariant(v);
-  }, [settingsQuery.data?.pdfVariant]);
+    if (v === 'minimal' || v === 'modern') {
+      setDownloadPdfVariant(v);
+      setPdfVariantHydrated(true);
+    }
+  }, [pdfVariantHydrated, settingsQuery.data?.pdfVariant]);
 
   const phaseLabel = (card: ResultCard): string => {
     const phase = card.termPhase ?? card.resultType;
@@ -101,6 +106,7 @@ export function ChildResultCards({ studentId }: { studentId: string }) {
         <Tooltip label={t('tooltipPdfLayoutChoice')} withArrow position="top">
           <div>
             <SegmentedControl
+              id="child-results-pdf-layout"
               value={downloadPdfVariant}
               onChange={(v) => setDownloadPdfVariant(v as 'minimal' | 'modern')}
               data={[

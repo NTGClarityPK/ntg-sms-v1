@@ -531,10 +531,6 @@ export function Sidebar({
       if (item.href === '/billing') {
         return isSchoolAdmin;
       }
-      const subFeature = subscriptionNavFeatures[item.href];
-      if (subFeature && planFeatures) {
-        if (!planFeatures[subFeature]) return false;
-      }
       // Parent-facing view only page
       if (item.href === '/my-children') {
         return isParent;
@@ -568,6 +564,10 @@ export function Sidebar({
       return isParent;
     }
     return true;
+  }).map((item) => {
+    const subFeature = subscriptionNavFeatures[item.href];
+    const planLocked = Boolean(subFeature && (!planFeatures || !planFeatures[subFeature]));
+    return planLocked ? { ...item, planLocked: true } : item;
   });
 
   const dashboardItem = navItems.find((item) => item.href === '/dashboard');
@@ -624,9 +624,13 @@ export function Sidebar({
 
   const renderNavItem = (item: NavItem) => {
     const active = isActive(item.href);
+    const planLocked = Boolean(item.planLocked);
+    const tooltipLabel = planLocked
+      ? tNav('planLockedTooltip')
+      : tNav(item.key);
     
     // Apply active styling ONLY when collapsed (like RMS)
-    const shouldShowActive = effectiveCollapsed && active;
+    const shouldShowActive = effectiveCollapsed && active && !planLocked;
     
     const content = (
       <Button
@@ -636,11 +640,13 @@ export function Sidebar({
         variant="subtle"
         size="md"
         fullWidth={!effectiveCollapsed}
+        disabled={planLocked}
         leftSection={effectiveCollapsed ? undefined : <item.icon size={NAV_ICON_SIZE} />}
         className="nav-item-button"
-        data-active={active}
+        data-active={active && !planLocked}
         data-collapsed={effectiveCollapsed}
         onClick={() => {
+          if (planLocked) return;
           router.push(item.href);
           onMobileClose?.();
         }}
@@ -651,6 +657,7 @@ export function Sidebar({
           color: shouldShowActive 
             ? navbarConfig?.activeTextColor 
             : navButtonConfig?.textColor || navbarConfig?.textColor,
+          opacity: planLocked ? 0.55 : 1,
         }}
         styles={{
           root: {
@@ -669,9 +676,9 @@ export function Sidebar({
       </Button>
     );
 
-    if (effectiveCollapsed) {
+    if (effectiveCollapsed || planLocked) {
       return (
-        <Tooltip key={item.href} label={tNav(item.key)} position="right" withArrow>
+        <Tooltip key={item.href} label={tooltipLabel} position="right" withArrow>
           <Box style={{ display: 'inline-block', width: '100%' }}>{content}</Box>
         </Tooltip>
       );

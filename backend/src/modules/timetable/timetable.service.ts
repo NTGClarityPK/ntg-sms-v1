@@ -632,7 +632,7 @@ export class TimetableService {
     // Calculate free periods (time gaps in schedule)
     // Note: With time-range primary approach, free periods are less meaningful
     // We'll calculate based on time gaps instead of period numbers
-    const schoolDays = await this.scheduleService.getSchoolDays();
+    const schoolDays = await this.scheduleService.getSchoolDays(branchId);
     const activeDays = schoolDays.data;
     const freePeriods: FreePeriod[] = [];
 
@@ -817,7 +817,7 @@ export class TimetableService {
     const effectiveSubjectTemplateId = input.subjectTemplateId ?? resolvedSubjectTemplateId ?? undefined;
 
     // Validate school day is active
-    const schoolDays = await this.scheduleService.getSchoolDays();
+    const schoolDays = await this.scheduleService.getSchoolDays(branchId);
     if (!schoolDays.data.includes(input.dayOfWeek)) {
       throw new BadRequestException(`Day ${input.dayOfWeek} is not an active school day`);
     }
@@ -1625,7 +1625,7 @@ export class TimetableService {
     }
 
     // Get active school days
-    const schoolDays = await this.scheduleService.getSchoolDays();
+    const schoolDays = await this.scheduleService.getSchoolDays(branchId);
     const activeDays = schoolDays.data;
 
     if (!activeDays || activeDays.length === 0) {
@@ -2023,7 +2023,7 @@ export class TimetableService {
     };
 
     // Get active school days
-    const schoolDays = await this.scheduleService.getSchoolDays();
+    const schoolDays = await this.scheduleService.getSchoolDays(branchId);
     const activeDays = schoolDays.data;
 
     // Check for invalid school days

@@ -141,7 +141,7 @@ export class IdCardsService {
   ): Promise<string> {
     const code = await this.getTenantCode(branchId);
     const year = new Date().getFullYear();
-    const padded = rollOrEmployeeId.replace(/\D/g, '').padStart(4, '0').slice(-6);
+    const padded = rollOrEmployeeId.replace(/\D/g, '').padStart(5, '0').slice(-6);
     return `${code}-${year}-${this.rolePrefix(personType)}-${padded}`;
   }
 
