@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import {
   Alert,
   Badge,
@@ -24,7 +25,7 @@ import {
 } from '@mantine/core';
 import { DatePickerInput, MonthPickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconAlertCircle, IconDownload, IconRefresh } from '@tabler/icons-react';
+import { IconAlertCircle, IconCash, IconDownload, IconFileInvoice, IconSettings } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import {
   useFeeChallanRoster,
@@ -36,6 +37,8 @@ import {
   usePrefetchStudentFeeTemplates,
   useStudentFeeTemplates,
   useUpdateFeeStudentTemplateLink,
+  useMarkFeePaid,
+  useEnsureFeeChallanPdf,
 } from '@/hooks/api/useFees';
 import type { FeeChallanMetricEdit, FeeChallanTemplateEdit } from '@/types/fees';
 import { useClassSections } from '@/hooks/useClassSections';
@@ -97,10 +100,17 @@ function formatLastGeneratedLabel(d: Date): string {
   return `${day}${ordinalSuffix(day)} ${datePart} ${timePart}`;
 }
 
+function addCalendarDays(base: Date, days: number): Date {
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 export function ChallansTab() {
   const t = useTranslations('fees');
   const tCommon = useTranslations('common');
   const theme = useMantineTheme();
+  const router = useRouter();
 
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date | null>(null);
@@ -134,6 +144,12 @@ export function ChallansTab() {
     };
   }, [selectedMonth]);
 
+  /** Due date default: day 10 of selected fee month (overridden by package when templates load). */
+  const individualDefaultDueDate = useMemo(() => {
+    if (!selectedMonth) return addCalendarDays(new Date(), 10);
+    return new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 10);
+  }, [selectedMonth]);
+
   const rosterQuery = useFeeChallanRoster({
     classId: selectedClassSection?.classId,
     sectionId: selectedClassSection?.sectionId,
@@ -146,6 +162,10 @@ export function ChallansTab() {
   });
 
   const generateMutation = useGenerateFeeChallans();
+  const markPaidMutation = useMarkFeePaid();
+  const ensurePdfMutation = useEnsureFeeChallanPdf({ mode: 'admin' });
+  const [markPaidChallanId, setMarkPaidChallanId] = useState<string | null>(null);
+  const [pdfLoadingChallanId, setPdfLoadingChallanId] = useState<string | null>(null);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -259,6 +279,41 @@ export function ChallansTab() {
     generateTarget?.kind === 'single' &&
     studentGenerateModal?.studentId === generateTarget.studentId;
 
+  const runBulkGenerate = async (selectedInheritedTemplateId: string) => {
+    setGenerateTarget({ kind: 'bulk' });
+    try {
+      const results = await generateMutation.mutateAsync({
+        studentIds: allStudentIdsInRoster,
+        months: activeMonth ? [activeMonth] : [],
+        autoCalculateDueDate: true,
+        selectedInheritedTemplateId,
+      });
+      notifications.show({
+        title: t('challans.generatedTitle'),
+        message: t('challans.generatedMessage', { count: results.length }),
+        color: 'green',
+      });
+      void rosterQuery.refetch();
+      const now = new Date();
+      setLastGeneratedAt(now);
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('fees_bulk_generate_last_generated_at', now.toISOString());
+        }
+      } catch {
+        // non-blocking
+      }
+    } catch (error) {
+      notifications.show({
+        title: t('challans.generateErrorTitle'),
+        message: error instanceof Error ? error.message : t('challans.generateErrorMessage'),
+        color: 'red',
+      });
+    } finally {
+      setGenerateTarget(null);
+    }
+  };
+
   return (
     <Stack gap="md">
       <Group justify="space-between" wrap="wrap">
@@ -272,39 +327,45 @@ export function ChallansTab() {
         </Stack>
         <Button
           id="fees-challans-generate"
-          leftSection={<IconRefresh size={16} />}
+          leftSection={<IconFileInvoice size={16} />}
           onClick={async () => {
             if (!selectedClassSection?.classId || !selectedClassSection?.sectionId) return;
-            // Open immediately so the click has instant feedback.
+
             setBulkCandidatesErrorInModal(null);
             setBulkCandidatesInModal(null);
             setBulkCandidatesLoadingInModal(true);
-            setBulkSpecificityModalOpened(true);
 
             let candidates = bulkCandidates;
             try {
-              // Always fetch latest candidates on demand (query might not be loaded yet).
               const candidatesRes = await inheritedCandidatesQuery.refetch();
               candidates = candidatesRes.data ?? candidates;
               setBulkCandidatesInModal(candidates ?? null);
             } catch (e) {
-              setBulkCandidatesErrorInModal(e instanceof Error ? e.message : t('challans.generateErrorMessage'));
+              setBulkCandidatesErrorInModal(
+                e instanceof Error ? e.message : t('challans.generateErrorMessage'),
+              );
+              setBulkCandidatesLoadingInModal(false);
+              setBulkSpecificityModalOpened(true);
+              return;
             } finally {
               setBulkCandidatesLoadingInModal(false);
             }
 
             const total = countCandidates(candidates ?? undefined);
             const defaultId =
-              total === 1
-                ? (candidates?.classSection?.[0]?.templateId ??
-                    candidates?.class?.[0]?.templateId ??
-                    candidates?.level?.[0]?.templateId ??
-                    null)
-                : (candidates?.classSection?.[0]?.templateId ??
-                    candidates?.class?.[0]?.templateId ??
-                    candidates?.level?.[0]?.templateId ??
-                    null);
+              candidates?.classSection?.[0]?.templateId ??
+              candidates?.class?.[0]?.templateId ??
+              candidates?.level?.[0]?.templateId ??
+              null;
+
+            if (total === 1 && defaultId) {
+              setBulkSelectedTemplateId(defaultId);
+              await runBulkGenerate(defaultId);
+              return;
+            }
+
             setBulkSelectedTemplateId(defaultId);
+            setBulkSpecificityModalOpened(true);
           }}
           disabled={!canBulkGenerate || bulkGenerateInFlight}
           loading={canBulkGenerate && bulkGenerateInFlight}
@@ -489,38 +550,7 @@ export function ChallansTab() {
               onClick={async () => {
                 if (!bulkSelectedTemplateId) return;
                 setBulkSpecificityModalOpened(false);
-                setGenerateTarget({ kind: 'bulk' });
-                try {
-                  const results = await generateMutation.mutateAsync({
-                    studentIds: allStudentIdsInRoster,
-                    months: activeMonth ? [activeMonth] : [],
-                    autoCalculateDueDate: true,
-                    selectedInheritedTemplateId: bulkSelectedTemplateId,
-                  });
-                  notifications.show({
-                    title: t('challans.generatedTitle'),
-                    message: t('challans.generatedMessage', { count: results.length }),
-                    color: 'green',
-                  });
-                  void rosterQuery.refetch();
-                  const now = new Date();
-                  setLastGeneratedAt(now);
-                  try {
-                    if (typeof window !== 'undefined') {
-                      window.localStorage.setItem('fees_bulk_generate_last_generated_at', now.toISOString());
-                    }
-                  } catch {
-                    // non-blocking
-                  }
-                } catch (error) {
-                  notifications.show({
-                    title: t('challans.generateErrorTitle'),
-                    message: error instanceof Error ? error.message : t('challans.generateErrorMessage'),
-                    color: 'red',
-                  });
-                } finally {
-                  setGenerateTarget(null);
-                }
+                await runBulkGenerate(bulkSelectedTemplateId);
               }}
               disabled={!bulkSelectedTemplateId || bulkGenerateInFlight || bulkCandidatesLoadingInModal}
               loading={!bulkGenerateInFlight ? false : bulkGenerateInFlight}
@@ -567,8 +597,25 @@ export function ChallansTab() {
       ) : rosterRows.length === 0 ? null : (
         <Stack gap="sm">
           {!awaitingBulkTemplateCheck && !hasApplicableTemplates ? (
-            <Alert icon={<IconAlertCircle size={16} />} color="yellow" variant="light">
-              {t('challans.noTemplatesLinkedHint')}
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              color="yellow"
+              variant="light"
+              title={t('challans.noTemplatesLinkedTitle')}
+            >
+              <Stack gap="sm">
+                <Text size="sm">{t('challans.noTemplatesLinkedHint')}</Text>
+                <Button
+                  id="fees-challans-setup-cta"
+                  size="xs"
+                  variant="light"
+                  leftSection={<IconSettings size={14} />}
+                  onClick={() => router.push('/settings?section=fees')}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  {t('challans.openFeeSettings')}
+                </Button>
+              </Stack>
             </Alert>
           ) : null}
           <Paper withBorder radius="md" p={0}>
@@ -621,18 +668,89 @@ export function ChallansTab() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap="xs" justify="flex-end" wrap="nowrap">
-                          {r.pdfUrl ? (
+                          {r.challanId ? (
                             <Button
                               id={`fees-challans-download-${r.studentId}`}
-                              component="a"
-                              href={withCacheBust(r.pdfUrl)}
-                              target="_blank"
-                              rel="noreferrer"
                               leftSection={<IconDownload size={16} />}
                               variant="light"
                               size="xs"
+                              loading={
+                                ensurePdfMutation.isPending && pdfLoadingChallanId === r.challanId
+                              }
+                              disabled={
+                                ensurePdfMutation.isPending && pdfLoadingChallanId !== r.challanId
+                              }
+                              onClick={() => {
+                                const challanId = r.challanId;
+                                if (!challanId) return;
+                                setPdfLoadingChallanId(challanId);
+                                ensurePdfMutation.mutate(challanId, {
+                                  onSuccess: (data) => {
+                                    window.open(withCacheBust(data.pdfUrl), '_blank', 'noopener,noreferrer');
+                                    void rosterQuery.refetch();
+                                  },
+                                  onError: (e: unknown) => {
+                                    notifications.show({
+                                      title: t('challans.pdfEnsureErrorTitle'),
+                                      message:
+                                        e instanceof Error
+                                          ? e.message
+                                          : t('challans.pdfEnsureErrorMessage'),
+                                      color: 'red',
+                                    });
+                                  },
+                                  onSettled: () => setPdfLoadingChallanId(null),
+                                });
+                              }}
                             >
-                              {t('challans.download')}
+                              {ensurePdfMutation.isPending && pdfLoadingChallanId === r.challanId
+                                ? t('challans.pdfPreparing')
+                                : t('challans.download')}
+                            </Button>
+                          ) : null}
+                          {r.challanId &&
+                          (r.status === 'Pending_Payment' || r.status === 'Rejected') ? (
+                            <Button
+                              id={`fees-challans-mark-paid-${r.studentId}`}
+                              size="xs"
+                              variant="light"
+                              color="teal"
+                              leftSection={<IconCash size={16} />}
+                              loading={
+                                markPaidMutation.isPending && markPaidChallanId === r.challanId
+                              }
+                              disabled={markPaidMutation.isPending}
+                              onClick={() => {
+                                const challanId = r.challanId;
+                                if (!challanId) return;
+                                setMarkPaidChallanId(challanId);
+                                markPaidMutation.mutate(
+                                  { challanId },
+                                  {
+                                    onSuccess: () => {
+                                      notifications.show({
+                                        title: t('challans.markPaidSuccessTitle'),
+                                        message: t('challans.markPaidSuccessMessage'),
+                                        color: 'green',
+                                      });
+                                      void rosterQuery.refetch();
+                                    },
+                                    onError: (e: unknown) => {
+                                      notifications.show({
+                                        title: t('challans.markPaidErrorTitle'),
+                                        message:
+                                          e instanceof Error
+                                            ? e.message
+                                            : t('challans.markPaidErrorMessage'),
+                                        color: 'red',
+                                      });
+                                    },
+                                    onSettled: () => setMarkPaidChallanId(null),
+                                  },
+                                );
+                              }}
+                            >
+                              {t('challans.markPaid')}
                             </Button>
                           ) : null}
                           <Button
@@ -674,7 +792,7 @@ export function ChallansTab() {
         studentName={studentGenerateModal?.studentName ?? null}
         billingMonthYm={activeMonth}
         monthBounds={monthBounds}
-        defaultDueDate={null}
+        defaultDueDate={individualDefaultDueDate}
         generateMutationPending={singleGenerateInFlightForOpenModal}
         onConfirmGenerate={
           studentGenerateModal
@@ -774,13 +892,6 @@ function StudentGenerateModal(props: {
     setExcludedTemplateIds({});
   }, [props.defaultDueDate, props.opened]);
 
-  useEffect(() => {
-    if (!props.monthBounds || !studentDueDate) return;
-    if (studentDueDate < props.monthBounds.minDate || studentDueDate > props.monthBounds.maxDate) {
-      setStudentDueDate(props.defaultDueDate);
-    }
-  }, [props.defaultDueDate, props.monthBounds, studentDueDate]);
-
   const previewQuery = useStudentFeeTemplates(props.studentId ?? undefined, {
     month: hasBillingMonth ? ym : undefined,
   });
@@ -789,6 +900,19 @@ function StudentGenerateModal(props: {
   const linkTemplateMutation = useCreateFeeStudentTemplateLink();
   const updateLinkMutation = useUpdateFeeStudentTemplateLink();
 
+  // When templates load, prefer the fee package’s due-by day of the fee month.
+  useEffect(() => {
+    if (!props.opened) return;
+    if (!props.monthBounds) return;
+    const templates = previewQuery.data?.templates ?? [];
+    const feeTpl = templates.find((tpl) => tpl.type === 'Fee' && typeof tpl.daysUntilDue === 'number');
+    if (!feeTpl) return;
+    const dueDay = Math.min(31, Math.max(1, Math.floor(feeTpl.daysUntilDue)));
+    const y = props.monthBounds.minDate.getFullYear();
+    const m = props.monthBounds.minDate.getMonth();
+    const lastDay = props.monthBounds.maxDate.getDate();
+    setStudentDueDate(new Date(y, m, Math.min(dueDay, lastDay)));
+  }, [props.opened, props.monthBounds, previewQuery.data?.templates]);
   const linkedIndividualTemplates = useMemo(() => {
     const templates = previewQuery.data?.templates ?? [];
     return templates.filter((tpl) => tpl.source === 'Individual' && tpl.linkId);
@@ -903,7 +1027,7 @@ function StudentGenerateModal(props: {
               onChange={setStudentDueDate}
               disabled={!hasBillingMonth}
               minDate={props.monthBounds?.minDate}
-              maxDate={props.monthBounds?.maxDate}
+              maxDate={addCalendarDays(new Date(), 365)}
               clearable={false}
             />
 

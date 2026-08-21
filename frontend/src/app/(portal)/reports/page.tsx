@@ -17,12 +17,14 @@ import {
   Badge,
   Skeleton,
 } from '@mantine/core';
-import { IconUser, IconUsersGroup, IconChartBar, IconReportAnalytics, IconCoin } from '@tabler/icons-react';
+import { IconUser, IconUsersGroup, IconChartBar, IconReportAnalytics, IconCoin, IconCash } from '@tabler/icons-react';
 import { RevenueReportContent } from '@/components/features/reports/RevenueReportContent';
+import { FeeReportsContent } from '@/components/features/reports/FeeReportsContent';
 import { useTranslations } from 'next-intl';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useStudents, useMyStudent } from '@/hooks/useStudents';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
 import {
   useStudentReport,
   useClassReport,
@@ -100,6 +102,9 @@ export default function ReportsPage() {
       const n = r.roleName?.toLowerCase();
       return n === 'school_admin' || n === 'principal';
     }) ?? false;
+  const { data: planFeatures } = useSubscriptionFeatures();
+  const showFeesTab =
+    showRevenueTab && !!planFeatures?.hasFeeManagement;
   const myStudentQuery = useMyStudent();
   const studentsQuery = useStudents({ limit: 100 });
   const classSectionsQuery = useClassSections({ limit: 200, minimal: true });
@@ -159,7 +164,10 @@ export default function ReportsPage() {
     if (tab === 'revenue' && showRevenueTab) {
       setActiveTab('revenue');
     }
-  }, [searchParams, showAdministrativeTab, showRevenueTab]);
+    if (tab === 'fees' && showFeesTab) {
+      setActiveTab('fees');
+    }
+  }, [searchParams, showAdministrativeTab, showRevenueTab, showFeesTab]);
 
   const handleTabChange = (value: string | null) => {
     setActiveTab(value);
@@ -167,6 +175,8 @@ export default function ReportsPage() {
       router.replace('/reports?tab=administrative', { scroll: false });
     } else if (value === 'revenue') {
       router.replace('/reports?tab=revenue', { scroll: false });
+    } else if (value === 'fees') {
+      router.replace('/reports?tab=fees', { scroll: false });
     } else if (searchParams?.get('tab')) {
       router.replace('/reports', { scroll: false });
     }
@@ -211,6 +221,11 @@ export default function ReportsPage() {
             {showRevenueTab && (
               <Tabs.Tab value="revenue" leftSection={<IconCoin size={16} />}>
                 {t('revenueTab')}
+              </Tabs.Tab>
+            )}
+            {showFeesTab && (
+              <Tabs.Tab value="fees" leftSection={<IconCash size={16} />}>
+                {t('feesTab')}
               </Tabs.Tab>
             )}
           </Tabs.List>
@@ -471,6 +486,12 @@ export default function ReportsPage() {
           {showRevenueTab && (
             <Tabs.Panel value="revenue" pt="md">
               <RevenueReportContent isActive={activeTab === 'revenue'} />
+            </Tabs.Panel>
+          )}
+
+          {showFeesTab && (
+            <Tabs.Panel value="fees" pt="md" px="md" pb="md">
+              <FeeReportsContent />
             </Tabs.Panel>
           )}
         </Tabs>

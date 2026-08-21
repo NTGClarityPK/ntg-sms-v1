@@ -46,6 +46,30 @@ export function useCreateFeeTemplate() {
   });
 }
 
+export function useUpdateFeeTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      name: string;
+      type: 'Fee' | 'Discount';
+      scope: 'Levels' | 'Class' | 'Class-Section' | 'Individual';
+      currencyCode?: 'PKR' | 'IQD' | 'SAR' | 'USD';
+      autoApply?: boolean;
+      autoApplyCondition?: Record<string, unknown> | null;
+      daysUntilDue?: number;
+      metrics: Array<{ name: string; amountType: 'Absolute' | 'Percentage'; amount: number; perDay?: boolean; displayOrder?: number }>;
+    }) => {
+      const { id, ...body } = input;
+      const response = await apiClient.put<FeeTemplate>(`/api/v1/fees/templates/${id}`, body);
+      return response.data;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['fees', 'templates'] });
+    },
+  });
+}
+
 export function useDeleteFeeTemplate() {
   const qc = useQueryClient();
   return useMutation({
@@ -96,6 +120,7 @@ export function useUpsertFeeChallanSettings() {
 }
 
 export function useCreateFeeTemplateAssignment() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { templateId: string; scopeType: 'Level' | 'Class' | 'Section'; scopeId: string }) => {
       const response = await apiClient.post<{ id: string }>(`/api/v1/fees/templates/${input.templateId}/assignments`, {
@@ -103,6 +128,9 @@ export function useCreateFeeTemplateAssignment() {
         scopeId: input.scopeId,
       });
       return response.data;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['fees', 'templates'] });
     },
   });
 }
@@ -127,6 +155,30 @@ export function useGenerateFeeChallans() {
     }) => {
       const response = await apiClient.post<FeeChallanGenerateResult[]>('/api/v1/fees/challans/generate', input);
       return response.data ?? [];
+    },
+  });
+}
+
+/** Lazy PDF: generate + cache on first download, then return pdfUrl. */
+export function useEnsureFeeChallanPdf(params?: { mode?: 'admin' | 'parent' | 'student' }) {
+  const qc = useQueryClient();
+  const mode = params?.mode ?? 'admin';
+  return useMutation({
+    mutationFn: async (challanId: string) => {
+      const url =
+        mode === 'student'
+          ? `/api/v1/student/fees/challans/${challanId}/pdf`
+          : `/api/v1/fees/challans/${challanId}/pdf`;
+      const response = await apiClient.get<{ pdfUrl: string }>(url);
+      const pdfUrl = response.data?.pdfUrl;
+      if (!pdfUrl) throw new Error('PDF URL missing');
+      return { pdfUrl };
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['fees', 'challans', 'roster'] }),
+        qc.invalidateQueries({ queryKey: ['fees', 'challans', 'my'] }),
+      ]);
     },
   });
 }
@@ -392,6 +444,24 @@ export function useRegenerateFeeReceipt() {
       return response.data;
     },
     onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['fees', 'payments', 'history'] });
+    },
+  });
+}
+
+/** Admin cash desk: mark a fee bill paid with no proof upload. */
+export function useMarkFeePaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { challanId: string; paymentDate?: string; notes?: string }) => {
+      const response = await apiClient.post<{ id: string; receiptUrl: string | null }>(
+        '/api/v1/fees/payments/mark-paid',
+        input,
+      );
+      return response.data;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['fees', 'challans', 'roster'] });
       await qc.invalidateQueries({ queryKey: ['fees', 'payments', 'history'] });
     },
   });

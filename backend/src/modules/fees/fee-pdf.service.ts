@@ -315,9 +315,10 @@ body{font-family:'Courier New',Courier,monospace;background:white;padding:0}
 
     const monthLabel = formatMonthLabel(input.months[0] ?? '');
     const dueDateLabel = formatDueDateLabel(input.dueDate);
-    const billingPeriodLabel =
-      input.billingStartDate && input.billingEndDate
-        ? `${formatShortDateLabel(input.billingStartDate)} - ${formatShortDateLabel(input.billingEndDate)}`
+    // Always show the fee month (e.g. "August 2026"), not a date range.
+    const monthDisplayLabel =
+      input.months.length > 1
+        ? input.months.map((ym) => formatMonthLabel(ym)).filter(Boolean).join(', ')
         : monthLabel;
     const issuedLabel = (() => {
       // input.issuedAt is ISO date (YYYY-MM-DD) in our flow
@@ -523,7 +524,7 @@ body{font-family:'Courier New',Courier,monospace;background:#fff;padding:0}
   <table class="details-table">
     <tr><td>STUDENT NAME:</td><td>${escapeHtml(input.studentName).toUpperCase()}</td></tr>
     <tr><td>STUDENT ID:</td><td>${escapeHtml(input.studentStudentId ?? '—')}</td></tr>
-    <tr><td>BILLING PERIOD:</td><td>${escapeHtml(billingPeriodLabel).toUpperCase()}</td></tr>
+    <tr><td>MONTH:</td><td>${escapeHtml(monthDisplayLabel).toUpperCase()}</td></tr>
     <tr><td>DUE DATE:</td><td>${escapeHtml(dueDateLabel).toUpperCase()}</td></tr>
   </table>
 </div>

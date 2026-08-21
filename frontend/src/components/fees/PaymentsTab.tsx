@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import {
   ActionIcon,
   Alert,
@@ -24,7 +25,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
 import { notifications } from '@mantine/notifications';
-import { IconDownload, IconEye, IconRefresh } from '@tabler/icons-react';
+import { IconAlertTriangle, IconDownload, IconEye, IconRefresh } from '@tabler/icons-react';
 import { useClassSections } from '@/hooks/useClassSections';
 import { useFeePaymentsHistory, useRegenerateFeeReceipt } from '@/hooks/api/useFees';
 import { apiClient } from '@/lib/api-client';
@@ -100,6 +101,7 @@ function inferPreviewType(input: { fileName: string; mimeType?: string | null; u
 
 export function PaymentsTab() {
   const t = useTranslations('fees');
+  const router = useRouter();
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [review, setReview] = useState<PaymentReview | null>(null);
@@ -108,15 +110,10 @@ export function PaymentsTab() {
   const [proofPreview, setProofPreview] = useState<ProofPreview | null>(null);
 
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>('All');
+  const [status, setStatus] = useState<string | null>('Pending_Review');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 30);
-    return [start, end];
-  });
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>(() => [null, null]);
 
   const classSectionsQuery = useClassSections({ page: 1, limit: 200, minimal: true, isActive: true });
   const selectedClassSection = useMemo(() => {
@@ -199,17 +196,28 @@ export function PaymentsTab() {
       <Stack gap="sm">
         <Group justify="space-between" wrap="wrap">
           <Text fw={600}>{t('tabs.payments')}</Text>
-          <Tooltip label={t('payments.refresh')}>
-            <ActionIcon
-              id="fees-payments-refresh"
+          <Group gap="xs">
+            <Button
+              id="fees-payments-overdue"
               variant="light"
-              size="lg"
-              loading={historyQuery.isFetching}
-              onClick={() => void historyQuery.refetch()}
+              color="orange"
+              leftSection={<IconAlertTriangle size={16} />}
+              onClick={() => router.push('/reports?tab=fees')}
             >
-              <IconRefresh size={18} />
-            </ActionIcon>
-          </Tooltip>
+              {t('payments.overdueBalances')}
+            </Button>
+            <Tooltip label={t('payments.refresh')}>
+              <ActionIcon
+                id="fees-payments-refresh"
+                variant="light"
+                size="lg"
+                loading={historyQuery.isFetching}
+                onClick={() => void historyQuery.refetch()}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </Group>
 
         <Group grow>
@@ -247,10 +255,10 @@ export function PaymentsTab() {
           placeholder={t('payments.filters.dateRangePlaceholder')}
           value={dateRange}
           onChange={(next) => {
-            setDateRange(next);
+            setDateRange(next ?? [null, null]);
             setPage(1);
           }}
-          clearable={false}
+          clearable
         />
 
         <TextInput

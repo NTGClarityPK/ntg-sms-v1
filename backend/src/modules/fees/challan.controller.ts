@@ -120,6 +120,25 @@ export class ChallanController {
     return this.challanService.listMyStudentsPending(user.id, branch.branchId);
   }
 
+  /** Lazy PDF — must be registered before bare :id */
+  @Get(':id/pdf')
+  async ensurePdf(
+    @Param('id') id: string,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: { pdfUrl: string } }> {
+    const roles = user.roles ?? [];
+    const isAdmin = roles.includes('school_admin') || roles.includes('principal');
+    if (isAdmin) {
+      return this.challanService.ensureChallanPdf(id, branch.branchId);
+    }
+    const isParent = roles.includes('parent');
+    if (isParent) {
+      return this.challanService.ensureChallanPdfForParent(id, user.id, branch.branchId);
+    }
+    throw new ForbiddenException('You do not have access to this fee bill');
+  }
+
   @Get('student/:studentId')
   async listByStudent(
     @Param('studentId') studentId: string,

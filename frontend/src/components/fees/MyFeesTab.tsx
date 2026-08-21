@@ -23,7 +23,7 @@ import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconAlertCircle, IconDownload, IconUpload } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { useMyFeePayments, useMyPendingFeeChallans, useSubmitFeePaymentProof } from '@/hooks/api/useFees';
+import { useMyFeePayments, useMyPendingFeeChallans, useSubmitFeePaymentProof, useEnsureFeeChallanPdf } from '@/hooks/api/useFees';
 
 type Mode = 'parent' | 'student';
 
@@ -58,6 +58,8 @@ export function MyFeesTab(props: { mode: Mode }) {
   const paymentsQuery = useMyFeePayments({ mode: props.mode });
 
   const submitProof = useSubmitFeePaymentProof({ mode: props.mode });
+  const ensurePdfMutation = useEnsureFeeChallanPdf({ mode: props.mode });
+  const [pdfLoadingChallanId, setPdfLoadingChallanId] = useState<string | null>(null);
   const [uploadModal, setUploadModal] = useState<null | {
     challanId: string;
     challanNumber: string;
@@ -149,19 +151,45 @@ export function MyFeesTab(props: { mode: Mode }) {
                           </Table.Td>
                           <Table.Td>
                             <Group gap="xs" justify="flex-end" wrap="nowrap">
-                              {c.pdfUrl ? (
-                                <Button
-                                  component="a"
-                                  href={withCacheBust(c.pdfUrl)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  leftSection={<IconDownload size={16} />}
-                                  size="xs"
-                                  variant="light"
-                                >
-                                  {tFees('myFees.download')}
-                                </Button>
-                              ) : null}
+                              <Button
+                                leftSection={<IconDownload size={16} />}
+                                size="xs"
+                                variant="light"
+                                loading={
+                                  ensurePdfMutation.isPending && pdfLoadingChallanId === c.id
+                                }
+                                disabled={
+                                  ensurePdfMutation.isPending && pdfLoadingChallanId !== c.id
+                                }
+                                onClick={() => {
+                                  setPdfLoadingChallanId(c.id);
+                                  ensurePdfMutation.mutate(c.id, {
+                                    onSuccess: (data) => {
+                                      window.open(
+                                        withCacheBust(data.pdfUrl),
+                                        '_blank',
+                                        'noopener,noreferrer',
+                                      );
+                                      void challansQuery.refetch();
+                                    },
+                                    onError: (e: unknown) => {
+                                      notifications.show({
+                                        title: tFees('myFees.pdfEnsureErrorTitle'),
+                                        message:
+                                          e instanceof Error
+                                            ? e.message
+                                            : tFees('myFees.pdfEnsureErrorMessage'),
+                                        color: 'red',
+                                      });
+                                    },
+                                    onSettled: () => setPdfLoadingChallanId(null),
+                                  });
+                                }}
+                              >
+                                {ensurePdfMutation.isPending && pdfLoadingChallanId === c.id
+                                  ? tFees('myFees.pdfPreparing')
+                                  : tFees('myFees.download')}
+                              </Button>
                               <Button
                                 leftSection={<IconUpload size={16} />}
                                 size="xs"
@@ -321,19 +349,22 @@ export function MyFeesTab(props: { mode: Mode }) {
                   { value: 'Cash', label: tFees('myFees.methods.cash') },
                 ]}
               />
-              <TextInput
-                label={tFees('myFees.form.bankName')}
-                value={bankName}
-                onChange={(e) => setBankName(e.currentTarget.value)}
-              />
+              {paymentMethod !== 'Cash' ? (
+                <TextInput
+                  label={tFees('myFees.form.bankName')}
+                  value={bankName}
+                  onChange={(e) => setBankName(e.currentTarget.value)}
+                />
+              ) : null}
             </Group>
 
-            <TextInput
-              label={tFees('myFees.form.transactionReference')}
-              value={transactionReference}
-              onChange={(e) => setTransactionReference(e.currentTarget.value)}
-            />
-
+            {paymentMethod !== 'Cash' ? (
+              <TextInput
+                label={tFees('myFees.form.transactionReference')}
+                value={transactionReference}
+                onChange={(e) => setTransactionReference(e.currentTarget.value)}
+              />
+            ) : null}
             <FileInput
               label={tFees('myFees.form.proof')}
               placeholder={tFees('myFees.form.proofPlaceholder')}
