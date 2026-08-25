@@ -33,8 +33,8 @@ Detailed guides for each module of the NTG Alma portal. One page per feature.
 | [🕐 Timetable & Schedule](timetable-and-schedule.md) | Generate/copy, My Schedule, Children Timetable |
 | [🔄 Teacher Substitution](teacher-substitution.md) | Arranging cover for absent teachers |
 | [⭐ Behavioural](behavioural.md) | 1–5 star matrix, Pending this month, settings |
-| [🎯 Promotion & Placement](promotion-and-placement.md) | Six outcomes; Save is immediate |
-| [🥇 Results](results.md) | Report cards, remarks, publish, PDF/ZIP; parent My Child |
+| [🎯 Promotion & Placement](promotion-and-placement.md) | Year-end window, bulk confirmations, six outcomes |
+| [🥇 Report Cards](results.md) | Term / progress cards, remarks, publish / unpublish, PDF/ZIP; parent My Child |
 | [📊 Reports](reports.md) | Student, class, public, administrative, revenue; fee reports URL |
 
 ## 📨 Requests & Communication
@@ -46,6 +46,7 @@ Detailed guides for each module of the NTG Alma portal. One page per feature.
 | [📅 Events](events.md) | Consent workflow, My Events; search unwired |
 | [🔔 Notifications](notifications.md) | Bell, All notifications filters, push settings |
 | [📨 Messages](messages.md) | One-to-one, class/school broadcast, read filters |
+| [🎧 In-app Support](in-app-support.md) | Reach chat, campus unread, coverage and minutes |
 
 ## 💵 Finance & Documents
 

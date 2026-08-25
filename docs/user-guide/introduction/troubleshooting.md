@@ -58,7 +58,7 @@ Each feature page has its own troubleshooting section at the bottom. Start there
 * [🔐 Authentication & Access](../features/authentication-and-access.md)
 * [⚙️ Settings & Configuration](../features/settings-and-configuration.md)
 * [💵 Fee Management](../features/fee-management.md)
-* [🥇 Results](../features/results.md)
+* [🥇 Report Cards](../features/results.md)
 * [🏫 Google Classroom](../features/google-classroom.md)
 
 ## Still Stuck?

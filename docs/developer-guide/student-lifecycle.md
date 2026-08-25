@@ -334,76 +334,62 @@ graph TB
 
 ## 🎓 Promotion & Placement Workflow
 
-### Year-End Process
+### Purpose
 
-```mermaid
-stateDiagram-v2
-    [*] --> Current_Year: Student enrolled
-    Current_Year --> Assessment: End of year
-    Assessment --> Decision_Pending: Marks compiled
-    Decision_Pending --> Promoted: Meets criteria
-    Decision_Pending --> Retained: Failed to meet criteria
-    Decision_Pending --> Conditional: Borderline case
-    
-    Promoted --> Next_Year: Auto-enroll next year
-    Retained --> Same_Year: Re-enroll same class
-    Conditional --> Review: Manual review
-    Review --> Promoted: Approved
-    Review --> Retained: Not approved
-    
-    Promoted --> [*]
-    Retained --> [*]
-```
+Year-end staff decisions for each active student (`promoted`, `repeated`, `graduated`, `transferred_out`, `withdrawn`, `inactive`). Decisions are **manual** — the API does **not** auto-calculate pass/fail from results.
 
-### Promotion Decision Flow
+### Safety gates (must pass before `POST /api/v1/promotion-placement/decisions`)
+
+1. **`promotion_module_enabled`** in `system_settings` is not `false` (default: enabled).
+2. **Promotion window open:** either `promotion_window_manual_open` is `true`, or `today >= academic_year.end_date - promotion_window_days` (default days: `45`).
+3. Source academic year is **not locked**.
+4. If every decision in the batch is `graduated`, request body must include **`classSectionId`** (scoped Graduate-all).
+
+Frontend also: dedicated RBAC feature code `promotion_placement`; bulk actions require a class-section filter; Graduate-all and bulk Save use confirmation modals.
+
+### Year-end placement flow
 
 ```mermaid
 sequenceDiagram
     participant Admin
-    participant Backend
-    participant Database
+    participant API as PromotionPlacementAPI
+    participant Window as PromotionWindowService
+    participant DB as Database
 
-    Note over Admin: Year-End Review
-    Admin->>Backend: GET /students?academic_year=2025&class=5
-    Backend->>Database: Fetch students + result cards
-    Backend-->>Admin: Student list with final results
-    
-    Admin->>Backend: POST /promotion-decisions (bulk)
-    Note over Backend: For each student:<br/>Calculate promotion eligibility
-    
-    loop For each student
-        Backend->>Database: Check final percentage
-        Backend->>Database: Check minimum passing grade
-        Backend->>Database: Insert student_promotion_decisions
-        Note over Database: outcome='promoted'<br/>target_class_id=next_class
-    end
-    
-    Backend-->>Admin: Promotion decisions recorded
-    
-    Note over Admin: Execute Rollover
-    Admin->>Backend: POST /academic-years/rollover
-    Backend->>Database: Create new academic year
-    Backend->>Database: Create new class sections
-    Backend->>Database: Create student_enrolments for promoted students
-    Backend->>Database: Record rollover in audit table
-    Backend-->>Admin: Rollover complete
+    Admin->>API: GET /promotion-placement/window
+    API->>Window: getWindowStatus
+    Window-->>Admin: enabled, open, opensOn
+
+    Note over Admin: Window must be open
+    Admin->>API: POST /promotion-placement/decisions
+    API->>Window: assertPromotionWindowOpen
+    API->>DB: Upsert student_promotion_decisions
+    API->>DB: Align closing-year student_enrolments
+    API-->>Admin: upserted count
+
+    Note over Admin: Later: lock academic year
+    Admin->>API: PATCH /academic-years/:id/lock
+    Note over API: Requires readiness (all active students decided)
+    API->>DB: Lock year, activate next, create next-year enrolments
 ```
 
-### Promotion Criteria (Configurable)
+### Decision outcomes (`student_promotion_decisions.outcome`)
 
-Typical criteria:
+* `promoted` — active in target class/section
+* `repeated` — active in target class/section (usually same as current)
+* `graduated` / `transferred_out` / `withdrawn` / `inactive` — terminal status on enrolments
 
-* Overall percentage ≥ minimum passing threshold
-* No more than X failing subjects
-* Behavioral assessment scores acceptable
-* Class teacher recommendation
+### System settings keys
 
-**Decision outcomes** (from `student_promotion_decisions.outcome`):
+| Key | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `promotion_module_enabled` | boolean | `true` | School admin only to write |
+| `promotion_window_days` | number | `45` | Days before `end_date` |
+| `promotion_window_manual_open` | boolean | `false` | Force-open override |
 
-* `promoted` - Advance to next grade
-* `retained` - Repeat current grade
-* `conditional` - Pending additional review
-* `transferred` - Moving to different school
+### RBAC
+
+Nav path `/promotion-placement` maps to feature code **`promotion_placement`** (view/edit via `role_permissions`). Seed/grant for `school_admin` and `principal` at minimum.
 
 ***
 
@@ -613,9 +599,10 @@ graph LR
 
 ### Promotions
 
-* Run promotion process before academic year rollover
-* Manually review borderline cases
-* Communicate decisions to parents before new year
+* Open the promotion window (near year end, or force-open in Settings) before saving
+* Prefer class-section scoped bulk actions; confirm Graduate-all carefully
+* Run promotion process before academic year lock / rollover
+* Communicate decisions to parents before the new year
   {% endstep %}
   {% endstepper %}
 

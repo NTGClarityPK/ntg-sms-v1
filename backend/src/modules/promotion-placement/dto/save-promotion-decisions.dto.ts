@@ -26,5 +26,10 @@ export class SavePromotionDecisionsDto {
   @ValidateNested({ each: true })
   @Type(() => PromotionDecisionInput)
   decisions!: PromotionDecisionInput[];
+
+  /** Present when the save was scoped to a specific class-section (required for Graduate-all). */
+  @IsOptional()
+  @IsUUID()
+  classSectionId?: string | null;
 }
 

@@ -257,7 +257,7 @@ Listed by functional area:
 | **SettingsImportModule**       | Settings import                        | Settings tables               |
 | **SystemSettingsModule**       | System-wide key-value config           | `system_settings`             |
 | **SettingsStatusModule**       | Settings readiness checks              | Multiple                      |
-| **PromotionPlacementModule**   | Year-end promotion UI                  | `student_promotion_decisions` |
+| **PromotionPlacementModule**   | Year-end promotion UI; window + module gates | `student_promotion_decisions`, `system_settings` |
 | **SetupWizardModule**          | First-run wizard                       | Multiple                      |
 | Plus 3 more utility modules... |                                        |                               |
 

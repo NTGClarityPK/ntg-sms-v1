@@ -56,18 +56,30 @@ export function useClassSectionResults(
   classSectionId: string | null,
   academicYearId: string | undefined,
   resultType: string,
+  progressMonth?: number | null,
 ) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const type = resultType === 'interim' || resultType === 'mid_term' || resultType === 'final' ? resultType : 'final';
 
   return useQuery({
-    queryKey: ['results', 'class-section', classSectionId, academicYearId, type, branchId],
+    queryKey: [
+      'results',
+      'class-section',
+      classSectionId,
+      academicYearId,
+      type,
+      progressMonth ?? null,
+      branchId,
+    ],
     queryFn: async (): Promise<ClassSectionResults | null> => {
       if (!classSectionId || !branchId) return null;
       const params = new URLSearchParams();
       params.set('resultType', type);
       if (academicYearId) params.set('academicYearId', academicYearId);
+      if (progressMonth != null && progressMonth >= 1 && progressMonth <= 12) {
+        params.set('progressMonth', String(progressMonth));
+      }
       const response = await apiClient.get<ClassSectionResults>(
         `/api/v1/results/class-section/${classSectionId}?${params.toString()}`,
       );
@@ -84,19 +96,37 @@ export function useResultCardsByClassSection(
   academicYearId: string | undefined,
   resultType: string,
   reportKind: string = 'term_report',
+  progressSequence?: number | null,
 ) {
   const { user } = useAuth();
   const branchId = user?.currentBranch?.id;
   const type = resultType === 'interim' || resultType === 'mid_term' || resultType === 'final' ? resultType : 'final';
 
   return useQuery({
-    queryKey: ['results', 'class-section-cards', classSectionId, academicYearId, type, reportKind, branchId],
+    queryKey: [
+      'results',
+      'class-section-cards',
+      classSectionId,
+      academicYearId,
+      type,
+      reportKind,
+      progressSequence ?? null,
+      branchId,
+    ],
     queryFn: async (): Promise<ResultCard[]> => {
       if (!classSectionId || !academicYearId || !branchId) return [];
       const params = new URLSearchParams();
       params.set('academicYearId', academicYearId);
       params.set('resultType', type);
       params.set('reportKind', reportKind);
+      if (
+        reportKind === 'progress_report' &&
+        progressSequence != null &&
+        progressSequence >= 1 &&
+        progressSequence <= 12
+      ) {
+        params.set('progressSequence', String(progressSequence));
+      }
       const response = await apiClient.get<ResultCard[]>(
         `/api/v1/results/class-section/${classSectionId}/cards?${params.toString()}`,
       );
@@ -153,7 +183,7 @@ export function useUpdateResultCardComment() {
   });
 }
 
-/** PATCH result card status (e.g. publish). */
+/** PATCH result card status (publish / unpublish → draft). */
 export function useUpdateResultCardStatus() {
   const qc = useQueryClient();
   return useMutation({
@@ -167,7 +197,7 @@ export function useUpdateResultCardStatus() {
   });
 }
 
-/** GET marks readiness (assessments in scope vs recorded grades). */
+/** GET marks readiness (phase exam assessments vs recorded grades). */
 export function useClassSectionMarksReadiness(
   classSectionId: string | null,
   academicYearId: string | undefined,

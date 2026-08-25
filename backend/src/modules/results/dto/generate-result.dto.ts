@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { REPORT_KINDS, type ReportKind } from './report-kind.enum';
 import { RESULT_TYPES, ResultType } from './result-type.enum';
 
@@ -22,9 +22,11 @@ export class GenerateResultDto {
   @IsOptional()
   resultType?: ResultType;
 
+  /** Calendar month 1–12 for progress (monthly) reports; stored as progress_sequence. */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(12)
   progressSequence?: number;
 }

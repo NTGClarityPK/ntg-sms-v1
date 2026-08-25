@@ -63,15 +63,26 @@ export function composeDesignPdfHtml(
   bodyInner: string,
   wrapperClass: 'report-card' | 'progress-report',
   themeVariablesCss: string,
+  detailedCompact = false,
 ): string {
   const pageBreakCss = `.page-break { page-break-before: always; }\n`;
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><style>${pageBreakCss}${themeVariablesCss}\n${styleBlock}\n${PDF_PRINT_LAYOUT_CSS}</style></head><body><div class="${wrapperClass}">${bodyInner}</div></body></html>`;
+  const compactClass = detailedCompact ? ' report-card--detailed-compact' : '';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><style>${pageBreakCss}${themeVariablesCss}\n${styleBlock}\n${PDF_PRINT_LAYOUT_CSS}</style></head><body><div class="${wrapperClass}${compactClass}">${bodyInner}</div></body></html>`;
 }
 
-export function composeDesignPdfHtmlMultiCard(styleBlock: string, cardInners: string[], themeVariablesCss: string): string {
+export function composeDesignPdfHtmlMultiCard(
+  styleBlock: string,
+  cardInners: string[],
+  themeVariablesCss: string,
+  detailedCompact = false,
+): string {
   const pageBreakCss = `.page-break { page-break-before: always; }\n`;
+  const compactClass = detailedCompact ? ' report-card--detailed-compact' : '';
   const body = cardInners
-    .map((inner, i) => `${i > 0 ? '<div class="page-break"></div>' : ''}<div class="report-card">${inner}</div>`)
+    .map(
+      (inner, i) =>
+        `${i > 0 ? '<div class="page-break"></div>' : ''}<div class="report-card${compactClass}">${inner}</div>`,
+    )
     .join('\n');
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><style>${pageBreakCss}${themeVariablesCss}\n${styleBlock}\n${PDF_PRINT_LAYOUT_CSS}</style></head><body>${body}</body></html>`;
 }
@@ -104,6 +115,8 @@ export function buildMinimalTermAnnualReportInner(input: {
   reportDate: string;
   result: StudentResultDto;
   classTeacherComment?: string;
+  conductLabel?: string;
+  attendanceLabel?: string;
 }): string {
   const banner = reportBannerForKind(input.reportKind, input.resultType);
   const termOrContext =
@@ -129,6 +142,8 @@ export function buildMinimalTermAnnualReportInner(input: {
       : '';
   const overallGrade = input.result.overallLetterGrade ?? '—';
   const overallPct = input.result.overallPercentage != null ? `${input.result.overallPercentage}%` : '—';
+  const conductLabel = input.conductLabel?.trim() || '—';
+  const attendanceLabel = input.attendanceLabel?.trim() || '—';
   const remarksTeacher =
     input.classTeacherComment && input.classTeacherComment.trim()
       ? `<div class="remarks-box"><div class="title">Class teacher remarks</div><p>${escapeHtmlPdf(input.classTeacherComment.trim())}</p></div>`
@@ -188,9 +203,12 @@ export function buildMinimalTermAnnualReportInner(input: {
                     <div class="value">${escapeHtmlPdf(overallPct)}</div>
                 </div>
                 <div class="summary-item">
+                    <div class="label">Attendance</div>
+                    <div class="value">${escapeHtmlPdf(attendanceLabel)}</div>
+                </div>
+                <div class="summary-item">
                     <div class="label">Conduct</div>
-                    <div class="value">—</div>
-                    <div style="font-size: 11px; margin-top: 5px;">See term report</div>
+                    <div class="value">${escapeHtmlPdf(conductLabel)}</div>
                 </div>
             </div>
         </div>
@@ -229,6 +247,8 @@ export function buildModernTermAnnualReportInner(input: {
   reportDate: string;
   result: StudentResultDto;
   classTeacherComment?: string;
+  conductLabel?: string;
+  attendanceLabel?: string;
 }): string {
   const banner =
     input.reportKind === 'annual_report'
@@ -277,6 +297,8 @@ export function buildModernTermAnnualReportInner(input: {
     input.classTeacherComment && input.classTeacherComment.trim()
       ? `<div class="remarks-section"><h3>Class teacher</h3><p>${escapeHtmlPdf(input.classTeacherComment.trim())}</p></div>`
       : '';
+  const conductLabel = input.conductLabel?.trim() || '—';
+  const attendanceLabel = input.attendanceLabel?.trim() || '—';
   return `
     <div class="header">
       <div class="school-info">
@@ -334,13 +356,17 @@ export function buildModernTermAnnualReportInner(input: {
           <h3>Overall grade</h3>
           <div class="value">${escapeHtmlPdf(input.result.overallLetterGrade ?? '—')}</div>
         </div>
-        <div class="summary-card attendance">
+        <div class="summary-card">
           <h3>Overall %</h3>
           <div class="value">${input.result.overallPercentage != null ? `${input.result.overallPercentage}%` : '—'}</div>
         </div>
+        <div class="summary-card attendance">
+          <h3>Attendance</h3>
+          <div class="value">${escapeHtmlPdf(attendanceLabel)}</div>
+        </div>
         <div class="summary-card conduct">
           <h3>Conduct</h3>
-          <div class="value">—</div>
+          <div class="value">${escapeHtmlPdf(conductLabel)}</div>
         </div>
       </div>
       ${remarks}
@@ -374,6 +400,8 @@ export function buildMinimalProgressInner(input: {
   reportDate: string;
   result: StudentResultDto;
   classTeacherComment?: string;
+  conductLabel?: string;
+  attendanceLabel?: string;
 }): string {
   const line2 = input.schoolLine2.trim()
     ? `<div class="subtitle">${escapeHtmlPdf(input.schoolLine2)}</div>`
@@ -392,6 +420,8 @@ export function buildMinimalProgressInner(input: {
     assessRows = '<tr><td colspan="5">No recent marks recorded</td></tr>';
   }
   const avg = input.result.overallPercentage != null ? `${input.result.overallPercentage}%` : '—';
+  const conductLabel = input.conductLabel?.trim() || '—';
+  const attendanceLabel = input.attendanceLabel?.trim() || '—';
   const remarks =
     input.classTeacherComment && input.classTeacherComment.trim()
       ? `<div class="section-heading">Teacher comments</div><div class="remarks-box"><p>${escapeHtmlPdf(input.classTeacherComment.trim())}</p></div>`
@@ -434,6 +464,8 @@ export function buildMinimalProgressInner(input: {
                     <th>Current average</th>
                     <th>Overall %</th>
                     <th>Letter grade</th>
+                    <th>Attendance</th>
+                    <th>Conduct</th>
                 </tr>
             </thead>
             <tbody>
@@ -441,6 +473,8 @@ export function buildMinimalProgressInner(input: {
                     <td><strong>${escapeHtmlPdf(avg)}</strong></td>
                     <td><strong>${escapeHtmlPdf(avg)}</strong></td>
                     <td><strong>${escapeHtmlPdf(input.result.overallLetterGrade ?? '—')}</strong></td>
+                    <td><strong>${escapeHtmlPdf(attendanceLabel)}</strong></td>
+                    <td><strong>${escapeHtmlPdf(conductLabel)}</strong></td>
                 </tr>
             </tbody>
         </table>
@@ -474,11 +508,15 @@ export function buildModernProgressInner(input: {
   reportDate: string;
   result: StudentResultDto;
   classTeacherComment?: string;
+  conductLabel?: string;
+  attendanceLabel?: string;
 }): string {
   const sub = input.schoolLine2.trim()
     ? `<p>${escapeHtmlPdf(input.schoolLine2)}</p>`
     : '';
   const avg = input.result.overallPercentage != null ? `${input.result.overallPercentage}%` : '—';
+  const conductLabel = input.conductLabel?.trim() || '—';
+  const attendanceLabel = input.attendanceLabel?.trim() || '—';
   let cards = '';
   for (const s of input.result.subjects) {
     cards += `<div class="assessment-card">
@@ -537,9 +575,13 @@ export function buildModernProgressInner(input: {
           <h3>Letter grade</h3>
           <div class="value">${escapeHtmlPdf(input.result.overallLetterGrade ?? '—')}</div>
         </div>
-        <div class="performance-card">
-          <h3>Subjects</h3>
-          <div class="value">${input.result.subjects.length}</div>
+        <div class="performance-card attendance">
+          <h3>Attendance</h3>
+          <div class="value">${escapeHtmlPdf(attendanceLabel)}</div>
+        </div>
+        <div class="performance-card conduct">
+          <h3>Conduct</h3>
+          <div class="value">${escapeHtmlPdf(conductLabel)}</div>
         </div>
       </div>
       <div class="section-title">
@@ -562,7 +604,19 @@ export function buildDetailedMinimalPageInner(
   schoolLine2: string,
   academicYearName: string,
   reportDate: string,
+  options?: {
+    headerMode?: 'full' | 'continuation';
+    compact?: boolean;
+    showSignatures?: boolean;
+    showFooter?: boolean;
+    conductLabel?: string;
+    attendanceLabel?: string;
+  },
 ): string {
+  const showSignatures = options?.showSignatures !== false;
+  const showFooter = options?.showFooter !== false;
+  const conductLabel = options?.conductLabel?.trim() || '—';
+  const attendanceLabel = options?.attendanceLabel?.trim() || '—';
   const line2 = schoolLine2.trim() ? `<div class="subtitle">${escapeHtmlPdf(schoolLine2)}</div>` : '';
   const classRankStr =
     d.classRank != null
@@ -598,6 +652,27 @@ export function buildDetailedMinimalPageInner(
   }
   const commentBlock = d.classTeacherComment
     ? `<div class="remarks-box"><div class="title">Class teacher remarks</div><p>${escapeHtmlPdf(d.classTeacherComment)}</p></div>`
+    : '';
+  const signatures = showSignatures
+    ? `<div class="signatures">
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Class teacher</div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Parent / guardian</div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Principal</div>
+            </div>
+        </div>`
+    : '';
+  const footer = showFooter
+    ? `<div class="footer">
+            <p>Detailed report — generated from the school management system.</p>
+        </div>`
     : '';
   return `
         <div class="header">
@@ -655,27 +730,33 @@ export function buildDetailedMinimalPageInner(
             </thead>
             <tbody>${assessRows}</tbody>
         </table>
+        <div class="section-heading">Summary</div>
+        <div class="summary-section">
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="label">Overall grade</div>
+                    <div class="value">${escapeHtmlPdf(d.overallLetterGrade ?? '—')}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Overall %</div>
+                    <div class="value">${d.overallPercentage != null ? `${d.overallPercentage}%` : '—'}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Attendance</div>
+                    <div class="value">${escapeHtmlPdf(attendanceLabel)}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Conduct</div>
+                    <div class="value">${escapeHtmlPdf(conductLabel)}</div>
+                </div>
+            </div>
+        </div>
         <div class="section-heading">Remarks</div>
         <div class="remarks-box"><p>${escapeHtmlPdf(d.generatedParagraph)}</p></div>
         ${commentBlock}
-        <div class="signatures">
-            <div class="signature-block">
-                <div class="signature-line"></div>
-                <div class="signature-label">Class teacher</div>
-            </div>
-            <div class="signature-block">
-                <div class="signature-line"></div>
-                <div class="signature-label">Parent / guardian</div>
-            </div>
-            <div class="signature-block">
-                <div class="signature-line"></div>
-                <div class="signature-label">Principal</div>
-            </div>
+        ${signatures}
         </div>
-        </div>
-        <div class="footer">
-            <p>Detailed report — generated from the school management system.</p>
-        </div>`;
+        ${footer}`;
 }
 
 export function buildModernDetailedPageInner(
@@ -686,9 +767,20 @@ export function buildModernDetailedPageInner(
   schoolLine2: string,
   academicYearName: string,
   reportDate: string,
-  options?: { headerMode?: 'full' | 'continuation' },
+  options?: {
+    headerMode?: 'full' | 'continuation';
+    compact?: boolean;
+    showSignatures?: boolean;
+    showFooter?: boolean;
+    conductLabel?: string;
+    attendanceLabel?: string;
+  },
 ): string {
   const headerMode = options?.headerMode ?? 'full';
+  const showSignatures = options?.showSignatures !== false;
+  const showFooter = options?.showFooter !== false;
+  const conductLabel = options?.conductLabel?.trim() || '—';
+  const attendanceLabel = options?.attendanceLabel?.trim() || '—';
   const sub = schoolLine2.trim() ? `<p>${escapeHtmlPdf(schoolLine2)}</p>` : '';
   const classRankStr =
     d.classRank != null
@@ -735,6 +827,27 @@ export function buildModernDetailedPageInner(
   }
   const commentBlock = d.classTeacherComment
     ? `<div class="remarks-section"><h3>Class teacher</h3><p>${escapeHtmlPdf(d.classTeacherComment)}</p></div>`
+    : '';
+  const signatures = showSignatures
+    ? `<div class="signatures">
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          <div class="signature-label">Class teacher</div>
+        </div>
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          <div class="signature-label">Parent / guardian</div>
+        </div>
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          <div class="signature-label">Principal</div>
+        </div>
+      </div>`
+    : '';
+  const footer = showFooter
+    ? `<div class="footer">
+      <p>Detailed report — generated from the school management system.</p>
+    </div>`
     : '';
   const fullHeader = `
     <div class="header">
@@ -823,6 +936,24 @@ export function buildModernDetailedPageInner(
         </thead>
         <tbody>${assessRows}</tbody>
       </table>
+      <div class="summary-cards">
+        <div class="summary-card">
+          <h3>Overall grade</h3>
+          <div class="value">${escapeHtmlPdf(d.overallLetterGrade ?? '—')}</div>
+        </div>
+        <div class="summary-card">
+          <h3>Overall %</h3>
+          <div class="value">${d.overallPercentage != null ? `${d.overallPercentage}%` : '—'}</div>
+        </div>
+        <div class="summary-card attendance">
+          <h3>Attendance</h3>
+          <div class="value">${escapeHtmlPdf(attendanceLabel)}</div>
+        </div>
+        <div class="summary-card conduct">
+          <h3>Conduct</h3>
+          <div class="value">${escapeHtmlPdf(conductLabel)}</div>
+        </div>
+      </div>
       <div class="section-title">
         <span class="section-icon">&#128172;</span>
         Remarks
@@ -831,22 +962,7 @@ export function buildModernDetailedPageInner(
         <p>${escapeHtmlPdf(d.generatedParagraph)}</p>
       </div>
       ${commentBlock}
-      <div class="signatures">
-        <div class="signature-box">
-          <div class="signature-line"></div>
-          <div class="signature-label">Class teacher</div>
-        </div>
-        <div class="signature-box">
-          <div class="signature-line"></div>
-          <div class="signature-label">Parent / guardian</div>
-        </div>
-        <div class="signature-box">
-          <div class="signature-line"></div>
-          <div class="signature-label">Principal</div>
-        </div>
-      </div>
+      ${signatures}
     </div>
-    <div class="footer">
-      <p>Detailed report — generated from the school management system.</p>
-    </div>`;
+    ${footer}`;
 }

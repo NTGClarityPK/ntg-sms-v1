@@ -30,7 +30,7 @@
 1. Start with the [📖 User Manual](../user-manual/README.md) - login and navigation
 2. Use [🕐 My Timetable](../features/timetable-and-schedule.md) - view your timetable
 3. View [✅ Attendance](../features/attendance.md) where available
-4. View [🥇 Results](../features/results.md) when published
+4. View [🥇 Report Cards](../features/results.md) when published
 5. Check [🔔 Notifications](../features/notifications.md) - track updates
 
 ## 🌐 First-Time Tips

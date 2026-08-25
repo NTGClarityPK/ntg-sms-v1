@@ -75,7 +75,7 @@ developer-guide/
 
 * Backend variables and which are required
 * Frontend public variables
-* Optional integrations (Google Classroom, Stripe, web push)
+* Optional integrations (Google Classroom, Stripe, web push, Reach Support)
 * Security rules for example files
 
 ### [🏗️ Architecture](architecture.md)

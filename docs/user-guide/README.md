@@ -38,7 +38,7 @@ This documentation space covers:
 
 1. [**User Manual**](user-manual/README.md) - Login and navigation
 2. [**Timetable & Schedule**](features/timetable-and-schedule.md) - Your timetable
-3. [**Results**](features/results.md) - Your report cards
+3. [**Report Cards**](features/results.md) - Your report cards
 4. [**Notifications**](features/notifications.md) - Track updates
 
 ## 📖 Documentation Structure
@@ -100,9 +100,10 @@ See [**Features**](features/README.md) for the complete catalogue. Highlights:
 * Grade entry and statistics
 * Rubric-based marking
 
-#### [**Results**](features/results.md)
+#### [**Report Cards**](features/results.md)
 
-* Term, annual, and progress reports
+* Term and monthly progress reports
+* Draft, publish, and unpublish for parents
 * Teacher comments and publishing
 * Distribution and delivery tracking
 
@@ -188,12 +189,13 @@ See [**Features**](features/README.md) for the complete catalogue. Highlights:
 3. Generate challans
 4. Download and share PDFs
 
-**Publishing Results:**
+**Publishing Report Cards:**
 
-1. Go to Results and select the class
-2. Create each required draft card
-3. Add the class teacher comment
-4. Publish for parents; parents download it under **My Child**
+1. Go to **Report Cards** and select the class
+2. Choose Term (Mid-term / Final) or Progress (month)
+3. Create each required draft card
+4. Add the class teacher comment
+5. Publish for parents; parents download under **My Child**
 
 ## 🆘 Troubleshooting
 

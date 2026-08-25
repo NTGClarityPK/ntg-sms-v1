@@ -44,9 +44,10 @@ Complete guide for all users:
 * Bulk and individual challan generation
 * Payment tracking and export
 
-### [🥇 Results](../features/results.md)
+### [🥇 Report Cards](../features/results.md)
 
-* Term, annual, and progress reports
+* Term and monthly progress reports
+* Draft, publish, and unpublish for parents
 * Teacher comments and publishing
 * Distribution and delivery tracking
 

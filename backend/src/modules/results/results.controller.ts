@@ -81,6 +81,7 @@ export class ResultsController {
     @Query('reportType') reportTypeParam: string | undefined,
     @Query('pdfVariant') pdfVariantParam: string | undefined,
     @Query('reportKind') reportKindParam: string | undefined,
+    @Query('progressMonth') progressMonthParam: string | undefined,
     @Res() res: Response,
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
@@ -101,13 +102,21 @@ export class ResultsController {
     const pdfVariant =
       pdfVariantParam === 'minimal' || pdfVariantParam === 'modern' ? pdfVariantParam : undefined;
     const reportKind = parseReportKindParam(reportKindParam);
+    const progressMonthRaw = progressMonthParam ? Number(progressMonthParam) : undefined;
+    const progressMonth =
+      progressMonthRaw != null &&
+      Number.isInteger(progressMonthRaw) &&
+      progressMonthRaw >= 1 &&
+      progressMonthRaw <= 12
+        ? progressMonthRaw
+        : undefined;
     const buffer = await this.resultsService.generateResultCardPdf(
       studentId,
       classSectionId,
       branch.branchId,
       academicYearId,
       type,
-      { reportType, pdfVariant, reportKind },
+      { reportType, pdfVariant, reportKind, progressMonth },
     );
     const filename = await this.resultsService.buildResultCardFilename(
       studentId,
@@ -120,6 +129,70 @@ export class ResultsController {
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="${filename}"`,
+    );
+    res.send(buffer);
+  }
+
+  @Get('student/:studentId/monthly-pack/attendance/pdf')
+  async getMonthlyPackAttendancePdf(
+    @Param('studentId') studentId: string,
+    @Query('month') monthParam: string,
+    @Query('academicYearId') academicYearId: string | undefined,
+    @Res() res: Response,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<void> {
+    await this.reportsService.ensureUserCanAccessStudent(
+      studentId,
+      user.id,
+      user.roles,
+    );
+    const month = Number(monthParam);
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new BadRequestException('month must be an integer from 1 to 12');
+    }
+    const buffer = await this.resultsService.generateMonthlyPackAttendancePdf(
+      studentId,
+      branch.branchId,
+      academicYearId,
+      month,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="attendance-${monthParam}-${studentId}.pdf"`,
+    );
+    res.send(buffer);
+  }
+
+  @Get('student/:studentId/monthly-pack/behaviour/pdf')
+  async getMonthlyPackBehaviourPdf(
+    @Param('studentId') studentId: string,
+    @Query('month') monthParam: string,
+    @Query('academicYearId') academicYearId: string | undefined,
+    @Res() res: Response,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<void> {
+    await this.reportsService.ensureUserCanAccessStudent(
+      studentId,
+      user.id,
+      user.roles,
+    );
+    const month = Number(monthParam);
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new BadRequestException('month must be an integer from 1 to 12');
+    }
+    const buffer = await this.resultsService.generateMonthlyPackBehaviourPdf(
+      studentId,
+      branch.branchId,
+      academicYearId,
+      month,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="behaviour-${monthParam}-${studentId}.pdf"`,
     );
     res.send(buffer);
   }
@@ -172,8 +245,19 @@ export class ResultsController {
       branch.branchId,
     );
     const reportKind = body.reportKind ?? 'term_report';
-    if (reportKind !== 'annual_report' && !body.resultType) {
-      throw new BadRequestException('resultType is required unless reportKind is annual_report');
+    if (reportKind === 'annual_report') {
+      throw new BadRequestException('Annual reports can no longer be created');
+    }
+    if (reportKind === 'term_report' && !body.resultType) {
+      throw new BadRequestException('resultType is required for term reports');
+    }
+    if (reportKind === 'progress_report') {
+      const month = body.progressSequence;
+      if (month == null || month < 1 || month > 12) {
+        throw new BadRequestException(
+          'progressSequence (calendar month 1–12) is required for progress reports',
+        );
+      }
     }
     const type = (body.resultType ?? 'final') as ResultType;
     const data = await this.resultsService.generateResultCard(
@@ -275,6 +359,7 @@ export class ResultsController {
     @Query('academicYearId') academicYearId: string | undefined,
     @Query('resultType') resultType: string,
     @Query('reportKind') reportKindParam: string | undefined,
+    @Query('progressSequence') progressSequenceParam: string | undefined,
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: ResultCardDto[] }> {
@@ -294,12 +379,16 @@ export class ResultsController {
       reportKindParam === 'annual_report' || reportKindParam === 'progress_report'
         ? reportKindParam
         : 'term_report';
+    const seqRaw = progressSequenceParam ? Number(progressSequenceParam) : undefined;
+    const progressSequence =
+      seqRaw != null && Number.isInteger(seqRaw) && seqRaw >= 1 && seqRaw <= 12 ? seqRaw : undefined;
     const data = await this.resultsService.listResultCardsByClassSection(
       classSectionId,
       branch.branchId,
       academicYearId,
       type,
       reportKind,
+      progressSequence,
     );
     return { data };
   }
@@ -419,6 +508,7 @@ export class ResultsController {
     @Param('classSectionId') classSectionId: string,
     @Query('academicYearId') academicYearId: string | undefined,
     @Query('resultType') resultType: string,
+    @Query('progressMonth') progressMonthParam: string | undefined,
     @CurrentBranch() branch: CurrentBranchContext,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: ClassSectionResultsDto }> {
@@ -431,11 +521,23 @@ export class ResultsController {
     const type = (resultType === 'interim' || resultType === 'mid_term' || resultType === 'final'
       ? resultType
       : 'final') as ResultType;
+    const monthRaw = progressMonthParam ? Number(progressMonthParam) : undefined;
+    const progressMonth =
+      monthRaw != null && Number.isInteger(monthRaw) && monthRaw >= 1 && monthRaw <= 12
+        ? monthRaw
+        : undefined;
+    const scope =
+      progressMonth != null
+        ? { progressMonth }
+        : type === 'mid_term'
+          ? { termWindow: 'until_mid' as const }
+          : undefined;
     const data = await this.resultsService.getResultsForClassSection(
       classSectionId,
       branch.branchId,
       academicYearId,
       type,
+      scope,
     );
     return { data };
   }

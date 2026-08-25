@@ -33,7 +33,7 @@
 
 **Publishing Results:**
 
-1. Go to **Results** and select the class
+1. Go to **Report Cards** and select the class
 2. Create each required draft card
 3. Add the class teacher comment
 4. Publish for parents; parents download it under **My Child**

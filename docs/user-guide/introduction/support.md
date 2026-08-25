@@ -9,11 +9,13 @@
 
 ## Who to Contact
 
+For day-to-day product help, use **Support** in the Alma portal (sidebar or headset button). See [🎧 In-app Support](../features/in-app-support.md).
+
 | Situation | Contact |
 | --- | --- |
 | Access or permission problems | Your school administrator |
 | Incorrect student, staff, or class data | Your school administrator |
-| Portal errors or unexpected behaviour | Your school administrator, who escalates to NTG support |
+| Portal errors or unexpected behaviour | In-app Support, or your school administrator who escalates to NTG |
 | Billing and subscription questions | Your school administrator or NTG support |
 
 ## What to Include in a Report

@@ -19,7 +19,9 @@ Assessment types and grade templates: **Settings → Academic** → Assessment S
 
 **Tabs:** **All assessments** | **Examination schedule**
 
-Filters: search, class section, subject, published state, assessment type, teacher. Pagination. Row menu: view grades, statistics, edit, delete, export schedule PDF (where offered).
+Filters: search, class section, subject, published state, assessment type, teacher, **due/exam date range**. Pagination. Row menu: view grades, statistics, edit, delete, export schedule PDF (where offered).
+
+On **Examination schedule**, the same date range narrows the timetable and PDF export.
 
 ---
 

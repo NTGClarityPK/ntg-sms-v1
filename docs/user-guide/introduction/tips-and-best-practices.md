@@ -28,7 +28,7 @@
 * Reserve individual adjustments for genuine exceptions such as mid-month joiners
 * Download and share challans before the due date
 
-## 🥇 Results
+## 🥇 Report Cards
 
 * Check **Marks readiness** before publishing a term card
 * Download a sample PDF to review the layout

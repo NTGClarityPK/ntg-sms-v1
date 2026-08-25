@@ -599,11 +599,17 @@ export class AssessmentsService {
     }
 
     if (query.startDate) {
-      dbQuery = dbQuery.gte('due_date', query.startDate);
+      const startBound = query.startDate.includes('T')
+        ? query.startDate
+        : `${query.startDate}T00:00:00.000`;
+      dbQuery = dbQuery.gte('due_date', startBound);
     }
 
     if (query.endDate) {
-      dbQuery = dbQuery.lte('due_date', query.endDate);
+      const endBound = query.endDate.includes('T')
+        ? query.endDate
+        : `${query.endDate}T23:59:59.999`;
+      dbQuery = dbQuery.lte('due_date', endBound);
     }
 
     const { data, error, count } = await dbQuery;

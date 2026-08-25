@@ -204,6 +204,8 @@ VAPID_PUBLIC_KEY=your_vapid_public
 VAPID_PRIVATE_KEY=your_vapid_private
 NTG_ALMA_LOGO_URL=https://your-cdn.com/logo.png
 INVITATION_NTG_LOGO_URL=https://your-app.example.com/NTGTempLogo.svg
+REACH_API_KEY=your_reach_support_api_key
+REACH_BASE_URL=https://your-reach-api.example.com
 
 # CRITICAL: Production logo URLs must be publicly accessible HTTPS URLs
 # localhost will NOT work for email recipients

@@ -15,6 +15,7 @@ import { Header } from './Header';
 import { StorageWarningBanner } from './StorageWarningBanner';
 import { SetupBanner } from './SetupBanner';
 import { ConnectionIndicator } from '@/components/common/ConnectionIndicator';
+import { SupportFloatingButton } from '@/components/features/support/SupportFloatingButton';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -111,6 +112,7 @@ export function AppShell({ children }: AppShellProps) {
           <StorageWarningBanner />
           <SetupBanner />
           {children}
+          <SupportFloatingButton />
         </MantineAppShell.Main>
     </MantineAppShell>
   );

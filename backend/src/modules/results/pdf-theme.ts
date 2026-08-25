@@ -103,6 +103,45 @@ tfoot { display: table-footer-group; }
   break-after: avoid;
   page-break-after: avoid;
 }
+/* Detailed compact: avoid orphan footer page from forced card height */
+.report-card--detailed-compact {
+  min-height: 0 !important;
+  height: auto !important;
+  display: block !important;
+  font-size: 11px;
+}
+.report-card--detailed-compact .content {
+  flex: none !important;
+}
+.report-card--detailed-compact .footer {
+  margin-top: 8px !important;
+  page-break-before: avoid;
+  break-before: avoid;
+}
+.report-card--detailed-compact .header h1,
+.report-card--detailed-compact .report-title h2 {
+  font-size: 16px !important;
+  margin: 0 0 4px !important;
+}
+.report-card--detailed-compact .section-title,
+.report-card--detailed-compact .section-heading {
+  margin: 8px 0 4px !important;
+  font-size: 12px !important;
+}
+.report-card--detailed-compact .subjects-table th,
+.report-card--detailed-compact .subjects-table td,
+.report-card--detailed-compact .performance-table th,
+.report-card--detailed-compact .performance-table td {
+  padding: 3px 6px !important;
+  font-size: 10px !important;
+}
+.report-card--detailed-compact .signatures {
+  margin-top: 10px !important;
+}
+.report-card--detailed-compact .remarks-box,
+.report-card--detailed-compact .remarks-section {
+  margin: 6px 0 !important;
+}
 /*
  * Screen-style flex + min-height pins the footer to the bottom of one "card", which is
  * correct for short single-page PDFs. When the same card spans multiple printed pages,
@@ -113,17 +152,18 @@ tfoot { display: table-footer-group; }
   .report-card,
   .progress-report {
     min-height: auto !important;
-    height: auto !important;
     display: block !important;
   }
   .report-card .content,
   .progress-report .content {
     flex: none !important;
-    flex-grow: 0 !important;
   }
   .report-card > .footer,
   .progress-report > .footer {
-    margin-top: 24px !important;
+    margin-top: 8px !important;
+  }
+  .report-card--detailed-compact {
+    min-height: 0 !important;
   }
 }
 `;

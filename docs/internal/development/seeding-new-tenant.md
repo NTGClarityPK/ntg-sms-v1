@@ -1,12 +1,51 @@
 > **Ops note (2026-08):** Tenant-specific ABC / Raqqa seed scripts were removed.
 > Prefer general scripts under `backend/src/scripts/`:
 > - `delete-tenant-cleanly.ts` — hard-delete one tenant by code/id
+> - `seed-demo-tenant.ts` — **factory wipe + lean reseed** on one or more branches (see below)
 > - `seed-attendance.ts` — mark/refresh attendance for any tenant (`--tenant-code=…`)
-> - `seed-assessments.ts` — quizzes + marks for school day(s) (`--tenant-code=…`, `--date` / `--days` / `--from`/`--to`)
+> - `seed-assessments.ts` — quizzes + marks (`--tenant-code=…`, `--date` / `--days` / `--from`/`--to`, or `--year-schedule` for a full AY plan)
 >
 > The rest of this file remains a historical prompt for one-off ABC demo seeding ideas.
 
-Hey Cursor, I need you to create a complete database seeding script for our Iraqi school management system. This will create realistic test data for ABC School Networks with two branches in Baghdad, Iraq.
+## Lean demo seed (`seed-demo-tenant.ts`)
+
+**Prerequisite:** Tenant already exists (signup / setup wizard). Does **not** create or delete tenants/branches.
+
+Every run **wipes branch-scoped data first**, then rebuilds a lean dataset (dates relative to **today** in the tenant timezone). Untargeted branches are left alone.
+
+### Safety
+
+| Mode | Command |
+|------|---------|
+| Dry-run (default) | `npm run seed:demo -- --tenant-code=YOURCODE` |
+| Wipe + rebuild (first branch) | `npm run seed:demo -- --tenant-code=YOURCODE --confirm=YOURCODE --execute` |
+| Two specific branches | `npm run seed:demo -- --tenant-code=YOURCODE --branch-code=ALAHMAIN01,SECONDARY --confirm=YOURCODE --execute` |
+| Every active branch | `npm run seed:demo -- --tenant-code=YOURCODE --all-branches --confirm=YOURCODE --execute` |
+
+Optional: `--password=user123`.
+
+**Never deleted:** tenant, branch rows, active academic year, subscription, role_permissions, school_admin user.
+
+**Multi-branch logins:** first targeted branch uses `cteacher1@domain`; further branches use `cteacher1.b2@domain`, `student1.b2@domain`, etc.
+
+### Lean shape (after seed)
+
+| Area | Count |
+|------|-------|
+| Class sections | 4 (Class I/II × A/B) |
+| Subjects | 5 |
+| Staff (beyond admin) | 3 teachers |
+| Students / parents | 4 / 4 |
+| Attendance | last 5 school days |
+| Assessments | **Year schedule**: 1 quiz/class-section/teaching month (rotate subject; skip last 2 months as leave); Mid + Final on all taught subjects |
+| Fee bills | 4 pending (current month) |
+| Leave / early departure | 2 each |
+| Events | 4 (incl. conflict pair) |
+| Uniforms / library | 2 items / 2 books |
+
+Demo emails: `{prefix}@{tenant.domain}` (e.g. `cteacher1@`, `student1@`, `parent1@`). Password: `user123`.
+
+---
 Important Context
 Before starting:
 

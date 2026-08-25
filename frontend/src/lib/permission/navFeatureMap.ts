@@ -37,7 +37,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/substitution': 'teacher_substitution',
   '/substitution/history': 'teacher_substitution',
   '/substitution/assign': 'teacher_substitution',
-  '/promotion-placement': 'students',
+  '/promotion-placement': 'promotion_placement',
   '/reports': 'reports',
   /** Class result cards: staff often have `assessment` without a separate `reports` matrix row. */
   '/results': 'results',

@@ -1,5 +1,6 @@
 import {
   IconAdjustments,
+  IconArrowUpRight,
   IconBuilding,
   IconCash,
   IconChartBar,
@@ -26,7 +27,8 @@ export type SettingsSectionId =
   | 'integrations'
   | 'theme-settings'
   | 'public-statistics'
-  | 'data-export';
+  | 'data-export'
+  | 'promotion-settings';
 
 type SettingsLabelKey =
   | 'tabBusinessInformation'
@@ -41,6 +43,7 @@ type SettingsLabelKey =
   | 'tabThemeSettings'
   | 'tabPublicStatistics'
   | 'tabDataExport'
+  | 'tabPromotionSettings'
   | 'categorySchoolSetup'
   | 'categoryAcademic'
   | 'categoryOperations'
@@ -97,6 +100,7 @@ const SETTINGS_CATEGORIES: SettingsNavCategory[] = [
     items: [
       { value: 'academic-years', labelKey: 'tabAcademic', icon: IconSchool, gate: 'always' },
       { value: 'schedule', labelKey: 'tabSchedule', icon: IconClock, gate: 'always' },
+      { value: 'promotion-settings', labelKey: 'tabPromotionSettings', icon: IconArrowUpRight, gate: 'always' },
     ],
   },
   {

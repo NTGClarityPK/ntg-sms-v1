@@ -57,6 +57,13 @@ export class SystemSettingsService {
     behavioral_assessment: { ...DEFAULT_BEHAVIOURAL_ASSESSMENT_VALUE },
   };
 
+  /** Scalar keys that return a default when missing (no 404). */
+  private static readonly OPTIONAL_SCALAR_DEFAULTS: Readonly<Record<string, boolean | number>> = {
+    promotion_module_enabled: true,
+    promotion_window_days: 45,
+    promotion_window_manual_open: false,
+  };
+
   async getByKey(key: string): Promise<{ data: SystemSettingDto }> {
     if (RESERVED_SETTINGS_ROUTE_KEYS.has(key)) {
       throw new NotFoundException(`Setting not found (reserved route key: ${key})`);
@@ -94,6 +101,17 @@ export class SystemSettingsService {
           data: new SystemSettingDto({
             key,
             value: valueOut,
+            createdAt: now,
+            updatedAt: now,
+          }),
+        };
+      }
+      if (key in SystemSettingsService.OPTIONAL_SCALAR_DEFAULTS) {
+        const now = new Date().toISOString();
+        return {
+          data: new SystemSettingDto({
+            key,
+            value: SystemSettingsService.OPTIONAL_SCALAR_DEFAULTS[key],
             createdAt: now,
             updatedAt: now,
           }),

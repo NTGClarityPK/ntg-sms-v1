@@ -29,7 +29,7 @@
 **🎓 Student:**
 
 * [🕐 Timetable & Schedule](../features/timetable-and-schedule.md)
-* [🥇 Results](../features/results.md)
+* [🥇 Report Cards](../features/results.md)
 * [🔔 Notifications](../features/notifications.md)
 
 ## By Task
@@ -55,7 +55,7 @@
 
 **📄 Issuing Documents:**
 
-* [🥇 Results](../features/results.md)
+* [🥇 Report Cards](../features/results.md)
 * [🏆 Certificates](../features/certificates.md)
 * [🪪 ID Cards](../features/id-cards.md)
 

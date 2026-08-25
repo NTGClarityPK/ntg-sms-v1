@@ -60,6 +60,7 @@ import { SubstitutionsModule } from './modules/substitutions/substitutions.modul
 import { CertificatesModule } from './modules/certificates/certificates.module';
 import { RubricsModule } from './modules/rubrics/rubrics.module';
 import { GoogleWorkspaceModule } from './modules/google-workspace/google-workspace.module';
+import { SupportModule } from './modules/support/support.module';
 
 @Module({
   imports: [
@@ -122,6 +123,7 @@ import { GoogleWorkspaceModule } from './modules/google-workspace/google-workspa
     CertificatesModule,
     RubricsModule,
     GoogleWorkspaceModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [

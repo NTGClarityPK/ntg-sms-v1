@@ -14,13 +14,17 @@ Student, class, administrative, public, and revenue reports — plus a separate 
 | **Administrative** | Teachers, school admin, principal, academic coordinator |
 | **Revenue** | School admin and principal only |
 
-Report cards / PDF generation for terms live under [🥇 Results](results.md), not here.
+Report cards / PDF generation for terms and monthly progress live under [🥇 Report Cards](results.md), not here.
 
 **Fee reports** (`/reports/fees`) is a **separate** page (collected / pending / under review / overdue / defaulters) — not one of these tabs. See [💵 Fee Management](fee-management.md).
 
 ---
 
 ## 👤 Student report
+
+Staff-only **360°** view of one student: academic marks, attendance, behaviour, and related sections for the selected period. Export PDF/Excel where offered.
+
+This is **not** the parent-facing report card. Official Mid-term / Final / monthly Progress cards (and the parent monthly Academic + Attendance + Behaviour downloads) are under [🥇 Report Cards](results.md) → **My Child** after publish.
 
 Periods: All, Year to date, This week, This month, Custom range. Configurable exports where offered.
 

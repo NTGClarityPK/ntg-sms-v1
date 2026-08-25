@@ -42,6 +42,12 @@ export class SystemSettingsController {
         throw new ForbiddenException('Only school administrators can update branch broadcast permissions');
       }
     }
+    if (['promotion_module_enabled', 'promotion_window_days', 'promotion_window_manual_open'].includes(key)) {
+      const isAdmin = user.roles?.includes('school_admin');
+      if (!isAdmin) {
+        throw new ForbiddenException('Only school administrators can update promotion settings');
+      }
+    }
     // Body.key is optional; path param is the source of truth.
     const updated = await this.systemSettingsService.upsert(key, body.value);
     return { data: updated.data };

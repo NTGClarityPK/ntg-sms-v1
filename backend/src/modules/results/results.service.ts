@@ -6,7 +6,9 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { PdfLogoCacheService } from '../../common/pdf/pdf-logo-cache.service';
 import { buildPdfFooterTemplate, buildPdfHeaderTemplate } from '../../common/pdf/pdf-templates';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
+import { AttendanceService } from '../attendance/attendance.service';
 import { BehavioralService } from '../behavioral/behavioral.service';
+import { BehavioralFrameworkService } from '../behavioral-framework/behavioral-framework.service';
 import { StudentResultDto } from './dto/student-result.dto';
 import { ResultSubjectDto } from './dto/result-subject.dto';
 import { ClassSectionResultsDto } from './dto/class-section-results.dto';
@@ -38,6 +40,20 @@ function throwIfDbError(error: PostgrestError | null): void {
 
 type BehavioralPeriod = { period: string; attributes: { attributeName: string; average: number }[] };
 
+/** Optional filters when loading assessments for results / readiness / progress months. */
+export type AssessmentScopeOptions = {
+  /** Only term-examination types matching mid_term / final (marks readiness). */
+  phaseExamsOnly?: boolean;
+  /** Calendar month 1–12 for progress (monthly) reports. */
+  progressMonth?: number;
+  /**
+   * Term window for detailed Mid / Final PDFs:
+   * - until_mid: assessments on/before mid-exam cutoff (excludes final exams when no cutoff)
+   * - after_mid: assessments after mid-exam cutoff (or final exams only when no cutoff)
+   */
+  termWindow?: 'until_mid' | 'after_mid';
+};
+
 function getPuppeteerExecutablePath(): string | undefined {
   return (
     process.env.PUPPETEER_EXECUTABLE_PATH ||
@@ -52,7 +68,9 @@ export class ResultsService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly attendanceService: AttendanceService,
     private readonly behavioralService: BehavioralService,
+    private readonly behavioralFrameworkService: BehavioralFrameworkService,
     private readonly pdfLogoCache: PdfLogoCacheService,
     private readonly resultReportSettingsService: ResultReportSettingsService,
   ) {}
@@ -221,25 +239,485 @@ export class ResultsService {
     return range?.letter;
   }
 
+  /** Classify a term-examination assessment type name as mid_term or final. */
+  private classifyTermExamPhase(typeName: string): 'mid_term' | 'final' | null {
+    const n = typeName.toLowerCase();
+    if (n.includes('mid')) return 'mid_term';
+    if (n.includes('final')) return 'final';
+    return null;
+  }
+
+  private assessmentFallsInCalendarMonth(
+    dueDate: string | null | undefined,
+    createdAt: string | null | undefined,
+    month: number,
+  ): boolean {
+    const raw = dueDate || createdAt;
+    if (!raw) return false;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return false;
+    return d.getMonth() + 1 === month;
+  }
+
+  private assessmentSortDateMs(
+    dueDate: string | null | undefined,
+    createdAt: string | null | undefined,
+  ): number | null {
+    const raw = dueDate || createdAt;
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.getTime();
+  }
+
+  private msToIsoDate(ms: number): string {
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+
+  private addOneCalendarDay(isoDate: string): string {
+    const d = new Date(`${isoDate}T12:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  private calendarMonthRangeWithinYear(
+    yearStart: string,
+    yearEnd: string,
+    month: number,
+  ): { startDate: string; endDate: string } {
+    const startY = Number(yearStart.slice(0, 4));
+    const endY = Number(yearEnd.slice(0, 4));
+    const mm = String(month).padStart(2, '0');
+    for (let y = startY; y <= endY + 1; y++) {
+      const first = `${y}-${mm}-01`;
+      const lastDay = new Date(Date.UTC(y, month, 0)).getUTCDate();
+      const last = `${y}-${mm}-${String(lastDay).padStart(2, '0')}`;
+      if (last < yearStart) continue;
+      if (first > yearEnd) continue;
+      const startDate = first < yearStart ? yearStart : first;
+      const endDate = last > yearEnd ? yearEnd : last;
+      if (startDate <= endDate) return { startDate, endDate };
+    }
+    const y = startY;
+    const first = `${y}-${mm}-01`;
+    const lastDay = new Date(Date.UTC(y, month, 0)).getUTCDate();
+    return { startDate: first, endDate: `${y}-${mm}-${String(lastDay).padStart(2, '0')}` };
+  }
+
+  /**
+   * Mid-exam cutoff date (YYYY-MM-DD) for a class section, or null if no mid exams dated.
+   */
+  private async getMidCutoffIsoDate(
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string,
+  ): Promise<string | null> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: assessments, error } = await supabase
+      .from('assessments')
+      .select('due_date, created_at, assessment_type_id')
+      .eq('class_section_id', classSectionId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId);
+    throwIfDbError(error);
+    const list = (assessments || []) as Array<{
+      due_date?: string | null;
+      created_at?: string | null;
+      assessment_type_id: string;
+    }>;
+    if (list.length === 0) return null;
+    const typeIds = [...new Set(list.map((a) => a.assessment_type_id).filter(Boolean))];
+    if (typeIds.length === 0) return null;
+    const { data: types, error: typeErr } = await supabase
+      .from('assessment_types')
+      .select('id, name, is_term_examination')
+      .in('id', typeIds)
+      .eq('branch_id', branchId);
+    throwIfDbError(typeErr);
+    const midTypeIds = new Set<string>();
+    for (const t of types || []) {
+      const row = t as { id: string; name: string; is_term_examination: boolean };
+      if (!row.is_term_examination) continue;
+      if (this.classifyTermExamPhase(row.name) === 'mid_term') midTypeIds.add(row.id);
+    }
+    let midCutoffMs: number | null = null;
+    for (const a of list) {
+      if (!midTypeIds.has(a.assessment_type_id)) continue;
+      const ms = this.assessmentSortDateMs(a.due_date, a.created_at);
+      if (ms == null) continue;
+      if (midCutoffMs == null || ms > midCutoffMs) midCutoffMs = ms;
+    }
+    return midCutoffMs != null ? this.msToIsoDate(midCutoffMs) : null;
+  }
+
+  /**
+   * Date window for Conduct + attendance summary on term / progress PDFs.
+   */
+  private async resolveSummaryDateRange(params: {
+    classSectionId: string;
+    branchId: string;
+    academicYearId: string;
+    reportKind: ReportKind;
+    resultType: ResultType;
+    progressMonth?: number;
+    termWindow?: 'until_mid' | 'after_mid';
+  }): Promise<{ startDate: string; endDate: string }> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: yearRow, error } = await supabase
+      .from('academic_years')
+      .select('start_date, end_date')
+      .eq('id', params.academicYearId)
+      .maybeSingle();
+    throwIfDbError(error);
+    const startDate = (yearRow as { start_date?: string } | null)?.start_date;
+    const endDate = (yearRow as { end_date?: string } | null)?.end_date;
+    if (!startDate || !endDate) {
+      throw new BadRequestException('Academic year dates are not configured');
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const todayClamped = today < endDate ? today : endDate;
+
+    if (
+      params.reportKind === 'progress_report' &&
+      params.progressMonth != null &&
+      params.progressMonth >= 1 &&
+      params.progressMonth <= 12
+    ) {
+      return this.calendarMonthRangeWithinYear(startDate, endDate, params.progressMonth);
+    }
+
+    const window =
+      params.termWindow ??
+      (params.reportKind === 'term_report' &&
+      (params.resultType === 'mid_term' || params.resultType === 'interim')
+        ? 'until_mid'
+        : params.reportKind === 'term_report' && params.resultType === 'final'
+          ? 'after_mid'
+          : undefined);
+
+    if (window === 'until_mid' || window === 'after_mid') {
+      const midCutoff = await this.getMidCutoffIsoDate(
+        params.classSectionId,
+        params.branchId,
+        params.academicYearId,
+      );
+      if (window === 'until_mid') {
+        return {
+          startDate,
+          endDate: midCutoff ?? todayClamped,
+        };
+      }
+      if (midCutoff) {
+        const after = this.addOneCalendarDay(midCutoff);
+        return {
+          startDate: after <= endDate ? after : endDate,
+          endDate,
+        };
+      }
+      return { startDate, endDate };
+    }
+
+    return { startDate, endDate: todayClamped };
+  }
+
+  private async resolveConductLabel(
+    studentId: string,
+    branchId: string,
+    academicYearId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<string> {
+    const startYm = startDate.slice(0, 7);
+    const endYm = endDate.slice(0, 7);
+
+    try {
+      const cfg = await this.behavioralFrameworkService.getConfig(branchId);
+      if (cfg.data.activeSystem === 'framework_based') {
+        const { data: ratings } = await this.behavioralFrameworkService.getRatingsForStudent(
+          studentId,
+          branchId,
+          academicYearId,
+        );
+        const scale = cfg.data.frameworkPreset?.defaultRatingScale ?? [];
+        const orderByCode = new Map(scale.map((l) => [l.code, l.order]));
+        const filtered = ratings.filter((r) => {
+          const ym = r.assessmentMonth.slice(0, 7);
+          return ym >= startYm && ym <= endYm;
+        });
+        const orders: number[] = [];
+        for (const r of filtered) {
+          for (const s of r.categoryScores) {
+            const order = orderByCode.get(s.ratingCode);
+            if (order != null) orders.push(order);
+          }
+        }
+        if (orders.length === 0 || scale.length === 0) return ResultsService.SUMMARY_EMPTY;
+        const avgOrder = orders.reduce((a, b) => a + b, 0) / orders.length;
+        const closest = scale.reduce((best, level) =>
+          Math.abs(level.order - avgOrder) < Math.abs(best.order - avgOrder) ? level : best,
+        );
+        return closest.label?.trim() || ResultsService.SUMMARY_EMPTY;
+      }
+    } catch {
+      // Fall through to star-based assessments.
+    }
+
+    const { data: assessments } = await this.behavioralService.getByStudent(
+      studentId,
+      branchId,
+      academicYearId,
+    );
+    if (!assessments?.length) return ResultsService.SUMMARY_EMPTY;
+    const periods = this.buildBehavioralPeriods(
+      assessments.map((a) => ({
+        assessmentMonth: a.assessmentMonth,
+        scores: a.scores.map((s) => ({ attributeName: s.attributeName, score: s.score })),
+      })),
+    ).filter((p) => p.period >= startYm && p.period <= endYm);
+    let sum = 0;
+    let count = 0;
+    for (const p of periods) {
+      for (const a of p.attributes) {
+        sum += a.average;
+        count += 1;
+      }
+    }
+    if (count === 0) return ResultsService.SUMMARY_EMPTY;
+    const avg = Math.round((sum / count) * 10) / 10;
+    return `${avg.toFixed(1)}/5`;
+  }
+
+  /** Empty placeholder for PDF summary cells (ASCII-safe; avoid file-encoding issues with em dash). */
+  private static readonly SUMMARY_EMPTY = '-';
+
+  private formatAttendanceLabel(
+    presentDays: number,
+    lateDays: number,
+    totalDays: number,
+    percentage: number,
+  ): string {
+    if (!totalDays) return ResultsService.SUMMARY_EMPTY;
+    // Count late with present for the fraction so it matches the % (present+late)/total.
+    const attended = presentDays + lateDays;
+    return `${attended}/${totalDays} (${percentage}%)`;
+  }
+
+  private async resolveAttendanceLabel(
+    studentId: string,
+    branchId: string,
+    academicYearId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<string> {
+    try {
+      const summary = await this.attendanceService.getAttendanceSummaryByStudent(
+        studentId,
+        branchId,
+        academicYearId,
+        startDate,
+        endDate,
+      );
+      if (summary.totalDays > 0) {
+        return this.formatAttendanceLabel(
+          summary.presentDays,
+          summary.lateDays,
+          summary.totalDays,
+          summary.percentage,
+        );
+      }
+    } catch {
+      // Fall through to a direct date-window query (authoritative for report cards).
+    }
+
+    // Fallback: count by date window only (do not require academic_year_id match).
+    // Report-card ranges are calendar windows; year id mismatches should not blank the card.
+    try {
+      const supabase = this.supabaseConfig.getClient();
+      const build = () =>
+        supabase
+          .from('attendance')
+          .select('id', { count: 'exact', head: true })
+          .eq('student_id', studentId)
+          .eq('branch_id', branchId)
+          .gte('date', startDate)
+          .lte('date', endDate);
+
+      const [presentRes, absentRes, lateRes, excusedRes] = await Promise.all([
+        build().eq('status', 'present'),
+        build().eq('status', 'absent'),
+        build().eq('status', 'late'),
+        build().eq('status', 'excused'),
+      ]);
+      throwIfDbError(presentRes.error);
+      throwIfDbError(absentRes.error);
+      throwIfDbError(lateRes.error);
+      throwIfDbError(excusedRes.error);
+
+      const presentDays = presentRes.count || 0;
+      const absentDays = absentRes.count || 0;
+      const lateDays = lateRes.count || 0;
+      const excusedDays = excusedRes.count || 0;
+      const totalDays = presentDays + absentDays + lateDays + excusedDays;
+      if (!totalDays) return ResultsService.SUMMARY_EMPTY;
+      const percentage = Math.round(((presentDays + lateDays) / totalDays) * 100);
+      return this.formatAttendanceLabel(presentDays, lateDays, totalDays, percentage);
+    } catch {
+      return ResultsService.SUMMARY_EMPTY;
+    }
+  }
+
+  private async resolveConductAndAttendanceLabels(params: {
+    studentId: string;
+    classSectionId: string;
+    branchId: string;
+    academicYearId: string;
+    reportKind: ReportKind;
+    resultType: ResultType;
+    progressMonth?: number;
+    termWindow?: 'until_mid' | 'after_mid';
+  }): Promise<{ conductLabel: string; attendanceLabel: string }> {
+    let range: { startDate: string; endDate: string };
+    try {
+      range = await this.resolveSummaryDateRange(params);
+    } catch {
+      return {
+        conductLabel: ResultsService.SUMMARY_EMPTY,
+        attendanceLabel: ResultsService.SUMMARY_EMPTY,
+      };
+    }
+
+    // Resolve independently so a conduct failure never blanks attendance (and vice versa).
+    const [conductLabel, attendanceLabel] = await Promise.all([
+      this.resolveConductLabel(
+        params.studentId,
+        params.branchId,
+        params.academicYearId,
+        range.startDate,
+        range.endDate,
+      ).catch(() => ResultsService.SUMMARY_EMPTY),
+      this.resolveAttendanceLabel(
+        params.studentId,
+        params.branchId,
+        params.academicYearId,
+        range.startDate,
+        range.endDate,
+      ).catch(() => ResultsService.SUMMARY_EMPTY),
+    ]);
+    return { conductLabel, attendanceLabel };
+  }
+
+  /**
+   * Mid-term reports (basic + detailed + list + draft) share the until-mid assessment pool.
+   * Progress month and explicit termWindow take precedence.
+   */
+  private resolveAssessmentScope(
+    reportKind: ReportKind | undefined,
+    resultType: ResultType | undefined,
+    extra?: AssessmentScopeOptions,
+  ): AssessmentScopeOptions | undefined {
+    if (extra?.progressMonth != null || extra?.termWindow != null || extra?.phaseExamsOnly) {
+      return extra;
+    }
+    if ((reportKind ?? 'term_report') === 'term_report' && resultType === 'mid_term') {
+      return { termWindow: 'until_mid' };
+    }
+    return extra;
+  }
+
   /**
    * Get assessments for class section and academic year.
-   * V1: no config - all result types include all assessments.
+   * Default: all assessments. Optional: phase exams only, calendar month, or mid/final term window.
    */
   private async getAssessmentsInScope(
     classSectionId: string,
     branchId: string,
     academicYearId: string,
-    _resultType: ResultType,
+    resultType: ResultType,
+    scope?: AssessmentScopeOptions,
   ): Promise<Map<string, { subjectId: string; totalMarks: number; subjectName?: string; title?: string }>> {
     const supabase = this.supabaseConfig.getClient();
     const { data: assessments, error } = await supabase
       .from('assessments')
-      .select('id, subject_id, total_marks, title')
+      .select('id, subject_id, total_marks, title, due_date, created_at, assessment_type_id')
       .eq('class_section_id', classSectionId)
       .eq('branch_id', branchId)
       .eq('academic_year_id', academicYearId);
     throwIfDbError(error);
-    const list = (assessments || []) as { id: string; subject_id: string; total_marks: number; title?: string }[];
+    type AssessRow = {
+      id: string;
+      subject_id: string;
+      total_marks: number;
+      title?: string;
+      due_date?: string | null;
+      created_at?: string | null;
+      assessment_type_id: string;
+    };
+    let list = (assessments || []) as AssessRow[];
+
+    if (scope?.progressMonth != null) {
+      const month = scope.progressMonth;
+      list = list.filter((a) =>
+        this.assessmentFallsInCalendarMonth(a.due_date, a.created_at, month),
+      );
+    }
+
+    const needsTypeMeta = !!(scope?.phaseExamsOnly || scope?.termWindow);
+    const typePhase = new Map<string, 'mid_term' | 'final' | null>();
+    if (needsTypeMeta) {
+      const typeIds = [...new Set(list.map((a) => a.assessment_type_id).filter(Boolean))];
+      if (typeIds.length > 0) {
+        const { data: types, error: typeErr } = await supabase
+          .from('assessment_types')
+          .select('id, name, is_term_examination')
+          .in('id', typeIds)
+          .eq('branch_id', branchId);
+        throwIfDbError(typeErr);
+        for (const t of types || []) {
+          const row = t as { id: string; name: string; is_term_examination: boolean };
+          if (!row.is_term_examination) {
+            typePhase.set(row.id, null);
+            continue;
+          }
+          typePhase.set(row.id, this.classifyTermExamPhase(row.name));
+        }
+      }
+    }
+
+    if (scope?.phaseExamsOnly) {
+      const wantPhase = resultType === 'mid_term' || resultType === 'final' ? resultType : null;
+      list = list.filter((a) => {
+        const phase = typePhase.get(a.assessment_type_id) ?? null;
+        return wantPhase != null && phase === wantPhase;
+      });
+    }
+
+    if (scope?.termWindow) {
+      let midCutoffMs: number | null = null;
+      for (const a of list) {
+        const phase = typePhase.get(a.assessment_type_id) ?? null;
+        if (phase !== 'mid_term') continue;
+        const ms = this.assessmentSortDateMs(a.due_date, a.created_at);
+        if (ms == null) continue;
+        if (midCutoffMs == null || ms > midCutoffMs) midCutoffMs = ms;
+      }
+
+      list = list.filter((a) => {
+        const phase = typePhase.get(a.assessment_type_id) ?? null;
+        const ms = this.assessmentSortDateMs(a.due_date, a.created_at);
+        if (scope.termWindow === 'until_mid') {
+          if (phase === 'final') return false;
+          if (midCutoffMs == null) return true;
+          if (ms == null) return phase === 'mid_term' || phase == null;
+          return ms <= midCutoffMs;
+        }
+        // after_mid
+        if (phase === 'mid_term') return false;
+        if (midCutoffMs == null) return phase === 'final';
+        if (ms == null) return phase === 'final';
+        return ms > midCutoffMs || phase === 'final';
+      });
+    }
+
     const subjectIds = [...new Set(list.map((a) => a.subject_id))];
     let subjectNames = new Map<string, string>();
     if (subjectIds.length > 0) {
@@ -266,12 +744,45 @@ export class ResultsService {
     return map;
   }
 
+  /**
+   * PDF banner phase: Interim until every student has grades for all phase exam assessments;
+   * otherwise Mid-term / Final. No matching exams ⇒ not ready (Interim).
+   */
+  async resolveDisplayResultType(
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string | undefined,
+    resultType: ResultType,
+  ): Promise<ResultType> {
+    if (resultType !== 'mid_term' && resultType !== 'final') {
+      return resultType === 'interim' ? 'interim' : resultType;
+    }
+    const readiness = await this.getMarksReadinessForClassSection(
+      classSectionId,
+      branchId,
+      academicYearId,
+      resultType,
+    );
+    if (readiness.length === 0) return 'interim';
+    const allClear = readiness.every((r) => r.missingAssessmentTitles.length === 0);
+    // Empty assessment set ⇒ every row has no missing titles, but we treat "no exams" as not ready.
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) return 'interim';
+    const yearId = academicYearId ?? activeYear.id;
+    const exams = await this.getAssessmentsInScope(classSectionId, branchId, yearId, resultType, {
+      phaseExamsOnly: true,
+    });
+    if (exams.size === 0) return 'interim';
+    return allClear ? resultType : 'interim';
+  }
+
   async getResultForStudent(
     studentId: string,
     classSectionId: string,
     branchId: string,
     academicYearId?: string,
     resultType: ResultType = 'final',
+    scope?: AssessmentScopeOptions,
   ): Promise<StudentResultDto> {
     const supabase = this.supabaseConfig.getClient();
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
@@ -320,6 +831,7 @@ export class ResultsService {
       branchId,
       yearId,
       resultType,
+      scope,
     );
     const assessmentIds = [...assessmentMap.keys()];
     if (assessmentIds.length === 0) {
@@ -422,12 +934,14 @@ export class ResultsService {
     branchId: string,
     yearId: string,
     resultType: ResultType,
+    scope?: AssessmentScopeOptions,
   ): Promise<AssessmentWiseEntryDto[]> {
     const assessmentMap = await this.getAssessmentsInScope(
       classSectionId,
       branchId,
       yearId,
       resultType,
+      scope,
     );
     const assessmentIds = [...assessmentMap.keys()];
     if (assessmentIds.length === 0) return [];
@@ -478,6 +992,7 @@ export class ResultsService {
       branchId,
       academicYearId,
       resultType,
+      this.resolveAssessmentScope('term_report', resultType),
     );
     return this.ranksFromClassBatch(batch.students).get(studentId);
   }
@@ -624,11 +1139,68 @@ export class ResultsService {
     });
   }
 
+  /** Detailed result using assessment scope (mid/final windows, month) — not the unscoped RPC. */
+  private async buildScopedDetailedResultForStudent(
+    studentId: string,
+    classSectionId: string,
+    branchId: string,
+    academicYearId: string,
+    resultType: ResultType,
+    scope: AssessmentScopeOptions | undefined,
+    classTeacherComment?: string,
+  ): Promise<DetailedStudentResultDto> {
+    const result = await this.getResultForStudent(
+      studentId,
+      classSectionId,
+      branchId,
+      academicYearId,
+      resultType,
+      scope,
+    );
+    const entries = await this.buildAssessmentWiseEntries(
+      studentId,
+      classSectionId,
+      branchId,
+      academicYearId,
+      resultType,
+      scope,
+    );
+    const supabase = this.supabaseConfig.getClient();
+    const { data: cs } = await supabase
+      .from('class_sections')
+      .select('class_id')
+      .eq('id', classSectionId)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+    const classId = (cs as { class_id: string } | null)?.class_id;
+    const [classRank, schoolRank, generatedParagraph] = await Promise.all([
+      this.getClassRank(studentId, classSectionId, branchId, academicYearId, resultType),
+      this.getSchoolRank(studentId, branchId, academicYearId, resultType),
+      classId
+        ? this.getGeneratedParagraph(classId, result.overallPercentage ?? 0)
+        : Promise.resolve('Keep up the effort and focus on consistent progress.'),
+    ]);
+    return new DetailedStudentResultDto({
+      studentId: result.studentId,
+      studentName: result.studentName,
+      studentStudentId: result.studentStudentId,
+      subjects: result.subjects,
+      overallPercentage: result.overallPercentage ?? 0,
+      overallLetterGrade: result.overallLetterGrade,
+      assessmentWiseEntries: entries,
+      classRank,
+      schoolRank,
+      generatedParagraph,
+      classTeacherComment,
+    });
+  }
+
   async getResultsForClassSection(
     classSectionId: string,
     branchId: string,
     academicYearId?: string,
     resultType: ResultType = 'final',
+    scope?: AssessmentScopeOptions,
   ): Promise<ClassSectionResultsDto> {
     const supabase = this.supabaseConfig.getClient();
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
@@ -681,6 +1253,7 @@ export class ResultsService {
       branchId,
       yearId,
       resultType,
+      scope,
     );
     const assessmentIds = [...assessmentMap.keys()];
     const studentIds = students.map((s) => s.id);
@@ -802,70 +1375,65 @@ export class ResultsService {
     options?: { reportKind?: ReportKind; progressSequence?: number },
   ): Promise<ResultCardDto> {
     const reportKind: ReportKind = options?.reportKind ?? 'term_report';
-    if (reportKind !== 'annual_report' && !resultType) {
-      throw new BadRequestException('resultType is required for this report kind');
+    if (reportKind === 'annual_report') {
+      throw new BadRequestException('Annual reports can no longer be created');
+    }
+    if (reportKind === 'term_report' && resultType === 'interim') {
+      throw new BadRequestException('Interim is not a selectable term phase; use Mid-term or Final');
+    }
+    if (reportKind === 'term_report' && !resultType) {
+      throw new BadRequestException('resultType is required for term reports');
+    }
+    if (reportKind === 'progress_report') {
+      const month = options?.progressSequence;
+      if (month == null || month < 1 || month > 12) {
+        throw new BadRequestException(
+          'progressSequence (calendar month 1–12) is required for progress reports',
+        );
+      }
     }
     const termPhase = reportKind === 'term_report' ? ((resultType ?? 'final') as ResultType) : null;
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) throw new BadRequestException('No active academic year found');
     const yearId = academicYearId ?? activeYear.id;
 
-    let resultData: Record<string, unknown>;
-    let legacyResultType: ResultType;
+    const progressMonth =
+      reportKind === 'progress_report' ? options?.progressSequence : undefined;
+    const scope = this.resolveAssessmentScope(reportKind, resultType ?? undefined, {
+      ...(progressMonth != null ? { progressMonth } : {}),
+    });
 
-    if (reportKind === 'annual_report') {
-      const [mid, fin] = await Promise.all([
-        this.getResultForStudent(studentId, classSectionId, branchId, academicYearId, 'mid_term'),
-        this.getResultForStudent(studentId, classSectionId, branchId, academicYearId, 'final'),
-      ]);
-      resultData = {
-        schemaVersion: 1,
-        reportKind: 'annual_report',
-        midTerm: {
-          subjects: mid.subjects,
-          overallPercentage: mid.overallPercentage,
-          overallLetterGrade: mid.overallLetterGrade,
-        },
-        finalTerm: {
-          subjects: fin.subjects,
-          overallPercentage: fin.overallPercentage,
-          overallLetterGrade: fin.overallLetterGrade,
-        },
-      };
-      legacyResultType = 'final';
-    } else {
-      const type = (resultType ?? 'final') as ResultType;
-      legacyResultType = type;
-      const result = await this.getResultForStudent(
-        studentId,
-        classSectionId,
-        branchId,
-        academicYearId,
-        type,
-      );
-      resultData = {
-        studentId: result.studentId,
-        studentName: result.studentName,
-        studentStudentId: result.studentStudentId,
-        subjects: result.subjects,
-        overallPercentage: result.overallPercentage,
-        overallLetterGrade: result.overallLetterGrade,
-        reportKind,
-      };
-    }
+    const type = (resultType ?? 'final') as ResultType;
+    const legacyResultType = type;
+    const result = await this.getResultForStudent(
+      studentId,
+      classSectionId,
+      branchId,
+      academicYearId,
+      type,
+      scope,
+    );
+    const resultData: Record<string, unknown> = {
+      studentId: result.studentId,
+      studentName: result.studentName,
+      studentStudentId: result.studentStudentId,
+      subjects: result.subjects,
+      overallPercentage: result.overallPercentage,
+      overallLetterGrade: result.overallLetterGrade,
+      reportKind,
+      ...(progressMonth != null ? { progressMonth } : {}),
+    };
 
     const supabase = this.supabaseConfig.getClient();
-    let progressSequence: number | null =
-      reportKind === 'progress_report'
-        ? (options?.progressSequence ?? (await this.getNextProgressSequence(supabase, studentId, classSectionId, yearId)))
-        : null;
+    const progressSequence: number | null =
+      reportKind === 'progress_report' ? (options?.progressSequence ?? null) : null;
 
     const rowBase = {
       student_id: studentId,
       class_section_id: classSectionId,
       academic_year_id: yearId,
       branch_id: branchId,
-      result_type: legacyResultType!,
+      result_type: legacyResultType,
       report_kind: reportKind,
       term_phase: termPhase,
       progress_sequence: progressSequence,
@@ -884,8 +1452,6 @@ export class ResultsService {
       .eq('report_kind', reportKind);
     if (reportKind === 'term_report') {
       existingQuery = existingQuery.eq('term_phase', termPhase!);
-    } else if (reportKind === 'annual_report') {
-      /* unique on year+student+section */
     } else if (reportKind === 'progress_report') {
       existingQuery = existingQuery.eq('progress_sequence', progressSequence!);
     }
@@ -936,27 +1502,6 @@ export class ResultsService {
     return this.mapResultCardRow(out);
   }
 
-  private async getNextProgressSequence(
-    supabase: import('@supabase/supabase-js').SupabaseClient,
-    studentId: string,
-    classSectionId: string,
-    academicYearId: string,
-  ): Promise<number> {
-    const { data, error } = await supabase
-      .from('result_cards')
-      .select('progress_sequence')
-      .eq('student_id', studentId)
-      .eq('class_section_id', classSectionId)
-      .eq('academic_year_id', academicYearId)
-      .eq('report_kind', 'progress_report')
-      .order('progress_sequence', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    throwIfDbError(error);
-    const last = (data as { progress_sequence: number | null } | null)?.progress_sequence;
-    return (typeof last === 'number' ? last : 0) + 1;
-  }
-
   async updateResultCardStatus(
     id: string,
     status: string,
@@ -971,6 +1516,10 @@ export class ResultsService {
     if (status === 'approved' || status === 'published') {
       update.approved_by = approvedBy ?? null;
       update.approved_at = new Date().toISOString();
+    }
+    if (status === 'draft') {
+      update.approved_by = null;
+      update.approved_at = null;
     }
     const { data, error } = await supabase
       .from('result_cards')
@@ -1021,6 +1570,7 @@ export class ResultsService {
     academicYearId: string,
     resultType: string,
     reportKind: ReportKind = 'term_report',
+    progressSequence?: number,
   ): Promise<ResultCardDto[]> {
     const supabase = this.supabaseConfig.getClient();
     let query = supabase
@@ -1032,6 +1582,8 @@ export class ResultsService {
       .eq('report_kind', reportKind);
     if (reportKind === 'term_report') {
       query = query.eq('term_phase', resultType);
+    } else if (reportKind === 'progress_report' && progressSequence != null) {
+      query = query.eq('progress_sequence', progressSequence);
     }
     const { data, error } = await query.order('student_id').order('generated_at', { ascending: false });
     throwIfDbError(error);
@@ -1121,6 +1673,7 @@ export class ResultsService {
     academicYearId: string,
     resultType: string,
     cardReportKind: ReportKind = 'term_report',
+    progressSequence?: number,
   ): Promise<string | undefined> {
     const cards = await this.listResultCardsByStudent(
       studentId,
@@ -1137,6 +1690,9 @@ export class ResultsService {
       return scoped.find((c) => c.reportKind === 'annual_report')?.classTeacherComment;
     }
     if (cardReportKind === 'progress_report') {
+      if (progressSequence != null) {
+        return scoped.find((c) => c.progressSequence === progressSequence)?.classTeacherComment;
+      }
       const sorted = [...scoped].sort(
         (a, b) => (b.progressSequence ?? 0) - (a.progressSequence ?? 0),
       );
@@ -1156,6 +1712,7 @@ export class ResultsService {
       reportType?: 'basic' | 'detailed';
       pdfVariant?: 'minimal' | 'modern';
       reportKind?: ReportKind;
+      progressMonth?: number;
     },
   ): Promise<Buffer> {
     const reportType = options?.reportType ?? 'basic';
@@ -1163,6 +1720,22 @@ export class ResultsService {
     const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
     if (!activeYear) throw new BadRequestException('No active academic year found');
     const yearId = academicYearId ?? activeYear.id;
+
+    const progressMonth =
+      reportKind === 'progress_report' ? options?.progressMonth : undefined;
+    if (reportKind === 'progress_report' && (progressMonth == null || progressMonth < 1 || progressMonth > 12)) {
+      // Legacy progress cards without month: fall back to latest sequence comment only; marks use all assessments.
+    }
+    const scope = this.resolveAssessmentScope(reportKind, resultType, {
+      ...(progressMonth != null && progressMonth >= 1 && progressMonth <= 12
+        ? { progressMonth }
+        : {}),
+    });
+
+    const displayResultType =
+      reportKind === 'term_report'
+        ? await this.resolveDisplayResultType(classSectionId, branchId, yearId, resultType)
+        : resultType;
 
     const settingsPdf = (await this.resultReportSettingsService.get(branchId)).data.pdfVariant;
     const effectiveVariant: 'minimal' | 'modern' =
@@ -1176,8 +1749,168 @@ export class ResultsService {
     const pdfThemeCss = buildPdfThemeVariablesCss(pdfPrimaryHex);
 
     if (reportType === 'detailed') {
-      const useTwoTermPages =
-        reportKind === 'annual_report' || (reportKind === 'term_report' && resultType === 'final');
+      // Progress / month-scoped: build from scoped marks instead of unscoped RPC.
+      if (reportKind === 'progress_report' && scope) {
+        const comment = await this.getResultCardComment(
+          studentId,
+          classSectionId,
+          branchId,
+          yearId,
+          resultType,
+          'progress_report',
+          progressMonth,
+        );
+        const [detailed, extras] = await Promise.all([
+          this.buildScopedDetailedResultForStudent(
+            studentId,
+            classSectionId,
+            branchId,
+            yearId,
+            resultType,
+            scope,
+            comment,
+          ),
+          this.resolveConductAndAttendanceLabels({
+            studentId,
+            classSectionId,
+            branchId,
+            academicYearId: yearId,
+            reportKind,
+            resultType,
+            progressMonth,
+          }),
+        ]);
+        return this.renderDetailedPdfSingle(
+          detailed,
+          'Progress Report',
+          classSectionId,
+          branchId,
+          effectiveVariant,
+          yearId,
+          pdfThemeCss,
+          extras,
+        );
+      }
+
+      // Final term detailed: page 1 = until mid, page 2 = after mid (max 2 pages, no duplicate full-year dump).
+      if (reportKind === 'term_report' && resultType === 'final') {
+        const midComment = await this.getResultCardComment(
+          studentId,
+          classSectionId,
+          branchId,
+          yearId,
+          'mid_term',
+          'term_report',
+        );
+        const finalComment = await this.getResultCardComment(
+          studentId,
+          classSectionId,
+          branchId,
+          yearId,
+          'final',
+          'term_report',
+        );
+        const [midDetail, finalDetail, midExtras, finalExtras] = await Promise.all([
+          this.buildScopedDetailedResultForStudent(
+            studentId,
+            classSectionId,
+            branchId,
+            yearId,
+            'mid_term',
+            { termWindow: 'until_mid' },
+            midComment,
+          ),
+          this.buildScopedDetailedResultForStudent(
+            studentId,
+            classSectionId,
+            branchId,
+            yearId,
+            'final',
+            { termWindow: 'after_mid' },
+            finalComment,
+          ),
+          this.resolveConductAndAttendanceLabels({
+            studentId,
+            classSectionId,
+            branchId,
+            academicYearId: yearId,
+            reportKind: 'term_report',
+            resultType: 'mid_term',
+            termWindow: 'until_mid',
+          }),
+          this.resolveConductAndAttendanceLabels({
+            studentId,
+            classSectionId,
+            branchId,
+            academicYearId: yearId,
+            reportKind: 'term_report',
+            resultType: 'final',
+            termWindow: 'after_mid',
+          }),
+        ]);
+        return this.renderDetailedPdfTwoPages(
+          midDetail,
+          finalDetail,
+          classSectionId,
+          branchId,
+          effectiveVariant,
+          yearId,
+          pdfThemeCss,
+          midExtras,
+          finalExtras,
+        );
+      }
+
+      // Mid-term (or interim display) detailed: single page, until-mid assessments only.
+      if (reportKind === 'term_report') {
+        const comment = await this.getResultCardComment(
+          studentId,
+          classSectionId,
+          branchId,
+          yearId,
+          resultType,
+          'term_report',
+        );
+        const [detailed, extras] = await Promise.all([
+          this.buildScopedDetailedResultForStudent(
+            studentId,
+            classSectionId,
+            branchId,
+            yearId,
+            resultType === 'mid_term' ? 'mid_term' : resultType,
+            { termWindow: 'until_mid' },
+            comment,
+          ),
+          this.resolveConductAndAttendanceLabels({
+            studentId,
+            classSectionId,
+            branchId,
+            academicYearId: yearId,
+            reportKind: 'term_report',
+            resultType: resultType === 'mid_term' ? 'mid_term' : resultType,
+            termWindow: 'until_mid',
+          }),
+        ]);
+        const resultTypeLabel =
+          displayResultType === 'interim'
+            ? 'Interim Report'
+            : displayResultType === 'mid_term'
+              ? 'Mid-term Report'
+              : 'Final Term Report';
+        return this.renderDetailedPdfSingle(
+          detailed,
+          resultTypeLabel,
+          classSectionId,
+          branchId,
+          effectiveVariant,
+          yearId,
+          pdfThemeCss,
+          extras,
+        );
+      }
+
+      // Legacy annual / other: keep previous RPC-based detailed path.
+      const useTwoTermPages = reportKind === 'annual_report';
       if (useTwoTermPages) {
         const midComment = await this.getResultCardComment(
           studentId,
@@ -1195,23 +1928,43 @@ export class ResultsService {
           'final',
           'term_report',
         );
-        const [midDetail, finalDetail] = await Promise.all([
-          this.getDetailedResultForStudent(
+        const [midDetail, finalDetail, midExtras, finalExtras] = await Promise.all([
+          this.buildScopedDetailedResultForStudent(
             studentId,
             classSectionId,
             branchId,
             yearId,
             'mid_term',
+            { termWindow: 'until_mid' },
             midComment,
           ),
-          this.getDetailedResultForStudent(
+          this.buildScopedDetailedResultForStudent(
             studentId,
             classSectionId,
             branchId,
             yearId,
             'final',
+            { termWindow: 'after_mid' },
             finalComment,
           ),
+          this.resolveConductAndAttendanceLabels({
+            studentId,
+            classSectionId,
+            branchId,
+            academicYearId: yearId,
+            reportKind: 'term_report',
+            resultType: 'mid_term',
+            termWindow: 'until_mid',
+          }),
+          this.resolveConductAndAttendanceLabels({
+            studentId,
+            classSectionId,
+            branchId,
+            academicYearId: yearId,
+            reportKind: 'term_report',
+            resultType: 'final',
+            termWindow: 'after_mid',
+          }),
         ]);
         return this.renderDetailedPdfTwoPages(
           midDetail,
@@ -1221,6 +1974,8 @@ export class ResultsService {
           effectiveVariant,
           yearId,
           pdfThemeCss,
+          midExtras,
+          finalExtras,
         );
       }
       const commentKind: ReportKind =
@@ -1232,19 +1987,31 @@ export class ResultsService {
         yearId,
         resultType,
         commentKind,
+        progressMonth,
       );
-      const detailed = await this.getDetailedResultForStudent(
-        studentId,
-        classSectionId,
-        branchId,
-        yearId,
-        resultType,
-        comment,
-      );
+      const [detailed, extras] = await Promise.all([
+        this.getDetailedResultForStudent(
+          studentId,
+          classSectionId,
+          branchId,
+          yearId,
+          resultType,
+          comment,
+        ),
+        this.resolveConductAndAttendanceLabels({
+          studentId,
+          classSectionId,
+          branchId,
+          academicYearId: yearId,
+          reportKind,
+          resultType,
+          progressMonth,
+        }),
+      ]);
       const resultTypeLabel =
-        resultType === 'interim'
+        displayResultType === 'interim'
           ? 'Interim Result'
-          : resultType === 'mid_term'
+          : displayResultType === 'mid_term'
             ? 'Mid-term Result'
             : 'Final Result';
       return this.renderDetailedPdfSingle(
@@ -1255,6 +2022,7 @@ export class ResultsService {
         effectiveVariant,
         yearId,
         pdfThemeCss,
+        extras,
       );
     }
 
@@ -1264,6 +2032,7 @@ export class ResultsService {
       branchId,
       yearId,
       resultType,
+      scope,
     );
     const result = batch.students.find((s) => s.studentId === studentId);
     if (!result) throw new NotFoundException('Student not found in this class section');
@@ -1278,18 +2047,30 @@ export class ResultsService {
           ? 'annual_report'
           : 'term_report';
     const supabase = this.supabaseConfig.getClient();
-    const [{ line1: schoolLine1, line2: schoolLine2 }, ayRow, classTeacherComment] = await Promise.all([
-      this.getReportSchoolLines(branchId),
-      supabase.from('academic_years').select('name').eq('id', yearId).maybeSingle().then((r) => r.data),
-      this.getResultCardComment(
-        studentId,
-        classSectionId,
-        branchId,
-        yearId,
-        resultType,
-        commentKind,
-      ),
-    ]);
+    const [{ line1: schoolLine1, line2: schoolLine2 }, ayRow, classTeacherComment, extras] =
+      await Promise.all([
+        this.getReportSchoolLines(branchId),
+        supabase.from('academic_years').select('name').eq('id', yearId).maybeSingle().then((r) => r.data),
+        this.getResultCardComment(
+          studentId,
+          classSectionId,
+          branchId,
+          yearId,
+          resultType,
+          commentKind,
+          progressMonth,
+        ),
+        this.resolveConductAndAttendanceLabels({
+          studentId,
+          classSectionId,
+          branchId,
+          academicYearId: yearId,
+          reportKind,
+          resultType,
+          progressMonth,
+          ...(scope?.termWindow ? { termWindow: scope.termWindow } : {}),
+        }),
+      ]);
     const academicYearName = (ayRow as { name?: string } | null)?.name?.trim() || '—';
     const htmlForPdf = this.composeBasicResultCardHtml({
       result,
@@ -1300,11 +2081,13 @@ export class ResultsService {
       schoolLine1,
       schoolLine2,
       academicYearName,
-      resultType,
+      resultType: displayResultType,
       reportKind,
       effectiveVariant,
       pdfThemeCss,
       classTeacherComment,
+      conductLabel: extras.conductLabel,
+      attendanceLabel: extras.attendanceLabel,
     });
 
     return this.printResultCardHtmlToPdf(htmlForPdf);
@@ -1325,6 +2108,8 @@ export class ResultsService {
     effectiveVariant: 'minimal' | 'modern';
     pdfThemeCss: string;
     classTeacherComment?: string;
+    conductLabel?: string;
+    attendanceLabel?: string;
   }): string {
     const {
       result,
@@ -1340,6 +2125,8 @@ export class ResultsService {
       effectiveVariant,
       pdfThemeCss,
       classTeacherComment,
+      conductLabel,
+      attendanceLabel,
     } = params;
     const reportDate = new Date().toLocaleDateString('en-GB', {
       day: 'numeric',
@@ -1372,6 +2159,8 @@ export class ResultsService {
                 reportDate,
                 result,
                 classTeacherComment,
+                conductLabel,
+                attendanceLabel,
               })
             : buildMinimalProgressInner({
                 schoolLine1,
@@ -1383,6 +2172,8 @@ export class ResultsService {
                 reportDate,
                 result,
                 classTeacherComment,
+                conductLabel,
+                attendanceLabel,
               })
           : effectiveVariant === 'modern'
             ? buildModernTermAnnualReportInner({
@@ -1398,6 +2189,8 @@ export class ResultsService {
                 reportDate,
                 result,
                 classTeacherComment,
+                conductLabel,
+                attendanceLabel,
               })
             : buildMinimalTermAnnualReportInner({
                 reportKind,
@@ -1412,6 +2205,8 @@ export class ResultsService {
                 reportDate,
                 result,
                 classTeacherComment,
+                conductLabel,
+                attendanceLabel,
               });
       return composeDesignPdfHtml(
         styles,
@@ -1495,8 +2290,18 @@ export class ResultsService {
     pdfVariant: 'minimal' | 'modern',
     academicYearId: string,
     pdfThemeCss: string,
+    extras?: { conductLabel: string; attendanceLabel: string },
   ): Promise<Buffer> {
-    return this.buildDetailedPdf(d, resultTypeLabel, classSectionId, branchId, pdfVariant, academicYearId, pdfThemeCss);
+    return this.buildDetailedPdf(
+      d,
+      resultTypeLabel,
+      classSectionId,
+      branchId,
+      pdfVariant,
+      academicYearId,
+      pdfThemeCss,
+      extras,
+    );
   }
 
   private async renderDetailedPdfTwoPages(
@@ -1507,6 +2312,8 @@ export class ResultsService {
     pdfVariant: 'minimal' | 'modern',
     academicYearId: string,
     pdfThemeCss: string,
+    midExtras?: { conductLabel: string; attendanceLabel: string },
+    finalExtras?: { conductLabel: string; attendanceLabel: string },
   ): Promise<Buffer> {
     const templateFile = `term-report-${pdfVariant}.html`;
     const styles = readDesignTemplateStyleBlock(templateFile);
@@ -1532,54 +2339,82 @@ export class ResultsService {
         pdfVariant === 'modern'
           ? buildModernDetailedPageInner(
               midDetail,
-              'Final report — Mid-term session',
+              'Mid-term Report',
               classLabel,
               school.line1,
               school.line2,
               academicYearName,
               reportDate,
+              {
+                compact: true,
+                showSignatures: false,
+                showFooter: false,
+                conductLabel: midExtras?.conductLabel,
+                attendanceLabel: midExtras?.attendanceLabel,
+              },
             )
           : buildDetailedMinimalPageInner(
               midDetail,
-              'Final report — Mid-term session',
+              'Mid-term Report',
               classLabel,
               school.line1,
               school.line2,
               academicYearName,
               reportDate,
+              {
+                compact: true,
+                showSignatures: false,
+                showFooter: false,
+                conductLabel: midExtras?.conductLabel,
+                attendanceLabel: midExtras?.attendanceLabel,
+              },
             );
       const inner2 =
         pdfVariant === 'modern'
           ? buildModernDetailedPageInner(
               finalDetail,
-              'Final report — Full year',
+              'Final Term Report',
               classLabel,
               school.line1,
               school.line2,
               academicYearName,
               reportDate,
-              { headerMode: 'continuation' },
+              {
+                headerMode: 'continuation',
+                compact: true,
+                showSignatures: true,
+                showFooter: true,
+                conductLabel: finalExtras?.conductLabel,
+                attendanceLabel: finalExtras?.attendanceLabel,
+              },
             )
           : buildDetailedMinimalPageInner(
               finalDetail,
-              'Final report — Full year',
+              'Final Term Report',
               classLabel,
               school.line1,
               school.line2,
               academicYearName,
               reportDate,
+              {
+                compact: true,
+                showSignatures: true,
+                showFooter: true,
+                conductLabel: finalExtras?.conductLabel,
+                attendanceLabel: finalExtras?.attendanceLabel,
+              },
             );
-      fullHtml = composeDesignPdfHtmlMultiCard(styles, [inner1, inner2], pdfThemeCss);
+      fullHtml = composeDesignPdfHtmlMultiCard(styles, [inner1, inner2], pdfThemeCss, true);
     } else {
       const htmlPage1 = await this.buildDetailedHtmlInner(
         midDetail,
-        'Final Report — Mid-term Session',
+        'Mid-term Report',
         classSectionId,
         branchId,
       );
       const htmlPage2 = await this.buildDetailedHtmlInner(
         finalDetail,
-        'Final Report — Full Year',
+        'Final Term Report',
         classSectionId,
         branchId,
       );
@@ -1680,6 +2515,7 @@ export class ResultsService {
     pdfVariant: 'minimal' | 'modern',
     academicYearId: string,
     pdfThemeCss: string,
+    extras?: { conductLabel: string; attendanceLabel: string },
   ): Promise<Buffer> {
     const templateFile = `term-report-${pdfVariant}.html`;
     const styles = readDesignTemplateStyleBlock(templateFile);
@@ -1711,6 +2547,13 @@ export class ResultsService {
               school.line2,
               academicYearName,
               reportDate,
+              {
+                compact: true,
+                showSignatures: true,
+                showFooter: true,
+                conductLabel: extras?.conductLabel,
+                attendanceLabel: extras?.attendanceLabel,
+              },
             )
           : buildDetailedMinimalPageInner(
               d,
@@ -1720,8 +2563,15 @@ export class ResultsService {
               school.line2,
               academicYearName,
               reportDate,
+              {
+                compact: true,
+                showSignatures: true,
+                showFooter: true,
+                conductLabel: extras?.conductLabel,
+                attendanceLabel: extras?.attendanceLabel,
+              },
             );
-      htmlContent = composeDesignPdfHtml(styles, inner, 'report-card', pdfThemeCss);
+      htmlContent = composeDesignPdfHtml(styles, inner, 'report-card', pdfThemeCss, true);
     } else {
       const inner = await this.buildDetailedHtmlInner(d, resultTypeLabel, classSectionId, branchId);
       htmlContent = `<!DOCTYPE html>
@@ -1780,29 +2630,37 @@ export class ResultsService {
   }
 
   /**
-   * Generate behavioural report PDF (star-based UI). Throws if no behavioural data.
+   * Generate behavioural report PDF (star-based UI). Throws if no behavioural data
+   * when monthFilter is omitted; with monthFilter may render an empty-state PDF.
    */
   async generateBehavioralReportPdf(
     studentId: string,
     branchId: string,
     academicYearId: string | undefined,
+    options?: { month?: number; allowEmpty?: boolean },
   ): Promise<Buffer> {
     const { data: assessments } = await this.behavioralService.getByStudent(
       studentId,
       branchId,
       academicYearId,
     );
-    if (!assessments?.length) {
-      throw new BadRequestException(
-        'Behavioural metrics not set for this student. Please contact the administrator.',
-      );
-    }
-    const periods = this.buildBehavioralPeriods(
-      assessments.map((a) => ({
+    let periods = this.buildBehavioralPeriods(
+      (assessments || []).map((a) => ({
         assessmentMonth: a.assessmentMonth,
         scores: a.scores.map((s) => ({ attributeName: s.attributeName, score: s.score })),
       })),
     );
+    if (options?.month != null && options.month >= 1 && options.month <= 12) {
+      const mm = String(options.month).padStart(2, '0');
+      periods = periods.filter((p) => p.period.endsWith(`-${mm}`));
+    }
+    if (!periods.length) {
+      if (!options?.allowEmpty) {
+        throw new BadRequestException(
+          'Behavioural metrics not set for this student. Please contact the administrator.',
+        );
+      }
+    }
     const allAttributes = Array.from(
       new Set(periods.flatMap((p) => p.attributes.map((a) => a.attributeName))),
     ).sort();
@@ -1814,14 +2672,19 @@ export class ResultsService {
       return stars || '—';
     };
     let tableRows = '';
-    for (const p of periods) {
-      const attrMap = Object.fromEntries(p.attributes.map((a) => [a.attributeName, a.average]));
-      tableRows += `<tr><td>${this.escapeHtml(p.period)}</td>`;
-      for (const attr of allAttributes) {
-        const value = attrMap[attr];
-        tableRows += `<td>${value != null ? `<span class="stars">${renderStars(value)} ${value.toFixed(1)}</span>` : '—'}</td>`;
+    if (periods.length === 0) {
+      tableRows =
+        '<tr><td colspan="2">No behavioural ratings recorded for this month.</td></tr>';
+    } else {
+      for (const p of periods) {
+        const attrMap = Object.fromEntries(p.attributes.map((a) => [a.attributeName, a.average]));
+        tableRows += `<tr><td>${this.escapeHtml(p.period)}</td>`;
+        for (const attr of allAttributes) {
+          const value = attrMap[attr];
+          tableRows += `<td>${value != null ? `<span class="stars">${renderStars(value)} ${value.toFixed(1)}</span>` : '—'}</td>`;
+        }
+        tableRows += '</tr>\n';
       }
-      tableRows += '</tr>\n';
     }
     let overallSum = 0;
     let overallCount = 0;
@@ -1833,6 +2696,14 @@ export class ResultsService {
     }
     const overallAverage = overallCount > 0 ? Math.round((overallSum / overallCount) * 10) / 10 : 0;
     const studentName = await this.getStudentName(studentId);
+    const monthTitle =
+      options?.month != null
+        ? ` — ${new Date(2000, options.month - 1, 1).toLocaleString('en-GB', { month: 'long' })}`
+        : '';
+    const overallBlock =
+      overallCount > 0
+        ? `<div class="overall">Overall (star-based): <span class="stars">${renderStars(overallAverage)} ${overallAverage.toFixed(1)}</span></div>`
+        : '<div class="overall">No ratings in this period.</div>';
     const htmlContent = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8">
@@ -1850,14 +2721,14 @@ export class ResultsService {
 </head>
 <body>
   <div class="header">
-    <h1>Behavioural Report</h1>
+    <h1>Behavioural Report${this.escapeHtml(monthTitle)}</h1>
     <p class="sub">${this.escapeHtml(studentName)}</p>
   </div>
   <table>
-    <thead><tr><th>Period</th>${allAttributes.map((a) => `<th>${this.escapeHtml(a)}</th>`).join('')}</tr></thead>
+    <thead><tr><th>Period</th>${allAttributes.map((a) => `<th>${this.escapeHtml(a)}</th>`).join('') || '<th>Attributes</th>'}</tr></thead>
     <tbody>${tableRows}</tbody>
   </table>
-  <div class="overall">Overall (star-based): <span class="stars">${renderStars(overallAverage)} ${overallAverage.toFixed(1)}</span></div>
+  ${overallBlock}
 </body>
 </html>`;
     const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
@@ -1882,6 +2753,162 @@ export class ResultsService {
     } finally {
       await browser.close();
     }
+  }
+
+  /**
+   * Parent monthly pack: require a published Progress card for the given calendar month.
+   */
+  private async ensurePublishedProgressMonth(
+    studentId: string,
+    branchId: string,
+    academicYearId: string,
+    month: number,
+  ): Promise<void> {
+    const cards = await this.listResultCardsByStudent(
+      studentId,
+      branchId,
+      academicYearId,
+      undefined,
+      true,
+      'progress_report',
+    );
+    const found = cards.some(
+      (c) => c.progressSequence === month && c.status === 'published',
+    );
+    if (!found) {
+      throw new ForbiddenException(
+        'Attendance and behaviour pack downloads are available only when a Progress report for this month is published.',
+      );
+    }
+  }
+
+  async generateMonthlyPackAttendancePdf(
+    studentId: string,
+    branchId: string,
+    academicYearId: string | undefined,
+    month: number,
+  ): Promise<Buffer> {
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new BadRequestException('month must be an integer from 1 to 12');
+    }
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+    await this.ensurePublishedProgressMonth(studentId, branchId, yearId, month);
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: yearRow } = await supabase
+      .from('academic_years')
+      .select('start_date, end_date, name')
+      .eq('id', yearId)
+      .maybeSingle();
+    const yearStart = (yearRow as { start_date?: string } | null)?.start_date;
+    const yearEnd = (yearRow as { end_date?: string } | null)?.end_date;
+    const yearName = (yearRow as { name?: string } | null)?.name?.trim() || '—';
+    if (!yearStart || !yearEnd) {
+      throw new BadRequestException('Academic year dates are not configured');
+    }
+    const range = this.calendarMonthRangeWithinYear(yearStart, yearEnd, month);
+    const summary = await this.attendanceService.getAttendanceSummaryByStudent(
+      studentId,
+      branchId,
+      yearId,
+      range.startDate,
+      range.endDate,
+    );
+    const studentName = await this.getStudentName(studentId);
+    const monthLabel = new Date(2000, month - 1, 1).toLocaleString('en-GB', { month: 'long' });
+    const pct = summary.totalDays ? `${summary.percentage}%` : '—';
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; padding: 20px; color: #212529; }
+  .header { margin-bottom: 24px; }
+  .header h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .header .sub { font-size: 13px; color: #868e96; }
+  table { width: 100%; border-collapse: collapse; border: 1px solid #dee2e6; margin-top: 16px; }
+  th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+  th { background: #f8f9fa; font-weight: 600; }
+  .summary { margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 4px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>Attendance — ${this.escapeHtml(monthLabel)}</h1>
+    <p class="sub">${this.escapeHtml(studentName)}</p>
+    <p class="sub">${this.escapeHtml(yearName)} · ${this.escapeHtml(range.startDate)} to ${this.escapeHtml(range.endDate)}</p>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Present</th>
+        <th>Absent</th>
+        <th>Late</th>
+        <th>Excused</th>
+        <th>Total days</th>
+        <th>Attendance %</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${summary.presentDays}</td>
+        <td>${summary.absentDays}</td>
+        <td>${summary.lateDays}</td>
+        <td>${summary.excusedDays}</td>
+        <td>${summary.totalDays}</td>
+        <td>${this.escapeHtml(pct)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="summary">${
+    summary.totalDays
+      ? `Present ${summary.presentDays} of ${summary.totalDays} recorded days (${summary.percentage}%).`
+      : 'No attendance recorded for this month.'
+  }</div>
+</body>
+</html>`;
+    const { headerTemplate, footerTemplate } = await this.getPdfBranding(branchId, 'en');
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: getPuppeteerExecutablePath(),
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.emulateMediaType('print');
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      const pdf = await page.pdf({
+        format: 'A4',
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '85px', right: '20px', bottom: '55px', left: '20px' },
+        printBackground: true,
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  }
+
+  async generateMonthlyPackBehaviourPdf(
+    studentId: string,
+    branchId: string,
+    academicYearId: string | undefined,
+    month: number,
+  ): Promise<Buffer> {
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new BadRequestException('month must be an integer from 1 to 12');
+    }
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+    if (!activeYear) throw new BadRequestException('No active academic year found');
+    const yearId = academicYearId ?? activeYear.id;
+    await this.ensurePublishedProgressMonth(studentId, branchId, yearId, month);
+    return this.generateBehavioralReportPdf(studentId, branchId, yearId, {
+      month,
+      allowEmpty: true,
+    });
   }
 
   private async getStudentName(studentId: string): Promise<string> {
@@ -1979,6 +3006,7 @@ export class ResultsService {
       branchId,
       yearId,
       resultType,
+      { phaseExamsOnly: true },
     );
     const titlesById = new Map<string, string>();
     for (const [id, info] of assessmentMap) {
@@ -1986,7 +3014,11 @@ export class ResultsService {
     }
     const assessmentIds = [...assessmentMap.keys()];
     if (assessmentIds.length === 0) {
-      return batch.students.map((s) => ({ studentId: s.studentId, missingAssessmentTitles: [] }));
+      // No matching mid/final exams configured — treat every student as missing readiness.
+      return batch.students.map((s) => ({
+        studentId: s.studentId,
+        missingAssessmentTitles: ['No mid/final term examinations configured'],
+      }));
     }
     const studentIds = batch.students.map((s) => s.studentId);
     const supabase = this.supabaseConfig.getClient();
@@ -2087,6 +3119,7 @@ export class ResultsService {
       branchId,
       academicYearId,
       resultType,
+      this.resolveAssessmentScope('term_report', resultType),
     );
     if (batch.students.length > ResultsService.BULK_MAX_STUDENTS) {
       throw new BadRequestException(

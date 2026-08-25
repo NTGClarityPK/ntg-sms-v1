@@ -29,6 +29,7 @@ import {
   useMantineTheme,
   Tabs,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import {
   IconPlus,
   IconRefresh,
@@ -39,6 +40,7 @@ import {
   IconEye,
   IconChartBar,
   IconFileTypePdf,
+  IconCalendar,
 } from '@tabler/icons-react';
 import { useMediaQuery } from '@mantine/hooks';
 import { useRouter } from 'next/navigation';
@@ -60,10 +62,16 @@ import { modals } from '@mantine/modals';
 import dayjs from 'dayjs';
 import type { Assessment } from '@/types/assessment';
 import { formatExaminationDurationMinutes } from '@/lib/format-examination-duration';
+import '@mantine/dates/styles.css';
 
 function formatDueDateTime(iso?: string | null): string {
   if (!iso) return '—';
   return dayjs(iso).format('MMM D, YYYY HH:mm');
+}
+
+function toDateOnly(d: Date | null): string | undefined {
+  if (!d) return undefined;
+  return dayjs(d).format('YYYY-MM-DD');
 }
 
 export default function AssessmentsPage() {
@@ -83,6 +91,11 @@ export default function AssessmentsPage() {
   const [isPublished, setIsPublished] = useState<string | null>(null);
   const [assessmentTypeIdFilter, setAssessmentTypeIdFilter] = useState<string | null>(null);
   const [teacherUserId, setTeacherUserId] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+
+  const dateFilterReady = !!(dateRange[0] && dateRange[1]);
+  const startDateStr = dateFilterReady ? toDateOnly(dateRange[0]) : undefined;
+  const endDateStr = dateFilterReady ? toDateOnly(dateRange[1]) : undefined;
 
   const { data: activeYearResponse } = useActiveAcademicYear();
   const activeYearId = activeYearResponse?.data?.id;
@@ -139,6 +152,8 @@ export default function AssessmentsPage() {
     teacherUserId: teacherUserId ?? undefined,
     status:
       isPublished === 'true' ? 'published' : isPublished === 'false' ? 'unpublished' : undefined,
+    startDate: startDateStr,
+    endDate: endDateStr,
   });
 
   const scheduleQuery = useExaminationSchedule(
@@ -150,6 +165,8 @@ export default function AssessmentsPage() {
       academicYearId: activeYearId,
       classSectionId: classSectionId || undefined,
       subjectId: subjectId || undefined,
+      startDate: startDateStr,
+      endDate: endDateStr,
     },
     mainTab === 'schedule',
   );
@@ -184,6 +201,8 @@ export default function AssessmentsPage() {
         classSectionId: classSectionId || undefined,
         subjectId: subjectId || undefined,
         academicYearId: activeYearId,
+        startDate: startDateStr,
+        endDate: endDateStr,
         language: pdfLanguage,
       },
       {
@@ -196,6 +215,19 @@ export default function AssessmentsPage() {
         },
       },
     );
+  };
+
+  const onDateRangeChange = (v: [Date | null, Date | null] | Date | null) => {
+    let next: [Date | null, Date | null];
+    if (!v || (Array.isArray(v) && !v[0] && !v[1])) {
+      next = [null, null];
+    } else if (Array.isArray(v)) {
+      next = v;
+    } else {
+      next = [null, null];
+    }
+    setDateRange(next);
+    setPage(1);
   };
 
   const headerLoading = mainTab === 'all' ? isRefetching : scheduleQuery.isRefetching;
@@ -310,6 +342,15 @@ export default function AssessmentsPage() {
                           searchable
                           nothingFoundMessage={tCommon('noData')}
                         />
+                        <DatePickerInput
+                          id="assessments-filter-date-range"
+                          type="range"
+                          placeholder={t('dateRangePlaceholder')}
+                          value={dateRange}
+                          onChange={onDateRangeChange}
+                          leftSection={<IconCalendar size={16} />}
+                          clearable
+                        />
                       </Stack>
                     ) : (
                       <ScrollArea type="auto" scrollbars="x" w="100%">
@@ -360,6 +401,17 @@ export default function AssessmentsPage() {
                               clearable
                               searchable
                               nothingFoundMessage={tCommon('noData')}
+                            />
+                          </Box>
+                          <Box style={{ minWidth: 240, flex: '1 1 260px' }}>
+                            <DatePickerInput
+                              id="assessments-filter-date-range"
+                              type="range"
+                              placeholder={t('dateRangePlaceholder')}
+                              value={dateRange}
+                              onChange={onDateRangeChange}
+                              leftSection={<IconCalendar size={16} />}
+                              clearable
                             />
                           </Box>
                         </Group>
@@ -588,6 +640,15 @@ export default function AssessmentsPage() {
                         clearable
                         searchable
                       />
+                      <DatePickerInput
+                        id="assessments-schedule-filter-date-range"
+                        type="range"
+                        placeholder={t('dateRangePlaceholder')}
+                        value={dateRange}
+                        onChange={onDateRangeChange}
+                        leftSection={<IconCalendar size={16} />}
+                        clearable
+                      />
                       <Button
                         id="assessments-schedule-export-pdf"
                         leftSection={<IconFileTypePdf size={16} />}
@@ -623,6 +684,15 @@ export default function AssessmentsPage() {
                           }}
                           clearable
                           searchable
+                        />
+                        <DatePickerInput
+                          id="assessments-schedule-filter-date-range"
+                          type="range"
+                          placeholder={t('dateRangePlaceholder')}
+                          value={dateRange}
+                          onChange={onDateRangeChange}
+                          leftSection={<IconCalendar size={16} />}
+                          clearable
                         />
                       </Group>
                       <Button

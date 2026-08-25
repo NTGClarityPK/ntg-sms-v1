@@ -16,7 +16,7 @@ Settings uses **two rows of tabs**:
 | Category | Sections you will see |
 | --- | --- |
 | **School setup** | **Business Info**, **Communication**, **General** |
-| **Academic** | **Academic**, **Schedule** |
+| **Academic** | **Academic**, **Schedule**, **Promotion & Placement** |
 | **Operations** | **Inventory** \*\*, **Integrations**, **Data export** * |
 | **Finance** | **Fee settings** \*\* |
 | **Appearance** | **Theme**, **Stats** * |
@@ -87,11 +87,13 @@ This is **not** where you create classes or subjects — those sit under **Acade
 
 ## 🎓 Academic (section tab)
 
-This one section stacks three areas:
+This category includes:
 
 1. **Academic years** — create years, mark one **Active**, and **Lock** a year when it is finalised; year-end rollover rules then apply
-2. **Academic Settings** — inner tabs for structure (explained next)
-3. **Assessment Settings** — **Assessment types** and **Grade templates**
+2. **Schedule** — school days, timing templates, holidays, vacations
+3. **Promotion & Placement** — enable the module, set how many days before year end the promotion window opens, and optionally force-open it early (school admins only). See [🎯 Promotion & Placement](promotion-and-placement.md).
+
+**Academic Settings** (subjects, classes, sections, levels, subject templates) and **Assessment Settings** sit under the Academic years / structure area as before.
 
 After classes and sections exist, day-to-day class lists also appear under [🧩 Class](class-sections.md).
 

@@ -57,9 +57,9 @@ Three tables work together. **Do not treat `students.class_id` as the only sourc
 
 ## School User Journey (After Implementation)
 
-### 1) Staff/teachers complete Promotion (end-of-year requirement)
+### 1) Staff complete Promotion (end-of-year requirement)
 
-From **Sidebar → Promotion**, staff record each student’s outcome:
+From **Sidebar → Promotions**, staff record each student’s outcome **only when the promotion window is open** (near the year end date, or after a school admin force-opens it under **Settings → Academic → Promotion & Placement**). Bulk actions require selecting a class-section first; **Graduate all** asks for typed confirmation.
 
 - **Promoted**: choose (or accept the auto-filled) **Target class** (next class by sort order) and **Target section** (same section).
 - **Repeated**: system keeps the student in the same class/section (not editable).

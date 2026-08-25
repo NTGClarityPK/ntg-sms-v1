@@ -26,6 +26,8 @@ Canonical examples live in `backend/.env.example`. Never commit real `.env` file
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | No | Web push |
 | `PUPPETEER_EXECUTABLE_PATH` | No | PDF/chromium path override |
 | `*_JOB_ENABLED` flags | No | Background jobs (invitations expiry, substitution reminders, tenant deletion, late fees, subscription end-of-period) |
+| `REACH_API_KEY` | No* | Reach Support API key (same secret as Reach `SUPPORT_ALMA_API_KEY`; *required for `/api/v1/support/*`) |
+| `REACH_BASE_URL` | No* | Reach API origin, no trailing slash or `/api` suffix (*required for support routes) |
 
 ## Frontend (`frontend/.env.local`)
 
@@ -40,3 +42,4 @@ Canonical examples live in `backend/.env.example`. Never commit real `.env` file
 - Example files must contain **placeholders only** — never real Mailjet/Stripe/Google secrets
 - Rotating `GOOGLE_TOKEN_ENCRYPTION_KEY` invalidates all stored Classroom connections
 - Production `FRONTEND_URL` and logo URLs must be stable HTTPS hosts email clients can reach
+- Never put `REACH_API_KEY` in the frontend. Nest is the only client of the Reach Support API.

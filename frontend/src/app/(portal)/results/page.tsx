@@ -14,6 +14,7 @@ import {
   Select,
   Skeleton,
   Stack,
+  Switch,
   Table,
   Text,
   Textarea,
@@ -24,12 +25,11 @@ import {
 import {
   IconCheck,
   IconChevronDown,
-  IconFileDescription,
   IconFileDownload,
-  IconFileText,
   IconInfoCircle,
   IconMessage,
   IconPlus,
+  IconArrowBackUp,
 } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
 import { useMediaQuery } from '@mantine/hooks';
@@ -66,10 +66,36 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+function monthsInAcademicYear(startDate?: string, endDate?: string): number[] {
+  if (!startDate || !endDate) {
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  }
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  }
+  const months: number[] = [];
+  const seen = new Set<number>();
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+  while (cursor <= endMonth) {
+    const m = cursor.getMonth() + 1;
+    if (!seen.has(m)) {
+      seen.add(m);
+      months.push(m);
+    }
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months.length > 0 ? months : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+}
+
 export default function ResultsPage() {
   const [classSectionId, setClassSectionId] = useState<string | null>(null);
   const [reportKind, setReportKind] = useState<ReportKind>('term_report');
-  const [resultType, setResultType] = useState<'interim' | 'mid_term' | 'final'>('final');
+  const [resultType, setResultType] = useState<'mid_term' | 'final'>('final');
+  const [progressMonth, setProgressMonth] = useState<number>(new Date().getMonth() + 1);
+  const [includeBreakdown, setIncludeBreakdown] = useState(false);
   const [commentModalCard, setCommentModalCard] = useState<ResultCard | null>(null);
   const [commentDraft, setCommentDraft] = useState('');
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
@@ -85,7 +111,6 @@ export default function ResultsPage() {
 
   const reportKindControlData = [
     { value: 'term_report', label: t('reportKindTerm') },
-    { value: 'annual_report', label: t('reportKindAnnual') },
     { value: 'progress_report', label: t('reportKindProgress') },
   ] as const;
   const { user } = useAuth();
@@ -93,20 +118,46 @@ export default function ResultsPage() {
   const { canEdit } = useFeaturePermission('results');
   const isClassTeacher =
     userTyped?.roles?.some((r) => r.roleName === 'class_teacher') ?? false;
-  const { data: myStaffData } = useMyStaff();
+  const { data: myStaffData, isLoading: myStaffLoading } = useMyStaff();
   const staffData = myStaffData?.data;
+  const classTeacherStaffId = isClassTeacher ? staffData?.id : undefined;
+  const classSectionsReady = !isClassTeacher || !!classTeacherStaffId || (!myStaffLoading && !staffData?.id);
   const classSectionsQuery = useClassSections({
     limit: 200,
     minimal: true,
-    classTeacherId: isClassTeacher && staffData?.id ? staffData.id : undefined,
+    classTeacherId: classTeacherStaffId,
+    enabled: classSectionsReady,
   });
+  const classSectionsLoading =
+    !classSectionsReady || (classSectionsQuery.isLoading && !classSectionsQuery.data);
   const activeYearQuery = useActiveAcademicYear();
   const activeYear = activeYearQuery.data?.data ?? null;
   const academicYearId = activeYear?.id;
 
-  const effectiveResultType = reportKind === 'term_report' ? resultType : 'final';
+  const monthOptions = useMemo(() => {
+    const months = monthsInAcademicYear(activeYear?.startDate, activeYear?.endDate);
+    return months.map((m) => ({
+      value: String(m),
+      label: t(`month${m}` as 'month1'),
+    }));
+  }, [activeYear?.startDate, activeYear?.endDate, t]);
 
-  const resultsQuery = useClassSectionResults(classSectionId ?? null, academicYearId, effectiveResultType);
+  useEffect(() => {
+    const allowed = monthOptions.map((o) => Number(o.value));
+    if (allowed.length > 0 && !allowed.includes(progressMonth)) {
+      setProgressMonth(allowed[0]!);
+    }
+  }, [monthOptions, progressMonth]);
+
+  const effectiveResultType = reportKind === 'term_report' ? resultType : 'final';
+  const activeProgressMonth = reportKind === 'progress_report' ? progressMonth : null;
+
+  const resultsQuery = useClassSectionResults(
+    classSectionId ?? null,
+    academicYearId,
+    effectiveResultType,
+    activeProgressMonth,
+  );
   const results = resultsQuery.data ?? null;
 
   const cardsQuery = useResultCardsByClassSection(
@@ -114,6 +165,7 @@ export default function ResultsPage() {
     academicYearId,
     effectiveResultType,
     reportKind,
+    activeProgressMonth,
   );
   const cards = cardsQuery.data ?? [];
 
@@ -127,7 +179,7 @@ export default function ResultsPage() {
   const resultReportSettingsQuery = useResultReportSettings(true);
 
   const generateMutation = useGenerateResultCard();
-  const publishMutation = useUpdateResultCardStatus();
+  const statusMutation = useUpdateResultCardStatus();
   const commentMutation = useUpdateResultCardComment();
 
   useEffect(() => {
@@ -147,36 +199,31 @@ export default function ResultsPage() {
   }, [pdfVariantHydrated, resultReportSettingsQuery.data?.pdfVariant]);
 
   const visibleClassSections = (classSectionsQuery.data?.data as ClassSection[] | undefined) ?? [];
-  const classOptions = visibleClassSections
-    .sort((a, b) => {
-      const classOrderA = a.classSortOrder ?? 999;
-      const classOrderB = b.classSortOrder ?? 999;
-      if (classOrderA !== classOrderB) return classOrderA - classOrderB;
-      const sectionOrderA = a.sectionSortOrder ?? 999;
-      const sectionOrderB = b.sectionSortOrder ?? 999;
-      return sectionOrderA - sectionOrderB;
-    })
-    .map((cs) => ({
-      value: cs.id,
-      label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
-    }));
+  const classOptions = useMemo(
+    () =>
+      [...visibleClassSections]
+        .sort((a, b) => {
+          const classOrderA = a.classSortOrder ?? 999;
+          const classOrderB = b.classSortOrder ?? 999;
+          if (classOrderA !== classOrderB) return classOrderA - classOrderB;
+          const sectionOrderA = a.sectionSortOrder ?? 999;
+          const sectionOrderB = b.sectionSortOrder ?? 999;
+          return sectionOrderA - sectionOrderB;
+        })
+        .map((cs) => ({
+          value: cs.id,
+          label: `${cs.className ?? ''} ${cs.sectionName ?? ''}`.trim() || cs.id,
+        })),
+    [visibleClassSections],
+  );
 
   const cardByStudent = useMemo(() => {
     const m = new Map<string, ResultCard>();
     for (const c of cards) {
-      const prev = m.get(c.studentId);
-      if (!prev) {
-        m.set(c.studentId, c);
-        continue;
-      }
-      if (reportKind === 'progress_report') {
-        if ((c.progressSequence ?? 0) > (prev.progressSequence ?? 0)) m.set(c.studentId, c);
-      } else {
-        m.set(c.studentId, c);
-      }
+      m.set(c.studentId, c);
     }
     return m;
-  }, [cards, reportKind]);
+  }, [cards]);
 
   const marksSummary = useMemo(() => {
     const rows = marksReadinessQuery.data ?? [];
@@ -186,9 +233,10 @@ export default function ResultsPage() {
 
   const rankLabels = [t('rankFirst'), t('rankSecond'), t('rankThird')];
 
-  const handleStudentPdf = async (studentId: string, reportType: 'basic' | 'detailed') => {
+  const handleStudentPdf = async (studentId: string) => {
     if (!classSectionId) return;
-    const key = `${studentId}-${reportKind}-${effectiveResultType}-${reportType}-${downloadPdfVariant}`;
+    const reportType = includeBreakdown ? 'detailed' : 'basic';
+    const key = `${studentId}-${reportKind}-${effectiveResultType}-${reportType}-${downloadPdfVariant}-${activeProgressMonth ?? ''}`;
     setDownloadingPdf(key);
     try {
       const params = new URLSearchParams();
@@ -198,6 +246,7 @@ export default function ResultsPage() {
       params.set('pdfVariant', downloadPdfVariant);
       if (academicYearId) params.set('academicYearId', academicYearId);
       if (reportKind !== 'term_report') params.set('reportKind', reportKind);
+      if (activeProgressMonth != null) params.set('progressMonth', String(activeProgressMonth));
       const { blob, filename } = await apiClient.getBlobWithFilename(
         `/api/v1/results/student/${studentId}/result-card/pdf?${params.toString()}`,
       );
@@ -229,10 +278,6 @@ export default function ResultsPage() {
   };
 
   const openCommentModal = (card: ResultCard) => {
-    if (card.status === 'published') {
-      notifications.show({ message: t('readOnlyPublished'), color: 'yellow' });
-      return;
-    }
     setCommentDraft(card.classTeacherComment ?? '');
     setCommentModalCard(card);
   };
@@ -250,6 +295,10 @@ export default function ResultsPage() {
 
   const handleGenerate = async (studentId: string) => {
     if (!classSectionId) return;
+    if (reportKind === 'progress_report' && (progressMonth < 1 || progressMonth > 12)) {
+      notifications.show({ message: t('progressMonthRequired'), color: 'yellow' });
+      return;
+    }
     try {
       const payload: Parameters<typeof generateMutation.mutateAsync>[0] = {
         studentId,
@@ -257,8 +306,11 @@ export default function ResultsPage() {
         academicYearId: academicYearId ?? undefined,
         reportKind,
       };
-      if (reportKind !== 'annual_report') {
+      if (reportKind === 'term_report') {
         payload.resultType = effectiveResultType;
+      } else {
+        payload.resultType = 'final';
+        payload.progressSequence = progressMonth;
       }
       await generateMutation.mutateAsync(payload);
       notifications.show({ message: t('generateSuccess'), color: 'green' });
@@ -274,7 +326,24 @@ export default function ResultsPage() {
       labels: { confirm: t('publishConfirmButton'), cancel: t('cancel') },
       onConfirm: async () => {
         try {
-          await publishMutation.mutateAsync({ id: card.id, status: 'published' });
+          await statusMutation.mutateAsync({ id: card.id, status: 'published' });
+        } catch {
+          // handled
+        }
+      },
+    });
+  };
+
+  const handleUnpublish = (card: ResultCard) => {
+    modals.openConfirmModal({
+      title: t('unpublishConfirmTitle'),
+      children: <Text size="sm">{t('unpublishConfirmBody')}</Text>,
+      labels: { confirm: t('unpublishConfirmButton'), cancel: t('cancel') },
+      confirmProps: { color: 'orange' },
+      onConfirm: async () => {
+        try {
+          await statusMutation.mutateAsync({ id: card.id, status: 'draft' });
+          notifications.show({ message: t('unpublishSuccess'), color: 'green' });
         } catch {
           // handled
         }
@@ -300,8 +369,14 @@ export default function ResultsPage() {
       <Stack gap="md" mt="xl" px="md" pb="xl">
         <Paper p="md" withBorder>
           <Stack gap="md">
-            {visibleClassSections.length > 1 && (
+            {classSectionsLoading ? (
+              <Stack gap={4} maw={400}>
+                <Skeleton height={14} width={120} radius="sm" />
+                <Skeleton height={36} radius="sm" />
+              </Stack>
+            ) : visibleClassSections.length > 1 ? (
               <Select
+                id="results-select-class-section"
                 label={t('classSectionLabel')}
                 placeholder={t('classSectionPlaceholder')}
                 data={classOptions}
@@ -311,7 +386,7 @@ export default function ResultsPage() {
                 searchable
                 maw={400}
               />
-            )}
+            ) : null}
             {activeYear && (
               <Text size="sm" c="dimmed">
                 {t('academicYearLabel')}: {activeYear.name}
@@ -345,9 +420,9 @@ export default function ResultsPage() {
             )}
             {reportKind === 'term_report' && (
               <Select
+                id="results-select-term-phase"
                 label={t('status')}
                 data={[
-                  { value: 'interim', label: t('resultTypeInterim') },
                   { value: 'mid_term', label: t('resultTypeMidTerm') },
                   { value: 'final', label: t('resultTypeFinal') },
                 ]}
@@ -356,10 +431,24 @@ export default function ResultsPage() {
                 maw={280}
               />
             )}
+            {reportKind === 'progress_report' && (
+              <Select
+                id="results-select-progress-month"
+                label={t('progressMonthLabel')}
+                description={t('progressMonthParentPackHint')}
+                data={monthOptions}
+                value={String(progressMonth)}
+                onChange={(v) => v && setProgressMonth(Number(v))}
+                allowDeselect={false}
+                maw={400}
+              />
+            )}
           </Stack>
         </Paper>
 
-        {!classSectionId && visibleClassSections.length > 1 ? (
+        {classSectionsLoading ? (
+          <Skeleton height={120} radius="sm" />
+        ) : !classSectionId && visibleClassSections.length > 1 ? (
           <Text c="dimmed" size="sm">
             {t('classSectionHint')}
           </Text>
@@ -370,6 +459,9 @@ export default function ResultsPage() {
                 <Stack gap="xs">
                   <Text fw={600} size="sm">
                     {t('marksReadinessTitle')}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {t('marksReadinessHint')}
                   </Text>
                   {marksReadinessQuery.isLoading ? (
                     <Skeleton height={20} />
@@ -403,17 +495,14 @@ export default function ResultsPage() {
                     </Stack>
                     <Tooltip label={t('tooltipBulkZip')} withArrow>
                       <Button
+                        id="results-bulk-zip"
                         size="sm"
                         variant="light"
                         leftSection={<IconFileDownload size={16} />}
                         loading={bulkDownloading}
                         onClick={() => void handleBulkZip()}
                       >
-                        {resultType === 'interim'
-                          ? t('downloadAllInterim')
-                          : resultType === 'mid_term'
-                            ? t('downloadAllMidTerm')
-                            : t('downloadAllFinal')}
+                        {resultType === 'mid_term' ? t('downloadAllMidTerm') : t('downloadAllFinal')}
                       </Button>
                     </Tooltip>
                   </Group>
@@ -477,7 +566,7 @@ export default function ResultsPage() {
                 </Paper>
 
                 <Paper withBorder p="md">
-                  <Stack gap="xs">
+                  <Stack gap="sm">
                     <Text fw={600} size="sm">
                       {t('downloadPdfVariantLabel')}
                     </Text>
@@ -497,6 +586,13 @@ export default function ResultsPage() {
                         />
                       </div>
                     </Tooltip>
+                    <Switch
+                      id="results-include-breakdown"
+                      label={t('includeAssessmentBreakdown')}
+                      description={t('includeAssessmentBreakdownHint')}
+                      checked={includeBreakdown}
+                      onChange={(e) => setIncludeBreakdown(e.currentTarget.checked)}
+                    />
                   </Stack>
                 </Paper>
 
@@ -517,23 +613,22 @@ export default function ResultsPage() {
                         const genBusy =
                           generateMutation.isPending &&
                           generateMutation.variables?.studentId === s.studentId;
-                        const basicKey = `${s.studentId}-${reportKind}-${effectiveResultType}-basic-${downloadPdfVariant}`;
-                        const detailedKey = `${s.studentId}-${reportKind}-${effectiveResultType}-detailed-${downloadPdfVariant}`;
-                        const basicLoading = downloadingPdf === basicKey;
-                        const detailedLoading = downloadingPdf === detailedKey;
-                        const publishBusy =
+                        const pdfKey = `${s.studentId}-${reportKind}-${effectiveResultType}-${includeBreakdown ? 'detailed' : 'basic'}-${downloadPdfVariant}-${activeProgressMonth ?? ''}`;
+                        const pdfLoading = downloadingPdf === pdfKey;
+                        const statusBusy =
                           !!card &&
-                          publishMutation.isPending &&
-                          publishMutation.variables?.id === card.id;
+                          statusMutation.isPending &&
+                          statusMutation.variables?.id === card.id;
                         return (
                           <Table.Tr key={s.studentId}>
                             <Table.Td>{s.studentName}</Table.Td>
                             <Table.Td>{s.overallPercentage != null ? `${s.overallPercentage}%` : '—'}</Table.Td>
                             <Table.Td>{statusBadge(card)}</Table.Td>
                             <Table.Td>
-                              <Menu shadow="md" width={260} position="bottom-end">
+                              <Menu shadow="md" width={280} position="bottom-end">
                                 <Menu.Target>
                                   <Button
+                                    id={`results-actions-${s.studentId}`}
                                     size="xs"
                                     variant="light"
                                     rightSection={<IconChevronDown size={14} />}
@@ -546,25 +641,12 @@ export default function ResultsPage() {
                                   <Menu.Label>{t('menuSectionDownloadPdf')}</Menu.Label>
                                   <Menu.Item
                                     leftSection={
-                                      basicLoading ? <Loader size={14} /> : <IconFileText size={16} stroke={1.5} />
+                                      pdfLoading ? <Loader size={14} /> : <IconFileDownload size={16} stroke={1.5} />
                                     }
-                                    disabled={!classSectionId || basicLoading}
-                                    onClick={() => void handleStudentPdf(s.studentId, 'basic')}
+                                    disabled={!classSectionId || pdfLoading}
+                                    onClick={() => void handleStudentPdf(s.studentId)}
                                   >
-                                    {t('menuPdfBasic')}
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    leftSection={
-                                      detailedLoading ? (
-                                        <Loader size={14} />
-                                      ) : (
-                                        <IconFileDescription size={16} stroke={1.5} />
-                                      )
-                                    }
-                                    disabled={!classSectionId || detailedLoading}
-                                    onClick={() => void handleStudentPdf(s.studentId, 'detailed')}
-                                  >
-                                    {t('menuPdfDetailed')}
+                                    {t('menuPdfDownload')}
                                   </Menu.Item>
                                   {canEdit && (
                                     <>
@@ -588,12 +670,27 @@ export default function ResultsPage() {
                                       {card && card.status !== 'published' && (
                                         <Menu.Item
                                           leftSection={
-                                            publishBusy ? <Loader size={14} /> : <IconCheck size={16} stroke={1.5} />
+                                            statusBusy ? <Loader size={14} /> : <IconCheck size={16} stroke={1.5} />
                                           }
-                                          disabled={publishBusy}
+                                          disabled={statusBusy}
                                           onClick={() => handlePublish(card)}
                                         >
                                           {t('menuPublishCard')}
+                                        </Menu.Item>
+                                      )}
+                                      {card && card.status === 'published' && (
+                                        <Menu.Item
+                                          leftSection={
+                                            statusBusy ? (
+                                              <Loader size={14} />
+                                            ) : (
+                                              <IconArrowBackUp size={16} stroke={1.5} />
+                                            )
+                                          }
+                                          disabled={statusBusy}
+                                          onClick={() => handleUnpublish(card)}
+                                        >
+                                          {t('menuUnpublishCard')}
                                         </Menu.Item>
                                       )}
                                     </>
@@ -621,11 +718,18 @@ export default function ResultsPage() {
       >
         <Stack gap="md">
           <Textarea
+            id="results-comment-textarea"
             minRows={4}
             placeholder={t('commentModalPlaceholder')}
             value={commentDraft}
+            readOnly={commentModalCard?.status === 'published'}
             onChange={(e) => setCommentDraft(e.currentTarget.value)}
           />
+          {commentModalCard?.status === 'published' && (
+            <Text size="sm" c="dimmed">
+              {t('readOnlyPublished')}
+            </Text>
+          )}
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setCommentModalCard(null)}>
               {t('cancel')}

@@ -98,6 +98,7 @@ async function bootstrap() {
     { name: 'Student self-service', description: 'Endpoints for the signed-in student role' },
     { name: 'Promotion & placement', description: 'Year-end promotion and class placement' },
     { name: 'Storage', description: 'File upload and signed URLs' },
+    { name: 'Support', description: 'Reach customer-support BFF (conversations, messages, realtime token)' },
   ];
 
   let swaggerConfig = new DocumentBuilder()

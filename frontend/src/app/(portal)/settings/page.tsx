@@ -81,6 +81,7 @@ import { BulkSetupTabContent } from '@/components/features/settings/BulkSetupTab
 import { FeeSettingsTabContent } from '@/components/features/settings/FeeSettingsTabContent';
 import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
 import { DataExportTabContent } from '@/components/features/settings/DataExportTabContent';
+import { PromotionSettings } from '@/components/features/settings/PromotionSettings';
 import { IntegrationsTabContent } from '@/components/features/settings/IntegrationsTabContent';
 
 // Common timezones list with GMT offsets (matching RMS)
@@ -481,6 +482,10 @@ export default function SettingsPage() {
                   <DataExportTabContent />
                 </Tabs.Panel>
               )}
+
+              <Tabs.Panel value="promotion-settings" pt="md" px="md" pb="md">
+                <PromotionSettings />
+              </Tabs.Panel>
 
               </Tabs>
             </Stack>

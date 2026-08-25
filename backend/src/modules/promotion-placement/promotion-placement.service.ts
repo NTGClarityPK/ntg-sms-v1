@@ -6,6 +6,7 @@ import { StudentPlacementService } from '../../common/services/student-placement
 import { PromotionStudentDto } from './dto/promotion-student.dto';
 import type { PromotionOutcome } from './dto/promotion-outcome.enum';
 import { YearCloseReadinessDto } from './dto/year-close-readiness.dto';
+import { PromotionWindowService } from './promotion-window.service';
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
@@ -25,6 +26,7 @@ export class PromotionPlacementService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
     private readonly studentPlacementService: StudentPlacementService,
+    private readonly promotionWindowService: PromotionWindowService,
   ) {}
 
   async listStudentsForPromotion(
@@ -172,10 +174,22 @@ export class PromotionPlacementService {
       targetClassId?: string | null;
       targetSectionId?: string | null;
     }>,
+    classSectionId?: string | null,
   ): Promise<{ upserted: number }> {
     const supabase = this.supabaseConfig.getClient();
 
+    // Gate 1: promotion module enabled + window open
+    await this.promotionWindowService.assertPromotionWindowOpen(branchId, sourceAcademicYearId);
+
+    // Gate 2: year must not be locked
     await this.academicYearsService.assertNotLockedForBranch(branchId, sourceAcademicYearId);
+
+    // Gate 3: Graduate-all (every decision is "graduated") requires a class-section scope
+    if (decisions.length > 0 && decisions.every((d) => d.outcome === 'graduated') && !classSectionId) {
+      throw new BadRequestException(
+        'Graduating all students at once requires selecting a specific class-section first.',
+      );
+    }
 
     if (decisions.length === 0) return { upserted: 0 };
 

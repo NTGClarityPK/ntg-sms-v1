@@ -6,6 +6,7 @@ import { CurrentBranch } from '../../common/decorators/current-branch.decorator'
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { PromotionPlacementService } from './promotion-placement.service';
+import { PromotionWindowService } from './promotion-window.service';
 import { QueryPromotionStudentsDto } from './dto/query-promotion-students.dto';
 import { SavePromotionDecisionsDto } from './dto/save-promotion-decisions.dto';
 
@@ -16,7 +17,22 @@ export class PromotionPlacementController {
   constructor(
     private readonly promotionPlacementService: PromotionPlacementService,
     private readonly academicYearsService: AcademicYearsService,
+    private readonly promotionWindowService: PromotionWindowService,
   ) {}
+
+  @Get('window')
+  async getWindow(
+    @Query('academicYearId') academicYearId: string | undefined,
+    @CurrentBranch() branch: { branchId: string },
+  ) {
+    const yearId =
+      academicYearId ?? (await this.academicYearsService.getActiveForBranch(branch.branchId))?.id;
+    if (!yearId) {
+      return { data: { enabled: true, open: false, opensOn: null, manualOverride: false } };
+    }
+    const data = await this.promotionWindowService.getWindowStatus(branch.branchId, yearId);
+    return { data };
+  }
 
   @Get('students')
   async listStudents(
@@ -46,6 +62,7 @@ export class PromotionPlacementController {
       body.sourceAcademicYearId,
       user.id,
       body.decisions,
+      body.classSectionId,
     );
     return { data: result };
   }

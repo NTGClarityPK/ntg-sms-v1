@@ -37,6 +37,7 @@ import {
   IconCalendarEvent,
   IconBell,
   IconMessage,
+  IconHeadset,
   IconStar,
   IconAlertTriangle,
   IconPackage,
@@ -53,6 +54,7 @@ import {
   type IconProps,
 } from '@tabler/icons-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
 import type { PlanFeatures } from '@/types/subscription';
@@ -138,6 +140,7 @@ const allNavItems: NavItem[] = [
   { key: 'earlyDeparture', label: 'Early Departure', href: '/early-departure', icon: IconWalk },
   { key: 'notifications', label: 'Notification', href: '/notifications', icon: IconBell },
   { key: 'messages', label: 'Messages', href: '/messages', icon: IconMessage },
+  { key: 'support', label: 'Support', href: '/support', icon: IconHeadset },
   { key: 'library', label: 'Library', href: '/library', icon: IconBook },
   { key: 'inventory', label: 'Inventory', href: '/inventory', icon: IconPackage },
   { key: 'uniformRequest', label: 'Request uniform', href: '/uniform-request', icon: IconClipboardList },
@@ -244,7 +247,7 @@ const allNavItems: NavItem[] = [
   },
   { key: 'promotionPlacement', label: 'Promotion & Placement', href: '/promotion-placement', icon: IconArrowUpRight },
   { key: 'reports', label: 'Report', href: '/reports', icon: IconChartBar },
-  { key: 'results', label: 'Results', href: '/results', icon: IconMedal },
+  { key: 'results', label: 'Report Cards', href: '/results', icon: IconMedal },
   {
     key: 'storage',
     label: 'Storage',
@@ -300,7 +303,7 @@ const SCHOOL_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[
   },
   {
     i18nKey: 'sidebarGroupCommunication',
-    hrefs: ['/messages', '/notifications', '/events', '/my-events'],
+    hrefs: ['/messages', '/support', '/notifications', '/events', '/my-events'],
   },
 ];
 
@@ -360,6 +363,7 @@ export function Sidebar({
   const tNav = useTranslations('navigation');
   const tCommon = useTranslations('common');
   const { user } = useAuth();
+  const isOnline = useOnlineStatus();
   const { canView, canEdit } = usePermissions();
   const { data: planFeatures } = useSubscriptionFeatures();
   const { studentToken } = useStudentSessionStore();
@@ -440,6 +444,11 @@ export function Sidebar({
   const navItems = allNavItems.filter((item) => {
     // Hide dashboard in child mode — students use My Assessments as home
     if (item.href === '/dashboard' && isActingAsStudent) return false;
+
+    // Support chat is campus-wide (no matrix/plan gate); hide when offline
+    if (item.href === '/support') {
+      return isOnline;
+    }
 
     // Request uniform: only for parents
     if (item.href === '/uniform-request') {

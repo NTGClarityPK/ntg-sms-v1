@@ -3,12 +3,21 @@ import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
 import type { PromotionStudent, SavePromotionDecisionsInput, YearCloseReadiness } from '@/types/promotion-placement';
 
+export type PromotionWindowStatus = {
+  enabled: boolean;
+  open: boolean;
+  opensOn: string | null;
+  manualOverride: boolean;
+};
+
 const keys = {
   all: ['promotionPlacement'] as const,
   students: (branchId: string | null, academicYearId: string | null, classSectionId: string | null) =>
     [...keys.all, 'students', branchId, academicYearId, classSectionId] as const,
   readiness: (branchId: string | null, academicYearId: string | null) =>
     [...keys.all, 'readiness', branchId, academicYearId] as const,
+  window: (branchId: string | null, academicYearId: string | null) =>
+    [...keys.all, 'window', branchId, academicYearId] as const,
 };
 
 export function usePromotionStudents(params: { academicYearId: string | null; classSectionId: string | null }) {
@@ -38,7 +47,7 @@ export function useSavePromotionDecisions() {
   const branchId = user?.currentBranch?.id ?? null;
 
   return useMutation({
-    mutationFn: async (payload: SavePromotionDecisionsInput) => {
+    mutationFn: async (payload: SavePromotionDecisionsInput & { classSectionId?: string | null }) => {
       const res = await apiClient.post<{ upserted: number }>('/api/v1/promotion-placement/decisions', payload);
       return res;
     },
@@ -46,6 +55,23 @@ export function useSavePromotionDecisions() {
       await qc.invalidateQueries({ queryKey: keys.all });
     },
     meta: { branchId },
+  });
+}
+
+export function usePromotionWindow(academicYearId: string | null) {
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id ?? null;
+
+  return useQuery({
+    queryKey: keys.window(branchId, academicYearId),
+    queryFn: async () => {
+      const res = await apiClient.get<PromotionWindowStatus>('/api/v1/promotion-placement/window', {
+        params: academicYearId ? { academicYearId } : undefined,
+      });
+      return res;
+    },
+    enabled: !!branchId,
+    staleTime: 30 * 1000,
   });
 }
 

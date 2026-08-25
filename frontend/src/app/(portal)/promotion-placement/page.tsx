@@ -6,24 +6,27 @@ import {
   Box,
   Button,
   Group,
+  Modal,
   Paper,
   Select,
   Skeleton,
   Stack,
   Table,
   Text,
+  TextInput,
   Title,
 } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { useTranslations } from 'next-intl';
 import { PAGE_TITLE_BAR_MOBILE_MEDIA } from '@/components/common/PageTitleBarLongTitleSizing';
 import { notifications } from '@mantine/notifications';
 import { useThemeColors, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useActiveAcademicYear, useAcademicYearsList } from '@/hooks/useAcademicYears';
 import { useClassSections } from '@/hooks/useClassSections';
-import { usePromotionStudents, useSavePromotionDecisions, useYearCloseReadiness } from '@/hooks/usePromotionPlacement';
+import { usePromotionStudents, useSavePromotionDecisions, useYearCloseReadiness, usePromotionWindow } from '@/hooks/usePromotionPlacement';
 import type { PromotionOutcome, PromotionStudent } from '@/types/promotion-placement';
 import { useClasses, useSections } from '@/hooks/useCoreLookups';
+import { IconLock, IconAlertTriangle } from '@tabler/icons-react';
 
 function fullName(s: PromotionStudent): string {
   return [s.firstName, s.lastName].filter(Boolean).join(' ') || s.studentId || s.id;
@@ -57,6 +60,9 @@ export default function PromotionPlacementPage() {
   useEffect(() => {
     if (!academicYearId && activeYearId) setAcademicYearId(activeYearId);
   }, [academicYearId, activeYearId]);
+
+  const windowQuery = usePromotionWindow(academicYearId);
+  const windowStatus = windowQuery.data?.data ?? null;
 
   const classSectionsQuery = useClassSections(
     academicYearId ? { isActive: true, minimal: true, academicYearId } : undefined,
@@ -160,6 +166,9 @@ export default function PromotionPlacementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentsQuery.data?.data]);
 
+  // Track whether a bulk action was used since last Save
+  const [bulkActionUsed, setBulkActionUsed] = useState(false);
+
   const outcomeOptions: Array<{ value: PromotionOutcome; label: string }> = [
     { value: 'promoted', label: 'Promoted' },
     { value: 'repeated', label: 'Repeated' },
@@ -173,7 +182,13 @@ export default function PromotionPlacementPage() {
     yearsQuery.isLoading ||
     classSectionsQuery.isLoading ||
     studentsQuery.isLoading ||
-    readinessQuery.isLoading;
+    readinessQuery.isLoading ||
+    windowQuery.isLoading;
+
+  // Whether controls are interactable
+  const windowOpen = windowStatus?.open ?? true; // default permissive while loading
+  const moduleEnabled = windowStatus?.enabled ?? true;
+  const controlsDisabled = !moduleEnabled || !windowOpen;
 
   const bulkSetOutcome = (outcome: PromotionOutcome) => {
     const next = { ...draft };
@@ -200,9 +215,50 @@ export default function PromotionPlacementPage() {
       };
     }
     setDraft(next);
+    setBulkActionUsed(true);
   };
 
-  const handleSave = async () => {
+  // Graduate-all confirmation modal state
+  const [graduateConfirmOpened, graduateConfirmHandlers] = useDisclosure(false);
+  const [graduateConfirmText, setGraduateConfirmText] = useState('');
+
+  const selectedClassSectionLabel = useMemo(() => {
+    if (!classSectionId) return '';
+    const opt = classSectionOptions.find((o) => o.value === classSectionId);
+    return opt?.label ?? '';
+  }, [classSectionId, classSectionOptions]);
+
+  const handleGraduateAllClick = () => {
+    setGraduateConfirmText('');
+    graduateConfirmHandlers.open();
+  };
+
+  const handleGraduateAllConfirm = () => {
+    bulkSetOutcome('graduated');
+    graduateConfirmHandlers.close();
+  };
+
+  // Save confirmation modal state
+  const [saveConfirmOpened, saveConfirmHandlers] = useDisclosure(false);
+
+  const draftSummary = useMemo(() => {
+    const counts: Partial<Record<PromotionOutcome, number>> = {};
+    for (const d of Object.values(draft)) {
+      counts[d.outcome] = (counts[d.outcome] ?? 0) + 1;
+    }
+    return counts;
+  }, [draft]);
+
+  const handleSaveClick = () => {
+    if (!academicYearId) return;
+    if (bulkActionUsed) {
+      saveConfirmHandlers.open();
+    } else {
+      void performSave();
+    }
+  };
+
+  const performSave = async () => {
     if (!academicYearId) return;
 
     const missingTargets = Object.entries(draft)
@@ -227,12 +283,17 @@ export default function PromotionPlacementPage() {
     }));
 
     try {
-      await saveMutation.mutateAsync({ sourceAcademicYearId: academicYearId, decisions });
+      await saveMutation.mutateAsync({
+        sourceAcademicYearId: academicYearId,
+        decisions,
+        classSectionId: classSectionId ?? null,
+      });
       notifications.show({
         title: 'Success',
         message: 'Promotion decisions saved',
         color: notifyColors.success,
       });
+      setBulkActionUsed(false);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to save promotion decisions';
       notifications.show({ title: 'Error', message: msg, color: notifyColors.error });
@@ -266,6 +327,29 @@ export default function PromotionPlacementPage() {
             </Stack>
           ) : (
             <>
+              {/* Module disabled notice */}
+              {!moduleEnabled && (
+                <Alert color="red" icon={<IconLock size={16} />} title="Promotion & Placement is disabled">
+                  <Text size="sm">
+                    This module has been disabled by an administrator. Go to Settings → Promotion &amp; Placement to
+                    re-enable it.
+                  </Text>
+                </Alert>
+              )}
+
+              {/* Window not open notice */}
+              {moduleEnabled && !windowOpen && (
+                <Alert color={colors.warning} icon={<IconAlertTriangle size={16} />} title="Promotion window not open">
+                  <Text size="sm">
+                    {windowStatus?.opensOn
+                      ? `Saving promotion decisions is not allowed yet. The window opens on ${windowStatus.opensOn}.`
+                      : 'Saving promotion decisions is not allowed yet.'}
+                    {' '}Contact an admin to force-open the window early in Settings.
+                  </Text>
+                </Alert>
+              )}
+
+              {/* Readiness warning */}
               {readiness && readiness.decisionsMissing > 0 && (
                 <Alert color={colors.warning} title="Year close readiness">
                   <Text size="sm">
@@ -299,24 +383,30 @@ export default function PromotionPlacementPage() {
               <Paper withBorder p="md">
                 <Group justify="space-between" w="100%" wrap="wrap" gap="xs" align="center">
                   <Group wrap="wrap" gap="xs">
+                    {/* Promote all / Repeat all: require class-section selection */}
                     <Button
                       variant="light"
                       onClick={() => bulkSetOutcome('promoted')}
-                      disabled={students.length === 0}
+                      disabled={controlsDisabled || students.length === 0 || !classSectionId}
+                      title={!classSectionId ? 'Select a class-section first to use bulk actions' : undefined}
                     >
                       Promote all
                     </Button>
                     <Button
                       variant="light"
                       onClick={() => bulkSetOutcome('repeated')}
-                      disabled={students.length === 0}
+                      disabled={controlsDisabled || students.length === 0 || !classSectionId}
+                      title={!classSectionId ? 'Select a class-section first to use bulk actions' : undefined}
                     >
                       Repeat all
                     </Button>
+                    {/* Graduate all: requires class-section + typed confirmation */}
                     <Button
                       variant="light"
-                      onClick={() => bulkSetOutcome('graduated')}
-                      disabled={students.length === 0}
+                      color="red"
+                      onClick={handleGraduateAllClick}
+                      disabled={controlsDisabled || students.length === 0 || !classSectionId}
+                      title={!classSectionId ? 'Select a class-section first to use Graduate all' : undefined}
                     >
                       Graduate all
                     </Button>
@@ -324,14 +414,19 @@ export default function PromotionPlacementPage() {
                   <Box style={{ flexShrink: 0 }}>
                     <Button
                       id="promotion-placement-btn-save"
-                      onClick={handleSave}
+                      onClick={handleSaveClick}
                       loading={!!academicYearId && saveMutation.isPending}
-                      disabled={!academicYearId}
+                      disabled={!academicYearId || controlsDisabled}
                     >
                       Save
                     </Button>
                   </Box>
                 </Group>
+                {!classSectionId && students.length > 0 && (
+                  <Text size="xs" c="dimmed" mt="xs">
+                    Select a class-section to enable bulk actions (Promote all, Repeat all, Graduate all).
+                  </Text>
+                )}
               </Paper>
 
               <Paper withBorder p="md" style={{ overflow: 'hidden' }}>
@@ -400,6 +495,7 @@ export default function PromotionPlacementPage() {
                               }}
                               placeholder="Select outcome"
                               searchable
+                              disabled={controlsDisabled}
                             />
                           </Table.Td>
                           <Table.Td>
@@ -416,7 +512,7 @@ export default function PromotionPlacementPage() {
                                   },
                                 }));
                               }}
-                              disabled={!draft[s.id] || draft[s.id]?.outcome !== 'promoted'}
+                              disabled={controlsDisabled || !draft[s.id] || draft[s.id]?.outcome !== 'promoted'}
                               placeholder="Select class"
                               searchable
                               clearable
@@ -436,7 +532,7 @@ export default function PromotionPlacementPage() {
                                   },
                                 }));
                               }}
-                              disabled={!draft[s.id] || draft[s.id]?.outcome !== 'promoted'}
+                              disabled={controlsDisabled || !draft[s.id] || draft[s.id]?.outcome !== 'promoted'}
                               placeholder="Select section"
                               searchable
                               clearable
@@ -453,7 +549,96 @@ export default function PromotionPlacementPage() {
           )}
         </Stack>
       </div>
+
+      {/* Graduate all confirmation modal */}
+      <Modal
+        opened={graduateConfirmOpened}
+        onClose={graduateConfirmHandlers.close}
+        title={
+          <Group gap="xs">
+            <IconAlertTriangle size={18} color="var(--mantine-color-red-6)" />
+            <Text fw={600} c="red">Graduate entire class?</Text>
+          </Group>
+        }
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            This will mark all <strong>{students.length}</strong> students in{' '}
+            <strong>{selectedClassSectionLabel}</strong> as <strong>Graduated</strong>.
+          </Text>
+          <Alert color="red" icon={<IconAlertTriangle size={14} />}>
+            <Text size="sm">
+              This updates student placement immediately when saved. There is no automatic undo.
+            </Text>
+          </Alert>
+          <TextInput
+            id="graduate-confirm-input"
+            label={`Type the class-section name to confirm`}
+            placeholder={selectedClassSectionLabel}
+            value={graduateConfirmText}
+            onChange={(e) => setGraduateConfirmText(e.currentTarget.value)}
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={graduateConfirmHandlers.close}>Cancel</Button>
+            <Button
+              id="graduate-confirm-btn"
+              color="red"
+              disabled={graduateConfirmText.trim() !== selectedClassSectionLabel.trim()}
+              onClick={handleGraduateAllConfirm}
+            >
+              Graduate all
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Save confirmation modal (shown when bulk action was used) */}
+      <Modal
+        opened={saveConfirmOpened}
+        onClose={saveConfirmHandlers.close}
+        title={
+          <Group gap="xs">
+            <IconAlertTriangle size={18} color="var(--mantine-color-orange-6)" />
+            <Text fw={600}>Confirm promotion decisions</Text>
+          </Group>
+        }
+        size="sm"
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            You are about to save promotion decisions for <strong>{Object.keys(draft).length}</strong> students.
+          </Text>
+          <Paper withBorder p="sm">
+            <Stack gap={4}>
+              {Object.entries(draftSummary).map(([outcome, count]) => (
+                <Group key={outcome} justify="space-between">
+                  <Text size="sm" tt="capitalize">{outcome.replace('_', ' ')}</Text>
+                  <Text size="sm" fw={600}>{count}</Text>
+                </Group>
+              ))}
+            </Stack>
+          </Paper>
+          <Alert color="orange" icon={<IconAlertTriangle size={14} />}>
+            <Text size="sm">
+              This updates student placement immediately and cannot be undone without admin support.
+            </Text>
+          </Alert>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={saveConfirmHandlers.close}>Cancel</Button>
+            <Button
+              id="save-decisions-confirm-btn"
+              loading={saveMutation.isPending}
+              onClick={async () => {
+                saveConfirmHandlers.close();
+                await performSave();
+              }}
+            >
+              Save decisions
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }
-
