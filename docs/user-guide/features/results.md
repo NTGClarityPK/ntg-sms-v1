@@ -4,13 +4,13 @@ Short guide for staff who generate report cards and for parents who download pub
 
 ## 📋 Overview
 
-Report Cards turn **assessment marks** into official PDF cards for parents. Staff work on the **Report Cards** page; parents see **published** cards under **My Child**.
+Report Cards turn **assessment marks** into official PDF cards for parents. Staff work on the **Report Cards** page; parents download **published** cards under **Learning → Report Cards**.
 
 | Audience | Where | What they can do |
 | --- | --- | --- |
 | Teachers / coordinators / admins with edit access | **Academics → Report Cards** | Filters, draft cards, remarks, publish / unpublish, PDF / ZIP download |
 | Principals and view-only roles | **Report Cards** | View and download PDFs (no draft / publish) |
-| Parents / guardians | **My Child** | Download **published** cards only |
+| Parents / guardians | **Learning → Report Cards** | Download **published** cards only |
 
 There is **no** email or SMS send from this page in the portal today. Share PDFs yourself (download, print, or WhatsApp).
 
@@ -23,7 +23,7 @@ There is **no** email or SMS send from this page in the portal today. Share PDFs
 | **Term report** | **Status**: Mid-term / Final | Official mid-term and final cards |
 | **Progress report** | **Month** (calendar month in the academic year) | Monthly academic snapshot for parents |
 
-**Annual** reports are no longer offered for new cards. Any older published annual cards may still appear under **My Child**.
+**Annual** reports are no longer offered for new cards. Any older published annual cards may still appear under parent **Report Cards**.
 
 ### Interim on the PDF (not a Status choice)
 
@@ -53,7 +53,7 @@ Class teachers only see class sections they own; other staff see available secti
 | --- | --- |
 | **Exam marks readiness** (term) | Whether every student has grades for mid/final term exams for the selected Status |
 | **Top students (overall %)** | Up to three students with the highest overall percentage (month-scoped for Progress) |
-| **PDF layout** | **Minimal** or **Modern** |
+| **PDF layout** | **Minimal** or **Modern** — staff downloads use this; **publishing locks it** for parents |
 | **Include assessment breakdown** | Off = subject totals only; on = each assessment listed |
 | **Student table** | Student, Overall %, Report card status, Actions |
 
@@ -65,7 +65,7 @@ Bulk ZIP (term report + edit access only): **Download all Mid-term/Final (ZIP)**
 
 ### Per student (Actions → Download report card)
 
-Uses the page toggle **Include assessment breakdown** and the **PDF layout** choice.
+Uses the page toggle **Include assessment breakdown** and the **PDF layout** choice (staff preview/download). Parents always receive the layout that was selected when the card was **published**.
 
 | Toggle | Notes |
 | --- | --- |
@@ -97,7 +97,7 @@ Progress PDFs use assessments whose due date (or created date) falls in the sele
 
 ## 📝 Official cards (draft → publish → unpublish)
 
-Use cards when you want a **class teacher comment** and parent visibility on **My Child**.
+Use cards when you want a **class teacher comment** and parent visibility on **Report Cards** (parent sidebar).
 
 | Status on table | Meaning |
 | --- | --- |
@@ -109,8 +109,9 @@ Use cards when you want a **class teacher comment** and parent visibility on **M
 
 1. Actions → **Create draft card** (or **Update draft from latest marks** if a card already exists). For Progress, the card is tied to the selected **month**.
 2. Actions → open remarks → enter **Class teacher comment** → Save.
-3. Actions → **Publish for parents** → confirm.
-4. To withdraw: Actions → **Unpublish (return to draft)** — parents lose access; remarks can be edited again.
+3. Choose **PDF layout** (Minimal / Modern) — parents will receive this style.
+4. Actions → **Publish for parents** → confirm (the dialog names the template parents will see).
+5. To withdraw: Actions → **Unpublish (return to draft)** — parents lose access; remarks can be edited again.
 
 Regenerating a card returns it to **Draft**. There is **no** bulk create/publish and **no** subject-teacher remarks field.
 
@@ -118,12 +119,13 @@ For **Progress**, staff still create and publish only the **academic** card. Onc
 
 ---
 
-## 👨‍👩‍👧 Parents: My Child
+## 👨‍👩‍👧 Parents: Report Cards
 
-1. Open **My Child**.
-2. Under each child, open **Published report cards**.
-3. **Monthly progress packs** — for each published Progress month: three downloads (**Academic**, **Attendance**, **Behaviour**). Choose Minimal / Modern for academic PDFs.
-4. **Term (and older annual) cards** — single academic PDF download each (those PDFs already include Conduct and Attendance summaries).
+1. Open **Learning → Report Cards** (not **My Child** — that page is for child identity only).
+2. If you have more than one child, choose the child at the top.
+3. Use **Progress** or **Term** tabs.
+4. **Progress** — each month has one download control with **Academic**, **Attendance**, and **Behaviour**. PDF layout is the style staff chose when publishing (parents do not pick Minimal / Modern).
+5. **Term** — one PDF download per published term (or older annual) card.
 
 Empty state: **No published report cards yet.**
 
@@ -155,4 +157,4 @@ Parents do not use the staff Report Cards page for viewing. They also do not use
 
 **PDF still says Interim:** Mid/final term examination types may be missing, misnamed, or not fully graded for every student.
 
-**Wrong layout:** Choose **PDF layout** on the page *before* downloading. Refresh if the toggle snaps back.
+**Wrong layout:** Staff — choose **PDF layout** on the page *before* publishing or downloading. Parents — layout is fixed at publish; unpublish and publish again to change it.

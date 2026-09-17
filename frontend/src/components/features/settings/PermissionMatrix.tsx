@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl';
 import type { User } from '@/types/auth';
 import { useClasses } from '@/hooks/useCoreLookups';
 import { useSystemSetting, useUpdateSystemSetting } from '@/hooks/useSystemSettings';
+import { isPermissionMatrixCellLocked } from '@/lib/permission/familyHardDeny';
 
 const SCHOOL_ADMIN_ROLE_NAME = 'school_admin';
 
@@ -31,28 +32,29 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   const tCommon = useTranslations('common');
   const tNav = useTranslations('navigation');
 
-  // Hide deprecated legacy codes and keep explicit personal/management split.
-  const managementFeatures = features.filter(
-    (f) =>
-      ![
-        'events',
-        'my_events',
-        'timetable',
-        'my_timetable',
-        'my_schedule',
-        'staff',
-      ].includes(f.code),
-  );
+  // Hide legacy codes + non-sidebar capabilities (API/settings gates, not nav tabs).
+  const managementFeatures = useMemo(() => {
+    const filtered = features.filter(
+      (f) =>
+        ![
+          'events',
+          'my_events',
+          'timetable',
+          'my_timetable',
+          'my_schedule',
+          'staff',
+          // Not sidebar tabs — gated elsewhere (Settings / Assessments APIs)
+          'google_classroom_integration',
+          'assessment_rubrics',
+        ].includes(f.code),
+    );
+    return filtered;
+  }, [features]);
 
   const [localPermissions, setLocalPermissions] = useState<Map<string, Permission>>(new Map());
   const [hasChanges, setHasChanges] = useState(false);
   const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
-
-  const visibleFeatures =
-    selectedFeatureIds.length === 0
-      ? managementFeatures
-      : managementFeatures.filter((f) => selectedFeatureIds.includes(f.id));
 
   const getFeatureLabel = (feature: Feature): string => {
     switch (feature.code) {
@@ -79,6 +81,12 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
         return tNav('myTimetable');
       case 'my_schedule':
         return tNav('mySchedule');
+      case 'conflict_management':
+        return tNav('conflictManagement');
+      case 'teacher_substitution':
+        return tNav('substitution');
+      case 'promotion_placement':
+        return tNav('promotionPlacement');
 
       // Attendance / behavioural / assessment
       case 'attendance':
@@ -116,11 +124,15 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
       case 'settings':
         return tNav('settings');
 
-      // Library / inventory / staff
+      // Library / inventory / staff / cards
       case 'library':
         return tNav('library');
       case 'inventory':
         return tNav('inventory');
+      case 'id_cards':
+        return tNav('idCards');
+      case 'certificates':
+        return tNav('certificates');
       case 'staff':
         // No dedicated nav key; reuse Users
         return tNav('users');
@@ -131,7 +143,20 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
     }
   };
 
-  const featureOptions = managementFeatures.map((f) => ({
+  const sortedManagementFeatures = useMemo(() => {
+    return [...managementFeatures].sort((a, b) =>
+      getFeatureLabel(a).localeCompare(getFeatureLabel(b), undefined, { sensitivity: 'base' }),
+    );
+    // getFeatureLabel depends on tNav; re-sort when feature list or locale labels change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managementFeatures, tNav]);
+
+  const visibleFeatures =
+    selectedFeatureIds.length === 0
+      ? sortedManagementFeatures
+      : sortedManagementFeatures.filter((f) => selectedFeatureIds.includes(f.id));
+
+  const featureOptions = sortedManagementFeatures.map((f) => ({
     value: f.id,
     label: getFeatureLabel(f),
   }));
@@ -145,7 +170,7 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
       : rolesInMatrix.filter((r) => selectedRoleIds.includes(r.id));
 
   const studentRole = rolesInMatrix.find((r) => r.name?.toLowerCase() === 'student') ?? null;
-  const leavesFeature = managementFeatures.find((f) => f.code === 'leaves') ?? null;
+  const leavesFeature = sortedManagementFeatures.find((f) => f.code === 'leaves') ?? null;
   const studentLeavesPermission: Permission =
     studentRole && leavesFeature
       ? localPermissions.get(`${studentRole.id}-${leavesFeature.id}`) || 'none'
@@ -188,14 +213,32 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   }, [remoteLeaveClassIds, localLeaveClassIds]);
 
   useEffect(() => {
+    const roleById = new Map(rolesInMatrix.map((r) => [r.id, r]));
+    const featureById = new Map(sortedManagementFeatures.map((f) => [f.id, f]));
     const newMap = new Map<string, Permission>();
     permissions.forEach((p) => {
       const key = `${p.roleId}-${p.featureId}`;
-      newMap.set(key, p.permission);
+      const role = roleById.get(p.roleId);
+      const feature = featureById.get(p.featureId);
+      // Locked family × staff cells always display as none (nav is hard-hidden anyway).
+      if (isPermissionMatrixCellLocked(role?.name, feature?.code)) {
+        newMap.set(key, 'none');
+      } else {
+        newMap.set(key, p.permission);
+      }
     });
+    // Ensure locked cells exist even when DB has no row yet
+    for (const role of rolesInMatrix) {
+      for (const feature of sortedManagementFeatures) {
+        if (!isPermissionMatrixCellLocked(role.name, feature.code)) continue;
+        newMap.set(`${role.id}-${feature.id}`, 'none');
+      }
+    }
     setLocalPermissions(newMap);
     setHasChanges(false);
-  }, [permissions]);
+    // rolesInMatrix / sortedManagementFeatures are derived from props; re-sync when matrix loads
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permissions, roles, features]);
 
   const updateMutation = useMutation({
     mutationFn: async (payload: UpdatePermissionsPayload) => {
@@ -205,10 +248,18 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['permissions', branchId] });
       if (response?.data?.data) {
+        const roleById = new Map(rolesInMatrix.map((r) => [r.id, r]));
+        const featureById = new Map(sortedManagementFeatures.map((f) => [f.id, f]));
         const newMap = new Map<string, Permission>();
         response.data.data.forEach((p) => {
           const key = `${p.roleId}-${p.featureId}`;
-          newMap.set(key, p.permission);
+          const role = roleById.get(p.roleId);
+          const feature = featureById.get(p.featureId);
+          if (isPermissionMatrixCellLocked(role?.name, feature?.code ?? p.featureCode)) {
+            newMap.set(key, 'none');
+          } else {
+            newMap.set(key, p.permission);
+          }
         });
         setLocalPermissions(newMap);
       }
@@ -239,11 +290,16 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
   const handleSave = () => {
     const payload: UpdatePermissionsPayload = {
       permissions: rolesInMatrix.flatMap((role) =>
-        managementFeatures.map((feature) => ({
-          roleId: role.id,
-          featureId: feature.id,
-          permission: localPermissions.get(`${role.id}-${feature.id}`) || 'none',
-        })),
+        sortedManagementFeatures.map((feature) => {
+          const locked = isPermissionMatrixCellLocked(role.name, feature.code);
+          return {
+            roleId: role.id,
+            featureId: feature.id,
+            permission: locked
+              ? 'none'
+              : localPermissions.get(`${role.id}-${feature.id}`) || 'none',
+          };
+        }),
       ),
     };
     updateMutation.mutate(payload);
@@ -314,10 +370,10 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
                 </Table.Td>
                 {visibleFeatures.map((feature) => {
                   const key = `${role.id}-${feature.id}`;
-                  const currentPermission = localPermissions.get(key) || 'none';
-                  const isStudentRole = role.name?.toLowerCase() === 'student';
-                  // Students should not be granted management "Assessment" permissions (they use "My Assessments").
-                  const isDisabledForStudent = isStudentRole && feature.code === 'assessment';
+                  const isCellLocked = isPermissionMatrixCellLocked(role.name, feature.code);
+                  const currentPermission = isCellLocked
+                    ? 'none'
+                    : localPermissions.get(key) || 'none';
 
                   const permissionColor: 'green' | 'blue' | 'gray' =
                     currentPermission === 'edit'
@@ -342,9 +398,9 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
                     <Table.Td key={feature.id}>
                       <Select
                         value={currentPermission}
-                        disabled={isDisabledForStudent}
+                        disabled={isCellLocked}
                         leftSection={
-                          <PermissionDot color={isDisabledForStudent ? 'gray' : permissionColor} />
+                          <PermissionDot color={isCellLocked ? 'gray' : permissionColor} />
                         }
                         renderOption={({ option }) => (
                           <Group gap="xs" wrap="nowrap">
@@ -353,7 +409,7 @@ export function PermissionMatrix({ roles, features, permissions }: PermissionMat
                           </Group>
                         )}
                         onChange={(value) => {
-                          if (isDisabledForStudent) return;
+                          if (isCellLocked) return;
                           handlePermissionChange(role.id, feature.id, value as Permission);
                         }}
                         data={[

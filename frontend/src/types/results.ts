@@ -47,6 +47,8 @@ export interface ResultCard {
   approvedBy?: string;
   approvedAt?: string;
   classTeacherComment?: string;
+  /** Locked when published — parents download this layout. */
+  pdfVariant?: 'minimal' | 'modern';
   createdAt: string;
   updatedAt: string;
 }

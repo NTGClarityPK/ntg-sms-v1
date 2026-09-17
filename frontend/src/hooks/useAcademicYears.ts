@@ -82,6 +82,22 @@ export function useLockAcademicYear() {
   });
 }
 
+export function useUpdateAcademicYearDates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { id: string; startDate: string; endDate: string }) => {
+      const res = await apiClient.patch<AcademicYear>(`/api/v1/academic-years/${payload.id}/dates`, {
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+      });
+      return res;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: academicYearsKeys.all });
+    },
+  });
+}
+
 export function useRolloverAcademicYear() {
   const qc = useQueryClient();
   return useMutation({

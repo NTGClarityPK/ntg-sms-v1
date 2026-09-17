@@ -2,6 +2,7 @@
 
 import { ActionIcon, Anchor, Badge, Box, Group, Paper, ScrollArea, Stack, Text, Tooltip, useComputedColorScheme } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
+import { useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { notifications } from '@mantine/notifications';
 import type { SupportConversation, SupportMessage } from '@/types/support';
@@ -142,7 +143,7 @@ function MessageBubble({
               minute: '2-digit',
             }).format(new Date(message.createdAt))}
           </Text>
-          {isCustomer && (
+          {isCustomer && !message.id.startsWith('temp-') && (
             <Tooltip label={t('deleteMessage')}>
               <ActionIcon
                 id={`support-delete-message-${message.id}`}
@@ -165,6 +166,11 @@ function MessageBubble({
 
 export function SupportThread({ conversation, messages, isLive = false }: Props) {
   const t = useTranslations('support');
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages.length, conversation?.id]);
 
   if (!conversation) {
     return (
@@ -231,6 +237,7 @@ export function SupportThread({ conversation, messages, isLive = false }: Props)
             {messages.map((m) => (
               <MessageBubble key={m.id} message={m} conversationId={conversation.id} />
             ))}
+            <div ref={bottomRef} />
           </Stack>
         )}
       </ScrollArea>

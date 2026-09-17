@@ -34,7 +34,7 @@ Detailed guides for each module of the NTG Alma portal. One page per feature.
 | [🔄 Teacher Substitution](teacher-substitution.md) | Arranging cover for absent teachers |
 | [⭐ Behavioural](behavioural.md) | 1–5 star matrix, Pending this month, settings |
 | [🎯 Promotion & Placement](promotion-and-placement.md) | Year-end window, bulk confirmations, six outcomes |
-| [🥇 Report Cards](results.md) | Term / progress cards, remarks, publish / unpublish, PDF/ZIP; parent My Child |
+| [🥇 Report Cards](results.md) | Term / progress cards, remarks, publish / unpublish, PDF/ZIP; parent Report Cards downloads |
 | [📊 Reports](reports.md) | Student, class, public, administrative, revenue; fee reports URL |
 
 ## 📨 Requests & Communication

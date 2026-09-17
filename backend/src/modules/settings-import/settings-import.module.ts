@@ -8,6 +8,9 @@ import { AssessmentModule } from '../assessment/assessment.module';
 import { SystemSettingsModule } from '../system-settings/system-settings.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { BranchesModule } from '../branches/branches.module';
+import { SubjectTemplatesModule } from '../subject-templates/subject-templates.module';
+import { ScheduleModule } from '../schedule/schedule.module';
+import { ClassSectionsModule } from '../class-sections/class-sections.module';
 
 @Module({
   imports: [
@@ -17,9 +20,11 @@ import { BranchesModule } from '../branches/branches.module';
     SystemSettingsModule,
     TenantsModule,
     BranchesModule,
+    SubjectTemplatesModule,
+    ScheduleModule,
+    ClassSectionsModule,
   ],
   controllers: [SettingsImportController],
   providers: [SettingsImportService, SupabaseConfig],
 })
 export class SettingsImportModule {}
-

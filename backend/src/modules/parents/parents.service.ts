@@ -35,6 +35,17 @@ type StudentRowLite = {
   student_id: string;
   user_id: string | null;
   branch_id?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  is_active?: boolean | null;
+  account_status?: string | null;
+  class_id?: string | null;
+  section_id?: string | null;
+  classes?:
+    | { name?: string | null; display_name?: string | null }
+    | { name?: string | null; display_name?: string | null }[]
+    | null;
+  sections?: { name?: string | null } | { name?: string | null }[] | null;
 };
 
 function throwIfDbError(error: PostgrestError | null): void {
@@ -90,11 +101,13 @@ export class ParentsService {
 
     const { data: students, error: studentsError } = await supabase
       .from('students')
-      .select('id, student_id, user_id, first_name, last_name')
+      .select(
+        'id, student_id, user_id, first_name, last_name, is_active, account_status, class_id, section_id, classes:class_id(name, display_name), sections:section_id(name)',
+      )
       .in('id', studentIds);
     throwIfDbError(studentsError);
 
-    const studentRows = (students || []) as unknown as Array<StudentRowLite & { first_name?: string | null; last_name?: string | null }>;
+    const studentRows = (students || []) as unknown as StudentRowLite[];
     const studentById = new Map(studentRows.map((s) => [s.id, s]));
 
     return rows.map((row) => {
@@ -102,6 +115,19 @@ export class ParentsService {
       const firstName = student?.first_name ?? undefined;
       const lastName = student?.last_name ?? undefined;
       const studentName = [firstName, lastName].filter(Boolean).join(' ') || undefined;
+      const classRow = Array.isArray(student?.classes)
+        ? student?.classes[0]
+        : student?.classes;
+      const sectionRow = Array.isArray(student?.sections)
+        ? student?.sections[0]
+        : student?.sections;
+      const className =
+        (classRow?.display_name || classRow?.name || '').trim() || undefined;
+      const sectionName = (sectionRow?.name || '').trim() || undefined;
+      const classSectionLabel =
+        className && sectionName
+          ? `${className} — ${sectionName}`
+          : className || sectionName || undefined;
 
       return new ParentStudentDto({
         id: row.id,
@@ -119,6 +145,9 @@ export class ParentsService {
         studentStudentId: student?.student_id,
         parentPhone: parentPhoneById.get(row.parent_user_id),
         parentEmail: emailMap.get(row.parent_user_id),
+        isActive: student?.is_active ?? undefined,
+        accountStatus: student?.account_status ?? undefined,
+        classSectionLabel,
       });
     });
   }

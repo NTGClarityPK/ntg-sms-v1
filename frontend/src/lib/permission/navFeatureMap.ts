@@ -11,8 +11,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/academic/class-sections': 'class_sections',
   '/academic/teacher-mapping': 'teacher_mapping',
   '/parent-associations': 'parent_associations',
-  '/my-children': 'parent_associations',
-  '/children-timetable': 'timetable_personal',
+  // /my-children and /children-timetable are parent-role gated in Sidebar (not matrix).
   '/attendance': 'attendance',
   '/assessments': 'assessment',
   '/my-assessments': 'my_assessments',
@@ -39,7 +38,7 @@ export const NAV_FEATURE_MAP: Record<string, string> = {
   '/substitution/assign': 'teacher_substitution',
   '/promotion-placement': 'promotion_placement',
   '/reports': 'reports',
-  /** Class result cards: staff often have `assessment` without a separate `reports` matrix row. */
+  /** Staff Report Cards page — gated by dedicated `results` matrix column. */
   '/results': 'results',
   '/reports/public': 'reports',
   '/reports/administrative': 'reports',

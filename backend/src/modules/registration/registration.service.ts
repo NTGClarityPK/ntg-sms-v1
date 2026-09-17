@@ -5,6 +5,7 @@ import { RegisterDto } from './dto/register.dto';
 import { RegisterResponseDto } from './dto/register-response.dto';
 import { AcademicYearsService } from '../academic-years/academic-years.service';
 import { SystemSettingsService } from '../system-settings/system-settings.service';
+import { SignupEmailVerificationService } from './signup-email-verification.service';
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (!error) return;
@@ -23,9 +24,15 @@ export class RegistrationService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly academicYearsService: AcademicYearsService,
     private readonly systemSettingsService: SystemSettingsService,
+    private readonly signupEmailVerificationService: SignupEmailVerificationService,
   ) {}
 
   async register(input: RegisterDto): Promise<RegisterResponseDto> {
+    this.signupEmailVerificationService.assertAndConsumeToken(
+      input.email,
+      input.emailVerificationToken,
+    );
+
     const supabase = this.supabaseConfig.getClient();
 
     // Start transaction-like flow (Supabase doesn't support transactions, so we'll handle rollback manually)
@@ -42,7 +49,10 @@ export class RegistrationService {
         providedTenantCode && providedTenantCode.length > 0
           ? this.normalizeTenantCode(providedTenantCode)
           : '';
-      const tenantDomain = input.schoolDomain.trim().toLowerCase();
+      const providedDomain = input.schoolDomain?.trim().toLowerCase() ?? '';
+      const tenantDomain = providedDomain
+        ? providedDomain
+        : await this.generateUniqueTenantDomain(supabase, input.schoolName);
       
       if (tenantCode) {
         const { data: existingTenant } = await supabase
@@ -293,6 +303,66 @@ export class RegistrationService {
     }
   }
 
+  async checkDomainAvailability(rawDomain: string): Promise<{
+    data: { domain: string; available: boolean; normalized: string };
+  }> {
+    const normalized = rawDomain.trim().toLowerCase();
+    if (!normalized) {
+      throw new BadRequestException('Domain is required');
+    }
+    if (
+      !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(normalized)
+    ) {
+      throw new BadRequestException('Enter a valid domain (e.g. example.edu)');
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: existingDomain, error } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('domain', normalized)
+      .maybeSingle();
+    throwIfDbError(error);
+
+    return {
+      data: {
+        domain: normalized,
+        normalized,
+        available: !existingDomain,
+      },
+    };
+  }
+
+  async checkCodeAvailability(rawCode: string): Promise<{
+    data: { code: string; available: boolean; normalized: string };
+  }> {
+    const normalized = this.normalizeTenantCode(rawCode);
+    if (!normalized) {
+      throw new BadRequestException('School code is required');
+    }
+    if (!/^[A-Z0-9]([A-Z0-9-]*[A-Z0-9])?$/.test(normalized) || normalized.length < 2) {
+      throw new BadRequestException(
+        'School code must be 2–32 characters (letters, numbers, hyphens)',
+      );
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data: existingCode, error } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('code', normalized)
+      .maybeSingle();
+    throwIfDbError(error);
+
+    return {
+      data: {
+        code: normalized,
+        normalized,
+        available: !existingCode,
+      },
+    };
+  }
+
   private normalizeTenantCode(code: string): string {
     // Keep codes URL-safe and human-friendly.
     // Example input: "Alekaf High School" -> "ALEKAF-3FQ9K2"
@@ -310,7 +380,7 @@ export class RegistrationService {
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '')
-      .substring(0, 8);
+      .substring(0, 16);
     return base || 'SCHOOL';
   }
 
@@ -325,15 +395,57 @@ export class RegistrationService {
   }
 
   private generateCandidateTenantCode(name: string): string {
-    const base = this.buildTenantCodeBase(name);
+    const base = this.buildTenantCodeBase(name).substring(0, 8);
     const suffix = this.randomBase36(6);
     return this.normalizeTenantCode(`${base}-${suffix}`);
+  }
+
+  private buildDomainBaseFromSchoolName(schoolName: string): string {
+    const slug = schoolName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '')
+      .substring(0, 40);
+    return slug || 'school';
+  }
+
+  private async generateUniqueTenantDomain(
+    supabase: ReturnType<SupabaseConfig['getClient']>,
+    schoolName: string,
+  ): Promise<string> {
+    const base = this.buildDomainBaseFromSchoolName(schoolName);
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate = attempt === 0 ? `${base}.edu` : `${base}${attempt + 1}.edu`;
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('domain', candidate)
+        .maybeSingle();
+      throwIfDbError(error);
+      if (!data) return candidate;
+    }
+    throw new BadRequestException('Failed to generate a unique school domain. Please enter one manually.');
   }
 
   private async generateUniqueTenantCode(
     supabase: ReturnType<SupabaseConfig['getClient']>,
     schoolName: string,
   ): Promise<string> {
+    const base = this.buildTenantCodeBase(schoolName);
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate =
+        attempt === 0
+          ? this.normalizeTenantCode(base)
+          : this.normalizeTenantCode(`${base}${attempt + 1}`);
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('code', candidate)
+        .maybeSingle();
+      throwIfDbError(error);
+      if (!data) return candidate;
+    }
+
     // Extremely low collision probability, but still verify uniqueness.
     for (let attempt = 0; attempt < 10; attempt++) {
       const candidate = this.generateCandidateTenantCode(schoolName);

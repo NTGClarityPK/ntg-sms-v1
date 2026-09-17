@@ -197,7 +197,7 @@ export class AssessmentService {
     input: {
       name: string;
       nameAr?: string;
-      name_translations?: { en?: string; ar?: string };
+      name_translations?: Record<string, string>;
       isActive?: boolean;
       sortOrder?: number;
       isTermExamination?: boolean;

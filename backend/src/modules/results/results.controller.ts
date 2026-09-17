@@ -99,8 +99,14 @@ export class ResultsController {
       : 'final') as ResultType;
     const reportType =
       reportTypeParam === 'detailed' ? ('detailed' as const) : ('basic' as const);
-    const pdfVariant =
-      pdfVariantParam === 'minimal' || pdfVariantParam === 'modern' ? pdfVariantParam : undefined;
+    const roles = (user.roles || []).map((r) => r.toLowerCase());
+    const isParent = roles.some((r) => ['parent', 'guardian'].includes(r));
+    // Parents always get the layout locked at publish (or branch default) — never a client override.
+    const pdfVariant = isParent
+      ? undefined
+      : pdfVariantParam === 'minimal' || pdfVariantParam === 'modern'
+        ? pdfVariantParam
+        : undefined;
     const reportKind = parseReportKindParam(reportKindParam);
     const progressMonthRaw = progressMonthParam ? Number(progressMonthParam) : undefined;
     const progressMonth =
@@ -295,6 +301,7 @@ export class ResultsController {
       body.status,
       branch.branchId,
       user.id,
+      body.pdfVariant,
     );
     return { data };
   }

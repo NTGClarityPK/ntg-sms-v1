@@ -187,8 +187,19 @@ export function useUpdateResultCardComment() {
 export function useUpdateResultCardStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const response = await apiClient.patch<ResultCard>(`/api/v1/results/${id}/status`, { status });
+    mutationFn: async ({
+      id,
+      status,
+      pdfVariant,
+    }: {
+      id: string;
+      status: string;
+      pdfVariant?: 'minimal' | 'modern';
+    }) => {
+      const response = await apiClient.patch<ResultCard>(`/api/v1/results/${id}/status`, {
+        status,
+        ...(pdfVariant ? { pdfVariant } : {}),
+      });
       return response.data;
     },
     onSuccess: () => {

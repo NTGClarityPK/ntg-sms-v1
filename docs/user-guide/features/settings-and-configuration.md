@@ -36,6 +36,23 @@ Certificate branding (logos and layout for certificates) lives on [🏆 Certific
 
 After a new school or campus is created — or when that campus’s essential configuration is still incomplete — Settings may show a prompt such as **Start school setup**.
 
+### Bulk setup workbook (optional shortcut)
+
+Instead of entering every lookup by hand, school admins can open **Bulk setup**, download the Excel template, fill it, validate, and apply. The import runs for the **currently selected campus**.
+
+Typical sheets:
+
+- **subjects** — `name`, `code`, `lang_code` (one row per language; same `code` merges translations)
+- **classes** — includes optional `section_names` (e.g. `A,B`); Alma creates those sections and the class × section combinations for the active academic year
+- **levels**
+- **assessment_types** — includes `is_term_examination` (`yes`/`no`; at least two must be `yes`)
+- **subject_templates** (optional)
+- **school_days** — one row per weekday (`day` = Sunday–Saturday, `active` = `Y` or `N`)
+- **timing_templates** / **timing_slots** — day clock plus breaks; templates can list `assigned_class_names`
+- **grade_templates** / **grade_ranges** — letter bands; templates can list `assigned_class_names` and `minimum_passing_grade`
+
+Inventory categories, behavioural attributes, leave quota, library categories, and a separate sections sheet are configured in Settings later (or derived automatically), not in this workbook. Class × section creation needs an **active academic year** already set for the campus.
+
 ### What the setup wizard is
 
 The **setup wizard** is a guided, step-by-step checklist. It walks you through the first things a campus needs so you do not have to hunt through every Settings tab alone. Typical steps cover:
@@ -89,7 +106,7 @@ This is **not** where you create classes or subjects — those sit under **Acade
 
 This category includes:
 
-1. **Academic years** — create years, mark one **Active**, and **Lock** a year when it is finalised; year-end rollover rules then apply
+1. **Academic years** — create years, mark one **Active**, and **Lock** a year when it is finalised; year-end rollover rules then apply. You can **Edit dates** (start and end only) on unlocked years — Alma blocks the change if holidays, vacations, or attendance would fall outside the new window. The year **name** cannot be changed.
 2. **Schedule** — school days, timing templates, holidays, vacations
 3. **Promotion & Placement** — enable the module, set how many days before year end the promotion window opens, and optionally force-open it early (school admins only). See [🎯 Promotion & Placement](promotion-and-placement.md).
 
@@ -228,7 +245,7 @@ Two inner tabs:
 
 | Tab | What it does |
 | --- | --- |
-| **Assign Access** | A grid of roles × features. For each cell choose **None**, **View**, or **Edit** (per campus) |
+| **Assign Access** | A grid of roles × **sidebar features** (columns sorted A–Z by label). For each cell choose **None**, **View**, or **Edit** (per campus). Capabilities that are not sidebar tabs (for example Google Classroom under Settings → Integrations) are not listed here. |
 | **Role Access View** | A simple summary of how much access each role has |
 
 School admin is not limited by this grid and is not listed as a row.
@@ -236,6 +253,10 @@ School admin is not limited by this grid and is not listed as a row.
 Also on **Assign Access**: a **student leave request** class picker — which classes may raise their own leave requests.
 
 The **Student + Assessment** cell is disabled (students use **My Assessments**, not the staff Assessments area).
+
+**Report Cards** is its own column (separate from **Reports** and **Assessment**). Parents and students should keep it on **None** — parents download published cards from **My Child**, not the staff Report Cards page.
+
+**Conflicts** (Schedule conflicts) is also its own column. It does not follow Timetable access — set Conflicts explicitly for each role.
 
 What appears in the sidebar depends on permissions, role checks, and your school’s plan (some modules such as fees or library may be hidden if they are not on the plan).
 

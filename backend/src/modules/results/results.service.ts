@@ -1507,6 +1507,7 @@ export class ResultsService {
     status: string,
     branchId: string,
     approvedBy?: string,
+    pdfVariant?: 'minimal' | 'modern',
   ): Promise<ResultCardDto> {
     const supabase = this.supabaseConfig.getClient();
     const update: Record<string, unknown> = {
@@ -1516,6 +1517,17 @@ export class ResultsService {
     if (status === 'approved' || status === 'published') {
       update.approved_by = approvedBy ?? null;
       update.approved_at = new Date().toISOString();
+    }
+    if (status === 'published') {
+      let locked: 'minimal' | 'modern' | undefined =
+        pdfVariant === 'minimal' || pdfVariant === 'modern' ? pdfVariant : undefined;
+      if (!locked) {
+        const settingsPdf = (await this.resultReportSettingsService.get(branchId)).data
+          .pdfVariant;
+        locked =
+          settingsPdf === 'minimal' || settingsPdf === 'modern' ? settingsPdf : 'modern';
+      }
+      update.pdf_variant = locked;
     }
     if (status === 'draft') {
       update.approved_by = null;
@@ -1623,6 +1635,10 @@ export class ResultsService {
       approvedBy: row.approved_by as string | undefined,
       approvedAt: row.approved_at as string | undefined,
       classTeacherComment: row.class_teacher_comment as string | undefined,
+      pdfVariant:
+        row.pdf_variant === 'minimal' || row.pdf_variant === 'modern'
+          ? row.pdf_variant
+          : undefined,
       createdAt: row.created_at as string | undefined,
       updatedAt: row.updated_at as string | undefined,
     });
@@ -1702,6 +1718,36 @@ export class ResultsService {
     return card?.classTeacherComment;
   }
 
+  private async findPublishedCardPdfVariant(
+    studentId: string,
+    branchId: string,
+    academicYearId: string,
+    reportKind: ReportKind,
+    resultType: ResultType,
+    progressMonth?: number,
+  ): Promise<'minimal' | 'modern' | undefined> {
+    const cards = await this.listResultCardsByStudent(
+      studentId,
+      branchId,
+      academicYearId,
+      reportKind === 'term_report' ? resultType : undefined,
+      true,
+      reportKind,
+    );
+    const match = cards.find((c) => {
+      if (c.status !== 'published') return false;
+      if (reportKind === 'progress_report') {
+        if (progressMonth == null) return true;
+        return c.progressSequence === progressMonth;
+      }
+      return (c.termPhase ?? c.resultType) === resultType;
+    });
+    if (match?.pdfVariant === 'minimal' || match?.pdfVariant === 'modern') {
+      return match.pdfVariant;
+    }
+    return undefined;
+  }
+
   async generateResultCardPdf(
     studentId: string,
     classSectionId: string,
@@ -1738,12 +1784,23 @@ export class ResultsService {
         : resultType;
 
     const settingsPdf = (await this.resultReportSettingsService.get(branchId)).data.pdfVariant;
+    const publishedCardVariant = await this.findPublishedCardPdfVariant(
+      studentId,
+      branchId,
+      yearId,
+      reportKind,
+      resultType,
+      progressMonth,
+    );
+    // Staff may pass pdfVariant for live preview; parents omit it → published snapshot (or settings).
     const effectiveVariant: 'minimal' | 'modern' =
       options?.pdfVariant === 'minimal' || options?.pdfVariant === 'modern'
         ? options.pdfVariant
-        : settingsPdf === 'minimal' || settingsPdf === 'modern'
-          ? settingsPdf
-          : 'modern';
+        : publishedCardVariant === 'minimal' || publishedCardVariant === 'modern'
+          ? publishedCardVariant
+          : settingsPdf === 'minimal' || settingsPdf === 'modern'
+            ? settingsPdf
+            : 'modern';
 
     const pdfPrimaryHex = await this.getTenantPdfPrimaryHex(branchId);
     const pdfThemeCss = buildPdfThemeVariablesCss(pdfPrimaryHex);

@@ -61,6 +61,11 @@ import type { PlanFeatures } from '@/types/subscription';
 import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
 import { getFeatureCodeForPath } from '@/lib/permission/navFeatureMap';
+import {
+  isFamilyHardDeniedNavHref,
+  isPermissionMatrixCellLocked,
+  shouldHideFamilyNavFromOperationalStaff,
+} from '@/lib/permission/familyHardDeny';
 import type { NavItem } from './nav-types';
 import {
   CollapsedNavDashboardButton,
@@ -103,6 +108,7 @@ const allNavItems: NavItem[] = [
   { key: 'classSections', label: 'Class', href: '/academic/class-sections', icon: IconSchool },
   { key: 'mapping', label: 'Mapping', href: '/mapping', icon: IconArrowsShuffle },
   { key: 'myChildren', label: 'My Child', href: '/my-children', icon: IconUsersGroup },
+  { key: 'myReportCards', label: 'Report Cards', href: '/my-report-cards', icon: IconMedal },
   { key: 'parentPinManagement', label: 'PIN Management', href: '/parent/pin-management', icon: IconKey },
   { key: 'childrenTimetable', label: 'Child Timetable', href: '/children-timetable', icon: IconCalendarClock },
   { key: 'attendance', label: 'Attendance', href: '/attendance', icon: IconCalendar },
@@ -284,7 +290,6 @@ const SCHOOL_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[
       '/leaves',
       '/early-departure',
       '/behavioral',
-      '/my-children',
       '/parent/pin-management',
     ],
   },
@@ -293,6 +298,7 @@ const SCHOOL_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[
     hrefs: [
       '/assessments',
       '/my-assessments',
+      '/my-report-cards',
       '/timetable',
       '/substitution',
       '/my-schedule',
@@ -315,6 +321,10 @@ const COLLAPSED_GROUP_ICONS: Record<string, ComponentType<IconProps>> = {
   sidebarGroupSetup: IconSettings,
   sidebarGroupResources: IconPackage,
   sidebarGroupSystem: IconChartBar,
+  sidebarGroupFamilyChildren: IconUsersGroup,
+  sidebarGroupFamilyLearning: IconSchool,
+  sidebarGroupFamilyServices: IconCash,
+  sidebarGroupFamilyConnect: IconMessage,
 };
 
 const MANAGEMENT_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[] = [
@@ -332,10 +342,62 @@ const MANAGEMENT_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[
   },
 ];
 
+/**
+ * Parent / student sidebar groups (family perspective — not staff Setup/Management).
+ * Empty groups after filtering are omitted. Leftover hrefs append under the last group.
+ */
+const FAMILY_NAV_GROUPS: readonly { i18nKey: string; hrefs: readonly string[] }[] = [
+  {
+    i18nKey: 'sidebarGroupFamilyChildren',
+    hrefs: ['/parent/pin-management', '/children-timetable'],
+  },
+  {
+    i18nKey: 'sidebarGroupFamilyLearning',
+    hrefs: [
+      '/my-assessments',
+      '/my-timetable',
+      '/my-report-cards',
+      '/attendance',
+      '/leaves',
+      '/early-departure',
+      '/my-certificates',
+    ],
+  },
+  {
+    i18nKey: 'sidebarGroupFamilyServices',
+    hrefs: ['/fees', '/library', '/uniform-request', '/reports'],
+  },
+  {
+    i18nKey: 'sidebarGroupFamilyConnect',
+    hrefs: ['/messages', '/support', '/notifications', '/my-events'],
+  },
+];
+
 function navItemsInHrefOrder(navItems: NavItem[], hrefs: readonly string[]): NavItem[] {
   return hrefs
     .map((href) => navItems.find((item) => item.href === href))
     .filter((item): item is NavItem => Boolean(item));
+}
+
+function buildFamilyNavGroups(navItems: NavItem[]): { i18nKey: string; items: NavItem[] }[] {
+  const grouped = FAMILY_NAV_GROUPS.map((def) => ({
+    i18nKey: def.i18nKey,
+    items: navItemsInHrefOrder(navItems, def.hrefs),
+  })).filter((g) => g.items.length > 0);
+
+  const used = new Set(grouped.flatMap((g) => g.items.map((i) => i.href)));
+  // Dashboard is rendered above the accordion; do not bury it in a leftover group.
+  used.add('/dashboard');
+  const rest = navItems.filter((item) => !used.has(item.href));
+  if (rest.length === 0) return grouped;
+  if (grouped.length === 0) {
+    return [{ i18nKey: 'sidebarGroupFamilyConnect', items: rest }];
+  }
+  const last = grouped[grouped.length - 1];
+  return [
+    ...grouped.slice(0, -1),
+    { i18nKey: last.i18nKey, items: [...last.items, ...rest] },
+  ];
 }
 
 interface SidebarProps {
@@ -419,6 +481,23 @@ export function Sidebar({
     return roleName === 'parent';
   }) || false);
 
+  /** Staff who also have parent keep grouped Management nav; pure parent/student get a flat list. */
+  const hasStaffSidebarRole =
+    user?.roles?.some((r) => {
+      const roleName = r.roleName?.toLowerCase();
+      return (
+        roleName === 'school_admin' ||
+        roleName === 'principal' ||
+        roleName === 'academic_coordinator' ||
+        roleName === 'class_teacher' ||
+        roleName === 'subject_teacher' ||
+        roleName === 'admin_assistant' ||
+        roleName === 'guidance_counselor'
+      );
+    }) ?? false;
+  /** Pure parent/student use family accordion groups (not staff School/Management). */
+  const useFamilySidebar = isStudent || (isParent && !hasStaffSidebarRole);
+
   // Check if user can manage events (admin/coordinator)
   const canManageEvents = user?.roles?.some((r) => {
     const roleName = r.roleName?.toLowerCase();
@@ -440,6 +519,10 @@ export function Sidebar({
     const roleName = r.roleName?.toLowerCase();
     return roleName === 'school_admin' || roleName === 'principal';
   }) || false;
+  // Pure family audience: staff tabs stay hidden even if legacy matrix grants exist.
+  const isFamilyAudience = isStudent || (isParent && !hasStaffSidebarRole);
+  const userRoleNames = user?.roles?.map((r) => r.roleName ?? '') ?? [];
+
   // Filter navigation items based on conditions
   const navItems = allNavItems.filter((item) => {
     // Hide dashboard in child mode — students use My Assessments as home
@@ -450,9 +533,39 @@ export function Sidebar({
       return isOnline;
     }
 
+    // Parent/student portal tabs: never for operational staff (SA/P exempt; parent/student keep their tabs)
+    if (
+      shouldHideFamilyNavFromOperationalStaff(userRoleNames, item.href) &&
+      !isParent &&
+      !isStudent
+    ) {
+      return false;
+    }
+
     // Request uniform: only for parents
     if (item.href === '/uniform-request') {
       return isParent;
+    }
+
+    // Parent-only pages: role gate only (do not require staff matrix features
+    // like parent_associations / timetable_personal, which parents often lack).
+    // My Child stays as a page (dashboard deep-link) but is hidden from the sidebar.
+    if (item.href === '/my-children') {
+      return false;
+    }
+    if (item.href === '/parent/pin-management') {
+      return isParent;
+    }
+    if (item.href === '/my-report-cards') {
+      return isParent;
+    }
+    if (item.href === '/children-timetable') {
+      return isParent;
+    }
+
+    // Staff-only tabs: never show to parent/student regardless of matrix grants
+    if (isFamilyAudience && isFamilyHardDeniedNavHref(item.href)) {
+      return false;
     }
 
     // ID Cards — before permission-matrix check (matrix may not be seeded yet)
@@ -470,7 +583,6 @@ export function Sidebar({
     }
 
     if (item.href === '/certificates') {
-      if (isStudent || isParent) return false;
       if (isSchoolAdmin) return true;
       return canView('certificates') || canEdit('certificates');
     }
@@ -493,9 +605,9 @@ export function Sidebar({
 
     // Check showCondition if it exists
     if (item.showCondition) {
-      // For management Assessments page, hide for students
+      // For management Assessments page, hide for family (they use My Assessments / child views)
       if (item.href === '/assessments') {
-        return !isStudent;
+        return !isFamilyAudience;
       }
       // For My Assessments, show only for students
       if (item.href === '/my-assessments') {
@@ -511,15 +623,18 @@ export function Sidebar({
       }
       // For "Timetable Management", show only if user has admin/coordinator role
       if (item.href === '/timetable') {
+        if (isFamilyAudience) return false;
         // Prefer permission matrix gating (Settings → Permission matrix).
         // Keep role-based fallback for existing deployments that rely on roles.
         return canView('timetable_management') || canManageTimetable;
       }
-      // For "Conflict Management", visibility is permission-controlled (Settings → Permission matrix).
+      // Conflict management: permission matrix only (no role shortcut that bypasses none).
       if (item.href === '/conflict-management') {
-        return true;
+        if (isFamilyAudience) return false;
+        return canView('conflict_management');
       }
       if (item.href === '/substitution') {
+        if (isFamilyAudience) return false;
         return canView('teacher_substitution') || canManageSubstitution || isTeacher;
       }
       // For "My Events", show for parents, students, and teachers
@@ -542,9 +657,6 @@ export function Sidebar({
         return isSchoolAdmin;
       }
       // Parent-facing view only page
-      if (item.href === '/my-children') {
-        return isParent;
-      }
       if (item.href === '/parent/pin-management') {
         return isParent;
       }
@@ -563,9 +675,6 @@ export function Sidebar({
       return !isParent;
     }
     // Parent-facing view only page
-    if (item.href === '/my-children') {
-      return isParent;
-    }
     if (item.href === '/parent/pin-management') {
       return isParent;
     }
@@ -592,8 +701,14 @@ export function Sidebar({
     items: navItemsInHrefOrder(navItems, def.hrefs),
   })).filter((g) => g.items.length > 0);
 
+  const familyAccordionGroups = buildFamilyNavGroups(navItems);
+  const familyDefaultOpenKey = isParent
+    ? 'sidebarGroupFamilyChildren'
+    : 'sidebarGroupFamilyLearning';
+
   const schoolAccordionKeysSig = schoolAccordionGroups.map((g) => g.i18nKey).join('|');
   const managementAccordionKeysSig = managementAccordionGroups.map((g) => g.i18nKey).join('|');
+  const familyAccordionKeysSig = familyAccordionGroups.map((g) => g.i18nKey).join('|');
 
   const [schoolAccordionValue, setSchoolAccordionValue] = useState<string[]>(() =>
     schoolAccordionGroups.some((g) => g.i18nKey === SCHOOL_ACCORDION_DEFAULT_OPEN_KEY)
@@ -601,20 +716,36 @@ export function Sidebar({
       : [],
   );
   const [managementAccordionValue, setManagementAccordionValue] = useState<string[]>([]);
+  const [familyAccordionValue, setFamilyAccordionValue] = useState<string[]>(() =>
+    familyAccordionGroups.some((g) => g.i18nKey === familyDefaultOpenKey)
+      ? [familyDefaultOpenKey]
+      : familyAccordionGroups[0]
+        ? [familyAccordionGroups[0].i18nKey]
+        : [],
+  );
   /** Which collapsed group flyout is open (only one at a time). */
   const [collapsedFlyoutId, setCollapsedFlyoutId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (useFamilySidebar) return;
     setSchoolAccordionValue(
       schoolAccordionGroups.some((g) => g.i18nKey === SCHOOL_ACCORDION_DEFAULT_OPEN_KEY)
         ? [SCHOOL_ACCORDION_DEFAULT_OPEN_KEY]
         : [],
     );
-  }, [schoolAccordionKeysSig]);
+  }, [schoolAccordionKeysSig, useFamilySidebar]);
 
   useEffect(() => {
     setManagementAccordionValue([]);
   }, [managementAccordionKeysSig]);
+
+  useEffect(() => {
+    if (!useFamilySidebar) return;
+    const preferred = familyAccordionGroups.some((g) => g.i18nKey === familyDefaultOpenKey)
+      ? familyDefaultOpenKey
+      : familyAccordionGroups[0]?.i18nKey;
+    setFamilyAccordionValue(preferred ? [preferred] : []);
+  }, [familyAccordionKeysSig, useFamilySidebar, familyDefaultOpenKey]);
 
   useEffect(() => {
     if (!effectiveCollapsed) setCollapsedFlyoutId(null);
@@ -730,6 +861,87 @@ export function Sidebar({
             gap={effectiveCollapsed ? 0 : 'xs'}
             p={effectiveCollapsed ? { px: 0 } : 'md'}
           >
+          {useFamilySidebar ? (
+            familyAccordionGroups.length > 0 || dashboardItem ? (
+              <>
+                {effectiveCollapsed ? (
+                  <Stack gap={2} align="stretch" w="100%">
+                    {dashboardItem ? (
+                      <CollapsedNavDashboardButton
+                        item={dashboardItem}
+                        label={tNav('dashboard')}
+                        onNavigate={onMobileClose}
+                      />
+                    ) : null}
+                    {familyAccordionGroups.map((group) => {
+                      const GroupIcon = COLLAPSED_GROUP_ICONS[group.i18nKey];
+                      if (!GroupIcon || group.items.length === 0) return null;
+                      return (
+                        <CollapsedNavGroupPopover
+                          key={group.i18nKey}
+                          groupId={group.i18nKey}
+                          groupLabel={tCommon(group.i18nKey)}
+                          GroupIcon={GroupIcon}
+                          items={group.items}
+                          opened={collapsedFlyoutId === group.i18nKey}
+                          onOpenChange={(open) => {
+                            setCollapsedFlyoutId((prev) => {
+                              if (open) return group.i18nKey;
+                              return prev === group.i18nKey ? null : prev;
+                            });
+                          }}
+                          useHoverInteraction={useHoverFlyouts}
+                          getItemLabel={(key) => tNav(key)}
+                          onNavigate={onMobileClose}
+                          navHoverBackground={navbarConfig?.hoverBackground}
+                          navHoverColor={navbarConfig?.hoverTextColor}
+                          navActiveBackground={navbarConfig?.activeBackground}
+                          navActiveTextColor={navbarConfig?.activeTextColor}
+                          navDefaultTextColor={navbarConfig?.textColor}
+                        />
+                      );
+                    })}
+                  </Stack>
+                ) : (
+                  <>
+                    {dashboardItem ? renderNavItem(dashboardItem) : null}
+                    {familyAccordionGroups.length > 0 ? (
+                      <Accordion
+                        multiple
+                        value={familyAccordionValue}
+                        onChange={setFamilyAccordionValue}
+                        variant="default"
+                        chevronPosition="right"
+                        disableChevronRotation
+                        styles={navAccordionStyles}
+                      >
+                        {familyAccordionGroups.map((group) => (
+                          <Accordion.Item key={group.i18nKey} value={group.i18nKey}>
+                            <Accordion.Control
+                              id={`nav-accordion-family-${group.i18nKey}`}
+                              chevron={
+                                familyAccordionValue.includes(group.i18nKey) ? (
+                                  <IconChevronDown size={NAV_ACCORDION_CHEVRON_SIZE} stroke={1.5} />
+                                ) : (
+                                  <IconChevronRight size={NAV_ACCORDION_CHEVRON_SIZE} stroke={1.5} />
+                                )
+                              }
+                            >
+                              {tCommon(group.i18nKey)}
+                            </Accordion.Control>
+                            <Accordion.Panel>
+                              <Stack gap={4}>{group.items.map(renderNavItem)}</Stack>
+                            </Accordion.Panel>
+                          </Accordion.Item>
+                        ))}
+                      </Accordion>
+                    ) : null}
+                  </>
+                )}
+              </>
+            ) : null
+          ) : (
+            <>
           {schoolFlatOrdered.length > 0 && (
             <>
               {!effectiveCollapsed && (
@@ -893,6 +1105,8 @@ export function Sidebar({
                   ))}
                 </Accordion>
               )}
+            </>
+          )}
             </>
           )}
         </Stack>

@@ -31,6 +31,7 @@ interface AcademicYearCardProps {
   year: AcademicYear;
   onActivate: (id: string) => void;
   onLock: (year: AcademicYear) => void;
+  onEditDates?: (year: AcademicYear) => void;
   onRollover?: (year: AcademicYear) => void;
   isActivating: boolean;
   isLocking: boolean;
@@ -40,6 +41,7 @@ export function AcademicYearCard({
   year,
   onActivate,
   onLock,
+  onEditDates,
   onRollover,
   isActivating,
   isLocking,
@@ -55,6 +57,7 @@ export function AcademicYearCard({
   const statusColor = year.isLocked ? colors.warning : year.isActive ? colors.success : colors.info;
   const activateDisabled = year.isLocked || year.isActive;
   const lockDisabled = year.isLocked || !year.isActive;
+  const editDatesDisabled = year.isLocked;
   const rolloverCompleted = Boolean(year.rollover);
   const rolloverDisabled = year.isLocked || !year.isActive || rolloverCompleted;
   const rolloverNotes = rolloverSummaryLines(year);
@@ -75,6 +78,16 @@ export function AcademicYearCard({
       </Group>
 
       <Group justify="flex-end" mt="md">
+        {onEditDates && (
+          <Button
+            id={`academic-year-card-${year.id}-edit-dates`}
+            variant="light"
+            disabled={editDatesDisabled}
+            onClick={() => onEditDates(year)}
+          >
+            {tSettings('academicYearEditDatesButton')}
+          </Button>
+        )}
         {onRollover && (
           <Button
             id={`academic-year-card-${year.id}-rollover`}

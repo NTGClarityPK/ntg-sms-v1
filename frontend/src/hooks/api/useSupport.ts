@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { flushSync } from 'react-dom';
 import type {
   SendSupportMessageInput,
   SupportConversation,
@@ -12,6 +13,19 @@ import type {
   SupportUploadResult,
   SupportUploadType,
 } from '@/types/support';
+
+function matchesSupportMessagesQuery(
+  queryKey: readonly unknown[],
+  branchId: string | undefined,
+  conversationId: string,
+): boolean {
+  return (
+    Array.isArray(queryKey) &&
+    queryKey[0] === 'support-messages' &&
+    queryKey[1] === branchId &&
+    queryKey[2] === conversationId
+  );
+}
 
 function karachiYearMonth(offsetMonths = 0): string {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -178,11 +192,89 @@ export function useSendSupportMessage() {
       const response = await apiClient.post<SupportMessage>('/api/v1/support/messages', input);
       return response.data;
     },
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({
-        queryKey: ['support-messages', branchId, variables.conversationId],
+    onMutate: async (input) => {
+      if (!user?.id) return;
+
+      const previousEntries = queryClient.getQueriesData<SupportMessage[]>({
+        predicate: (query) =>
+          matchesSupportMessagesQuery(query.queryKey, branchId, input.conversationId),
       });
+
+      const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const optimisticMessage: SupportMessage = {
+        id: optimisticId,
+        conversationId: input.conversationId,
+        senderId: user.id,
+        senderType: 'customer',
+        senderDisplayName: user.fullName ?? null,
+        messageType: input.messageType,
+        content: input.content ?? null,
+        fileUrl: input.fileUrl ?? null,
+        createdAt: new Date().toISOString(),
+        readAt: null,
+        expiresAt: input.expiresAt ?? null,
+      };
+
+      flushSync(() => {
+        queryClient.setQueriesData<SupportMessage[]>(
+          {
+            predicate: (query) =>
+              matchesSupportMessagesQuery(query.queryKey, branchId, input.conversationId),
+          },
+          (prev) => {
+            const list = prev ?? [];
+            if (list.some((m) => m.id === optimisticId)) return list;
+            return [...list, optimisticMessage];
+          },
+        );
+      });
+
+      void queryClient.cancelQueries({
+        predicate: (query) =>
+          matchesSupportMessagesQuery(query.queryKey, branchId, input.conversationId),
+      });
+
+      return { previousEntries, optimisticId };
+    },
+    onSuccess: (data, variables, context) => {
+      const optimisticId = context?.optimisticId;
+      if (data) {
+        queryClient.setQueriesData<SupportMessage[]>(
+          {
+            predicate: (query) =>
+              matchesSupportMessagesQuery(query.queryKey, branchId, variables.conversationId),
+          },
+          (prev) => {
+            const list = prev ?? [];
+            if (list.some((m) => m.id === data.id)) {
+              return optimisticId ? list.filter((m) => m.id !== optimisticId) : list;
+            }
+            if (optimisticId) {
+              return list.map((m) => (m.id === optimisticId ? data : m));
+            }
+            return [...list.filter((m) => !m.id.startsWith('temp-')), data];
+          },
+        );
+      }
       void queryClient.invalidateQueries({ queryKey: ['support-conversations', branchId] });
+    },
+    onError: (_error, variables, context) => {
+      const optimisticId = context?.optimisticId;
+      if (optimisticId) {
+        queryClient.setQueriesData<SupportMessage[]>(
+          {
+            predicate: (query) =>
+              matchesSupportMessagesQuery(query.queryKey, branchId, variables.conversationId),
+          },
+          (prev) => (prev ? prev.filter((m) => m.id !== optimisticId) : prev),
+        );
+        return;
+      }
+      if (context?.previousEntries) {
+        for (const [key, data] of context.previousEntries) {
+          queryClient.setQueryData(key, data);
+        }
+      }
     },
   });
 }

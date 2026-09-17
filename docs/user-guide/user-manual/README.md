@@ -58,12 +58,13 @@ NTG Alma supports creating a new school (tenant) from the **Signup** page.
    * **Google signup** (continue with Google and finish setup)
 3. Fill in school and branch information:
    * **School Name**
-   * **School Code** and **School Domain** (as required by the form)
+   * **School Code** and **School Domain** (optional — leave blank to auto-create from the school name; if entered, Alma checks uniqueness)
    * **Branch Name** and branch contact details
 4. Create the first admin user:
    * **Full Name**
    * **Email** (for email signup)
    * **Password** (for email signup)
+   * **Email verification code** (email signup only — 4-digit code sent to the admin email; Google signup skips this)
 5. Complete signup
 
 **Sign up with Google:**

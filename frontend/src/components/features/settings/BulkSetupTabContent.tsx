@@ -169,6 +169,8 @@ export function BulkSetupTabContent() {
         <List spacing={4} size="sm">
           <List.Item>{t('bulkSetupStep1')}</List.Item>
           <List.Item>{t('bulkSetupStep2')}</List.Item>
+          <List.Item>{t('bulkSetupSubjectTemplatesOptionalStep')}</List.Item>
+          <List.Item>{t('bulkSetupScheduleGradesStep')}</List.Item>
           <List.Item>{t('bulkSetupBehaviorOptionalStep')}</List.Item>
           <List.Item>{t('bulkSetupStep3')}</List.Item>
           <List.Item>{t('bulkSetupStep4')}</List.Item>

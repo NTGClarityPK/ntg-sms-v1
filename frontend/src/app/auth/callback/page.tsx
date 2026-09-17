@@ -190,7 +190,9 @@ export default function AuthCallbackPage() {
           if (typeof window !== 'undefined') {
             window.sessionStorage.setItem('ntg_alma_show_tours_modal', '1');
           }
-          await selectBranchAndGoDashboard(branchId, router);
+          await selectBranchAndGoDashboard(branchId, router, undefined, {
+            preferSettingsIfUninitialized: true,
+          });
           return;
         }
 
@@ -239,7 +241,9 @@ export default function AuthCallbackPage() {
     try {
       setShowBranchSelection(false);
       setMessage('Taking you to dashboard...');
-      await selectBranchAndGoDashboard(branchId, router);
+      await selectBranchAndGoDashboard(branchId, router, undefined, {
+        preferSettingsIfUninitialized: true,
+      });
     } catch {
       setError('Failed to select branch. Please try again.');
     } finally {

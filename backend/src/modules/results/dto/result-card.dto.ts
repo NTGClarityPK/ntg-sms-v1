@@ -17,6 +17,8 @@ export class ResultCardDto {
   approvedAt?: string;
   /** Optional comment from class teacher for detailed report card. */
   classTeacherComment?: string;
+  /** PDF layout snapshot set when publishing (parents download this). */
+  pdfVariant?: 'minimal' | 'modern';
   createdAt!: string;
   updatedAt!: string;
 

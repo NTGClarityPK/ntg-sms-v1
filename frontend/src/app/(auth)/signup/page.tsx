@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
@@ -16,7 +16,11 @@ import {
   Group,
   Divider,
   LoadingOverlay,
+  Loader,
+  ThemeIcon,
+  PinInput,
 } from '@mantine/core';
+import { useDebouncedValue } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import {
   IconAlertCircle,
@@ -29,6 +33,7 @@ import {
   IconBuilding,
   IconCalendar,
   IconBrandGoogle,
+  IconX,
 } from '@tabler/icons-react';
 import { apiClient, getEffectiveApiBaseURL } from '@/lib/api-client';
 import { getSessionWithRetry, signIn } from '@/lib/auth';
@@ -39,11 +44,19 @@ import {
 import { BranchSelectionModal } from '@/components/common/BranchSelectionModal';
 import { useThemeStore } from '@/lib/store/theme-store';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
-import { useErrorColor, useInfoColor, useSuccessColor, useNotificationColors } from '@/lib/hooks/use-theme-colors';
+import { useErrorColor, useSuccessColor, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeColor } from '@/lib/hooks/use-theme-color';
 import { generateThemeColors } from '@/lib/utils/themeColors';
 import { notifications } from '@mantine/notifications';
+import {
+  DOMAIN_PATTERN,
+  SCHOOL_CODE_PATTERN,
+  getPasswordRuleResults,
+  getPasswordValidationMessage,
+  suggestDomainFromSchoolName,
+  suggestSchoolCodeFromSchoolName,
+} from '@/lib/utils/signup-validation';
 
 interface RegisterData {
   // School/Tenant
@@ -73,7 +86,6 @@ export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const errorColor = useErrorColor();
-  const infoColor = useInfoColor();
   const successColor = useSuccessColor();
   const notifyColors = useNotificationColors();
   const { isDark } = useTheme();
@@ -89,6 +101,20 @@ export default function SignupPage() {
   >([]);
   const [branchSelectionLoading, setBranchSelectionLoading] = useState(false);
   const { setPrimaryColor } = useThemeStore();
+  const [domainCheckStatus, setDomainCheckStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+  >('idle');
+  const [codeCheckStatus, setCodeCheckStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+  >('idle');
+  const [emailVerificationToken, setEmailVerificationToken] = useState<string | null>(null);
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+  const [otpVisible, setOtpVisible] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState(0);
+  const [resendSecondsLeft, setResendSecondsLeft] = useState(0);
 
   const form = useForm<RegisterData>({
     initialValues: {
@@ -112,11 +138,18 @@ export default function SignupPage() {
     validateInputOnChange: false,
     validate: {
       schoolName: (value) => (value.length < 2 ? 'School name must be at least 2 characters' : null),
+      schoolCode: (value) => {
+        const v = value.trim().toUpperCase();
+        if (!v) return null;
+        if (v.length < 2) return 'School code must be at least 2 characters';
+        return SCHOOL_CODE_PATTERN.test(v)
+          ? null
+          : 'Use letters, numbers, and hyphens only (e.g. ALEKAF)';
+      },
       schoolDomain: (value) => {
         const v = value.trim().toLowerCase();
-        if (!v) return 'Domain is required';
-        const ok = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(v);
-        return ok ? null : 'Enter a valid domain (e.g. example.edu)';
+        if (!v) return null;
+        return DOMAIN_PATTERN.test(v) ? null : 'Enter a valid domain (e.g. example.edu)';
       },
       branchName: (value) => (value.length < 2 ? 'Branch name must be at least 2 characters' : null),
       academicYearName: (value) => (value.length < 2 ? 'Academic year name must be at least 2 characters' : null),
@@ -131,18 +164,230 @@ export default function SignupPage() {
         return null;
       },
       email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
-      password: (value) => (value.length < 6 ? 'Password must be at least 6 characters' : null),
+      password: (value) => getPasswordValidationMessage(value),
       confirmPassword: (value, values) =>
         value !== values.password ? 'Passwords do not match' : null,
       fullName: (value) => (value.length < 2 ? 'Full name must be at least 2 characters' : null),
     },
   });
 
-  const nextStep = () => {
+  const [debouncedDomain] = useDebouncedValue(form.values.schoolDomain.trim().toLowerCase(), 350);
+  const [debouncedCode] = useDebouncedValue(form.values.schoolCode.trim().toUpperCase(), 350);
+  const suggestedDomain = useMemo(
+    () => suggestDomainFromSchoolName(form.values.schoolName),
+    [form.values.schoolName],
+  );
+  const suggestedCode = useMemo(
+    () => suggestSchoolCodeFromSchoolName(form.values.schoolName),
+    [form.values.schoolName],
+  );
+  const passwordRules = useMemo(
+    () => getPasswordRuleResults(form.values.password),
+    [form.values.password],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!debouncedDomain) {
+        setDomainCheckStatus('idle');
+        return;
+      }
+      if (!DOMAIN_PATTERN.test(debouncedDomain)) {
+        setDomainCheckStatus('invalid');
+        return;
+      }
+
+      setDomainCheckStatus('checking');
+      try {
+        const response = await apiClient.get<{
+          domain: string;
+          available: boolean;
+          normalized: string;
+        }>('/api/v1/auth/check-domain', {
+          params: { domain: debouncedDomain },
+        });
+        if (cancelled) return;
+        setDomainCheckStatus(response.data.available ? 'available' : 'taken');
+      } catch {
+        if (cancelled) return;
+        setDomainCheckStatus('invalid');
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedDomain]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!debouncedCode) {
+        setCodeCheckStatus('idle');
+        return;
+      }
+      if (debouncedCode.length < 2 || !SCHOOL_CODE_PATTERN.test(debouncedCode)) {
+        setCodeCheckStatus('invalid');
+        return;
+      }
+
+      setCodeCheckStatus('checking');
+      try {
+        const response = await apiClient.get<{
+          code: string;
+          available: boolean;
+          normalized: string;
+        }>('/api/v1/auth/check-code', {
+          params: { code: debouncedCode },
+        });
+        if (cancelled) return;
+        setCodeCheckStatus(response.data.available ? 'available' : 'taken');
+      } catch {
+        if (cancelled) return;
+        setCodeCheckStatus('invalid');
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedCode]);
+
+  // Changing the admin email invalidates prior OTP confirmation for a different address.
+  useEffect(() => {
+    const current = form.values.email.trim().toLowerCase();
+    if (verifiedEmail && current !== verifiedEmail) {
+      setEmailVerificationToken(null);
+      setVerifiedEmail(null);
+      setOtpVisible(false);
+      setOtpCode('');
+      setOtpError(null);
+    }
+  }, [form.values.email, verifiedEmail]);
+
+  useEffect(() => {
+    if (resendAvailableAt <= Date.now()) {
+      setResendSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000));
+      setResendSecondsLeft(left);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [resendAvailableAt]);
+
+  const extractApiError = (err: unknown, fallback: string): string => {
+    const fromAxios = err as {
+      response?: { data?: { error?: { message?: string }; message?: string } };
+      message?: string;
+    };
+    return (
+      fromAxios.response?.data?.error?.message ||
+      fromAxios.response?.data?.message ||
+      fromAxios.message ||
+      fallback
+    );
+  };
+
+  const sendSignupEmailCode = async (email: string, fullName: string) => {
+    setOtpLoading(true);
+    setOtpError(null);
+    try {
+      const response = await apiClient.post<{
+        sent: true;
+        expiresInSeconds: number;
+        resendAvailableInSeconds: number;
+      }>('/api/v1/auth/signup/send-email-code', {
+        email,
+        fullName: fullName || undefined,
+      });
+      setOtpVisible(true);
+      setOtpCode('');
+      setResendAvailableAt(
+        Date.now() + (response.data.resendAvailableInSeconds ?? 60) * 1000,
+      );
+      notifications.show({
+        id: 'signup-otp-sent',
+        title: 'Code sent',
+        message: `We sent a 4-digit code to ${email}`,
+        color: notifyColors.success,
+        autoClose: 4000,
+      });
+      return true;
+    } catch (err: unknown) {
+      const msg = extractApiError(err, 'Failed to send verification code');
+      setOtpError(msg);
+      notifications.show({
+        id: 'signup-otp-send-error',
+        title: 'Could not send code',
+        message: msg,
+        color: notifyColors.error,
+        autoClose: 4000,
+      });
+      return false;
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const verifySignupEmailCode = async (email: string, code: string) => {
+    setOtpLoading(true);
+    setOtpError(null);
+    try {
+      const response = await apiClient.post<{
+        verified: true;
+        emailVerificationToken: string;
+        expiresInSeconds: number;
+      }>('/api/v1/auth/signup/verify-email-code', {
+        email,
+        code,
+      });
+      const token = response.data.emailVerificationToken;
+      setEmailVerificationToken(token);
+      setVerifiedEmail(email.trim().toLowerCase());
+      setOtpVisible(false);
+      setOtpCode('');
+      return token;
+    } catch (err: unknown) {
+      const msg = extractApiError(err, 'Incorrect or expired code');
+      setOtpError(msg);
+      return null;
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const nextStep = async () => {
     if (active === 0) {
       // Validate step 1: School Information before moving to step 2
-      const validation = form.validateField('schoolName');
-      if (!validation.hasError) {
+      const nameValidation = form.validateField('schoolName');
+      const codeValidation = form.validateField('schoolCode');
+      const domainValidation = form.validateField('schoolDomain');
+      if (form.values.schoolCode.trim() && codeCheckStatus === 'taken') {
+        form.setFieldError('schoolCode', 'This school code is already taken');
+        return;
+      }
+      if (form.values.schoolCode.trim() && codeCheckStatus === 'checking') {
+        form.setFieldError('schoolCode', 'Please wait while we check school code availability');
+        return;
+      }
+      if (form.values.schoolDomain.trim() && domainCheckStatus === 'taken') {
+        form.setFieldError('schoolDomain', 'This domain is already taken');
+        return;
+      }
+      if (form.values.schoolDomain.trim() && domainCheckStatus === 'checking') {
+        form.setFieldError('schoolDomain', 'Please wait while we check domain availability');
+        return;
+      }
+      if (!nameValidation.hasError && !codeValidation.hasError && !domainValidation.hasError) {
         // Clear any errors from other steps when moving forward
         form.clearFieldError('branchName');
         form.clearFieldError('academicYearName');
@@ -190,13 +435,37 @@ export default function SignupPage() {
         const confirmPasswordValidation = form.validateField('confirmPassword');
 
         if (
-          !emailValidation.hasError &&
-          !passwordValidation.hasError &&
-          !confirmPasswordValidation.hasError &&
-          !fullNameValidation.hasError
+          emailValidation.hasError ||
+          passwordValidation.hasError ||
+          confirmPasswordValidation.hasError ||
+          fullNameValidation.hasError
         ) {
-          setActive((current) => (current < 4 ? current + 1 : current));
+          return;
         }
+
+        const email = form.values.email.trim().toLowerCase();
+        const alreadyVerified =
+          !!emailVerificationToken && verifiedEmail === email;
+
+        if (alreadyVerified) {
+          setActive((current) => (current < 4 ? current + 1 : current));
+          return;
+        }
+
+        if (otpVisible && otpCode.trim().length === 4) {
+          const token = await verifySignupEmailCode(email, otpCode.trim());
+          if (token) {
+            setActive((current) => (current < 4 ? current + 1 : current));
+          }
+          return;
+        }
+
+        if (otpVisible) {
+          setOtpError('Enter the 4-digit verification code');
+          return;
+        }
+
+        await sendSignupEmailCode(email, form.values.fullName);
       }
     }
   };
@@ -258,6 +527,12 @@ export default function SignupPage() {
 
     try {
       const { confirmPassword, ...registerData } = values;
+      if (!emailVerificationToken) {
+        setError('Please verify your email before creating the account');
+        setLoading(false);
+        setActive(3);
+        return;
+      }
       await apiClient.post('/api/v1/auth/register', {
         schoolName: registerData.schoolName,
         schoolCode: registerData.schoolCode || undefined,
@@ -273,6 +548,7 @@ export default function SignupPage() {
         password: registerData.password,
         fullName: registerData.fullName,
         phone: registerData.phone || undefined,
+        emailVerificationToken: emailVerificationToken ?? undefined,
       });
 
       try {
@@ -349,7 +625,9 @@ export default function SignupPage() {
 
     try {
       setShowBranchSelection(false);
-      await selectBranchAndGoDashboard(branchId, router, setPrimaryColor);
+      await selectBranchAndGoDashboard(branchId, router, setPrimaryColor, {
+        preferSettingsIfUninitialized: true,
+      });
     } catch {
       setError('Failed to select branch. Please try again.');
     } finally {
@@ -464,18 +742,6 @@ export default function SignupPage() {
         />
       <Stack gap="lg">
         <Box>
-          <Button
-            id="signup-back-method"
-            variant="subtle"
-            size="sm"
-            onClick={() => {
-              setSignupMethod(null);
-              setActive(0);
-            }}
-            style={{ marginBottom: '1rem', color: DEFAULT_THEME_COLOR }}
-          >
-            Back
-          </Button>
           <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
             Create School Account
           </Title>
@@ -506,27 +772,84 @@ export default function SignupPage() {
               <TextInput
                 id="signup-school-code"
                 label="School Code (Optional)"
-                placeholder="ALEKAF001"
-                description="Unique code for your school. Leave empty to auto-generate."
+                placeholder={suggestedCode || 'ALEKAF'}
+                description={
+                  form.values.schoolCode.trim()
+                    ? 'Checked instantly for uniqueness.'
+                    : `Leave blank to auto-create from school name (e.g. ${suggestedCode}).`
+                }
                 leftSection={<IconSchool size={18} />}
+                rightSection={
+                  codeCheckStatus === 'checking' ? (
+                    <Loader size="xs" />
+                  ) : codeCheckStatus === 'available' ? (
+                    <ThemeIcon size="sm" radius="xl" color="teal" variant="light">
+                      <IconCheck size={12} />
+                    </ThemeIcon>
+                  ) : codeCheckStatus === 'taken' || codeCheckStatus === 'invalid' ? (
+                    <ThemeIcon size="sm" radius="xl" color="red" variant="light">
+                      <IconX size={12} />
+                    </ThemeIcon>
+                  ) : null
+                }
                 size="lg"
                 radius="md"
                 disabled={loading}
+                styles={{ input: { textTransform: 'uppercase' } }}
+                error={
+                  codeCheckStatus === 'taken'
+                    ? 'This school code is already taken'
+                    : form.errors.schoolCode
+                }
                 {...form.getInputProps('schoolCode')}
+                onChange={(event) => {
+                  form.setFieldValue('schoolCode', event.currentTarget.value.toUpperCase());
+                }}
               />
+              {codeCheckStatus === 'available' && (
+                <Text size="xs" c="teal">
+                  School code is available
+                </Text>
+              )}
 
               <TextInput
                 id="signup-school-domain"
-                label="Domain"
-                placeholder="alekaf.edu"
-                description="Unique school domain (used for student login emails)"
+                label="Domain (optional)"
+                placeholder={suggestedDomain || 'alekaf.edu'}
+                description={
+                  form.values.schoolDomain.trim()
+                    ? 'Used for student login emails. Checked instantly for uniqueness.'
+                    : `Leave blank to auto-create from school name (e.g. ${suggestedDomain}).`
+                }
                 leftSection={<IconMail size={18} />}
+                rightSection={
+                  domainCheckStatus === 'checking' ? (
+                    <Loader size="xs" />
+                  ) : domainCheckStatus === 'available' ? (
+                    <ThemeIcon size="sm" radius="xl" color="teal" variant="light">
+                      <IconCheck size={12} />
+                    </ThemeIcon>
+                  ) : domainCheckStatus === 'taken' || domainCheckStatus === 'invalid' ? (
+                    <ThemeIcon size="sm" radius="xl" color="red" variant="light">
+                      <IconX size={12} />
+                    </ThemeIcon>
+                  ) : null
+                }
                 size="lg"
                 radius="md"
                 disabled={loading}
-                required
+                error={
+                  domainCheckStatus === 'taken'
+                    ? 'This domain is already taken'
+                    : form.errors.schoolDomain
+                }
                 {...form.getInputProps('schoolDomain')}
               />
+              {domainCheckStatus === 'available' && (
+                <Text size="xs" c="teal">
+                  Domain is available
+                </Text>
+              )}
             </Stack>
           </Stepper.Step>
 
@@ -641,7 +964,7 @@ export default function SignupPage() {
                   size="lg"
                   radius="md"
                   autoComplete="email"
-                  disabled={loading}
+                  disabled={loading || otpLoading}
                   {...form.getInputProps('email')}
                 />
               )}
@@ -654,7 +977,7 @@ export default function SignupPage() {
                 leftSection={<IconUser size={18} />}
                 size="lg"
                 radius="md"
-                disabled={loading}
+                disabled={loading || otpLoading}
                 {...form.getInputProps('fullName')}
               />
 
@@ -665,7 +988,7 @@ export default function SignupPage() {
                 leftSection={<IconPhone size={18} />}
                 size="lg"
                 radius="md"
-                disabled={loading}
+                disabled={loading || otpLoading}
                 {...form.getInputProps('phone')}
               />
 
@@ -680,9 +1003,27 @@ export default function SignupPage() {
                     size="lg"
                     radius="md"
                     autoComplete="new-password"
-                    disabled={loading}
+                    disabled={loading || otpLoading}
                     {...form.getInputProps('password')}
                   />
+
+                  <Stack gap={6}>
+                    {passwordRules.map((rule) => (
+                      <Group key={rule.id} gap="xs" wrap="nowrap">
+                        <ThemeIcon
+                          size={18}
+                          radius="xl"
+                          variant="light"
+                          color={rule.passed ? 'teal' : 'gray'}
+                        >
+                          {rule.passed ? <IconCheck size={12} /> : <IconX size={12} />}
+                        </ThemeIcon>
+                        <Text size="sm" c={rule.passed ? 'teal' : 'dimmed'}>
+                          {rule.label}
+                        </Text>
+                      </Group>
+                    ))}
+                  </Stack>
 
                   <PasswordInput
                     id="signup-confirm-password"
@@ -693,23 +1034,78 @@ export default function SignupPage() {
                     size="lg"
                     radius="md"
                     autoComplete="new-password"
-                    disabled={loading}
+                    disabled={loading || otpLoading}
                     {...form.getInputProps('confirmPassword')}
                   />
 
-                  <Alert
-                    style={{
-                      backgroundColor: `${infoColor}15`,
-                      borderColor: infoColor,
-                      color: infoColor,
-                    }}
-                    variant="light"
-                    radius="md"
-                  >
-                    <Text size="sm">
-                      Password must be at least 6 characters long. Choose a strong password to keep your account secure.
-                    </Text>
-                  </Alert>
+                  {emailVerificationToken &&
+                    verifiedEmail === form.values.email.trim().toLowerCase() && (
+                      <Alert
+                        icon={<IconCheck size={16} />}
+                        style={{
+                          backgroundColor: `${successColor}15`,
+                          borderColor: successColor,
+                          color: successColor,
+                        }}
+                        variant="light"
+                        radius="md"
+                      >
+                        <Text size="sm">Email verified — you can continue to review.</Text>
+                      </Alert>
+                    )}
+
+                  {otpVisible &&
+                    !(
+                      emailVerificationToken &&
+                      verifiedEmail === form.values.email.trim().toLowerCase()
+                    ) && (
+                      <Stack gap="sm">
+                        <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
+                          Enter the 4-digit code we sent to{' '}
+                          <Text span fw={600} style={{ color: themeColors.colorTextDark }}>
+                            {form.values.email.trim().toLowerCase()}
+                          </Text>
+                        </Text>
+                        <PinInput
+                          id="signup-email-otp"
+                          length={4}
+                          type="number"
+                          oneTimeCode
+                          size="lg"
+                          value={otpCode}
+                          onChange={setOtpCode}
+                          disabled={loading || otpLoading}
+                          error={!!otpError}
+                        />
+                        {otpError && (
+                          <Text size="sm" c="red">
+                            {otpError}
+                          </Text>
+                        )}
+                        <Group justify="space-between">
+                          <Button
+                            id="signup-otp-resend"
+                            type="button"
+                            variant="subtle"
+                            size="compact-sm"
+                            disabled={
+                              loading || otpLoading || resendSecondsLeft > 0
+                            }
+                            loading={!loading && otpLoading}
+                            onClick={() => {
+                              void sendSignupEmailCode(
+                                form.values.email.trim().toLowerCase(),
+                                form.values.fullName,
+                              );
+                            }}
+                          >
+                            {resendSecondsLeft > 0
+                              ? `Resend in ${resendSecondsLeft}s`
+                              : 'Resend code'}
+                          </Button>
+                        </Group>
+                      </Stack>
+                    )}
                 </>
               )}
             </Stack>
@@ -808,36 +1204,61 @@ export default function SignupPage() {
         </Stepper>
 
         <Group justify="space-between" mt="xl">
-          {active > 0 ? (
-            <Button
-              id="signup-prev"
-              type="button"
-              variant="default"
-              onClick={prevStep}
-              disabled={loading}
-              style={{
-                backgroundColor: isDark ? themeColors.colorMedium : '#f5f5f5',
-                color: themeColors.colorTextDark,
-                borderColor: themeColors.borderLight,
-              }}
-            >
-              Previous
-            </Button>
-          ) : (
-            <div /> // Spacer
-          )}
+          <Button
+            id="signup-prev"
+            type="button"
+            variant="default"
+            onClick={() => {
+              if (active > 0) {
+                prevStep();
+                return;
+              }
+              setSignupMethod(null);
+              setActive(0);
+            }}
+            disabled={loading}
+            style={{
+              backgroundColor: isDark ? themeColors.colorMedium : '#f5f5f5',
+              color: themeColors.colorTextDark,
+              borderColor: themeColors.borderLight,
+            }}
+          >
+            Previous
+          </Button>
           {active < 4 ? (
             <Button
               id="signup-next"
               type="button"
-              onClick={nextStep}
-              disabled={loading}
+              onClick={() => {
+                void nextStep();
+              }}
+              disabled={
+                loading ||
+                otpLoading ||
+                (active === 3 &&
+                  signupMethod === 'email' &&
+                  otpVisible &&
+                  !(
+                    emailVerificationToken &&
+                    verifiedEmail === form.values.email.trim().toLowerCase()
+                  ) &&
+                  otpCode.trim().length !== 4)
+              }
+              loading={!loading && otpLoading}
               style={{
                 backgroundColor: DEFAULT_THEME_COLOR,
                 color: 'white',
               }}
             >
-              Next
+              {active === 3 &&
+              signupMethod === 'email' &&
+              otpVisible &&
+              !(
+                emailVerificationToken &&
+                verifiedEmail === form.values.email.trim().toLowerCase()
+              )
+                ? 'Verify & continue'
+                : 'Next'}
             </Button>
           ) : (
             <Button

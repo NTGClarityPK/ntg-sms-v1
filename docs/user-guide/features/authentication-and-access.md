@@ -27,6 +27,7 @@ If the account is switched off, you may see a message that an administrator must
 After a successful login:
 
 - **School admin** with more than one campus (branch) → you pick which campus to open, then enter the portal
+- **School admin** whose campus is **not yet set up** (wizard or bulk setup not completed) → Alma opens **Settings** so you can finish setup
 - **Everyone else** → you go straight into the portal; Alma picks your campus for you (your last choice, or the first one available)
 
 ---
@@ -49,11 +50,13 @@ If Google cannot find a matching Alma user, you are guided toward **signup** wit
 
 **Sign up** walks you through five steps:
 
-1. **School information**
+1. **School information** — school name is required; **school code** and **domain** are optional. If you leave them blank, Alma creates both from the school name (e.g. `Alekaf High School` → code `ALEKAFHIGHSCHOOL`, domain `alekafhighschool.edu`). If you type a code or domain, Alma checks immediately whether it is already taken.
 2. **Branch information** (your first campus)
 3. **Academic year**
-4. **Admin account** (password at least **6** characters)
+4. **Admin account** — password must be at least **8** characters and include uppercase, lowercase, a number, and a special character. Alma then emails a **4-digit verification code** to the admin address; enter that code on the same step before continuing. Changing the email clears confirmation and requires a new code. (**Google signup** skips this step — Google already proves the email.)
 5. **Review** → Create account
+
+After a successful signup, if the campus is not set up yet, Alma opens **Settings** so you can run the setup wizard or bulk setup.
 
 ---
 
@@ -94,6 +97,8 @@ A **branch** is one campus or site of your school. Much of what you see (student
 ## 👨‍👩‍👧 Which child you are viewing (parents)
 
 If you are a parent linked to more than one child, use the child switcher in the **header** (top of the portal). It may say **Select child**, or **Acting as** followed by that child’s name. Changing it updates what you see on child-specific screens such as **My Child**, attendance, and timetable.
+
+Parents and students see a **simple flat sidebar** (no Management / Setup / System section headers). Staff keep the grouped sidebar. If you also have a staff role (for example teacher), you keep the staff grouping.
 
 ---
 
@@ -148,6 +153,8 @@ Arabic uses a right-to-left layout. Before you log in, screens default to Englis
 ## 🆘 Troubleshooting
 
 **Google sends me to signup:** That Google account is not linked to an existing Alma user. Use your invitation link, or ask an admin to invite you.
+
+**I did not get the signup verification code:** Check spam/junk for the admin email. Wait about a minute, then use **Resend code** on the Admin account step. If you changed the email, request a new code for the new address.
 
 **I am in the portal but modules are missing:** Check your role and which campus you are on. Parents: check which child is selected in the header.
 

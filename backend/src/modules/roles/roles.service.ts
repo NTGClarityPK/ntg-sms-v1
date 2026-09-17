@@ -5,6 +5,105 @@ import { RoleDto } from './dto/role.dto';
 import { FeatureDto } from './dto/feature.dto';
 import { PermissionMatrixDto, UpdatePermissionsDto } from './dto/permission-matrix.dto';
 
+/** Staff features parent/student must never hold (mirrors frontend familyHardDeny). */
+const FAMILY_HARD_DENIED_FEATURE_CODES = new Set([
+  'students',
+  'user_management',
+  'staff',
+  'class_sections',
+  'teacher_mapping',
+  'parent_associations',
+  'assessment',
+  'behavioral',
+  'inventory',
+  'id_cards',
+  'events_management',
+  'events',
+  'timetable_management',
+  'timetable',
+  'conflict_management',
+  'teacher_substitution',
+  'promotion_placement',
+  'results',
+  'settings',
+]);
+
+const PARENT_HARD_DENIED_FEATURE_CODES = new Set([
+  'my_assessments',
+  'timetable_personal',
+  'my_timetable',
+  'my_schedule',
+]);
+
+const STUDENT_HARD_DENIED_FEATURE_CODES = new Set(['my_schedule']);
+
+const OPERATIONAL_STAFF_HARD_DENIED_FAMILY_FEATURE_CODES = new Set(['my_assessments']);
+
+const NON_TEACHER_STAFF_HARD_DENIED_FAMILY_FEATURE_CODES = new Set([
+  'timetable_personal',
+  'my_timetable',
+  'my_schedule',
+  'events_personal',
+  'my_events',
+]);
+
+const PRIVILEGED_STAFF_ROLE_NAMES = new Set(['school_admin', 'principal']);
+
+const OPERATIONAL_STAFF_ROLE_NAMES = new Set([
+  'academic_coordinator',
+  'admin_assistant',
+  'class_teacher',
+  'subject_teacher',
+  'guidance_counselor',
+]);
+
+const NON_TEACHER_OPERATIONAL_STAFF_ROLE_NAMES = new Set([
+  'academic_coordinator',
+  'admin_assistant',
+  'guidance_counselor',
+]);
+
+function isFeatureHardDeniedForFamilyRole(
+  roleName: string | undefined,
+  featureCode: string | undefined,
+): boolean {
+  const role = (roleName ?? '').toLowerCase();
+  const code = featureCode ?? '';
+  if (!code || (role !== 'parent' && role !== 'student')) return false;
+  if (FAMILY_HARD_DENIED_FEATURE_CODES.has(code)) return true;
+  if (role === 'parent' && PARENT_HARD_DENIED_FEATURE_CODES.has(code)) return true;
+  if (role === 'student' && STUDENT_HARD_DENIED_FEATURE_CODES.has(code)) return true;
+  return false;
+}
+
+function isFeatureHardDeniedForOperationalStaffRole(
+  roleName: string | undefined,
+  featureCode: string | undefined,
+): boolean {
+  const role = (roleName ?? '').toLowerCase();
+  const code = featureCode ?? '';
+  if (!code || PRIVILEGED_STAFF_ROLE_NAMES.has(role)) return false;
+  if (!OPERATIONAL_STAFF_ROLE_NAMES.has(role)) return false;
+  if (OPERATIONAL_STAFF_HARD_DENIED_FAMILY_FEATURE_CODES.has(code)) return true;
+  if (
+    NON_TEACHER_STAFF_HARD_DENIED_FAMILY_FEATURE_CODES.has(code) &&
+    NON_TEACHER_OPERATIONAL_STAFF_ROLE_NAMES.has(role)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isPermissionMatrixCellLocked(
+  roleName: string | undefined,
+  featureCode: string | undefined,
+): boolean {
+  return (
+    isFeatureHardDeniedForFamilyRole(roleName, featureCode) ||
+    isFeatureHardDeniedForOperationalStaffRole(roleName, featureCode)
+  );
+}
+
 type RoleRow = {
   id: string;
   name: string;
@@ -152,12 +251,14 @@ export class RolesService {
     const roleMap = new Map(roles.map((r) => [r.id, r]));
     const featureMap = new Map(features.map((f) => [f.id, f]));
 
-    // Validate all role and feature IDs exist
-    for (const perm of input.permissions) {
-      if (!roleMap.has(perm.roleId)) {
+    // Coerce family × staff locks to none (do not trust client)
+    const permissionRows = input.permissions.map((perm) => {
+      const role = roleMap.get(perm.roleId);
+      const feature = featureMap.get(perm.featureId);
+      if (!role) {
         throw new BadRequestException(`Role ${perm.roleId} not found`);
       }
-      if (!featureMap.has(perm.featureId)) {
+      if (!feature) {
         throw new BadRequestException(`Feature ${perm.featureId} not found`);
       }
       if (!['none', 'view', 'edit'].includes(perm.permission)) {
@@ -165,16 +266,15 @@ export class RolesService {
           `Invalid permission value: ${perm.permission}. Must be 'none', 'view', or 'edit'`,
         );
       }
-    }
-
-    // Upsert permissions - use a single upsert with all permissions for better performance
-    const permissionRows = input.permissions.map((perm) => ({
-      role_id: perm.roleId,
-      feature_id: perm.featureId,
-      branch_id: branchId,
-      permission: perm.permission,
-      updated_at: new Date().toISOString(),
-    }));
+      const locked = isPermissionMatrixCellLocked(role.name, feature.code);
+      return {
+        role_id: perm.roleId,
+        feature_id: perm.featureId,
+        branch_id: branchId,
+        permission: locked ? 'none' : perm.permission,
+        updated_at: new Date().toISOString(),
+      };
+    });
 
     const { error: upsertError } = await supabase
       .from('role_permissions')

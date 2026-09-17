@@ -6,7 +6,18 @@ import { IconPlus, IconRefresh, IconAlertTriangle } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { AcademicYearForm, type AcademicYearFormValues } from '@/components/features/settings/AcademicYearForm';
 import { AcademicYearCard } from '@/components/features/settings/AcademicYearCard';
-import { useAcademicYearsList, useActivateAcademicYear, useCreateAcademicYear, useLockAcademicYear, useRolloverAcademicYear } from '@/hooks/useAcademicYears';
+import {
+  EditAcademicYearDatesModal,
+  type AcademicYearDatesFormValues,
+} from '@/components/features/settings/EditAcademicYearDatesModal';
+import {
+  useAcademicYearsList,
+  useActivateAcademicYear,
+  useCreateAcademicYear,
+  useLockAcademicYear,
+  useRolloverAcademicYear,
+  useUpdateAcademicYearDates,
+} from '@/hooks/useAcademicYears';
 import { useThemeColors, useNotificationColors } from '@/lib/hooks/use-theme-colors';
 import { notifications } from '@mantine/notifications';
 import type { AcademicYear } from '@/types/settings';
@@ -35,9 +46,12 @@ export default function AcademicYearsPage() {
   const createMutation = useCreateAcademicYear();
   const activateMutation = useActivateAcademicYear();
   const lockMutation = useLockAcademicYear();
+  const updateDatesMutation = useUpdateAcademicYearDates();
   const rolloverMutation = useRolloverAcademicYear();
   const [lockingYearId, setLockingYearId] = useState<string | null>(null);
   const [activatingYearId, setActivatingYearId] = useState<string | null>(null);
+  const [editDatesOpened, editDatesHandlers] = useDisclosure(false);
+  const [editDatesYear, setEditDatesYear] = useState<AcademicYear | null>(null);
 
   // Lock danger-zone modal
   const [lockModalOpened, lockModalHandlers] = useDisclosure(false);
@@ -69,6 +83,37 @@ export default function AcademicYearsPage() {
       notifications.show({ title: 'Error', message, color: notifyColors.error });
     } finally {
       setActivatingYearId(null);
+    }
+  };
+
+  const openEditDates = (year: AcademicYear) => {
+    setEditDatesYear(year);
+    editDatesHandlers.open();
+  };
+
+  const handleUpdateDates = async (values: AcademicYearDatesFormValues) => {
+    if (!editDatesYear) return;
+    try {
+      await updateDatesMutation.mutateAsync({
+        id: editDatesYear.id,
+        startDate: values.startDate,
+        endDate: values.endDate,
+      });
+      notifications.show({
+        title: t('academicYearDatesUpdatedTitle'),
+        message: t('academicYearDatesUpdatedMessage'),
+        color: notifyColors.success,
+      });
+      editDatesHandlers.close();
+      setEditDatesYear(null);
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      notifications.show({
+        title: t('academicYearDatesUpdateFailedTitle'),
+        message,
+        color: notifyColors.error,
+      });
+      throw error;
     }
   };
 
@@ -167,6 +212,7 @@ export default function AcademicYearsPage() {
                 year={year}
                 onActivate={handleActivate}
                 onLock={handleLock}
+                onEditDates={openEditDates}
                 onRollover={openRollover}
                 isActivating={activatingYearId === year.id}
                 isLocking={lockingYearId === year.id}
@@ -182,6 +228,17 @@ export default function AcademicYearsPage() {
         onClose={close}
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}
+      />
+
+      <EditAcademicYearDatesModal
+        opened={editDatesOpened}
+        year={editDatesYear}
+        onClose={() => {
+          editDatesHandlers.close();
+          setEditDatesYear(null);
+        }}
+        onSubmit={handleUpdateDates}
+        isSubmitting={updateDatesMutation.isPending}
       />
 
       {/* Lock Danger-Zone Modal */}

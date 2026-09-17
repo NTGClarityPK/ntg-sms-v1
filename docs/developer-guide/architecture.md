@@ -623,7 +623,11 @@ sequenceDiagram
 /api/v1/
 ├── auth/                    # Authentication
 │   ├── POST /login
-│   ├── POST /signup
+│   ├── POST /register
+│   ├── POST /signup/send-email-code
+│   ├── POST /signup/verify-email-code
+│   ├── GET  /check-domain
+│   ├── GET  /check-code
 │   ├── POST /refresh
 │   └── POST /reset-password
 │

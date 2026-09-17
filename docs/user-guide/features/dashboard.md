@@ -56,12 +56,14 @@ When a parent is **acting as a child**, Dashboard is hidden and child mode opens
 
 | Card / panel | Opens |
 | --- | --- |
-| **Children** | My Child |
+| **Children** (stat) | My Child page |
 | **Pending tasks** | Leaves |
 | **Upcoming events** | My Events |
 | **Unread** | Notifications |
 | **Pending requests** / **Tasks summary** | Leave and early departure items |
-| **My children** | Linked children summary |
+| **My children** (list) | Full **My Child** page — name, class, status, relationship; **not** in the sidebar |
+
+Use the header **child switcher** when you need to act as a child. **My Child** is for reviewing linked children only.
 
 ---
 

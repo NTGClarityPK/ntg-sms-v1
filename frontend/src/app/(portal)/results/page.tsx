@@ -320,13 +320,26 @@ export default function ResultsPage() {
   };
 
   const handlePublish = (card: ResultCard) => {
+    const layoutLabel =
+      downloadPdfVariant === 'minimal' ? t('pdfVariantMinimal') : t('pdfVariantModern');
     modals.openConfirmModal({
       title: t('publishConfirmTitle'),
-      children: <Text size="sm">{t('publishConfirmBody')}</Text>,
+      children: (
+        <Stack gap="xs">
+          <Text size="sm">{t('publishConfirmBody')}</Text>
+          <Text size="sm" fw={500}>
+            {t('publishConfirmLayout', { layout: layoutLabel })}
+          </Text>
+        </Stack>
+      ),
       labels: { confirm: t('publishConfirmButton'), cancel: t('cancel') },
       onConfirm: async () => {
         try {
-          await statusMutation.mutateAsync({ id: card.id, status: 'published' });
+          await statusMutation.mutateAsync({
+            id: card.id,
+            status: 'published',
+            pdfVariant: downloadPdfVariant,
+          });
         } catch {
           // handled
         }
@@ -570,6 +583,14 @@ export default function ResultsPage() {
                     <Text fw={600} size="sm">
                       {t('downloadPdfVariantLabel')}
                     </Text>
+                    <Alert
+                      id="results-pdf-layout-parent-notice"
+                      variant="light"
+                      color="blue"
+                      icon={<IconInfoCircle size={16} />}
+                    >
+                      <Text size="sm">{t('downloadPdfVariantParentNotice')}</Text>
+                    </Alert>
                     <Text size="xs" c="dimmed">
                       {t('downloadPdfVariantHint')}
                     </Text>

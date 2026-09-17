@@ -305,7 +305,9 @@ export default function LoginPage() {
 
     try {
       setShowBranchSelection(false);
-      await selectBranchAndGoDashboard(branchId, router, setPrimaryColor);
+      await selectBranchAndGoDashboard(branchId, router, setPrimaryColor, {
+        preferSettingsIfUninitialized: true,
+      });
     } catch (err: unknown) {
       console.error('Failed to select branch:', err);
       setError('Failed to select branch. Please try again.');

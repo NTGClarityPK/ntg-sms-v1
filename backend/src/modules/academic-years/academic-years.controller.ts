@@ -7,6 +7,7 @@ import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current
 import { AcademicYearsService } from './academic-years.service';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
 import { QueryAcademicYearsDto } from './dto/query-academic-years.dto';
+import { UpdateAcademicYearDatesDto } from './dto/update-academic-year-dates.dto';
 import { AcademicYearDto } from './dto/academic-year.dto';
 import { PromotionPlacementService } from '../promotion-placement/promotion-placement.service';
 import { RolloverAcademicYearDto } from './dto/rollover-academic-year.dto';
@@ -64,6 +65,22 @@ export class AcademicYearsController {
         userEmail: user.email,
       });
     }
+    return { data: updated };
+  }
+
+  @Patch(':id/dates')
+  async updateDates(
+    @Param('id') id: string,
+    @Body() body: UpdateAcademicYearDatesDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<{ data: AcademicYearDto }> {
+    const updated = await this.academicYearsService.updateDates(
+      id,
+      body,
+      branch.tenantId,
+      user.email,
+    );
     return { data: updated };
   }
 

@@ -59,6 +59,7 @@ export async function selectBranchAndGoDashboard(
   branchId: string,
   router: AppRouterForAuth,
   setPrimaryColor?: (color: string) => void,
+  options?: { preferSettingsIfUninitialized?: boolean },
 ): Promise<void> {
   await apiClient.post('/api/v1/auth/select-branch', { branchId });
   if (typeof window !== 'undefined') {
@@ -97,8 +98,25 @@ export async function selectBranchAndGoDashboard(
     }
   }
 
+  let destination = '/dashboard';
+  if (options?.preferSettingsIfUninitialized) {
+    try {
+      const statusRes = await apiClient.get<{
+        isInitialized?: boolean;
+        tabbedScreenReady?: boolean;
+      }>('/api/v1/settings-status/status');
+      const status = statusRes.data;
+      const isReady = status?.isInitialized ?? status?.tabbedScreenReady ?? true;
+      if (!isReady) {
+        destination = '/settings';
+      }
+    } catch {
+      // Non-blocking: fall back to dashboard if status check fails.
+    }
+  }
+
   // Navigate ASAP; do not block on cache-warming/theme.
-  pushPortalRoute(router, '/dashboard');
+  pushPortalRoute(router, destination);
 
   // Theme fetch is intentionally NOT done here (login critical path).
   // Portal layout/components handle tenant theme bootstrap.
@@ -206,7 +224,9 @@ export async function completeSessionRouting(params: CompleteSessionRoutingParam
     }
 
     if (userBranches.length === 1) {
-      await selectBranchAndGoDashboard(userBranches[0].id, router, setPrimaryColor);
+      await selectBranchAndGoDashboard(userBranches[0].id, router, setPrimaryColor, {
+        preferSettingsIfUninitialized: isSchoolAdmin,
+      });
       setLoading?.(false);
       return;
     }

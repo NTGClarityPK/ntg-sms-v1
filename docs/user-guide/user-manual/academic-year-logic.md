@@ -28,6 +28,12 @@ The **locked academic year** is finished and becomes **read-only**.
 - Staff can still **view** it (reports/history), but cannot **edit** records in that year.
 - Locking is intended to be **final**. There is no unlock tool in the portal — if a year was locked in error, contact NTG Alma support.
 
+### Editing dates (unlocked years only)
+
+You may change **start** and **end** dates on an unlocked academic year. The **year name cannot be changed**.
+
+Alma **blocks** the save if any public holidays, vacations, or attendance records for that year would fall outside the new date range. Fix or remove those records first, or choose a wider range.
+
 ### Fresh Start (New Year)
 
 When a new academic year is activated, the school should experience a **fresh operational start**:

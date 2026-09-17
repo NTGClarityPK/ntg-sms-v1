@@ -108,20 +108,49 @@ export function useSupportThreadRealtime(
               const row = payload.new as ReachMessageRow;
               const message = mapRow(row);
               onMessageRef.current(message);
+
+              queryClient.setQueriesData<SupportMessage[]>(
+                {
+                  predicate: (query) => {
+                    const key = query.queryKey;
+                    return (
+                      Array.isArray(key) &&
+                      key[0] === 'support-messages' &&
+                      key[1] === branchId &&
+                      key[2] === conversationId
+                    );
+                  },
+                },
+                (prev) => {
+                  const list = prev ?? [];
+                  if (list.some((m) => m.id === message.id)) return list;
+                  // Drop matching optimistic temp bubble for our own echoed send
+                  const withoutTemp =
+                    message.senderType === 'customer'
+                      ? list.filter(
+                          (m) =>
+                            !(
+                              m.id.startsWith('temp-') &&
+                              m.messageType === message.messageType &&
+                              m.content === message.content
+                            ),
+                        )
+                      : list;
+                  return [...withoutTemp, message];
+                },
+              );
+
               if (message.senderType === 'agent') {
                 void noteAgent.mutateAsync({
                   conversationId,
                   at: message.createdAt,
                 });
+                void queryClient.invalidateQueries({
+                  queryKey: ['support-unread', branchId],
+                });
               }
               void queryClient.invalidateQueries({
-                queryKey: ['support-messages', branchId, conversationId],
-              });
-              void queryClient.invalidateQueries({
                 queryKey: ['support-conversations', branchId],
-              });
-              void queryClient.invalidateQueries({
-                queryKey: ['support-unread', branchId],
               });
             },
           )

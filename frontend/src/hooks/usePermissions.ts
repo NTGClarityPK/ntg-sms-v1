@@ -52,8 +52,9 @@ export function usePermissions() {
       case 'timetable_management':
         return ['timetable_management', 'timetable'];
       case 'conflict_management':
-        // Backward-safe: historically /conflict-management was gated by timetable_management.
-        return ['conflict_management', 'timetable_management', 'timetable'];
+        // Dedicated matrix column only — do not inherit timetable_management
+        // (that leaked Schedule conflicts to parents with Timetable view).
+        return ['conflict_management'];
       case 'timetable_personal':
       case 'my_timetable':
       case 'my_schedule':
@@ -61,7 +62,9 @@ export function usePermissions() {
       case 'user_management':
         return ['user_management', 'staff'];
       case 'results':
-        return ['results', 'reports', 'assessment'];
+        // Dedicated Report Cards column — do not inherit reports/assessment
+        // (that showed staff Report Cards for parents with Assessment/Reports view).
+        return ['results'];
       default:
         return [featureCode];
     }

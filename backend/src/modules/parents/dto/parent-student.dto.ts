@@ -15,6 +15,12 @@ export class ParentStudentDto {
   studentStudentId?: string;
   parentPhone?: string; // Phone number from profiles table
   parentEmail?: string; // Email from auth.users
+  /** Enrolment flag from students.is_active */
+  isActive?: boolean;
+  /** Portal account status when the student has a linked user */
+  accountStatus?: string;
+  /** Class × section label for parent identity view */
+  classSectionLabel?: string;
 
   constructor(partial: Partial<ParentStudentDto>) {
     Object.assign(this, partial);

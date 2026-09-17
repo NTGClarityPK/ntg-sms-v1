@@ -1,5 +1,6 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import {
   Stack,
@@ -22,6 +23,7 @@ import {
   IconMessageCircle,
   IconCalendarEvent,
   IconTrendingUp,
+  IconChevronRight,
 } from '@tabler/icons-react';
 import {
   BarChart,
@@ -33,13 +35,14 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useParentAssociations } from '@/hooks/useParentAssociations';
 import { useLeaveRequests } from '@/hooks/useLeaveRequests';
 import { useEarlyDepartures } from '@/hooks/useEarlyDepartures';
 import { useUnreadCount } from '@/hooks/useNotifications';
 import { useMyEvents } from '@/hooks/api/useEvents';
+import { apiClient } from '@/lib/api-client';
 import { DashboardStatCard } from './DashboardStatCard';
 import type { User } from '@/types/auth';
+import type { ParentLinkedChild } from '@/types/parent-children';
 
 const linkPaperStyles = {
   root: {
@@ -60,6 +63,31 @@ function formatRoleName(roleName: string): string {
     .join(' ');
 }
 
+function relationshipLabel(
+  t: ReturnType<typeof useTranslations<'dashboard'>>,
+  relationship: ParentLinkedChild['relationship'],
+): string {
+  if (relationship === 'father') return t('relationshipFather');
+  if (relationship === 'mother') return t('relationshipMother');
+  return t('relationshipGuardian');
+}
+
+function childStatusBadge(
+  t: ReturnType<typeof useTranslations<'dashboard'>>,
+  child: ParentLinkedChild,
+): { label: string; color: string } {
+  if (child.isActive === false) {
+    return { label: t('childStatusInactive'), color: 'gray' };
+  }
+  if (child.accountStatus === 'pending_verification') {
+    return { label: t('childStatusPending'), color: 'yellow' };
+  }
+  if (child.accountStatus === 'link_expired') {
+    return { label: t('childStatusLinkExpired'), color: 'orange' };
+  }
+  return { label: t('childStatusActive'), color: 'green' };
+}
+
 interface ParentDashboardOverviewProps {
   user: User | undefined;
 }
@@ -67,12 +95,24 @@ interface ParentDashboardOverviewProps {
 export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) {
   const t = useTranslations('dashboard');
   const colors = useThemeColors();
-  const { data: associationsResponse } = useParentAssociations({
-    parentId: user?.id,
-    limit: 100,
+  const userId = user?.id;
+
+  const childrenQuery = useQuery({
+    queryKey: ['my-children', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const response = await apiClient.get<ParentLinkedChild[]>(
+        `/api/v1/parents/${userId}/children`,
+      );
+      return response.data || [];
+    },
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
   });
-  const associations = associationsResponse?.data ?? [];
-  const childrenCount = new Set(associations.map((a) => a.studentId)).size;
+
+  const children = Array.isArray(childrenQuery.data) ? childrenQuery.data : [];
+  const childrenCount = children.length;
+
   const leavePendingQuery = useLeaveRequests({ status: 'pending', page: 1, limit: 1 });
   const earlyPendingQuery = useEarlyDepartures({ status: 'pending', page: 1, limit: 1 });
   const pendingLeaves = leavePendingQuery.data?.meta?.total ?? leavePendingQuery.data?.data?.length ?? 0;
@@ -86,6 +126,7 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
 
   const loading =
     leavePendingQuery.isLoading || earlyPendingQuery.isLoading;
+  const childrenLoading = childrenQuery.isLoading;
 
   const roleLabel = user?.roles?.[0]?.roleName
     ? formatRoleName(user.roles[0].roleName)
@@ -272,31 +313,65 @@ export function ParentDashboardOverview({ user }: ParentDashboardOverviewProps) 
             id="dashboard-panel-my-children"
             p="md"
             withBorder
+            h="100%"
             styles={linkPaperStyles}
           >
             <Stack gap="md">
-              <Group gap="xs">
-                <IconUsers size={24} style={{ color: colors.primary }} />
-                <Title order={3}>My children</Title>
+              <Group justify="space-between" align="center" wrap="nowrap">
+                <Group gap="xs" wrap="nowrap">
+                  <IconUsers size={24} style={{ color: colors.primary }} />
+                  <Title order={3}>{t('myChildrenPanelTitle')}</Title>
+                </Group>
+                <Group gap={4} wrap="nowrap">
+                  <Text size="xs" c="dimmed">
+                    {t('myChildrenPanelViewAll')}
+                  </Text>
+                  <IconChevronRight size={16} style={{ color: colors.primary }} />
+                </Group>
               </Group>
-              {associations.length === 0 ? (
+
+              {childrenLoading ? (
+                <Stack gap="xs">
+                  <Skeleton height={72} radius="sm" />
+                  <Skeleton height={72} radius="sm" />
+                </Stack>
+              ) : children.length === 0 ? (
                 <Text c="dimmed" size="sm">
-                  No children linked
+                  {t('noChildrenLinked')}
                 </Text>
               ) : (
                 <Stack gap="xs">
-                  {[...new Map(associations.map((a) => [a.studentId, a])).values()]
-                    .slice(0, 5)
-                    .map((a) => (
-                      <Card key={a.id} p="sm" withBorder>
-                        <Text fw={500} size="sm">
-                          {a.studentName ?? a.studentStudentId ?? 'Student'}
-                        </Text>
-                        <Badge variant="light" size="xs" mt="xs">
-                          {a.relationship}
-                        </Badge>
+                  {children.slice(0, 5).map((child) => {
+                    const status = childStatusBadge(t, child);
+                    return (
+                      <Card key={child.id} p="sm" withBorder>
+                        <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm">
+                          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+                            <Text fw={600} size="sm" lineClamp={1}>
+                              {child.studentName || t('unnamedStudent')}
+                            </Text>
+                            <Text size="xs" c="dimmed" lineClamp={1}>
+                              {child.classSectionLabel
+                                ? child.classSectionLabel
+                                : `${t('studentIdLabel')}: ${child.studentStudentId || child.studentId}`}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                              {relationshipLabel(t, child.relationship)}
+                              {child.isPrimary ? ` · ${t('primaryContact')}` : ''}
+                            </Text>
+                          </Stack>
+                          <Badge variant="light" color={status.color} style={{ flexShrink: 0 }}>
+                            {status.label}
+                          </Badge>
+                        </Group>
                       </Card>
-                    ))}
+                    );
+                  })}
+                  {children.length > 5 ? (
+                    <Text size="xs" c="dimmed">
+                      {t('myChildrenPanelMore', { count: children.length - 5 })}
+                    </Text>
+                  ) : null}
                 </Stack>
               )}
             </Stack>

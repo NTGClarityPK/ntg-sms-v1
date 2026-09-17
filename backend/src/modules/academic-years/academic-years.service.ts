@@ -790,6 +790,130 @@ export class AcademicYearsService {
 
     return mapAcademicYear(newRow);
   }
+
+  /**
+   * Update start/end dates only. Name stays immutable.
+   * Rejects locked years and any range that would leave holidays, vacations, or attendance outside the window.
+   */
+  async updateDates(
+    id: string,
+    input: { startDate: string; endDate: string },
+    tenantId: string | null,
+    userEmail: string,
+  ): Promise<AcademicYearDto> {
+    if (input.startDate >= input.endDate) {
+      throw new BadRequestException('Start date must be before end date');
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
+
+    const { data: existing, error: existingError } = await supabase
+      .from('academic_years')
+      .select('*')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    throwIfDbError(existingError);
+    if (!existing) throw new NotFoundException('Academic year not found');
+
+    const row = existing as AcademicYearRow;
+    if (row.is_locked) {
+      throw new BadRequestException('Locked academic years cannot be edited');
+    }
+
+    if (row.start_date === input.startDate && row.end_date === input.endDate) {
+      return mapAcademicYear(row);
+    }
+
+    const [
+      { count: holidayOutsideCount, error: holidayError },
+      { count: vacationOutsideCount, error: vacationError },
+      { count: attendanceOutsideCount, error: attendanceError },
+      { data: holidaySamples, error: holidaySampleError },
+      { data: vacationSamples, error: vacationSampleError },
+    ] = await Promise.all([
+      supabase
+        .from('public_holidays')
+        .select('id', { count: 'exact', head: true })
+        .eq('academic_year_id', id)
+        .or(`start_date.lt.${input.startDate},end_date.gt.${input.endDate}`),
+      supabase
+        .from('vacations')
+        .select('id', { count: 'exact', head: true })
+        .eq('academic_year_id', id)
+        .or(`start_date.lt.${input.startDate},end_date.gt.${input.endDate}`),
+      supabase
+        .from('attendance')
+        .select('id', { count: 'exact', head: true })
+        .eq('academic_year_id', id)
+        .or(`date.lt.${input.startDate},date.gt.${input.endDate}`),
+      supabase
+        .from('public_holidays')
+        .select('name')
+        .eq('academic_year_id', id)
+        .or(`start_date.lt.${input.startDate},end_date.gt.${input.endDate}`)
+        .limit(3),
+      supabase
+        .from('vacations')
+        .select('name')
+        .eq('academic_year_id', id)
+        .or(`start_date.lt.${input.startDate},end_date.gt.${input.endDate}`)
+        .limit(3),
+    ]);
+
+    throwIfDbError(holidayError);
+    throwIfDbError(vacationError);
+    throwIfDbError(attendanceError);
+    throwIfDbError(holidaySampleError);
+    throwIfDbError(vacationSampleError);
+
+    const holidayCount = holidayOutsideCount ?? 0;
+    const vacationCount = vacationOutsideCount ?? 0;
+    const attendanceCount = attendanceOutsideCount ?? 0;
+
+    if (holidayCount > 0 || vacationCount > 0 || attendanceCount > 0) {
+      const parts: string[] = [];
+      if (holidayCount > 0) {
+        const names = (holidaySamples ?? [])
+          .map((h) => (h as { name?: string }).name)
+          .filter(Boolean)
+          .join(', ');
+        parts.push(
+          `${holidayCount} public holiday(s)${names ? ` (${names}${holidayCount > 3 ? '…' : ''})` : ''}`,
+        );
+      }
+      if (vacationCount > 0) {
+        const names = (vacationSamples ?? [])
+          .map((v) => (v as { name?: string }).name)
+          .filter(Boolean)
+          .join(', ');
+        parts.push(
+          `${vacationCount} vacation(s)${names ? ` (${names}${vacationCount > 3 ? '…' : ''})` : ''}`,
+        );
+      }
+      if (attendanceCount > 0) {
+        parts.push(`${attendanceCount} attendance record(s)`);
+      }
+      throw new BadRequestException(
+        `Cannot change dates: existing ${parts.join('; ')} fall outside ${input.startDate} to ${input.endDate}. Move or remove those records first, or choose a wider date range.`,
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('academic_years')
+      .update({
+        start_date: input.startDate,
+        end_date: input.endDate,
+        updated_by: username,
+      })
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .select('*')
+      .single();
+    throwIfDbError(error);
+    return mapAcademicYear(data as AcademicYearRow);
+  }
 }
 
 

@@ -74,8 +74,11 @@ Examples (UI spelling):
 
 Special rules:
 
-- **Student** row: **Assessment** cell is disabled — students use **My Assessments**
-- **Student leave requests**: class-section picker on the same tab limits which classes students may raise leaves for
+- **Parent** and **Student** rows: staff-only features are **disabled** (locked to None).
+- **Class Teacher**, **Subject Teacher**, **Academic Coordinator**, **Admin Assistant**, and **Guidance Counselor** rows: family-personal features (**My Assessments**, personal timetable/events where applicable) are **disabled**. **School Admin** and **Principal** are exempt from this staff-side lock.
+- Saving permissions clears any old grants. The sidebar also hides cross-audience tabs even if a legacy grant remains.
+- **Student** leave requests: class picker on the same tab limits which classes students may raise leaves for
+- Family personal tabs stay available where intended (**My Assessments**, **My Certificates**, **My Events**, etc.)
 
 ---
 
@@ -87,7 +90,8 @@ Parents switch child session from the **header child switcher**, not from **My C
 
 | View | Path |
 | --- | --- |
-| My Child | `/my-children` |
+| My Child | `/my-children` (from Dashboard; not in sidebar) |
+| Report Cards (parent) | `/my-report-cards` |
 | My Assessments | `/my-assessments` |
 | My Timetable | `/my-timetable` |
 | My Events | `/my-events` |
