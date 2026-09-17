@@ -15,15 +15,14 @@ Settings uses **two rows of tabs**:
 
 | Category | Sections you will see |
 | --- | --- |
-| **School setup** | **Business Info**, **Communication**, **General** |
+| **School setup** | **Business Info**, **Branches** *, **Communication**, **General** |
 | **Academic** | **Academic**, **Schedule**, **Promotion & Placement** |
 | **Operations** | **Inventory** \*\*, **Integrations**, **Data export** * |
 | **Finance** | **Fee settings** \*\* |
 | **Appearance** | **Theme**, **Stats** * |
 | **Access control** | **Permissions** |
 
-\* **Data export** — school admin only. See [💾 Data Export](data-export.md).  
-\* **Stats** — school admin only (password and link for public statistics).  
+\* **Branches**, **Data export**, and **Stats** — school admin only. **Branches** lets you add campuses (subject to your plan limit). See [💾 Data Export](data-export.md).  
 \*\* **Inventory** and **Fee settings** only appear when those modules are on your plan. Library categories and behavioural assessment under **General** are also omitted when not on the plan.
 
 Certificate branding (logos and layout for certificates) lives on [🏆 Certificates](certificates.md) → **Settings**, not under this Settings menu.
@@ -81,6 +80,17 @@ Open **Sidebar → Settings** and configure the sections below in a sensible ord
 Your school’s identity on this campus: name, code, domain, contact email and phone, timezone, fiscal year start, VAT, and **Default language** (English UK, English US, or Arabic).
 
 People who have not chosen a personal language follow this default after login. See [🔐 Authentication & Access](authentication-and-access.md).
+
+---
+
+## 🏢 Branches
+
+School admins can open **School setup → Branches** to manage campuses.
+
+- **Add branch** opens a form for name (required) plus optional code, address, phone, and email.
+- The table lists every campus for the school, with a **Current** badge on the campus you are viewing.
+- New campuses start unset — switch to them and use the setup wizard or bulk setup (or **Copy settings from other branch** once you have more than one).
+- Your subscription **campus limit** still applies; when the limit is reached, Add branch is disabled.
 
 ---
 

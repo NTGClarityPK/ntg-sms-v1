@@ -29,6 +29,7 @@ import { notifications } from '@mantine/notifications';
 // Import components for each tab
 import { PermissionMatrix } from '@/components/features/settings/PermissionMatrix';
 import { RoleAccessSummary } from '@/components/features/settings/RoleAccessSummary';
+import { BranchesTabContent } from '@/components/features/settings/BranchesTabContent';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRoles, useFeatures } from '@/hooks/useRoles';
 
@@ -418,6 +419,12 @@ export default function SettingsPage() {
               <Tabs.Panel value="business-information" pt="md" px="md" pb="md">
                 <BusinessInformationTabContent />
               </Tabs.Panel>
+
+              {isSchoolAdmin && (
+                <Tabs.Panel value="branches" pt="md" px="md" pb="md">
+                  <BranchesTabContent />
+                </Tabs.Panel>
+              )}
 
               {/* Academic Years Tab */}
               <Tabs.Panel value="academic-years" pt="md" px="md" pb="md">

@@ -2,6 +2,7 @@ import {
   IconAdjustments,
   IconArrowUpRight,
   IconBuilding,
+  IconBuildingCommunity,
   IconCash,
   IconChartBar,
   IconClock,
@@ -17,6 +18,7 @@ import {
 
 export type SettingsSectionId =
   | 'business-information'
+  | 'branches'
   | 'academic-years'
   | 'permissions'
   | 'schedule'
@@ -32,6 +34,7 @@ export type SettingsSectionId =
 
 type SettingsLabelKey =
   | 'tabBusinessInformation'
+  | 'tabBranches'
   | 'tabAcademic'
   | 'tabPermissions'
   | 'tabSchedule'
@@ -89,6 +92,7 @@ const SETTINGS_CATEGORIES: SettingsNavCategory[] = [
     icon: IconBuilding,
     items: [
       { value: 'business-information', labelKey: 'tabBusinessInformation', icon: IconBuilding, gate: 'always' },
+      { value: 'branches', labelKey: 'tabBranches', icon: IconBuildingCommunity, gate: 'schoolAdmin' },
       { value: 'communication', labelKey: 'tabCommunication', icon: IconMessage, gate: 'always' },
       { value: 'general', labelKey: 'tabGeneral', icon: IconAdjustments, gate: 'always' },
     ],

@@ -313,10 +313,34 @@ export class BranchesService {
     throwIfDbError(error);
   }
 
-  async create(input: CreateBranchDto, userEmail: string): Promise<BranchDto> {
+  async create(
+    input: CreateBranchDto,
+    access: BranchAccessContext,
+  ): Promise<BranchDto> {
     const supabase = this.supabaseConfig.getClient();
-    const nameTranslations = input.name_translations ?? { en: input.name, ar: input.nameAr ?? input.name };
+    const nameTranslations = input.name_translations ?? {
+      en: input.name,
+      ar: input.nameAr ?? input.name,
+    };
     const requestedCode = (input.code ?? '').trim();
+
+    const tenantId = await this.resolveTenantIdForUser(access.userId);
+    if (!tenantId) {
+      throw new BadRequestException('Unable to determine school for this account');
+    }
+
+    const { count: existingCount, error: countError } = await supabase
+      .from('branches')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId);
+    throwIfDbError(countError);
+
+    await this.subscriptionService.assertWithinLimit(
+      tenantId,
+      'branches',
+      (existingCount ?? 0) + 1,
+      access.roles,
+    );
 
     let lastError: PostgrestError | null = null;
     let row: BranchRow | null = null;
@@ -328,6 +352,7 @@ export class BranchesService {
       const { data, error } = await supabase
         .from('branches')
         .insert({
+          tenant_id: tenantId,
           name: input.name,
           name_ar: input.nameAr ?? null,
           name_translations: nameTranslations,
@@ -337,6 +362,8 @@ export class BranchesService {
           email: input.email ?? null,
           storage_quota_gb: input.storageQuotaGb ?? 100,
           is_active: input.isActive ?? true,
+          created_by: access.email || null,
+          updated_by: access.email || null,
         })
         .select('*')
         .single();
@@ -365,7 +392,104 @@ export class BranchesService {
     if (!row) {
       throw new BadRequestException('Failed to create branch');
     }
+
+    try {
+      await this.grantSchoolAdminsAccessToBranch(tenantId, row.id, access);
+    } catch (grantError) {
+      await supabase.from('branches').delete().eq('id', row.id);
+      throw grantError;
+    }
+
     return mapBranch(row, 'en-GB');
+  }
+
+  private async resolveTenantIdForUser(userId: string): Promise<string | null> {
+    const supabase = this.supabaseConfig.getClient();
+    const { data: links, error } = await supabase
+      .from('user_branches')
+      .select('branch_id')
+      .eq('user_id', userId)
+      .limit(20);
+    throwIfDbError(error);
+    const branchIds = (links ?? []).map((l) => l.branch_id).filter(Boolean);
+    if (branchIds.length === 0) return null;
+
+    const { data: branch, error: branchError } = await supabase
+      .from('branches')
+      .select('tenant_id')
+      .in('id', branchIds)
+      .not('tenant_id', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    throwIfDbError(branchError);
+    return (branch?.tenant_id as string | null) ?? null;
+  }
+
+  private async grantSchoolAdminsAccessToBranch(
+    tenantId: string,
+    newBranchId: string,
+    access: BranchAccessContext,
+  ): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+
+    const { data: schoolAdminRole, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', 'school_admin')
+      .maybeSingle();
+    throwIfDbError(roleError);
+    if (!schoolAdminRole?.id) {
+      throw new BadRequestException('School Admin role not found');
+    }
+
+    const { data: tenantBranches, error: tenantBranchesError } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('tenant_id', tenantId);
+    throwIfDbError(tenantBranchesError);
+    const tenantBranchIds = (tenantBranches ?? []).map((b) => b.id);
+    if (tenantBranchIds.length === 0) {
+      throw new BadRequestException('No campuses found for this school');
+    }
+
+    const { data: adminRoles, error: adminRolesError } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role_id', schoolAdminRole.id)
+      .in('branch_id', tenantBranchIds);
+    throwIfDbError(adminRolesError);
+
+    const adminUserIds = Array.from(
+      new Set(
+        [
+          access.userId,
+          ...(adminRoles ?? []).map((r) => r.user_id as string),
+        ].filter(Boolean),
+      ),
+    );
+
+    for (const userId of adminUserIds) {
+      const { error: ubError } = await supabase.from('user_branches').upsert(
+        {
+          user_id: userId,
+          branch_id: newBranchId,
+          is_primary: false,
+          created_by: access.email || null,
+        },
+        { onConflict: 'user_id,branch_id', ignoreDuplicates: true },
+      );
+      throwIfDbError(ubError);
+
+      const { error: urError } = await supabase.from('user_roles').upsert(
+        {
+          user_id: userId,
+          role_id: schoolAdminRole.id,
+          branch_id: newBranchId,
+        },
+        { onConflict: 'user_id,role_id,branch_id', ignoreDuplicates: true },
+      );
+      throwIfDbError(urError);
+    }
   }
 
   async update(
@@ -457,9 +581,28 @@ export class BranchesService {
     tenantId: string | null,
     userId: string,
     language: string = SYSTEM_DEFAULT_LOCALE,
+    access?: { roles?: string[] },
   ): Promise<{ data: BranchDto[] }> {
     const supabase = this.supabaseConfig.getClient();
     const resolvedLanguage = resolveContentLanguage(language);
+
+    if (!tenantId) {
+      return { data: [] };
+    }
+
+    const isSchoolAdmin = (access?.roles ?? []).includes('school_admin');
+
+    if (isSchoolAdmin) {
+      const { data: branches, error: branchesError } = await supabase
+        .from('branches')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('name', { ascending: true });
+      throwIfDbError(branchesError);
+      return {
+        data: ((branches as BranchRow[]) ?? []).map((row) => mapBranch(row, resolvedLanguage)),
+      };
+    }
 
     const { data: userBranches, error: userBranchesError } = await supabase
       .from('user_branches')

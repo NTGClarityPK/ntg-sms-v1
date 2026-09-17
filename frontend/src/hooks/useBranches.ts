@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale } from 'next-intl';
 import { apiClient } from '@/lib/api-client';
-import type { Branch } from '@/types/auth';
 
 const branchesKeys = {
   all: ['branches'] as const,
@@ -40,7 +39,7 @@ export function useTenantBranches() {
   return useQuery({
     queryKey: branchesKeys.byTenant(locale),
     queryFn: async () => {
-      const res = await apiClient.get<Branch[]>('/api/v1/branches/by-tenant', {
+      const res = await apiClient.get<BranchDetails[]>('/api/v1/branches/by-tenant', {
         params: { language: locale },
       });
       return res;
@@ -84,6 +83,31 @@ export function useUpdateBranch() {
 export interface UpdatePublicStatsPayload {
   enabled: boolean;
   password?: string | null;
+}
+
+export interface CreateBranchPayload {
+  name: string;
+  code?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+}
+
+export function useCreateBranch() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: CreateBranchPayload) => {
+      const res = await apiClient.post<BranchDetails>('/api/v1/branches', payload);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: branchesKeys.all });
+      await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+      await qc.invalidateQueries({ queryKey: ['subscription'] });
+      await qc.invalidateQueries({ queryKey: ['settings-status'] });
+    },
+  });
 }
 
 export function useUpdatePublicStats() {

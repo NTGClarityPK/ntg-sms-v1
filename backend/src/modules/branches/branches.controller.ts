@@ -35,7 +35,7 @@ export class BranchesController {
 
   @Get('by-tenant')
   async listByTenant(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: CurrentUserPayload,
     @Query('language') language?: 'en' | 'en-US' | 'en-GB' | 'ar',
   ): Promise<{ data: BranchDto[] }> {
     const userData = await this.authService.getCurrentUser(user.id);
@@ -43,7 +43,9 @@ export class BranchesController {
 
     const tenantId = branches.length > 0 ? branches[0].tenantId : null;
 
-    return this.branchesService.listByTenant(tenantId, user.id, language ?? 'en-GB');
+    return this.branchesService.listByTenant(tenantId, user.id, language ?? 'en-GB', {
+      roles: user.roles,
+    });
   }
 
   @Put(':id/public-stats')
@@ -100,7 +102,17 @@ export class BranchesController {
     @Body() body: CreateBranchDto,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<{ data: BranchDto }> {
-    const created = await this.branchesService.create(body, user.email);
+    const roleNames = user.roles || [];
+    const canCreate =
+      roleNames.includes('school_admin') || roleNames.includes('tenant_owner');
+    if (!canCreate) {
+      throw new ForbiddenException('Only school admins can create campuses');
+    }
+    const created = await this.branchesService.create(body, {
+      userId: user.id,
+      email: user.email ?? '',
+      roles: roleNames,
+    });
     return { data: created };
   }
 
