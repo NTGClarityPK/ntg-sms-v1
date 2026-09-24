@@ -32,10 +32,12 @@ Configure under **Settings → Permissions** — tabs **Assign Access** and **Ro
 
 | Badge | Meaning |
 | --- | --- |
-| **Active** | Can sign in |
-| **Inactive** | Deactivated |
-| **Pending verification** | Invited, not finished setup |
-| **Link expired** | Invitation expired — use **Resend invitation** |
+| **Active** | Included in school operations (and can sign in once setup is done) |
+| **Inactive** | Deactivated by an administrator — hidden from operational pickers |
+| **Pending verification** | Invitation sent; **cannot sign in** until password setup. Staff remain usable in mappings and lists while pending |
+| **Link expired** | Setup link expired — use **Resend invitation**. Staff stay in the system unless deactivated |
+
+**System active vs login ready:** New staff from create/bulk import are system-active immediately. Portal login stays blocked until they complete the invitation link.
 
 ### Login identifiers
 
@@ -57,7 +59,7 @@ Create user, bulk import, edit roles, activate/deactivate, resend invitation, vi
 2. Fill rows:
    - **Full Name** (required)
    - **Roles** — use exact portal role names from the Allowed Roles sheet (comma-separated for multiple). After upload, fix roles with the **Roles** multiselect in the preview (avoids typos such as “Sub Teacher”)
-   - **Staff:** **Username** + **Invitation Email**
+   - **Staff:** **Username** (required) + **Invitation Email** (optional — blank uses the school login email)
    - **Parents:** **Email** (login and invitation)
 3. Upload the file, edit the preview if needed, then **Validate**
 4. **Import** creates accounts and sends invitation emails

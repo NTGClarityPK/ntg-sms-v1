@@ -211,6 +211,28 @@ export class AuthService {
       );
     }
 
+    // Staff/parent invitees are system-active before password setup. Block portal login while
+    // they still have an unused invitation (pending or expired).
+    {
+      const { data: pendingInvites, error: pendingInviteError } = await supabase
+        .from('invitations')
+        .select('id, expires_at')
+        .eq('user_id', userId)
+        .in('invitation_type', ['staff', 'parent_account'])
+        .is('used_at', null)
+        .limit(1);
+      if (pendingInviteError) {
+        throw new BadRequestException(
+          `Failed to verify invitation status: ${pendingInviteError.message}`,
+        );
+      }
+      if ((pendingInvites ?? []).length > 0) {
+        throw new ForbiddenException(
+          'Your account setup is not complete. Please use the invitation link from your school to set a password before signing in.',
+        );
+      }
+    }
+
     const { data: userBranchesData, error: userBranchesError } = userBranchesResult;
     if (userBranchesError) {
       if (isSupabaseConnectivityError(userBranchesError)) {
@@ -313,17 +335,32 @@ export class AuthService {
     if (isStudentUser) {
       const { data: studentRows, error: studentRowsError } = await supabase
         .from('students')
-        .select('is_active')
+        .select('is_active, account_status')
         .eq('user_id', userId);
 
       if (studentRowsError) {
         throw new BadRequestException(`Failed to verify student status: ${studentRowsError.message}`);
       }
 
-      const rows = (studentRows || []) as Array<{ is_active: boolean }>;
+      const rows = (studentRows || []) as Array<{
+        is_active: boolean;
+        account_status?: string | null;
+      }>;
       if (rows.length > 0 && rows.some((row) => !row.is_active)) {
         throw new ForbiddenException(
           'Your account has been marked as inactive by an administrator. Please contact your school if you need help.',
+        );
+      }
+      if (
+        rows.length > 0 &&
+        rows.some(
+          (row) =>
+            row.account_status === 'pending_verification' ||
+            row.account_status === 'link_expired',
+        )
+      ) {
+        throw new ForbiddenException(
+          'Your account setup is not complete. Please use the invitation link from your school to set a password before signing in.',
         );
       }
     }

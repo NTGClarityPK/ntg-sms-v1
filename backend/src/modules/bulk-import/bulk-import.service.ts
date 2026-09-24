@@ -132,6 +132,7 @@ const USER_COLUMN_MAP: Record<string, string[]> = {
     'invitation_email',
     'Invitation Email',
     'Invitation Email (staff)',
+    'Invitation Email (staff, optional)',
     'Correspondence Email',
     'correspondence_email',
     'Invite Email',
@@ -237,6 +238,13 @@ const COLUMN_MAP: Record<string, string[]> = {
     'mobile',
     'Mobile',
   ],
+  address: [
+    'address',
+    'Address',
+    'Address (optional)',
+    'home_address',
+    'Home Address',
+  ],
   date_of_birth: [
     'date_of_birth',
     'Date of Birth',
@@ -259,6 +267,39 @@ const COLUMN_MAP: Record<string, string[]> = {
     'student_number',
     'Roll Number',
     'id',
+  ],
+  blood_group: [
+    'blood_group',
+    'Blood Group',
+    'Blood Group (optional)',
+    'blood group',
+    'BloodType',
+    'blood_type',
+  ],
+  medical_notes: [
+    'medical_notes',
+    'Medical Notes',
+    'Medical Notes (optional)',
+    'medical notes',
+    'Medical Notes / Allergies',
+    'allergies',
+  ],
+  admission_date: [
+    'admission_date',
+    'Admission Date',
+    'Admission Date (optional)',
+    'admission date',
+    'Date of Admission',
+  ],
+  google_account_email: [
+    'google_account_email',
+    'Google Account Email',
+    'Google Account Email (optional)',
+    'Google Classroom Email',
+    'Google Classroom Email (optional)',
+    'gmail',
+    'Gmail',
+    'Gmail (optional)',
   ],
   class_name_or_id: [
     'class_name',
@@ -1243,7 +1284,7 @@ export class BulkImportService {
           if (typeof val === 'string') {
             val = normalizeSpreadsheetString(val);
           }
-          if (targetField === 'date_of_birth') {
+          if (targetField === 'date_of_birth' || targetField === 'admission_date') {
             val = this.normalizeDate(val) ?? undefined;
           }
           if (val !== undefined && val !== '') {
@@ -1440,8 +1481,13 @@ export class BulkImportService {
               classId: placement.classId ?? undefined,
               sectionId: placement.sectionId ?? undefined,
               phone: row.phone,
+              address: row.address,
               dateOfBirth: row.date_of_birth,
               gender: row.gender,
+              bloodGroup: row.blood_group,
+              medicalNotes: row.medical_notes,
+              admissionDate: row.admission_date,
+              googleAccountEmail: row.google_account_email,
               academicYearId,
               subjectTemplateId: placement.subjectTemplateId ?? undefined,
               invitationType: row.invitation_type,
@@ -1688,9 +1734,7 @@ export class BulkImportService {
       if (!dto.username?.trim()) {
         errors.push('Username is required for staff users.');
       }
-      if (!dto.invitation_email?.trim()) {
-        errors.push('Invitation email is required for staff users.');
-      }
+      // Invitation email is optional for staff — blank defaults to school login email on create.
     }
 
     return { roleIds, roleLabels, errors, userType };

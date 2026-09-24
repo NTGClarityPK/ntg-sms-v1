@@ -41,9 +41,14 @@ export interface BulkStudentRowDto {
   create_parent_account: boolean;
   parent_relationship?: 'father' | 'mother' | 'guardian';
   phone?: string;
+  address?: string;
   date_of_birth?: string;
   gender: string;
   student_id?: string;
+  blood_group?: string;
+  medical_notes?: string;
+  admission_date?: string;
+  google_account_email?: string;
   class_name_or_id?: string;
   section_name_or_id?: string;
   subject_template_name_or_id?: string;

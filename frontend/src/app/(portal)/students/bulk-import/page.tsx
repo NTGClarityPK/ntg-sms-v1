@@ -241,7 +241,16 @@ export default function BulkImportStudentsPage() {
         example: 'parent.personal@example.com',
       },
       { key: 'phone', label: 'Phone (optional)', example: '+9647701234567' },
+      { key: 'address', label: 'Address (optional)', example: 'Baghdad' },
       { key: 'date_of_birth', label: 'Date of Birth (optional)', example: '2010-05-15' },
+      { key: 'blood_group', label: 'Blood Group (optional)', example: 'O+' },
+      { key: 'medical_notes', label: 'Medical Notes (optional)', example: 'None' },
+      { key: 'admission_date', label: 'Admission Date (optional)', example: '2025-09-01' },
+      {
+        key: 'google_account_email',
+        label: 'Google Account Email (optional)',
+        example: 'ahmed.ali@gmail.com',
+      },
       { key: 'class_section', label: 'Class-Section (optional)', example: 'Grade 1 - A' },
       {
         key: 'subject_template_name_or_id',

@@ -53,7 +53,8 @@ export class InvitationsService {
   private readonly expireUnusedInvitationsEnabled: boolean;
 
   constructor(
-    private readonly supabaseConfig: SupabaseConfig,    private readonly mailjetService: MailjetService,
+    private readonly supabaseConfig: SupabaseConfig,
+    private readonly mailjetService: MailjetService,
     private readonly configService: ConfigService,
   ) {
     const configured = Number(this.configService.get<string>('INVITATIONS_RATE_LIMIT_PER_MINUTE'));
@@ -504,29 +505,38 @@ export class InvitationsService {
   }
 
   private async purgeExpiredInvitationUser(supabase: SupabaseClient, userId: string): Promise<void> {
-    const { error: stuErr } = await supabase
+    const { data: expiredStudents, error: stuErr } = await supabase
       .from('students')
       .update({
         user_id: null,
         account_status: 'link_expired',
-        is_active: false,
+        // Do not clear is_active — system/roster activity is independent of login setup.
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', userId)
-      .eq('account_status', 'pending_verification');
+      .eq('account_status', 'pending_verification')
+      .select('id');
     if (stuErr) throw new BadRequestException(stuErr.message);
 
-    await supabase.from('parent_students').delete().eq('parent_user_id', userId);
-    await supabase.from('user_roles').delete().eq('user_id', userId);
-    await supabase.from('user_branches').delete().eq('user_id', userId);
-    await supabase.from('profiles').delete().eq('id', userId);
+    // Student path: remove login identity; keep the student roster row (link_expired).
+    if ((expiredStudents ?? []).length > 0) {
+      await supabase.from('parent_students').delete().eq('parent_user_id', userId);
+      await supabase.from('user_roles').delete().eq('user_id', userId);
+      await supabase.from('user_branches').delete().eq('user_id', userId);
+      await supabase.from('profiles').delete().eq('id', userId);
 
-    const { error: delAuthErr } = await supabase.auth.admin.deleteUser(userId);
-    if (delAuthErr && !delAuthErr.message.toLowerCase().includes('not found')) {
-      throw new BadRequestException(delAuthErr.message);
+      const { error: delAuthErr } = await supabase.auth.admin.deleteUser(userId);
+      if (delAuthErr && !delAuthErr.message.toLowerCase().includes('not found')) {
+        throw new BadRequestException(delAuthErr.message);
+      }
+
+      await supabase.from('invitations').delete().eq('user_id', userId).is('used_at', null);
+      return;
     }
 
-    await supabase.from('invitations').delete().eq('user_id', userId).is('used_at', null);
+    // Staff / parent path: keep the person system-active (profile, roles, staff row).
+    // Leave the unused expired invitation so UI shows link_expired; login stays blocked
+    // until they are re-invited and complete setup. Do not delete auth/profile here.
   }
 
   async resendInvitation(input: {

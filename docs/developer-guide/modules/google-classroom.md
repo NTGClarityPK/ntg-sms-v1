@@ -409,7 +409,7 @@ Two related caveats:
 
 ```text
 Admin: enable → connect OAuth → map class/subject → Google course
-Staff: set student google_account_email
+Staff: set student google_account_email (create/edit modal or Students bulk import)
 Teacher: create Alma assessment + Classroom assignment
 Teacher: link Alma assessment → coursework
          └─ optional: import Google rubric into Alma

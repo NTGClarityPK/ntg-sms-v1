@@ -271,7 +271,7 @@ export default function BulkImportUsersPage() {
       { key: 'username', label: 'Username (staff)', example: 'sara.ahmed' },
       {
         key: 'invitation_email',
-        label: 'Invitation Email (staff)',
+        label: 'Invitation Email (staff, optional)',
         example: 'sara.personal@example.com',
       },
       { key: 'email', label: 'Email (parent)', example: 'parent@example.com' },

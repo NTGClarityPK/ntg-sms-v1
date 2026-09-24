@@ -23,9 +23,12 @@ There is **no** separate student detail page — open a row to edit in a **modal
 
 | Status | Meaning |
 | --- | --- |
-| **Active** | Enrolled and active |
-| **Pending verification** | Account invited, setup incomplete |
-| **Link expired** | Invitation expired — resend from **Users** |
+| **Active** | On the school roster — included in attendance, assessments, and other modules |
+| **Inactive** | Withdrawn / deactivated by staff — hidden from operational rosters |
+| **Pending verification** | Invitation sent; pupil **cannot log in** until they set a password. Still **Active** on the roster unless staff deactivate them |
+| **Link expired** | Setup link expired (login removed) — re-invite from the row. Roster **Active** status is unchanged unless staff deactivate them |
+
+**System active vs login ready:** Bulk import and invitation create set the student **Active** for school operations immediately. Portal login stays blocked until password setup completes (`Pending verification`).
 
 Row actions (edit permission): edit modal, **Emergency contacts**, re-invitation flows where applicable.
 
@@ -50,6 +53,8 @@ Enrolment outcomes used elsewhere (e.g. leaving certificates, promotion): **Grad
 3. Fill spreadsheet
 4. Upload — review validation errors and fix rows
 5. Re-import failed rows
+
+Optional spreadsheet columns (same as the create modal where relevant): **address**, **blood group**, **medical notes**, **admission date**, and **Google Account Email** (for Google Classroom grade matching — unique per student in the branch when set). Leave blank if unused.
 
 Not a separate permission flag in the UI — requires students **Edit** and the route.
 

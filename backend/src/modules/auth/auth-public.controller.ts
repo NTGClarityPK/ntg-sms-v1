@@ -32,7 +32,7 @@ export class AuthPublicController {
     // Use limit(1) and handle array result explicitly to avoid errors when multiple rows exist.
     const { data: students, error: studentError } = await supabase
       .from('students')
-      .select('id, user_id, is_active')
+      .select('id, user_id, is_active, account_status')
       .eq('student_id', rollNumber)
       .limit(1);
 
@@ -41,12 +41,25 @@ export class AuthPublicController {
       throw new BadRequestException('No student found');
     }
 
-    const studentRow = students[0] as { id: string; user_id: string | null; is_active: boolean };
+    const studentRow = students[0] as {
+      id: string;
+      user_id: string | null;
+      is_active: boolean;
+      account_status?: string | null;
+    };
     if (!studentRow.user_id) {
       throw new BadRequestException('No student found');
     }
 
     if (studentRow.is_active === false) {
+      throw new BadRequestException('No student found');
+    }
+
+    // Login not available until password setup is complete.
+    if (
+      studentRow.account_status === 'pending_verification' ||
+      studentRow.account_status === 'link_expired'
+    ) {
       throw new BadRequestException('No student found');
     }
 
@@ -105,21 +118,47 @@ export class AuthPublicController {
       return { data: { inactive: false } };
     }
 
-    const [{ data: profile }, { data: studentRows }] = await Promise.all([
+    const [{ data: profile }, { data: studentRows }, { data: pendingInvites }] = await Promise.all([
       supabase.from('profiles').select('is_active').eq('id', userId).maybeSingle(),
-      supabase.from('students').select('is_active').eq('user_id', userId),
+      supabase
+        .from('students')
+        .select('is_active, account_status')
+        .eq('user_id', userId),
+      supabase
+        .from('invitations')
+        .select('id')
+        .eq('user_id', userId)
+        .in('invitation_type', ['staff', 'parent_account'])
+        .is('used_at', null)
+        .limit(1),
     ]);
 
     const profileInactive = (profile as { is_active?: boolean | null } | null)?.is_active === false;
-    const studentInactive = ((studentRows || []) as Array<{ is_active: boolean }>).some(
-      (row) => row.is_active === false,
+    const studentRowsTyped =
+      (studentRows || []) as Array<{ is_active: boolean; account_status?: string | null }>;
+    const studentInactive = studentRowsTyped.some((row) => row.is_active === false);
+    const studentSetupIncomplete = studentRowsTyped.some(
+      (row) =>
+        row.account_status === 'pending_verification' ||
+        row.account_status === 'link_expired',
     );
+    const staffOrParentSetupIncomplete = (pendingInvites ?? []).length > 0;
 
     if (profileInactive || studentInactive) {
       return {
         data: {
           inactive: true,
           message: 'Your account has been marked as inactive. Please contact your administrator.',
+        },
+      };
+    }
+
+    if (studentSetupIncomplete || staffOrParentSetupIncomplete) {
+      return {
+        data: {
+          inactive: true,
+          message:
+            'Your account setup is not complete. Please use the invitation link from your school to set a password before signing in.',
         },
       };
     }

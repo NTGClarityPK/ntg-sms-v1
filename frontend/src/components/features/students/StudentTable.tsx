@@ -169,27 +169,23 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
     resendModal.open();
   };
 
-  const statusBadge = (student: Student) => {
-    if (student.accountStatus === 'link_expired') {
-      return (
-        <Badge color="red" variant="light">
-          {t('linkExpired')}
-        </Badge>
-      );
-    }
-    if (student.accountStatus === 'pending_verification') {
-      return (
-        <Badge color="yellow" variant="light">
-          {t('pendingVerification')}
-        </Badge>
-      );
-    }
-    return (
+  const statusBadge = (student: Student) => (
+    <Group gap={6} wrap="nowrap">
       <Badge color={student.isActive ? 'green' : 'red'} variant="light">
         {student.isActive ? t('active') : t('inactive')}
       </Badge>
-    );
-  };
+      {student.accountStatus === 'pending_verification' ? (
+        <Badge color="yellow" variant="light">
+          {t('pendingVerification')}
+        </Badge>
+      ) : null}
+      {student.accountStatus === 'link_expired' ? (
+        <Badge color="orange" variant="light">
+          {t('linkExpired')}
+        </Badge>
+      ) : null}
+    </Group>
+  );
 
   const SortableHeader = ({ field, children }: { field: string; children: React.ReactNode }) => {
     const isSorted = sortBy === field;
@@ -302,7 +298,9 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
                             <IconEdit size={isMobile ? 14 : 16} />
                           </ActionIcon>
                         </Tooltip>
-                        {student.accountStatus !== 'active' && !student.isActive ? (
+                        {student.accountStatus === 'pending_verification' ||
+                        student.accountStatus === 'link_expired' ||
+                        needsReinviteFlow(student) ? (
                           <Tooltip label={t('resendInvitationTitle')} withArrow>
                             <ActionIcon
                               id={`students-resend-invite-${student.id}`}

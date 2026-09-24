@@ -605,9 +605,11 @@ export class UsersService {
 
     const invitationRecipientEmail = await (async () => {
       if (userType === 'parent') return resolvedLoginEmail;
-      const email = this.normalizeLoginEmail((input.invitationEmail ?? '').trim());
-      if (!email) throw new BadRequestException('Invitation email is required for staff users');
-      return email;
+      const raw = (input.invitationEmail ?? '').trim();
+      // Optional for staff — blank means send setup link to the school login email
+      // (same pattern as student invitations).
+      if (!raw) return resolvedLoginEmail;
+      return this.normalizeLoginEmail(raw);
     })();
 
     const {
@@ -642,9 +644,9 @@ export class UsersService {
           address: input.address ?? null,
           date_of_birth: input.dateOfBirth ?? null,
           gender: input.gender ?? null,
-          // Users created via invitations should remain pending until they complete account setup.
-          // Admin can activate/deactivate later via Edit.
-          is_active: false,
+          // System-active immediately (staff lists, mappings, etc.).
+          // Portal login stays gated by unused invitation until password setup.
+          is_active: input.isActive ?? true,
         })
         .select()
         .single();

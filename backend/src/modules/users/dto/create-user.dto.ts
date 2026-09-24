@@ -72,7 +72,7 @@ export class CreateUserDto {
 
   /**
    * Destination email address where the staff invitation link is sent.
-   * This may be the same as, or different from, the school login email.
+   * Optional — blank defaults to the school login email (`username@domain`).
    */
   @IsOptional()
   @IsEmail()

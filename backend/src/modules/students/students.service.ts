@@ -1187,7 +1187,9 @@ export class StudentsService {
           medical_notes: input.medicalNotes ?? null,
           admission_date: input.admissionDate ?? null,
           academic_year_id: academicYearId,
-          is_active: false,
+          // System-active for rosters/modules immediately. Portal login stays blocked until
+          // password setup flips account_status to active.
+          is_active: input.isActive ?? true,
           account_status: 'pending_verification',
           google_account_email: normalizeOptionalEmail(input.googleAccountEmail),
           created_by: username,
@@ -1571,7 +1573,7 @@ export class StudentsService {
         address: null,
         date_of_birth: null,
         gender: null,
-        is_active: false,
+        is_active: true,
         current_branch_id: branchId,
         created_by: username,
         updated_by: username,
@@ -1605,7 +1607,8 @@ export class StudentsService {
         .update({
           user_id: user.id,
           account_status: 'pending_verification',
-          is_active: false,
+          // Keep/restore system-active so the pupil stays on rosters while login is pending.
+          is_active: true,
           updated_at: new Date().toISOString(),
           updated_by: username,
         })
@@ -1869,8 +1872,8 @@ export class StudentsService {
           ? (input.sectionId ?? null)
           : (currentSectionId ?? enrolmentSectionId);
 
-      // Pending invite students are is_active=false until password setup, but they are still
-      // placed in a class. Never treat pending_verification as withdrawn placement.
+      // System-active (rosters) is independent of login readiness (account_status).
+      // Admin deactivate still sets is_active=false; pending invite must not force inactive enrolment.
       const oldAccountStatus = accountStatusFromRow(
         (oldRow as { account_status?: string | null }).account_status,
       );
@@ -1879,7 +1882,11 @@ export class StudentsService {
           ? Boolean(input.isActive)
           : Boolean((oldRow as { is_active?: boolean | null }).is_active ?? true);
       const enrolmentStatus =
-        oldAccountStatus === 'pending_verification' || nextIsActive ? 'active' : 'inactive';
+        oldAccountStatus === 'pending_verification' ||
+        oldAccountStatus === 'link_expired' ||
+        nextIsActive
+          ? 'active'
+          : 'inactive';
 
       await this.studentPlacementService.upsertEnrolment({
         student_id: id,

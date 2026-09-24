@@ -99,6 +99,15 @@ export class BulkStudentRowDto {
 
   @IsOptional()
   @Transform(({ value }) => {
+    if (value == null || value === '') return undefined;
+    const v = String(value).trim();
+    return v || undefined;
+  })
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
     if (value == null) return undefined;
     const v = String(value).trim();
     if (!v) return undefined;
@@ -125,6 +134,62 @@ export class BulkStudentRowDto {
   @IsOptional()
   @IsString()
   student_id?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value == null || value === '') return undefined;
+    const v = String(value).trim();
+    return v || undefined;
+  })
+  @IsString()
+  blood_group?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value == null || value === '') return undefined;
+    const v = String(value).trim();
+    return v || undefined;
+  })
+  @IsString()
+  medical_notes?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value == null) return undefined;
+    const v = String(value).trim();
+    if (!v) return undefined;
+    const lower = v.toLowerCase();
+    if (lower === 'yyyy-mm-dd' || lower === 'optional' || lower === 'n/a' || lower === 'na' || lower === '-') {
+      return undefined;
+    }
+    return v;
+  })
+  @ValidateIf((o) => o.admission_date != null && o.admission_date !== '')
+  @IsDateString()
+  admission_date?: string;
+
+  /**
+   * Optional Google Classroom / Workspace account email (unique per branch when set).
+   * Distinct from invitation / school login email.
+   */
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value == null) return undefined;
+    const cleaned = String(value)
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .trim()
+      .toLowerCase();
+    if (!cleaned) return undefined;
+    const lower = cleaned;
+    if (lower === 'optional' || lower === 'n/a' || lower === 'na' || lower === '-') {
+      return undefined;
+    }
+    return cleaned;
+  })
+  @ValidateIf((_, v) => typeof v === 'string' && v.length > 0)
+  @IsEmail({}, { message: 'Google account email must be a valid email address' })
+  google_account_email?: string;
 
   /** Class name or UUID (from Settings). Optional; validated against branch. */
   @IsOptional()

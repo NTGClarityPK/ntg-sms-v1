@@ -67,9 +67,13 @@ sequenceDiagram
 
 **`students` table:**
 
-* `is_active` - Boolean flag (true = enrolled, false = withdrawn/inactive)
-* `account_status` - Text field (default: 'active')
-  * Values: 'active', 'inactive', 'transferred', etc.
+* `is_active` - **System / roster flag** (true = included in attendance, assessments, and other modules; false = withdrawn/inactive). Independent of whether the pupil can log in.
+* `account_status` - **Login readiness**
+  * `pending_verification` — invitation sent; password not set yet (cannot portal-login)
+  * `active` — password setup complete; can log in (if also `is_active`)
+  * `link_expired` — unused invite expired; auth user removed; re-invite required
+
+Invitation / bulk-import create sets `is_active = true` and `account_status = pending_verification` so new pupils appear in modules immediately while login stays gated.
 
 **`student_enrolments` table:**
 
