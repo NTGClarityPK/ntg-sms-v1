@@ -13,11 +13,37 @@ export interface BulkImportPreview {
   }>;
 }
 
+export interface BulkImportRowOutcome {
+  row: number;
+  username: string;
+  studentName: string;
+  loginEmail?: string;
+  status: 'added' | 'updated' | 'unchanged' | 'failed_insert' | 'failed_update' | 'skipped';
+  reason?: string;
+  recipientEmail?: string;
+  invitationType?: 'parent' | 'student';
+  expiresAt?: string;
+  parentRecipientEmail?: string;
+  parentExpiresAt?: string;
+}
+
 export interface BulkImportResult {
   totalProcessed: number;
   successCount: number;
   failureCount: number;
+  createdCount?: number;
+  updatedCount?: number;
+  unchangedCount?: number;
+  failedInsertCount?: number;
+  failedUpdateCount?: number;
+  skippedCount?: number;
   errors: Array<{ row: number; message: string }>;
+  rowOutcomes?: BulkImportRowOutcome[];
+  resultsFile?: {
+    fileName: string;
+    contentBase64: string;
+    mimeType: string;
+  };
   created?: Array<{
     row: number;
     username: string;
@@ -28,6 +54,7 @@ export interface BulkImportResult {
     expiresAt: string;
     parentRecipientEmail?: string;
     parentExpiresAt?: string;
+    action?: 'created' | 'updated';
   }>;
 }
 
@@ -55,6 +82,8 @@ export interface BulkStudentRowDto {
   parent_name?: string;
   parent_email?: string;
   parent_phone?: string;
+  /** From a previous results sheet — added/updated/unchanged rows are skipped on re-import. */
+  import_status?: string;
 }
 
 export interface BulkUserRowDto {
@@ -137,6 +166,7 @@ export const bulkImportApi = {
     const res = await apiClient.post<BulkImportResult>(
       '/api/v1/bulk-import/students/import',
       { rows, academicYearId },
+      { timeout: 300_000 },
     );
     return (res as ApiResponse<BulkImportResult>).data ?? (res as unknown as BulkImportResult);
   },
@@ -148,6 +178,38 @@ export const bulkImportApi = {
     const data = (res as ApiResponse<TemplateColumnsResponse>).data;
     if (data) return data;
     return res as unknown as TemplateColumnsResponse;
+  },
+
+  async exportStudents(academicYearId?: string): Promise<{
+    fileName: string;
+    contentBase64: string;
+    mimeType: string;
+    rowCount: number;
+  }> {
+    const res = await apiClient.post<{
+      fileName: string;
+      contentBase64: string;
+      mimeType: string;
+      rowCount: number;
+    }>(
+      '/api/v1/bulk-import/students/export',
+      { academicYearId },
+      { timeout: 180_000 },
+    );
+    return (
+      (res as ApiResponse<{
+        fileName: string;
+        contentBase64: string;
+        mimeType: string;
+        rowCount: number;
+      }>).data ??
+      (res as unknown as {
+        fileName: string;
+        contentBase64: string;
+        mimeType: string;
+        rowCount: number;
+      })
+    );
   },
 
   async getSubjectTemplateHelp(): Promise<SubjectTemplateHelpResponse> {

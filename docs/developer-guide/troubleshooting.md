@@ -17,6 +17,7 @@
 - Supabase Auth URL configuration (Site URL + redirect URLs)
 - Anon key on frontend vs service key on backend (do not swap them)
 - Clear cookies and retry after env changes (restart `next dev`)
+- **Password reset opens `/home` with `otp_expired`:** Usually Site URL is wrong (must not be `/home`) or Redirect URLs omit `/reset-password`. App-owned reset emails use `/reset-password?token_hash=…` and no longer depend on Supabase's verify redirect. Request a **new** reset after deploying the fix — old emails still use the broken Supabase action link.
 
 ## Migrations
 

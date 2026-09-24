@@ -20,10 +20,12 @@ const LOCAL_API = 'http://localhost:3001';
 
 const API_OFFLINE_NOTIFICATION_ID = 'ntg-api-offline';
 const API_CONNECTION_NOTIFICATION_ID = 'ntg-api-connection-error';
+const API_TIMEOUT_NOTIFICATION_ID = 'ntg-api-timeout';
 const API_ERROR_TOAST_COOLDOWN_MS = 20_000;
 
 let lastOfflineToastAt = 0;
 let lastConnectionToastAt = 0;
+let lastTimeoutToastAt = 0;
 
 function shouldShowGlobalErrorToast(config?: InternalAxiosRequestConfig): boolean {
   return !config?.suppressErrorNotification;
@@ -52,6 +54,20 @@ function showConnectionToastOnce(): void {
     message: 'Could not reach the server. Please check your internet connection.',
     color: 'red',
     autoClose: 8000,
+  });
+}
+
+function showTimeoutToastOnce(): void {
+  const now = Date.now();
+  if (now - lastTimeoutToastAt < API_ERROR_TOAST_COOLDOWN_MS) return;
+  lastTimeoutToastAt = now;
+  notifications.show({
+    id: API_TIMEOUT_NOTIFICATION_ID,
+    title: 'Request timed out',
+    message:
+      'The server took too long to respond. For large imports, wait a moment and check whether the data was saved, then retry if needed.',
+    color: 'orange',
+    autoClose: 10000,
   });
 }
 
@@ -256,9 +272,24 @@ class ApiClient {
           // Non-blocking
         }
 
-        // Network/timeout errors - show connection message
+        // Timeout vs unreachable — do not treat timeout as "offline"
+        if (error.code === 'ECONNABORTED') {
+          if (
+            typeof window !== 'undefined' &&
+            shouldShowGlobalErrorToast(error.config)
+          ) {
+            showTimeoutToastOnce();
+          }
+          const timeoutError = new Error(
+            'Request timed out. The server may still be processing — check your data before retrying.',
+          ) as AxiosError<ApiResponse<unknown>>;
+          timeoutError.code = error.code;
+          timeoutError.name = error.name;
+          return Promise.reject(timeoutError);
+        }
+
         const isNetworkError =
-          error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED' || error.message === 'Network Error';
+          error.code === 'ERR_NETWORK' || error.message === 'Network Error';
         if (
           isNetworkError &&
           typeof window !== 'undefined' &&

@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from '@mantine/form';
 import {
   Box,
   Title,
-  TextInput,
   PasswordInput,
   Button,
   Stack,
@@ -15,7 +14,7 @@ import {
   Skeleton,
 } from '@mantine/core';
 import { IconAlertCircle, IconLock, IconCheck } from '@tabler/icons-react';
-import { updatePassword, getSession } from '@/lib/auth';
+import { updatePassword } from '@/lib/auth';
 import { supabase } from '@/lib/supabase/client';
 import { DEFAULT_THEME_COLOR } from '@/lib/utils/theme';
 import { useErrorColor, useSuccessColor } from '@/lib/hooks/use-theme-colors';
@@ -23,55 +22,131 @@ import { useTheme } from '@/lib/hooks/use-theme';
 import { useThemeColor } from '@/lib/hooks/use-theme-color';
 import { generateThemeColors } from '@/lib/utils/themeColors';
 
+type RecoveryType = 'recovery' | 'email';
+
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const errorColor = useErrorColor();
   const successColor = useSuccessColor();
   const { isDark } = useTheme();
   const primaryColor = useThemeColor();
   const themeColors = generateThemeColors(primaryColor, isDark);
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [hasValidSession, setHasValidSession] = useState(false);
+  /** Present when email used our app-owned token_hash link (preferred). */
+  const [pendingTokenHash, setPendingTokenHash] = useState<string | null>(null);
+  const [pendingType, setPendingType] = useState<RecoveryType>('recovery');
+
+  const clearHashFromUrl = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const { pathname, search } = window.location;
+    window.history.replaceState(null, '', `${pathname}${search}`);
+  }, []);
 
   useEffect(() => {
-    // Supabase automatically handles the token from URL hash and creates a session
-    // We need to check if we have a valid session
-    const checkSession = async () => {
+    const bootstrap = async () => {
       try {
-        // Wait a bit for Supabase to process the hash token
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        
-        const session = await getSession();
-        if (session) {
-          setHasValidSession(true);
-        } else {
-          // Check if there's a token in the URL hash
-          const hash = window.location.hash;
-          if (hash && hash.includes('access_token')) {
-            // Token is present, wait a bit more for Supabase to process it
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            const newSession = await getSession();
-            if (newSession) {
-              setHasValidSession(true);
-            } else {
-              setError('Invalid or expired reset token. Please request a new password reset link.');
-            }
-          } else {
-            setError('Invalid or missing reset token. Please request a new password reset link.');
-          }
+        const tokenHash = searchParams?.get('token_hash');
+        const typeParam = (searchParams?.get('type') || 'recovery').toLowerCase();
+        const recoveryType: RecoveryType =
+          typeParam === 'email' ? 'email' : 'recovery';
+
+        if (tokenHash) {
+          // Do not auto-verify: mail scanners that prefetch URLs would burn the OTP.
+          setPendingTokenHash(tokenHash);
+          setPendingType(recoveryType);
+          setCheckingSession(false);
+          return;
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to verify reset token. Please request a new password reset link.');
+
+        // Legacy Supabase action_link flow: tokens arrive in the URL hash.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          setHasValidSession(true);
+          clearHashFromUrl();
+          setCheckingSession(false);
+          return;
+        }
+
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        if (hash.includes('error=')) {
+          const params = new URLSearchParams(hash.replace(/^#/, ''));
+          const desc =
+            params.get('error_description')?.replace(/\+/g, ' ') ||
+            params.get('error_code') ||
+            'Invalid or expired reset link';
+          setError(
+            `${desc}. Please request a new password reset link from the sign-in page.`,
+          );
+          setCheckingSession(false);
+          return;
+        }
+
+        if (hash.includes('access_token')) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          const { data: retry } = await supabase.auth.getSession();
+          if (retry.session) {
+            setHasValidSession(true);
+            clearHashFromUrl();
+          } else {
+            setError(
+              'Invalid or expired reset token. Please request a new password reset link.',
+            );
+          }
+        } else {
+          setError(
+            'Invalid or missing reset token. Please request a new password reset link from the sign-in page.',
+          );
+        }
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Failed to verify reset token. Please request a new password reset link.';
+        setError(message);
       } finally {
         setCheckingSession(false);
       }
     };
 
-    checkSession();
-  }, []);
+    void bootstrap();
+  }, [searchParams, clearHashFromUrl]);
+
+  const handleContinueWithToken = async () => {
+    if (!pendingTokenHash) return;
+    setVerifying(true);
+    setError(null);
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: pendingTokenHash,
+        type: pendingType,
+      });
+      if (verifyError) {
+        throw verifyError;
+      }
+      if (!data.session) {
+        throw new Error('Could not establish a reset session. Please request a new link.');
+      }
+      setHasValidSession(true);
+      setPendingTokenHash(null);
+      // Drop token from the address bar so refresh does not re-use it.
+      router.replace('/reset-password');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Invalid or expired reset link. Please request a new one from the sign-in page.';
+      setError(message);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const form = useForm({
     initialValues: {
@@ -79,7 +154,8 @@ export default function ResetPasswordPage() {
       confirmPassword: '',
     },
     validate: {
-      password: (value: string) => (value.length < 6 ? 'Password must be at least 6 characters' : null),
+      password: (value: string) =>
+        value.length < 6 ? 'Password must be at least 6 characters' : null,
       confirmPassword: (value: string, values) =>
         value !== values.password ? 'Passwords do not match' : null,
     },
@@ -97,16 +173,14 @@ export default function ResetPasswordPage() {
     try {
       await updatePassword(values.password);
       setSuccess(true);
-      
-      // Sign out after password reset
       await supabase.auth.signOut();
-      
-      // Redirect to login after 2 seconds
       setTimeout(() => {
         router.push('/login');
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset password. Please try again.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to reset password. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -147,10 +221,66 @@ export default function ResetPasswordPage() {
             variant="light"
             radius="md"
           >
-            <Text size="sm">
-              Redirecting to login page...
-            </Text>
+            <Text size="sm">Redirecting to login page...</Text>
           </Alert>
+        </Stack>
+      </Box>
+    );
+  }
+
+  if (pendingTokenHash && !hasValidSession) {
+    return (
+      <Box style={{ maxWidth: 400, margin: '0 auto', paddingTop: '5rem' }}>
+        <Stack gap="lg">
+          <Box>
+            <Title order={2} size="1.8rem" fw={700} mb="xs" style={{ color: themeColors.colorTextDark }}>
+              Reset Password
+            </Title>
+            <Text size="sm" style={{ color: themeColors.colorTextMedium }}>
+              Click continue to verify your reset link, then choose a new password.
+            </Text>
+          </Box>
+
+          {error && (
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              style={{
+                backgroundColor: `${errorColor}15`,
+                borderColor: errorColor,
+                color: errorColor,
+              }}
+              variant="light"
+              radius="md"
+            >
+              {error}
+            </Alert>
+          )}
+
+          <Button
+            id="reset-password-continue"
+            fullWidth
+            size="lg"
+            radius="md"
+            loading={verifying}
+            onClick={() => void handleContinueWithToken()}
+            style={{
+              backgroundColor: DEFAULT_THEME_COLOR,
+              color: 'white',
+            }}
+          >
+            Continue
+          </Button>
+
+          <Text ta="center" size="sm" style={{ color: themeColors.colorTextMedium }}>
+            Link expired?{' '}
+            <a
+              id="reset-password-request-new"
+              href="/login"
+              style={{ color: DEFAULT_THEME_COLOR, fontWeight: 500, textDecoration: 'none' }}
+            >
+              Request a new one
+            </a>
+          </Text>
         </Stack>
       </Box>
     );
@@ -241,4 +371,3 @@ export default function ResetPasswordPage() {
     </Box>
   );
 }
-

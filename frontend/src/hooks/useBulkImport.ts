@@ -46,6 +46,12 @@ export function useBulkImportTemplate() {
   });
 }
 
+export function useBulkStudentsExport() {
+  return useMutation({
+    mutationFn: (academicYearId?: string) => bulkImportApi.exportStudents(academicYearId),
+  });
+}
+
 export function useSubjectTemplateHelp(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['bulk-import-subject-template-help'],

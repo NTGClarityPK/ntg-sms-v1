@@ -22,17 +22,22 @@ export class PasswordResetService {
    *
    * Uses Admin generateLink + Mailjet instead of POST /auth/v1/recover so school
    * domains are not rejected by GoTrue extended email / MX validation when sending via Supabase SMTP.
+   *
+   * When the user has an invitation recipient email different from their login email
+   * (typical staff school-domain logins), the reset link is sent to that recipient.
+   * Otherwise it is sent to the login email provided.
    */
   async requestPasswordReset(input: {
     rawEmail: string;
+    /** @deprecated No longer required; kept for API compatibility with older clients. */
     confirmSendToProvided?: boolean;
   }): Promise<{
     ok: true;
-    /** The email address the reset link was (or would be) delivered to. */
+    /** The email address the reset link was delivered to (when a user was found). */
     deliveredToEmail?: string;
     /** True when deliveredToEmail differs from the login email provided. */
     usedAssociatedEmail?: boolean;
-    /** When true, we did not send yet and require confirmation to send to provided email. */
+    /** Always false; kept for API compatibility with older clients. */
     requiresConfirmation?: boolean;
   }> {
     const email = this.normalizeEmail(input.rawEmail);
@@ -62,15 +67,15 @@ export class PasswordResetService {
       throw new BadRequestException(error.message);
     }
 
-    const actionLink = data.properties?.action_link;
-    if (!actionLink) {
+    const hashedToken = data.properties?.hashed_token;
+    if (!hashedToken) {
       throw new BadRequestException('Could not generate password reset link.');
     }
 
-    const safeLink =
-      actionLink.startsWith('http://') || actionLink.startsWith('https://')
-        ? actionLink
-        : `${this.configService.get<string>('SUPABASE_URL')?.replace(/\/$/, '') ?? ''}/${actionLink.replace(/^\//, '')}`;
+    // Build an app-owned link. Do NOT use action_link (Supabase /auth/v1/verify):
+    // if Redirect URLs / Site URL are misconfigured, verify falls back to Site URL
+    // (e.g. /home) with error=otp_expired. Our page verifies via verifyOtp instead.
+    const resetLink = `${frontendBase}/reset-password?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`;
 
     const userId = data.user?.id;
     let deliveryEmail = email;
@@ -93,19 +98,13 @@ export class PasswordResetService {
     }
 
     const usedAssociatedEmail = deliveryEmail !== email;
-    if (!usedAssociatedEmail && userId && input.confirmSendToProvided !== true) {
-      // We found a user but no associated invitation recipient email; ask user to confirm sending to provided email.
-      return {
-        ok: true,
-        deliveredToEmail: email,
-        usedAssociatedEmail: false,
-        requiresConfirmation: true,
-      };
-    }
 
+    // Prefer invitation recipient when it differs from the login email (staff school
+    // logins). When they match — e.g. school admin signed up with their real mailbox
+    // and has no invitations row — send immediately to the login email.
     const template = passwordResetEmailTemplate({
       loginEmail: email,
-      resetLink: safeLink,
+      resetLink,
       deliveredToEmail: deliveryEmail !== email ? deliveryEmail : undefined,
     });
 

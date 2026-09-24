@@ -49,12 +49,16 @@ Enrolment outcomes used elsewhere (e.g. leaving certificates, promotion): **Grad
 **Path:** **Students → Bulk import** (edit permission required)
 
 1. Open **Bulk import**
-2. Download template if offered
-3. Fill spreadsheet
+2. **Export students** (optional) — downloads current branch pupils in the same column layout as the import template, so you can edit and re-upload
+3. Or download the blank template and fill it
 4. Upload — review validation errors and fix rows
-5. Re-import failed rows
+5. Validate, then import
+6. After import, a **status modal** shows counts: added, updated, unchanged, failed inserts, failed updates (with row list)
+7. If anything failed, download the **results spreadsheet** (Import Status column; failed rows highlighted). Fix failed rows and re-import the same file — rows marked **added** / **updated** / **unchanged** are skipped
 
-Optional spreadsheet columns (same as the create modal where relevant): **address**, **blood group**, **medical notes**, **admission date**, and **Google Account Email** (for Google Classroom grade matching — unique per student in the branch when set). Leave blank if unused.
+Match key remains portal **username**. Updates do not resend invitations. New students get invitations after create succeeds.
+
+Optional spreadsheet columns (same as the create modal where relevant): **address**, **blood group**, **medical notes**, **admission date**, and **Google Account Email**. Leave blank if unused.
 
 Not a separate permission flag in the UI — requires students **Edit** and the route.
 

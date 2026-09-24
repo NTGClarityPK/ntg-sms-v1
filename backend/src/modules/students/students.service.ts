@@ -49,6 +49,33 @@ function accountStatusFromRow(v: unknown): 'active' | 'pending_verification' | '
   return 'active';
 }
 
+/** Invitation email + in-app message payload deferred until a bulk batch commits. */
+export type DeferredInvitationDelivery = {
+  invitation: {
+    id: string;
+    token: string;
+    user_id: string;
+    recipient_email: string;
+    invitation_type: 'student' | 'parent' | 'parent_account' | 'staff';
+    created_by: string;
+    created_at: string;
+    expires_at: string;
+    used_at: string | null;
+  };
+  recipientName: string;
+  loginEmail: string;
+  studentName?: string;
+  recipientUserId: string;
+  recipientDisplayName: string;
+  accountLabel: 'student' | 'parent';
+  studentNameForParent?: string;
+};
+
+export type CreateStudentWithInvitationOptions = {
+  /** Create invitation rows but do not send email / in-app message yet. */
+  deferInvitationDelivery?: boolean;
+};
+
 function normalizeOptionalEmail(email?: string | null): string | null {
   const raw = (email ?? '').trim().toLowerCase();
   return raw || null;
@@ -164,6 +191,221 @@ export class StudentsService {
 
   private buildLoginEmail(username: string, domain: string): string {
     return `${this.normalizeUsername(username)}@${domain.trim().toLowerCase()}`;
+  }
+
+  /** Public helper for bulk import: username → school login email for the branch tenant. */
+  async resolveLoginEmailForUsername(username: string, branchId: string): Promise<string> {
+    const domain = await this.getTenantDomainForBranch(branchId);
+    return this.normalizeLoginEmail(this.buildLoginEmail(username, domain));
+  }
+
+  /**
+   * Batch lookup of existing students in a branch by school login emails (profiles.email).
+   * Used by bulk import upsert (match on username → login email).
+   */
+  async findStudentsByLoginEmails(
+    branchId: string,
+    loginEmails: string[],
+  ): Promise<
+    Map<
+      string,
+      {
+        studentId: string;
+        userId: string;
+        loginEmail: string;
+        accountStatus: 'active' | 'pending_verification' | 'link_expired';
+      }
+    >
+  > {
+    const result = new Map<
+      string,
+      {
+        studentId: string;
+        userId: string;
+        loginEmail: string;
+        accountStatus: 'active' | 'pending_verification' | 'link_expired';
+      }
+    >();
+    const emails = [
+      ...new Set(
+        loginEmails
+          .map((e) => this.normalizeLoginEmail(e))
+          .filter((e) => e.length > 0),
+      ),
+    ];
+    if (emails.length === 0) return result;
+
+    const supabase = this.supabaseConfig.getClient();
+    const CHUNK = 100;
+    for (let i = 0; i < emails.length; i += CHUNK) {
+      const chunk = emails.slice(i, i + CHUNK);
+      const { data: profiles, error: profileErr } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('email', chunk);
+      throwIfDbError(profileErr);
+      const profileRows = (profiles ?? []) as Array<{ id: string; email: string | null }>;
+      if (profileRows.length === 0) continue;
+
+      const userIds = profileRows.map((p) => p.id);
+      const emailByUserId = new Map(
+        profileRows
+          .filter((p) => p.email)
+          .map((p) => [p.id, this.normalizeLoginEmail(p.email!)] as const),
+      );
+
+      const { data: students, error: studentErr } = await supabase
+        .from('students')
+        .select('id, user_id, account_status')
+        .eq('branch_id', branchId)
+        .in('user_id', userIds);
+      throwIfDbError(studentErr);
+
+      for (const row of (students ?? []) as Array<{
+        id: string;
+        user_id: string | null;
+        account_status?: string | null;
+      }>) {
+        if (!row.user_id) continue;
+        const loginEmail = emailByUserId.get(row.user_id);
+        if (!loginEmail) continue;
+        result.set(loginEmail, {
+          studentId: row.id,
+          userId: row.user_id,
+          loginEmail,
+          accountStatus: accountStatusFromRow(row.account_status),
+        });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Login emails that already exist in Auth/profiles but are not students in this branch
+   * (e.g. staff) — bulk import must not create or update them as students.
+   */
+  async findNonStudentLoginEmailConflicts(
+    branchId: string,
+    loginEmails: string[],
+  ): Promise<Set<string>> {
+    const conflicts = new Set<string>();
+    const emails = [
+      ...new Set(
+        loginEmails
+          .map((e) => this.normalizeLoginEmail(e))
+          .filter((e) => e.length > 0),
+      ),
+    ];
+    if (emails.length === 0) return conflicts;
+
+    const existingStudents = await this.findStudentsByLoginEmails(branchId, emails);
+    const supabase = this.supabaseConfig.getClient();
+    const CHUNK = 100;
+    for (let i = 0; i < emails.length; i += CHUNK) {
+      const chunk = emails.slice(i, i + CHUNK);
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('email')
+        .in('email', chunk);
+      throwIfDbError(error);
+      for (const p of (profiles ?? []) as Array<{ email: string | null }>) {
+        if (!p.email) continue;
+        const email = this.normalizeLoginEmail(p.email);
+        if (!existingStudents.has(email)) {
+          conflicts.add(email);
+        }
+      }
+    }
+    return conflicts;
+  }
+
+  /** Best-effort purge after a failed bulk batch (student + optional new parent). */
+  async purgeImportedStudentAccount(input: {
+    studentUserId: string;
+    branchId: string;
+    createdParentUserId?: string | null;
+  }): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    const { studentUserId, branchId, createdParentUserId } = input;
+
+    try {
+      const { data: studentRow } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', studentUserId)
+        .eq('branch_id', branchId)
+        .maybeSingle();
+      const studentId = (studentRow as { id: string } | null)?.id ?? null;
+      if (studentId) {
+        await supabase.from('parent_students').delete().eq('student_id', studentId);
+        await supabase
+          .from('student_subject_template_assignments')
+          .delete()
+          .eq('student_id', studentId);
+        await supabase.from('student_enrolments').delete().eq('student_id', studentId);
+        await supabase.from('students').delete().eq('id', studentId);
+      }
+      await supabase.from('invitations').delete().eq('user_id', studentUserId);
+      await supabase.from('user_roles').delete().eq('user_id', studentUserId).eq('branch_id', branchId);
+      await supabase.from('user_branches').delete().eq('user_id', studentUserId).eq('branch_id', branchId);
+      await supabase.from('profiles').delete().eq('id', studentUserId);
+      await supabase.auth.admin.deleteUser(studentUserId);
+    } catch {
+      // best-effort
+    }
+
+    if (createdParentUserId) {
+      try {
+        await supabase.from('parent_students').delete().eq('parent_user_id', createdParentUserId);
+        await supabase.from('invitations').delete().eq('user_id', createdParentUserId);
+        await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', createdParentUserId)
+          .eq('branch_id', branchId);
+        await supabase
+          .from('user_branches')
+          .delete()
+          .eq('user_id', createdParentUserId)
+          .eq('branch_id', branchId);
+        await supabase.from('profiles').delete().eq('id', createdParentUserId);
+        await supabase.auth.admin.deleteUser(createdParentUserId);
+      } catch {
+        // best-effort
+      }
+    }
+  }
+
+  async deliverDeferredInvitationEmails(
+    deliveries: DeferredInvitationDelivery[],
+    adminUser: CurrentUserPayload,
+    branchId: string,
+  ): Promise<void> {
+    for (const d of deliveries) {
+      await this.invitationsService.sendInvitationEmail({
+        invitation: d.invitation,
+        recipientName: d.recipientName,
+        loginEmail: d.loginEmail,
+        studentName: d.studentName,
+        userEmailForAudit: adminUser.email,
+        branchId,
+      });
+      try {
+        await this.sendInvitationDetailsMessage({
+          branchId,
+          adminUser,
+          recipientUserId: d.recipientUserId,
+          recipientDisplayName: d.recipientDisplayName,
+          loginEmail: d.loginEmail,
+          inviteEmail: d.invitation.recipient_email,
+          expiresAt: d.invitation.expires_at,
+          accountLabel: d.accountLabel,
+          studentNameForParent: d.studentNameForParent,
+        });
+      } catch {
+        // non-fatal
+      }
+    }
   }
 
   private nameFromEmail(email: string): string {
@@ -1087,13 +1329,19 @@ export class StudentsService {
     input: CreateStudentWithInvitationDto,
     branchId: string,
     adminUser: CurrentUserPayload,
+    options?: CreateStudentWithInvitationOptions,
   ): Promise<{
     student: StudentDto;
     studentInvitation: { token: string; recipientEmail: string; invitationType: 'parent' | 'student'; expiresAt: string };
     parentInvitation?: { token: string; recipientEmail: string; expiresAt: string; parentUserId: string };
+    deferredDeliveries?: DeferredInvitationDelivery[];
+    /** Auth user id of a parent created in this call (for bulk rollback). */
+    createdParentUserId?: string | null;
   }> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(adminUser.email);
+    const deferInvitationDelivery = options?.deferInvitationDelivery === true;
+    const deferredDeliveries: DeferredInvitationDelivery[] = [];
     // If we create a brand-new parent account during this flow and later fail,
     // we must roll it back to avoid orphan parent records for failed imports.
     let createdParentUserId: string | null = null;
@@ -1384,13 +1632,25 @@ export class StudentsService {
             invitationType: 'parent_account',
             createdByUserId: adminUser.id,
           });
-          await this.invitationsService.sendInvitationEmail({
-            invitation: parentInv,
-            recipientName: parentName,
-            loginEmail: parentEmail,
-            userEmailForAudit: adminUser.email,
-            branchId,
-          });
+          if (deferInvitationDelivery) {
+            deferredDeliveries.push({
+              invitation: parentInv,
+              recipientName: parentName,
+              loginEmail: parentEmail,
+              recipientUserId: parentUserIdToUse,
+              recipientDisplayName: parentName,
+              accountLabel: 'parent',
+              studentNameForParent: displayName,
+            });
+          } else {
+            await this.invitationsService.sendInvitationEmail({
+              invitation: parentInv,
+              recipientName: parentName,
+              loginEmail: parentEmail,
+              userEmailForAudit: adminUser.email,
+              branchId,
+            });
+          }
           parentInvitation = {
             token: parentInv.token,
             recipientEmail: parentInv.recipient_email,
@@ -1425,47 +1685,75 @@ export class StudentsService {
         createdByUserId: adminUser.id,
       });
 
-      await this.invitationsService.sendInvitationEmail({
-        invitation: inv,
-        recipientName,
-        loginEmail: normalizedLoginEmail,
-        studentName: displayName,
-        userEmailForAudit: adminUser.email,
-        branchId,
-      });
+      if (deferInvitationDelivery) {
+        deferredDeliveries.push({
+          invitation: inv,
+          recipientName,
+          loginEmail: normalizedLoginEmail,
+          studentName: displayName,
+          recipientUserId: user.id,
+          recipientDisplayName: displayName,
+          accountLabel: 'student',
+        });
+        if (parentInvitation?.parentUserId) {
+          // Parent delivery may already be queued above when newly created / expired.
+          // Ensure in-app parent message still has student name when only parent_account was deferred.
+          const parentDelivery = deferredDeliveries.find(
+            (d) =>
+              d.accountLabel === 'parent' &&
+              d.recipientUserId === parentInvitation.parentUserId,
+          );
+          if (parentDelivery) {
+            parentDelivery.studentNameForParent = displayName;
+          }
+        }
+      } else {
+        await this.invitationsService.sendInvitationEmail({
+          invitation: inv,
+          recipientName,
+          loginEmail: normalizedLoginEmail,
+          studentName: displayName,
+          userEmailForAudit: adminUser.email,
+          branchId,
+        });
+      }
 
       const studentDto = await this.getStudentById(studentRow.id, branchId);
 
       // Also send a curated in-app message so admins can see it in Messages.
       // Student always gets a message; parent only if a parent account is created (registered).
-      try {
-        await this.sendInvitationDetailsMessage({
-          branchId,
-          adminUser,
-          recipientUserId: user.id,
-          recipientDisplayName: displayName,
-          loginEmail: normalizedLoginEmail,
-          inviteEmail: inv.recipient_email,
-          expiresAt: inv.expires_at,
-          accountLabel: 'student',
-        });
-        if (parentInvitation?.parentUserId) {
-          const parentLoginEmail = this.normalizeLoginEmail(input.parentEmail ?? '') || parentInvitation.recipientEmail;
-          const parentName = (input.parentName ?? '').trim() || this.nameFromEmail(parentLoginEmail);
+      if (!deferInvitationDelivery) {
+        try {
           await this.sendInvitationDetailsMessage({
             branchId,
             adminUser,
-            recipientUserId: parentInvitation.parentUserId,
-            recipientDisplayName: parentName,
-            loginEmail: parentLoginEmail,
-            inviteEmail: parentInvitation.recipientEmail,
-            expiresAt: parentInvitation.expiresAt,
-            accountLabel: 'parent',
-            studentNameForParent: displayName,
+            recipientUserId: user.id,
+            recipientDisplayName: displayName,
+            loginEmail: normalizedLoginEmail,
+            inviteEmail: inv.recipient_email,
+            expiresAt: inv.expires_at,
+            accountLabel: 'student',
           });
+          if (parentInvitation?.parentUserId) {
+            const parentLoginEmail =
+              this.normalizeLoginEmail(input.parentEmail ?? '') || parentInvitation.recipientEmail;
+            const parentName =
+              (input.parentName ?? '').trim() || this.nameFromEmail(parentLoginEmail);
+            await this.sendInvitationDetailsMessage({
+              branchId,
+              adminUser,
+              recipientUserId: parentInvitation.parentUserId,
+              recipientDisplayName: parentName,
+              loginEmail: parentLoginEmail,
+              inviteEmail: parentInvitation.recipientEmail,
+              expiresAt: parentInvitation.expiresAt,
+              accountLabel: 'parent',
+              studentNameForParent: displayName,
+            });
+          }
+        } catch {
+          // non-fatal
         }
-      } catch {
-        // non-fatal
       }
 
       return {
@@ -1477,6 +1765,8 @@ export class StudentsService {
           expiresAt: inv.expires_at,
         },
         parentInvitation,
+        deferredDeliveries: deferInvitationDelivery ? deferredDeliveries : undefined,
+        createdParentUserId,
       };
     } catch (error) {
       // If we created a *new* parent account during this flow and the student row ultimately failed,

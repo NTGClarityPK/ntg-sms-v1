@@ -641,13 +641,15 @@ sudo certbot renew --dry-run
 
 ### Update the following fields
 
-* **Site URL**: `https://alma.ntgapps.com` (your production domain)
+* **Site URL**: `https://alma.ntgapps.com` (your production domain — do **not** use `/home`)
 * **Redirect URLs**: Add all valid redirect URLs:
 
 ```
 https://alma.ntgapps.com/auth/callback
+https://alma.ntgapps.com/reset-password
 https://alma.ntgapps.com/*
-http://localhost:3000/auth/callback  # For development
+http://localhost:3000/auth/callback
+http://localhost:3000/reset-password
 ```
 
 {% endstep %}

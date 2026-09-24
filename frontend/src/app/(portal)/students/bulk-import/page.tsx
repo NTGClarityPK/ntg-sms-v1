@@ -28,12 +28,31 @@ import {
   useMantineTheme,
 } from '@mantine/core';
 import { IconUpload, IconCheck, IconX, IconAlertCircle, IconDownload, IconQuestionMark } from '@tabler/icons-react';
-import { useBulkImportPreview, useBulkImport, useBulkImportTemplate, useBulkImportValidate, useSubjectTemplateHelp } from '@/hooks/useBulkImport';
+import {
+  useBulkImportPreview,
+  useBulkImport,
+  useBulkImportTemplate,
+  useBulkImportValidate,
+  useBulkStudentsExport,
+  useSubjectTemplateHelp,
+} from '@/hooks/useBulkImport';
 import { useAcademicYearsList, useActiveAcademicYear } from '@/hooks/useAcademicYears';
 import { notifications } from '@mantine/notifications';
 import * as XLSX from 'xlsx';
 import type { BulkImportPreview, BulkImportResult, BulkStudentRowDto } from '@/hooks/useBulkImport';
-import { modals } from '@mantine/modals';
+
+function downloadBase64File(fileName: string, contentBase64: string, mimeType: string): void {
+  const binary = atob(contentBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function BulkImportStudentsPage() {
   const t = useTranslations('students');
@@ -43,6 +62,7 @@ export default function BulkImportStudentsPage() {
   const [preview, setPreview] = useState<BulkImportPreview | null>(null);
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [lastImportResult, setLastImportResult] = useState<BulkImportResult | null>(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [isValidated, setIsValidated] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -50,6 +70,7 @@ export default function BulkImportStudentsPage() {
   const previewMutation = useBulkImportPreview();
   const importMutation = useBulkImport();
   const validateMutation = useBulkImportValidate();
+  const exportMutation = useBulkStudentsExport();
   const { data: templateData } = useBulkImportTemplate();
   const { data: academicYearsResponse } = useAcademicYearsList({ page: 1, limit: 50 });
   const { data: activeAcademicYearResponse } = useActiveAcademicYear();
@@ -127,16 +148,12 @@ export default function BulkImportStudentsPage() {
       });
       return;
     }
-    const validRows = preview.rows
-      .filter(
-        (r) =>
-          r.data.first_name?.trim() &&
-          r.data.last_name?.trim() &&
-          r.data.username?.trim() &&
-          r.data.gender?.trim()
-      )
-      .map((r) => ({ ...r.data, row_number: r.rowNumber }));
-    if (validRows.length === 0) {
+    // Send all rows (including prior Import Status) so the backend can skip added/updated.
+    const rowsToImport = preview.rows.map((r) => ({
+      ...r.data,
+      row_number: r.rowNumber,
+    }));
+    if (rowsToImport.length === 0) {
       notifications.show({
         title: t('bulkNoValidRows'),
         message: t('bulkNoValidRowsMessage'),
@@ -146,77 +163,16 @@ export default function BulkImportStudentsPage() {
     }
     try {
       const result = await importMutation.mutateAsync({
-        rows: validRows,
+        rows: rowsToImport,
         academicYearId: selectedYear,
       });
       setLastImportResult(result);
-      notifications.show({
-        title: t('bulkImportComplete'),
-        message: result.errors.length > 0
-          ? t('bulkImportCompletePartial', { successCount: result.successCount, failureCount: result.failureCount })
-          : t('bulkImportCompleteSuccess', { successCount: result.successCount }),
-        color: result.failureCount === 0 ? 'green' : 'yellow',
-        icon: <IconCheck size={16} />,
-      });
-
-      if ((result.created?.length ?? 0) > 0) {
-        modals.open({
-          title: 'Invitations sent',
-          size: 'xl',
-          centered: true,
-          children: (
-            <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-              <Stack gap="sm">
-                {result.created!.map((c) => (
-                  <Paper key={`${c.row}-${c.username}`} withBorder p="md">
-                    <Group justify="space-between" align="flex-start">
-                      <div>
-                        <Text fw={600}>
-                          Row {c.row} — {c.studentName} ({c.username})
-                        </Text>
-                        {c.loginEmail && (
-                          <Text size="sm" c="dimmed">
-                            Login: {c.loginEmail}
-                          </Text>
-                        )}
-                      </div>
-                      <Badge color={c.invitationType === 'parent' ? 'blue' : 'green'}>
-                        {c.invitationType}
-                      </Badge>
-                    </Group>
-                    <Divider my="sm" />
-                    <Text size="sm">
-                      <strong>Recipient email:</strong> {c.recipientEmail}
-                    </Text>
-                    <Text size="sm">
-                      <strong>Expires at:</strong> {new Date(c.expiresAt).toLocaleString()}
-                    </Text>
-
-                    {c.parentRecipientEmail && (
-                      <>
-                        <Divider my="sm" />
-                        <Text size="sm">
-                          <strong>Parent setup recipient:</strong> {c.parentRecipientEmail}
-                        </Text>
-                        {c.parentExpiresAt && (
-                          <Text size="sm">
-                            <strong>Parent invite expires at:</strong>{' '}
-                            {new Date(c.parentExpiresAt).toLocaleString()}
-                          </Text>
-                        )}
-                      </>
-                    )}
-                  </Paper>
-                ))}
-              </Stack>
-            </div>
-          ),
-        });
-      }
-
+      setStatusModalOpen(true);
       setFile(null);
       setPreview(null);
       setSelectedYear(null);
+      setIsValidated(false);
+      setShowValidation(false);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('bulkFailedToImportStudents');
       notifications.show({
@@ -226,6 +182,37 @@ export default function BulkImportStudentsPage() {
         icon: <IconX size={16} />,
       });
     }
+  };
+
+  const handleExportStudents = async () => {
+    try {
+      const file = await exportMutation.mutateAsync(selectedYear ?? activeAcademicYear?.id);
+      downloadBase64File(file.fileName, file.contentBase64, file.mimeType);
+      notifications.show({
+        title: t('bulkExportComplete'),
+        message: t('bulkExportCompleteMessage', { count: file.rowCount }),
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('bulkExportFailed');
+      notifications.show({
+        title: t('bulkExportFailed'),
+        message,
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    }
+  };
+
+  const handleDownloadResultsFile = () => {
+    const resultsFile = lastImportResult?.resultsFile;
+    if (!resultsFile) return;
+    downloadBase64File(
+      resultsFile.fileName,
+      resultsFile.contentBase64,
+      resultsFile.mimeType,
+    );
   };
 
   const handleDownloadTemplate = () => {
@@ -421,14 +408,25 @@ export default function BulkImportStudentsPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>{t('bulkImportTitle')}</Title>
-          <Button
-            id="bulk-import-download-template"
-            leftSection={<IconDownload size={16} />}
-            variant="light"
-            onClick={handleDownloadTemplate}
-          >
-            {t('downloadTemplate')}
-          </Button>
+          <Group gap="sm">
+            <Button
+              id="bulk-import-export-students"
+              leftSection={<IconDownload size={16} />}
+              variant="default"
+              loading={exportMutation.isPending}
+              onClick={() => void handleExportStudents()}
+            >
+              {t('bulkExportStudents')}
+            </Button>
+            <Button
+              id="bulk-import-download-template"
+              leftSection={<IconDownload size={16} />}
+              variant="light"
+              onClick={handleDownloadTemplate}
+            >
+              {t('downloadTemplate')}
+            </Button>
+          </Group>
         </Group>
       </div>
 
@@ -446,47 +444,34 @@ export default function BulkImportStudentsPage() {
           {lastImportResult != null && (
             <Paper p="md" withBorder>
               <Stack gap="xs">
-                <Title order={5}>{t('lastImportResult')}</Title>
+                <Group justify="space-between">
+                  <Title order={5}>{t('lastImportResult')}</Title>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    onClick={() => setStatusModalOpen(true)}
+                  >
+                    {t('bulkViewImportStatus')}
+                  </Button>
+                </Group>
                 <Text size="sm">
-                  {t('bulkStudentsImportedSuccess', { count: lastImportResult.successCount })}
-                  {lastImportResult.failureCount > 0 && (
-                    <> {t('bulkRowsFailed', { count: lastImportResult.failureCount })}</>
-                  )}
+                  {t('bulkImportStatusSummary', {
+                    added: lastImportResult.createdCount ?? 0,
+                    updated: lastImportResult.updatedCount ?? 0,
+                    unchanged: lastImportResult.unchangedCount ?? 0,
+                    failedInsert: lastImportResult.failedInsertCount ?? 0,
+                    failedUpdate: lastImportResult.failedUpdateCount ?? 0,
+                  })}
                 </Text>
-                {lastImportResult.successCount > 0 && (
-                  <Text size="xs" c="dimmed">
-                    {t('importedStudentsHint')}
-                  </Text>
-                )}
-                {lastImportResult.errors.length > 0 && (
-                  <>
-                    <Alert color="red" title={t('errorsByRow')}>
-                      <Stack gap={4}>
-                        {lastImportResult.errors
-                          .filter((e) => !e.message.startsWith('Student imported but:'))
-                          .map((e, idx) => (
-                            <Text key={idx} size="sm">
-                              {t('rowWithMessage', { row: e.row, message: e.message })}
-                            </Text>
-                          ))}
-                      </Stack>
-                    </Alert>
-                    {lastImportResult.errors.some((e) =>
-                      e.message.startsWith('Student imported but:')
-                    ) && (
-                      <Alert color="yellow" title={t('warningsImportedWithIssues')}>
-                        <Stack gap={4}>
-                          {lastImportResult.errors
-                            .filter((e) => e.message.startsWith('Student imported but:'))
-                            .map((e, idx) => (
-                              <Text key={idx} size="sm">
-                                {t('rowWithMessage', { row: e.row, message: e.message })}
-                              </Text>
-                            ))}
-                        </Stack>
-                      </Alert>
-                    )}
-                  </>
+                {lastImportResult.resultsFile && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    leftSection={<IconDownload size={14} />}
+                    onClick={handleDownloadResultsFile}
+                  >
+                    {t('bulkDownloadResultsSheet')}
+                  </Button>
                 )}
               </Stack>
             </Paper>
@@ -881,6 +866,89 @@ export default function BulkImportStudentsPage() {
             </Paper>
           )}
         </Stack>
+      </Modal>
+
+      <Modal
+        opened={statusModalOpen && lastImportResult != null}
+        onClose={() => setStatusModalOpen(false)}
+        title={t('bulkImportStatusTitle')}
+        size="lg"
+        centered
+      >
+        {lastImportResult && (
+          <Stack gap="md">
+            <Text size="sm">
+              {t('bulkStatusAdded', { count: lastImportResult.createdCount ?? 0 })}
+            </Text>
+            <Text size="sm">
+              {t('bulkStatusUpdated', { count: lastImportResult.updatedCount ?? 0 })}
+            </Text>
+            <Text size="sm">
+              {t('bulkStatusUnchanged', { count: lastImportResult.unchangedCount ?? 0 })}
+            </Text>
+            {(lastImportResult.skippedCount ?? 0) > 0 && (
+              <Text size="sm" c="dimmed">
+                {t('bulkStatusSkipped', { count: lastImportResult.skippedCount ?? 0 })}
+              </Text>
+            )}
+
+            <Divider />
+
+            <div>
+              <Text size="sm" fw={600} c="red">
+                {t('bulkStatusFailedUpdate', {
+                  count: lastImportResult.failedUpdateCount ?? 0,
+                })}
+              </Text>
+              {(lastImportResult.rowOutcomes ?? [])
+                .filter((o) => o.status === 'failed_update')
+                .map((o) => (
+                  <Text key={`fu-${o.row}`} size="xs" mt={4}>
+                    {t('rowWithMessage', {
+                      row: o.row,
+                      message: `${o.username || o.studentName}: ${o.reason ?? ''}`,
+                    })}
+                  </Text>
+                ))}
+            </div>
+
+            <div>
+              <Text size="sm" fw={600} c="red">
+                {t('bulkStatusFailedInsert', {
+                  count: lastImportResult.failedInsertCount ?? 0,
+                })}
+              </Text>
+              {(lastImportResult.rowOutcomes ?? [])
+                .filter((o) => o.status === 'failed_insert' && o.row > 0)
+                .map((o) => (
+                  <Text key={`fi-${o.row}`} size="xs" mt={4}>
+                    {t('rowWithMessage', {
+                      row: o.row,
+                      message: `${o.username || o.studentName}: ${o.reason ?? ''}`,
+                    })}
+                  </Text>
+                ))}
+            </div>
+
+            {lastImportResult.resultsFile && (
+              <Alert color="orange" title={t('bulkResultsSheetAvailable')}>
+                <Stack gap="sm">
+                  <Text size="sm">{t('bulkResultsSheetHint')}</Text>
+                  <Button
+                    leftSection={<IconDownload size={16} />}
+                    onClick={handleDownloadResultsFile}
+                  >
+                    {t('bulkDownloadResultsSheet')}
+                  </Button>
+                </Stack>
+              </Alert>
+            )}
+
+            <Group justify="flex-end">
+              <Button onClick={() => setStatusModalOpen(false)}>{t('bulkCloseStatus')}</Button>
+            </Group>
+          </Stack>
+        )}
       </Modal>
     </>
   );

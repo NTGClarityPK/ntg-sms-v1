@@ -5,9 +5,19 @@ import { plainToInstance } from 'class-transformer';
 import * as XLSX from 'xlsx';
 import { BulkStudentRowDto } from './dto/bulk-student-row.dto';
 import { BulkUserRowDto } from './dto/bulk-user-row.dto';
-import { StudentsService } from '../students/students.service';
+import {
+  StudentsService,
+  type DeferredInvitationDelivery,
+} from '../students/students.service';
 import { UsersService } from '../users/users.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { mapWithConcurrency } from '../../common/utils/map-with-concurrency.util';
+import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
+import {
+  IMPORT_STATUS_COLUMN,
+  STUDENT_BULK_COLUMN_DEFS,
+  isSkipImportStatus,
+} from './student-bulk-columns';
 
 type SupabaseClient = ReturnType<SupabaseConfig['getClient']>;
 
@@ -76,11 +86,55 @@ export interface ImportPreview {
   rows: ParsedRow[];
 }
 
+export interface ImportRowOutcome {
+  row: number;
+  username: string;
+  studentName: string;
+  loginEmail?: string;
+  status: 'added' | 'updated' | 'unchanged' | 'failed_insert' | 'failed_update' | 'skipped';
+  reason?: string;
+  recipientEmail?: string;
+  invitationType?: 'parent' | 'student';
+  expiresAt?: string;
+  parentRecipientEmail?: string;
+  parentExpiresAt?: string;
+}
+
+type StudentImportSnapshot = {
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  address: string | null;
+  dateOfBirth: string | null;
+  gender: string | null;
+  bloodGroup: string | null;
+  medicalNotes: string | null;
+  admissionDate: string | null;
+  googleAccountEmail: string | null;
+  classId: string | null;
+  sectionId: string | null;
+  subjectTemplateId: string | null;
+};
+
 export interface ImportResult {
   totalProcessed: number;
   successCount: number;
   failureCount: number;
+  createdCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  failedInsertCount: number;
+  failedUpdateCount: number;
+  skippedCount: number;
   errors: Array<{ row: number; message: string }>;
+  rowOutcomes: ImportRowOutcome[];
+  /** Present when any row failed — Excel matching import shape + Import Status column. */
+  resultsFile?: {
+    fileName: string;
+    contentBase64: string;
+    mimeType: string;
+  };
+  /** @deprecated Prefer rowOutcomes; kept for older clients. */
   created?: Array<{
     row: number;
     username: string;
@@ -91,6 +145,7 @@ export interface ImportResult {
     expiresAt: string;
     parentRecipientEmail?: string;
     parentExpiresAt?: string;
+    action: 'created' | 'updated';
   }>;
 }
 
@@ -353,6 +408,14 @@ const COLUMN_MAP: Record<string, string[]> = {
     'Parent Phone (optional)',
     'Guardian Phone',
     'parent phone',
+  ],
+  import_status: [
+    'import_status',
+    'Import Status',
+    'import status',
+    'Status',
+    'Import result',
+    'Import Result',
   ],
 };
 
@@ -1385,155 +1448,830 @@ export class BulkImportService {
     academicYearId: string,
     adminUser: CurrentUserPayload,
   ): Promise<{ data: ImportResult }> {
-    const supabase = this.getClient();
-    const refs = await this.loadPlacementRefs(supabase, branchId);
-    const results: ImportResult = {
-      totalProcessed: rows.length,
-      successCount: 0,
-      failureCount: 0,
-      errors: [],
-      created: [],
-    };
-
     if (rows.length === 0) {
       throw new BadRequestException('No rows to import');
     }
 
-    // Small concurrency to reduce total wall time without overwhelming Auth/Email providers.
-    const CONCURRENCY = 4;
-    const indices = rows.map((_, i) => i);
-    let cursor = 0;
+    const supabase = this.getClient();
+    const refs = await this.loadPlacementRefs(supabase, branchId);
 
-    const worker = async () => {
-      while (cursor < indices.length) {
-        const idx = indices[cursor]!;
-        cursor += 1;
-        const row = rows[idx]!;
-        const rowLabel = row.row_number ?? idx + 2;
+    const prepared = rows.map((incoming, i) => {
+      const rowLabel = incoming.row_number ?? i + 2;
+      const dto = plainToInstance(BulkStudentRowDto, {
+        ...incoming,
+        create_parent_account: incoming.create_parent_account ?? false,
+        invitation_type: incoming.invitation_type ?? 'student',
+      });
+      return { rowLabel, dto, originalIndex: i };
+    });
 
-        const hasCore =
-          row.first_name?.trim() &&
-          row.last_name?.trim() &&
-          row.username?.trim() &&
-          row.gender;
-        if (!hasCore) {
-          results.failureCount += 1;
-          results.errors.push({
-            row: rowLabel,
-            message:
-              'Missing required fields: username, first name, last name, and gender are required.',
+    const rowOutcomes: ImportRowOutcome[] = [];
+    const deferredDeliveries: DeferredInvitationDelivery[] = [];
+    const sheetStatusByIndex = new Map<number, string>();
+
+    // Skip rows already marked added/updated/unchanged from a prior results sheet
+    const actionable: typeof prepared = [];
+    for (const item of prepared) {
+      if (isSkipImportStatus(item.dto.import_status)) {
+        const statusLabel = String(item.dto.import_status ?? '').trim() || 'skipped';
+        sheetStatusByIndex.set(item.originalIndex, statusLabel);
+        rowOutcomes.push({
+          row: item.rowLabel,
+          username: (item.dto.username ?? '').trim(),
+          studentName: `${(item.dto.first_name ?? '').trim()} ${(item.dto.last_name ?? '').trim()}`.trim(),
+          status: 'skipped',
+          reason: `Skipped (prior status: ${statusLabel})`,
+        });
+      } else {
+        actionable.push(item);
+      }
+    }
+
+    // Validate actionable rows (do not abort whole import — invalid → failed outcome)
+    type ActionableValid = {
+      rowLabel: number;
+      dto: BulkStudentRowDto;
+      originalIndex: number;
+      loginEmail: string;
+      classId?: string;
+      sectionId?: string;
+      subjectTemplateId?: string;
+      existingStudentId?: string;
+    };
+    const validActionable: ActionableValid[] = [];
+
+    for (const item of actionable) {
+      const errors = await validate(item.dto);
+      const fieldErrors = errors.flatMap((err) =>
+        err.constraints ? Object.values(err.constraints) : [],
+      );
+      const allErrors = [...fieldErrors, ...this.appendExtraRowValidation(item.dto)];
+
+      if (allErrors.length === 0) {
+        const placement = this.resolvePlacementForRowFromRefs(item.dto, refs);
+        const hasClass = !!item.dto.class_name_or_id?.trim();
+        const hasSection = !!item.dto.section_name_or_id?.trim();
+        const hasTemplate = !!item.dto.subject_template_name_or_id?.trim();
+
+        if (hasClass && !placement.classId) {
+          const classIssues = (placement.warnings ?? []).filter((w) => {
+            const s = String(w).toLowerCase();
+            return s.startsWith('class ') && s.includes('not found');
+          });
+          if (classIssues.length > 0) allErrors.push(...classIssues);
+        }
+        if (hasSection && !placement.sectionId) {
+          const sectionIssues = (placement.warnings ?? []).filter((w) => {
+            const s = String(w).toLowerCase();
+            return s.startsWith('section ') && s.includes('not found');
+          });
+          if (sectionIssues.length > 0) allErrors.push(...sectionIssues);
+        }
+        if (hasTemplate) {
+          const templateIssues = (placement.warnings ?? []).filter((w) =>
+            String(w).toLowerCase().includes('subject template'),
+          );
+          if (templateIssues.length > 0) allErrors.push(...templateIssues);
+          else if (!placement.subjectTemplateId) {
+            allErrors.push(
+              `Subject template '${item.dto.subject_template_name_or_id}' not found.`,
+            );
+          }
+        } else {
+          const requiredTemplateIssues = (placement.warnings ?? []).filter((w) =>
+            String(w).toLowerCase().includes('subject template is required'),
+          );
+          if (requiredTemplateIssues.length > 0) allErrors.push(...requiredTemplateIssues);
+        }
+
+        if (allErrors.length === 0) {
+          const loginEmail = await this.studentsService.resolveLoginEmailForUsername(
+            item.dto.username,
+            branchId,
+          );
+          validActionable.push({
+            rowLabel: item.rowLabel,
+            dto: item.dto,
+            originalIndex: item.originalIndex,
+            loginEmail,
+            classId: placement.classId ?? undefined,
+            sectionId: placement.sectionId ?? undefined,
+            subjectTemplateId: placement.subjectTemplateId ?? undefined,
           });
           continue;
         }
+      }
 
+      const reason = allErrors.join(' ');
+      // Classify as insert vs update failure after we know existence — provisional failed_insert
+      rowOutcomes.push({
+        row: item.rowLabel,
+        username: (item.dto.username ?? '').trim(),
+        studentName: `${(item.dto.first_name ?? '').trim()} ${(item.dto.last_name ?? '').trim()}`.trim(),
+        status: 'failed_insert',
+        reason,
+      });
+      sheetStatusByIndex.set(item.originalIndex, `failed: ${reason}`);
+    }
+
+    // Duplicate usernames among valid actionable only
+    const usernameCounts = new Map<string, number[]>();
+    for (const item of validActionable) {
+      const key = item.dto.username.trim().toLowerCase();
+      const list = usernameCounts.get(key) ?? [];
+      list.push(item.rowLabel);
+      usernameCounts.set(key, list);
+    }
+    const dupeUsernames = new Set(
+      [...usernameCounts.entries()].filter(([, labels]) => labels.length > 1).map(([u]) => u),
+    );
+    const afterDupeCheck: ActionableValid[] = [];
+    for (const item of validActionable) {
+      const key = item.dto.username.trim().toLowerCase();
+      if (dupeUsernames.has(key)) {
+        const reason = `Duplicate username '${item.dto.username.trim()}' in this import sheet`;
+        rowOutcomes.push({
+          row: item.rowLabel,
+          username: item.dto.username.trim(),
+          studentName: `${item.dto.first_name.trim()} ${item.dto.last_name.trim()}`.trim(),
+          loginEmail: item.loginEmail,
+          status: 'failed_insert',
+          reason,
+        });
+        sheetStatusByIndex.set(item.originalIndex, `failed: ${reason}`);
+      } else {
+        afterDupeCheck.push(item);
+      }
+    }
+
+    const existingByEmail = await this.studentsService.findStudentsByLoginEmails(
+      branchId,
+      afterDupeCheck.map((i) => i.loginEmail),
+    );
+    const nonStudentConflicts = await this.studentsService.findNonStudentLoginEmailConflicts(
+      branchId,
+      afterDupeCheck.map((i) => i.loginEmail),
+    );
+
+    const toUpdate: ActionableValid[] = [];
+    const toInsert: ActionableValid[] = [];
+
+    for (const item of afterDupeCheck) {
+      if (nonStudentConflicts.has(item.loginEmail)) {
+        const reason =
+          'Username already registered but not as a student in this branch';
+        rowOutcomes.push({
+          row: item.rowLabel,
+          username: item.dto.username.trim(),
+          studentName: `${item.dto.first_name.trim()} ${item.dto.last_name.trim()}`.trim(),
+          loginEmail: item.loginEmail,
+          status: 'failed_insert',
+          reason,
+        });
+        sheetStatusByIndex.set(item.originalIndex, `failed: ${reason}`);
+        continue;
+      }
+      const existing = existingByEmail.get(item.loginEmail);
+      if (existing) {
+        item.existingStudentId = existing.studentId;
+        toUpdate.push(item);
+      } else {
+        toInsert.push(item);
+      }
+    }
+
+    // Reclassify validation-failed rows that match existing students as failed_update
+    const failedForClassify = rowOutcomes.filter(
+      (o) => o.status === 'failed_insert' && o.username.trim() !== '',
+    );
+    if (failedForClassify.length > 0) {
+      const emails = await Promise.all(
+        failedForClassify.map(async (o) => {
+          try {
+            return await this.studentsService.resolveLoginEmailForUsername(
+              o.username,
+              branchId,
+            );
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const existingFailed = await this.studentsService.findStudentsByLoginEmails(
+        branchId,
+        emails.filter((e): e is string => !!e),
+      );
+      for (let i = 0; i < failedForClassify.length; i++) {
+        const email = emails[i];
+        if (email && existingFailed.has(email)) {
+          failedForClassify[i]!.status = 'failed_update';
+        }
+      }
+    }
+
+    // Load snapshots for unchanged detection
+    const snapshots = await this.loadStudentImportSnapshots(
+      branchId,
+      academicYearId,
+      toUpdate.map((u) => u.existingStudentId!).filter(Boolean),
+    );
+
+    const UPDATE_CONCURRENCY = 4;
+    type UpdateOutcome =
+      | { ok: true; item: ActionableValid; unchanged: boolean }
+      | { ok: false; item: ActionableValid; error: unknown };
+
+    const updateOutcomes = await mapWithConcurrency(
+      toUpdate,
+      UPDATE_CONCURRENCY,
+      async (item): Promise<UpdateOutcome> => {
         try {
-          const placement = this.resolvePlacementForRowFromRefs(row, refs);
-
-          const hasClass = !!row.class_name_or_id?.trim();
-          const hasSection = !!row.section_name_or_id?.trim();
-          const hasTemplate = !!row.subject_template_name_or_id?.trim();
-          const blockingIssues: string[] = [];
-
-          if (hasClass && !placement.classId) {
-            const classWarn = (placement.warnings ?? []).find((w) => {
-              const s = String(w).toLowerCase();
-              return s.startsWith('class ') && s.includes('not found');
-            });
-            if (classWarn) blockingIssues.push(classWarn);
+          const snap = snapshots.get(item.existingStudentId!);
+          if (snap && this.isStudentRowUnchanged(item, snap)) {
+            return { ok: true, item, unchanged: true };
           }
+          await this.studentsService.updateStudent(
+            item.existingStudentId!,
+            {
+              firstName: item.dto.first_name.trim(),
+              lastName: item.dto.last_name.trim(),
+              phone: item.dto.phone,
+              address: item.dto.address,
+              dateOfBirth: item.dto.date_of_birth,
+              gender: item.dto.gender as 'male' | 'female',
+              classId: item.classId,
+              sectionId: item.sectionId,
+              bloodGroup: item.dto.blood_group,
+              medicalNotes: item.dto.medical_notes,
+              admissionDate: item.dto.admission_date,
+              googleAccountEmail: item.dto.google_account_email,
+              academicYearId,
+              subjectTemplateId: item.subjectTemplateId,
+            },
+            branchId,
+            adminUser.email,
+          );
+          return { ok: true, item, unchanged: false };
+        } catch (error: unknown) {
+          return { ok: false, item, error };
+        }
+      },
+    );
 
-          if (hasSection && !placement.sectionId) {
-            const sectionWarn = (placement.warnings ?? []).find((w) => {
-              const s = String(w).toLowerCase();
-              return s.startsWith('section ') && s.includes('not found');
-            });
-            if (sectionWarn) blockingIssues.push(sectionWarn);
-          }
+    for (const outcome of updateOutcomes) {
+      const name = `${outcome.item.dto.first_name.trim()} ${outcome.item.dto.last_name.trim()}`.trim();
+      if (!outcome.ok) {
+        const reason =
+          outcome.error instanceof Error ? outcome.error.message : 'Unknown error during update';
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          username: outcome.item.dto.username.trim(),
+          studentName: name,
+          loginEmail: outcome.item.loginEmail,
+          status: 'failed_update',
+          reason,
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, `failed: ${reason}`);
+        continue;
+      }
+      if (outcome.unchanged) {
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          username: outcome.item.dto.username.trim(),
+          studentName: name,
+          loginEmail: outcome.item.loginEmail,
+          status: 'unchanged',
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, 'unchanged');
+      } else {
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          username: outcome.item.dto.username.trim(),
+          studentName: name,
+          loginEmail: outcome.item.loginEmail,
+          status: 'updated',
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, 'updated');
+      }
+    }
 
-          if (hasTemplate) {
-            const templateIssues = (placement.warnings ?? []).filter((w) =>
-              String(w).toLowerCase().includes('subject template'),
-            );
-            if (templateIssues.length > 0) {
-              blockingIssues.push(...templateIssues);
-            } else if (!placement.subjectTemplateId) {
-              blockingIssues.push(
-                `Subject template '${row.subject_template_name_or_id}' not found.`,
-              );
-            }
-          } else {
-            const requiredTemplateIssues = (placement.warnings ?? []).filter((w) =>
-              String(w).toLowerCase().includes('subject template is required'),
-            );
-            if (requiredTemplateIssues.length > 0) {
-              blockingIssues.push(...requiredTemplateIssues);
-            }
-          }
-          if (blockingIssues.length > 0) {
-            throw new BadRequestException(blockingIssues.join(' '));
-          }
+    const INSERT_CONCURRENCY = 3;
+    type InsertOutcome =
+      | {
+          ok: true;
+          item: ActionableValid;
+          created: Awaited<ReturnType<StudentsService['createStudentWithInvitation']>>;
+        }
+      | { ok: false; item: ActionableValid; error: unknown };
 
+    const insertOutcomes = await mapWithConcurrency(
+      toInsert,
+      INSERT_CONCURRENCY,
+      async (item): Promise<InsertOutcome> => {
+        try {
           const created = await this.studentsService.createStudentWithInvitation(
             {
-              username: row.username.trim(),
-              firstName: row.first_name.trim(),
-              lastName: row.last_name.trim(),
-              classId: placement.classId ?? undefined,
-              sectionId: placement.sectionId ?? undefined,
-              phone: row.phone,
-              address: row.address,
-              dateOfBirth: row.date_of_birth,
-              gender: row.gender,
-              bloodGroup: row.blood_group,
-              medicalNotes: row.medical_notes,
-              admissionDate: row.admission_date,
-              googleAccountEmail: row.google_account_email,
+              username: item.dto.username.trim(),
+              firstName: item.dto.first_name.trim(),
+              lastName: item.dto.last_name.trim(),
+              classId: item.classId,
+              sectionId: item.sectionId,
+              phone: item.dto.phone,
+              address: item.dto.address,
+              dateOfBirth: item.dto.date_of_birth,
+              gender: item.dto.gender,
+              bloodGroup: item.dto.blood_group,
+              medicalNotes: item.dto.medical_notes,
+              admissionDate: item.dto.admission_date,
+              googleAccountEmail: item.dto.google_account_email,
               academicYearId,
-              subjectTemplateId: placement.subjectTemplateId ?? undefined,
-              invitationType: row.invitation_type,
+              subjectTemplateId: item.subjectTemplateId,
+              invitationType: item.dto.invitation_type,
               invitationRecipientEmail: this.sanitizeSingleEmail(
-                row.invitation_recipient_email,
+                item.dto.invitation_recipient_email,
               ),
-              createParentAccount: row.create_parent_account,
-              parentEmail: row.parent_email,
-              parentName: row.parent_name,
-              parentPhone: row.parent_phone,
-              parentRelationship: row.parent_relationship,
+              createParentAccount: item.dto.create_parent_account,
+              parentEmail: item.dto.parent_email,
+              parentName: item.dto.parent_name,
+              parentPhone: item.dto.parent_phone,
+              parentRelationship: item.dto.parent_relationship,
             },
             branchId,
             adminUser,
+            { deferInvitationDelivery: true },
           );
-
-          results.successCount += 1;
-          results.created?.push({
-            row: rowLabel,
-            username: row.username.trim(),
-            studentName: `${row.first_name.trim()} ${row.last_name.trim()}`.trim(),
-            loginEmail: created.student.email ?? '',
-            recipientEmail: created.studentInvitation.recipientEmail,
-            invitationType: created.studentInvitation.invitationType,
-            expiresAt: created.studentInvitation.expiresAt,
-            parentRecipientEmail: created.parentInvitation?.recipientEmail,
-            parentExpiresAt: created.parentInvitation?.expiresAt,
-          });
-          if (placement.warnings.length > 0) {
-            results.errors.push({
-              row: rowLabel,
-              message: `Student imported but: ${placement.warnings.join(' ')}`,
-            });
-          }
-        } catch (err: unknown) {
-          results.failureCount += 1;
-          const message =
-            err instanceof Error ? err.message : 'Unknown error during import';
-          results.errors.push({ row: rowLabel, message });
+          return { ok: true, item, created };
+        } catch (error: unknown) {
+          return { ok: false, item, error };
         }
+      },
+    );
+
+    for (const outcome of insertOutcomes) {
+      const name = `${outcome.item.dto.first_name.trim()} ${outcome.item.dto.last_name.trim()}`.trim();
+      if (!outcome.ok) {
+        const reason =
+          outcome.error instanceof Error ? outcome.error.message : 'Unknown error during create';
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          username: outcome.item.dto.username.trim(),
+          studentName: name,
+          loginEmail: outcome.item.loginEmail,
+          status: 'failed_insert',
+          reason,
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, `failed: ${reason}`);
+        continue;
       }
+      if (outcome.created.deferredDeliveries?.length) {
+        deferredDeliveries.push(...outcome.created.deferredDeliveries);
+      }
+      rowOutcomes.push({
+        row: outcome.item.rowLabel,
+        username: outcome.item.dto.username.trim(),
+        studentName: name,
+        loginEmail: outcome.created.student.email ?? outcome.item.loginEmail,
+        status: 'added',
+        recipientEmail: outcome.created.studentInvitation.recipientEmail,
+        invitationType: outcome.created.studentInvitation.invitationType,
+        expiresAt: outcome.created.studentInvitation.expiresAt,
+        parentRecipientEmail: outcome.created.parentInvitation?.recipientEmail,
+        parentExpiresAt: outcome.created.parentInvitation?.expiresAt,
+      });
+      sheetStatusByIndex.set(outcome.item.originalIndex, 'added');
+    }
+
+    if (deferredDeliveries.length > 0) {
+      try {
+        await this.studentsService.deliverDeferredInvitationEmails(
+          deferredDeliveries,
+          adminUser,
+          branchId,
+        );
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to send invitation emails';
+        rowOutcomes.push({
+          row: 0,
+          username: '',
+          studentName: '',
+          status: 'failed_insert',
+          reason: `Invitation emails failed after save: ${message}. Use Resend invitation if needed.`,
+        });
+      }
+    }
+
+    rowOutcomes.sort((a, b) => a.row - b.row);
+
+    const added = rowOutcomes.filter((o) => o.status === 'added');
+    const updated = rowOutcomes.filter((o) => o.status === 'updated');
+    const unchanged = rowOutcomes.filter((o) => o.status === 'unchanged');
+    const failedInserts = rowOutcomes.filter((o) => o.status === 'failed_insert');
+    const failedUpdates = rowOutcomes.filter((o) => o.status === 'failed_update');
+    const skipped = rowOutcomes.filter((o) => o.status === 'skipped');
+
+    const results: ImportResult = {
+      totalProcessed: prepared.length,
+      createdCount: added.length,
+      updatedCount: updated.length,
+      unchangedCount: unchanged.length,
+      failedInsertCount: failedInserts.length,
+      failedUpdateCount: failedUpdates.length,
+      skippedCount: skipped.length,
+      successCount: added.length + updated.length + unchanged.length,
+      failureCount: failedInserts.length + failedUpdates.length,
+      errors: [...failedInserts, ...failedUpdates].map((o) => ({
+        row: o.row,
+        message: o.reason ?? 'Failed',
+      })),
+      rowOutcomes,
+      created: [
+        ...added.map((o) => ({
+          row: o.row,
+          username: o.username,
+          studentName: o.studentName,
+          loginEmail: o.loginEmail ?? '',
+          recipientEmail: o.recipientEmail ?? '',
+          invitationType: o.invitationType ?? 'student',
+          expiresAt: o.expiresAt ?? '',
+          parentRecipientEmail: o.parentRecipientEmail,
+          parentExpiresAt: o.parentExpiresAt,
+          action: 'created' as const,
+        })),
+        ...updated.map((o) => ({
+          row: o.row,
+          username: o.username,
+          studentName: o.studentName,
+          loginEmail: o.loginEmail ?? '',
+          recipientEmail: '',
+          invitationType: 'student' as const,
+          expiresAt: '',
+          action: 'updated' as const,
+        })),
+      ],
     };
 
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    if (results.failureCount > 0) {
+      results.resultsFile = await this.buildImportResultsWorkbook(prepared, sheetStatusByIndex);
+    }
 
     return { data: results };
+  }
+
+  async exportStudentsForImport(
+    branchId: string,
+    academicYearId?: string,
+  ): Promise<{
+    data: {
+      fileName: string;
+      contentBase64: string;
+      mimeType: string;
+      rowCount: number;
+    };
+  }> {
+    const rows = await this.loadStudentsAsImportRows(branchId, academicYearId);
+    const ExcelJS = require('exceljs') as typeof import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Students');
+    const headers = STUDENT_BULK_COLUMN_DEFS.map((c) => c.label);
+    sheet.addRow(headers);
+    sheet.getRow(1).font = { bold: true };
+
+    for (const row of rows) {
+      sheet.addRow(
+        STUDENT_BULK_COLUMN_DEFS.map((c) => {
+          const v = row[c.key];
+          return v == null ? '' : String(v);
+        }),
+      );
+    }
+
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      data: {
+        fileName: `students-export-${stamp}.xlsx`,
+        contentBase64: buffer.toString('base64'),
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        rowCount: rows.length,
+      },
+    };
+  }
+
+  private async buildImportResultsWorkbook(
+    prepared: Array<{ rowLabel: number; dto: BulkStudentRowDto; originalIndex: number }>,
+    sheetStatusByIndex: Map<number, string>,
+  ): Promise<{ fileName: string; contentBase64: string; mimeType: string }> {
+    const ExcelJS = require('exceljs') as typeof import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Students');
+    const headers = [
+      ...STUDENT_BULK_COLUMN_DEFS.map((c) => c.label),
+      IMPORT_STATUS_COLUMN.label,
+    ];
+    sheet.addRow(headers);
+    sheet.getRow(1).font = { bold: true };
+
+    const failFill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFFFC7CE' },
+    };
+
+    for (const item of prepared) {
+      const status = sheetStatusByIndex.get(item.originalIndex) ?? '';
+      const classSection = this.formatClassSectionForSheet(item.dto);
+      const values = STUDENT_BULK_COLUMN_DEFS.map((c) => {
+        if (c.key === 'class_section') return classSection;
+        if (c.key === 'create_parent_account') {
+          return item.dto.create_parent_account ? 'yes' : 'no';
+        }
+        const raw = (item.dto as unknown as Record<string, unknown>)[c.key];
+        return raw == null ? '' : String(raw);
+      });
+      values.push(status);
+      const excelRow = sheet.addRow(values);
+      if (status.toLowerCase().startsWith('failed')) {
+        excelRow.eachCell((cell) => {
+          cell.fill = failFill;
+        });
+      }
+    }
+
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      fileName: `students-import-results-${stamp}.xlsx`,
+      contentBase64: buffer.toString('base64'),
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+  }
+
+  private formatClassSectionForSheet(dto: BulkStudentRowDto): string {
+    const cls = (dto.class_name_or_id ?? '').trim();
+    const sec = (dto.section_name_or_id ?? '').trim();
+    if (cls && sec) return `${cls} - ${sec}`;
+    return cls || sec || '';
+  }
+
+  private normCmp(v: string | null | undefined): string {
+    return String(v ?? '')
+      .trim()
+      .toLowerCase();
+  }
+
+  private isStudentRowUnchanged(
+    item: {
+      dto: BulkStudentRowDto;
+      classId?: string;
+      sectionId?: string;
+      subjectTemplateId?: string;
+    },
+    snap: StudentImportSnapshot,
+  ): boolean {
+    const d = item.dto;
+    return (
+      this.normCmp(d.first_name) === this.normCmp(snap.firstName) &&
+      this.normCmp(d.last_name) === this.normCmp(snap.lastName) &&
+      this.normCmp(d.phone) === this.normCmp(snap.phone) &&
+      this.normCmp(d.address) === this.normCmp(snap.address) &&
+      this.normCmp(d.date_of_birth) === this.normCmp(snap.dateOfBirth) &&
+      this.normCmp(d.gender) === this.normCmp(snap.gender) &&
+      this.normCmp(d.blood_group) === this.normCmp(snap.bloodGroup) &&
+      this.normCmp(d.medical_notes) === this.normCmp(snap.medicalNotes) &&
+      this.normCmp(d.admission_date) === this.normCmp(snap.admissionDate) &&
+      this.normCmp(d.google_account_email) === this.normCmp(snap.googleAccountEmail) &&
+      (item.classId ?? null) === (snap.classId ?? null) &&
+      (item.sectionId ?? null) === (snap.sectionId ?? null) &&
+      (item.subjectTemplateId ?? null) === (snap.subjectTemplateId ?? null)
+    );
+  }
+
+  private async loadStudentImportSnapshots(
+    branchId: string,
+    academicYearId: string,
+    studentIds: string[],
+  ): Promise<Map<string, StudentImportSnapshot>> {
+    const map = new Map<string, StudentImportSnapshot>();
+    const ids = [...new Set(studentIds.filter(Boolean))];
+    if (ids.length === 0) return map;
+
+    const supabase = this.getClient();
+    const CHUNK = 100;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const { data: students, error } = await supabase
+        .from('students')
+        .select(
+          'id, user_id, first_name, last_name, class_id, section_id, blood_group, medical_notes, admission_date, google_account_email',
+        )
+        .eq('branch_id', branchId)
+        .in('id', chunk);
+      if (error) throw new BadRequestException(error.message);
+      const rows = (students ?? []) as Array<{
+        id: string;
+        user_id: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        class_id: string | null;
+        section_id: string | null;
+        blood_group: string | null;
+        medical_notes: string | null;
+        admission_date: string | null;
+        google_account_email: string | null;
+      }>;
+      const userIds = rows.map((r) => r.user_id).filter((id): id is string => !!id);
+      const profileByUser = new Map<
+        string,
+        { phone: string | null; address: string | null; date_of_birth: string | null; gender: string | null }
+      >();
+      if (userIds.length > 0) {
+        const { data: profiles, error: pErr } = await supabase
+          .from('profiles')
+          .select('id, phone, address, date_of_birth, gender')
+          .in('id', userIds);
+        if (pErr) throw new BadRequestException(pErr.message);
+        for (const p of (profiles ?? []) as Array<{
+          id: string;
+          phone: string | null;
+          address: string | null;
+          date_of_birth: string | null;
+          gender: string | null;
+        }>) {
+          profileByUser.set(p.id, p);
+        }
+      }
+
+      const { data: templates, error: tErr } = await supabase
+        .from('student_subject_template_assignments')
+        .select('student_id, subject_template_id')
+        .eq('branch_id', branchId)
+        .eq('academic_year_id', academicYearId)
+        .in('student_id', chunk);
+      if (tErr) throw new BadRequestException(tErr.message);
+      const templateByStudent = new Map<string, string>();
+      for (const t of (templates ?? []) as Array<{
+        student_id: string;
+        subject_template_id: string;
+      }>) {
+        templateByStudent.set(t.student_id, t.subject_template_id);
+      }
+
+      for (const r of rows) {
+        const profile = r.user_id ? profileByUser.get(r.user_id) : undefined;
+        map.set(r.id, {
+          firstName: r.first_name,
+          lastName: r.last_name,
+          phone: profile?.phone ?? null,
+          address: profile?.address ?? null,
+          dateOfBirth: profile?.date_of_birth ?? null,
+          gender: profile?.gender ?? null,
+          bloodGroup: r.blood_group,
+          medicalNotes: r.medical_notes,
+          admissionDate: r.admission_date,
+          googleAccountEmail: r.google_account_email,
+          classId: r.class_id,
+          sectionId: r.section_id,
+          subjectTemplateId: templateByStudent.get(r.id) ?? null,
+        });
+      }
+    }
+    return map;
+  }
+
+  private async loadStudentsAsImportRows(
+    branchId: string,
+    academicYearId?: string,
+  ): Promise<Record<string, string>[]> {
+    const supabase = this.getClient();
+    let yearId = academicYearId ?? null;
+    if (!yearId) {
+      const { data: active } = await supabase
+        .from('academic_years')
+        .select('id')
+        .eq('branch_id', branchId)
+        .eq('is_active', true)
+        .maybeSingle();
+      yearId = (active as { id: string } | null)?.id ?? null;
+    }
+
+    const { data: students, error } = await supabase
+      .from('students')
+      .select(
+        'id, user_id, first_name, last_name, class_id, section_id, blood_group, medical_notes, admission_date, google_account_email, classes:class_id(name, display_name), sections:section_id(name)',
+      )
+      .eq('branch_id', branchId)
+      .order('first_name', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+
+    const rows = (students ?? []) as unknown as Array<{
+      id: string;
+      user_id: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      class_id: string | null;
+      section_id: string | null;
+      blood_group: string | null;
+      medical_notes: string | null;
+      admission_date: string | null;
+      google_account_email: string | null;
+      classes: { name: string; display_name: string | null } | null;
+      sections: { name: string } | null;
+    }>;
+
+    if (rows.length === 0) return [];
+
+    const userIds = rows.map((r) => r.user_id).filter((id): id is string => !!id);
+    const profileByUser = new Map<
+      string,
+      {
+        email: string | null;
+        phone: string | null;
+        address: string | null;
+        date_of_birth: string | null;
+        gender: string | null;
+      }
+    >();
+    const CHUNK = 100;
+    for (let i = 0; i < userIds.length; i += CHUNK) {
+      const chunk = userIds.slice(i, i + CHUNK);
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, email, phone, address, date_of_birth, gender')
+        .in('id', chunk);
+      if (pErr) throw new BadRequestException(pErr.message);
+      for (const p of (profiles ?? []) as Array<{
+        id: string;
+        email: string | null;
+        phone: string | null;
+        address: string | null;
+        date_of_birth: string | null;
+        gender: string | null;
+      }>) {
+        profileByUser.set(p.id, p);
+      }
+    }
+
+    const templateNameByStudent = new Map<string, string>();
+    if (yearId) {
+      const studentIds = rows.map((r) => r.id);
+      for (let i = 0; i < studentIds.length; i += CHUNK) {
+        const chunk = studentIds.slice(i, i + CHUNK);
+        const { data: assignments, error: aErr } = await supabase
+          .from('student_subject_template_assignments')
+          .select('student_id, subject_template_id, subject_templates:subject_template_id(name)')
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', yearId)
+          .in('student_id', chunk);
+        if (aErr) throw new BadRequestException(aErr.message);
+        for (const a of (assignments ?? []) as unknown as Array<{
+          student_id: string;
+          subject_templates: { name: string } | { name: string }[] | null;
+        }>) {
+          const tpl = a.subject_templates;
+          const name = Array.isArray(tpl) ? tpl[0]?.name : tpl?.name;
+          if (name) templateNameByStudent.set(a.student_id, name);
+        }
+      }
+    }
+
+    return rows.map((r) => {
+      const profile = r.user_id ? profileByUser.get(r.user_id) : undefined;
+      const username = profile?.email
+        ? extractUsernameFromEmail(profile.email)
+        : '';
+      const className =
+        (r.classes?.display_name || r.classes?.name || '').trim();
+      const sectionName = (r.sections?.name || '').trim();
+      const classSection =
+        className && sectionName
+          ? `${className} - ${sectionName}`
+          : className || sectionName;
+
+      return {
+        username,
+        first_name: r.first_name ?? '',
+        last_name: r.last_name ?? '',
+        gender: profile?.gender ?? '',
+        invitation_type: 'student',
+        invitation_recipient_email: '',
+        phone: profile?.phone ?? '',
+        address: profile?.address ?? '',
+        date_of_birth: profile?.date_of_birth ?? '',
+        blood_group: r.blood_group ?? '',
+        medical_notes: r.medical_notes ?? '',
+        admission_date: r.admission_date ?? '',
+        google_account_email: r.google_account_email ?? '',
+        class_section: classSection,
+        subject_template_name_or_id: templateNameByStudent.get(r.id) ?? '',
+        create_parent_account: 'no',
+        parent_email: '',
+        parent_name: '',
+        parent_phone: '',
+        parent_relationship: '',
+      };
+    });
   }
 
   // ---------------------------------------------------------------------------

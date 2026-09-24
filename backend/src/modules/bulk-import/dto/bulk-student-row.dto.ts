@@ -217,4 +217,18 @@ export class BulkStudentRowDto {
   @IsOptional()
   @IsString()
   parent_phone?: string;
+
+  /**
+   * Optional status from a previous import results sheet.
+   * Values like `added` / `updated` / `unchanged` are skipped on re-import;
+   * `failed` (or blank) rows are processed again.
+   */
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value == null) return undefined;
+    const v = String(value).trim();
+    return v || undefined;
+  })
+  @IsString()
+  import_status?: string;
 }

@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, type CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { STUDENT_BULK_COLUMN_DEFS } from './student-bulk-columns';
 
 const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -100,110 +101,27 @@ export class BulkImportController {
   downloadTemplate() {
     return {
       data: {
-        columns: [
-          {
-            key: 'username',
-            label: 'Username',
-            example: 'ahmedali',
-          },
-          {
-            key: 'first_name',
-            label: 'First Name',
-            example: 'Ahmed',
-          },
-          {
-            key: 'last_name',
-            label: 'Last Name',
-            example: 'Ali',
-          },
-          {
-            key: 'gender',
-            label: 'Gender',
-            example: 'male',
-          },
-          {
-            key: 'invitation_type',
-            label: 'Invitation Type',
-            example: 'student',
-          },
-          {
-            key: 'invitation_recipient_email',
-            label: 'Invitation Recipient Email (optional)',
-            example: 'parent.personal@example.com',
-          },
-          {
-            key: 'phone',
-            label: 'Phone (optional)',
-            example: '+9647701234567',
-          },
-          {
-            key: 'address',
-            label: 'Address (optional)',
-            example: 'Baghdad',
-          },
-          {
-            key: 'date_of_birth',
-            label: 'Date of Birth (optional)',
-            example: '2010-05-15',
-          },
-          {
-            key: 'blood_group',
-            label: 'Blood Group (optional)',
-            example: 'O+',
-          },
-          {
-            key: 'medical_notes',
-            label: 'Medical Notes (optional)',
-            example: 'None',
-          },
-          {
-            key: 'admission_date',
-            label: 'Admission Date (optional)',
-            example: '2025-09-01',
-          },
-          {
-            key: 'google_account_email',
-            label: 'Google Account Email (optional)',
-            example: 'ahmed.ali@gmail.com',
-          },
-          {
-            key: 'class_section',
-            label: 'Class-Section (optional)',
-            example: 'Grade 1 - A',
-          },
-          {
-            key: 'subject_template_name_or_id',
-            label: 'Subject Template name or ID (optional)',
-            example: 'Primary Curriculum',
-          },
-          {
-            key: 'create_parent_account',
-            label: 'Create Parent Account',
-            example: 'no',
-          },
-          {
-            key: 'parent_email',
-            label: 'Parent Email (for new parent account)',
-            example: 'parent@example.com',
-          },
-          {
-            key: 'parent_name',
-            label: 'Parent Name (optional)',
-            example: 'Ali Ahmed',
-          },
-          {
-            key: 'parent_phone',
-            label: 'Parent Phone (optional)',
-            example: '+9647709876543',
-          },
-          {
-            key: 'parent_relationship',
-            label: 'Parent Relationship (optional)',
-            example: 'guardian',
-          },
-        ],
+        columns: STUDENT_BULK_COLUMN_DEFS.map((c) => ({
+          key: c.key,
+          label: c.label,
+          example: c.example,
+        })),
       },
     };
+  }
+
+  @Post('students/export')
+  @ApiOperation({
+    summary: 'Export branch students as an import-shaped Excel workbook',
+  })
+  async exportStudents(
+    @Body() body: { academicYearId?: string },
+    @CurrentBranch() branch: CurrentBranchContext,
+  ) {
+    return this.bulkImportService.exportStudentsForImport(
+      branch.branchId,
+      body?.academicYearId,
+    );
   }
 
   @Post('students/subject-template-help')
