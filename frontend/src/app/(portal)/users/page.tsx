@@ -1,9 +1,10 @@
 'use client';
 
 import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip, Tooltip, ActionIcon } from '@mantine/core';
-import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconSearch, IconUpload } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { UserTable } from '@/components/features/users/UserTable';
@@ -144,9 +145,20 @@ export default function UsersPage() {
               </ActionIcon>
             </Tooltip>
             {canEdit && (
-              <Button id="users-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
-                {t('createUser')}
-              </Button>
+              <>
+                <Button
+                  id="users-link-bulk-import"
+                  component={Link}
+                  href="/users/bulk-import"
+                  variant="light"
+                  leftSection={<IconUpload size={16} />}
+                >
+                  {t('bulkImport')}
+                </Button>
+                <Button id="users-btn-create" leftSection={<IconPlus size={16} />} onClick={open}>
+                  {t('createUser')}
+                </Button>
+              </>
             )}
           </Group>
         </Group>

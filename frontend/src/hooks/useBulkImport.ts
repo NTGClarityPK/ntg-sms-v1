@@ -4,6 +4,9 @@ import {
   type BulkImportPreview,
   type BulkImportResult,
   type BulkStudentRowDto,
+  type BulkUserImportPreview,
+  type BulkUserImportResult,
+  type BulkUserRowDto,
 } from '@/lib/api/bulk-import';
 import type { SubjectTemplateHelpResponse } from '@/lib/api/bulk-import';
 
@@ -53,4 +56,44 @@ export function useSubjectTemplateHelp(options?: { enabled?: boolean }) {
   });
 }
 
-export type { BulkImportPreview, BulkImportResult, BulkStudentRowDto };
+export function useBulkUsersImportPreview() {
+  return useMutation({
+    mutationFn: (file: File) => bulkImportApi.previewUsers(file),
+  });
+}
+
+export function useBulkUsersImportValidate() {
+  return useMutation({
+    mutationFn: (rows: BulkUserRowDto[]) => bulkImportApi.validateUsers(rows),
+  });
+}
+
+export function useBulkUsersImport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rows: BulkUserRowDto[]) => bulkImportApi.importUsers(rows),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['permissions'] });
+    },
+  });
+}
+
+export function useBulkUsersImportTemplate() {
+  return useQuery({
+    queryKey: ['bulk-import-template', 'users'],
+    queryFn: () => bulkImportApi.getUsersTemplate(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export type {
+  BulkImportPreview,
+  BulkImportResult,
+  BulkStudentRowDto,
+  BulkUserImportPreview,
+  BulkUserImportResult,
+  BulkUserRowDto,
+  SubjectTemplateHelpResponse,
+};

@@ -52,6 +52,46 @@ export interface BulkStudentRowDto {
   parent_phone?: string;
 }
 
+export interface BulkUserRowDto {
+  row_number?: number;
+  full_name: string;
+  roles: string;
+  username?: string;
+  invitation_email?: string;
+  email?: string;
+  phone?: string;
+  date_of_birth?: string;
+  gender?: 'male' | 'female';
+  address?: string;
+}
+
+export interface BulkUserImportPreview {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  rows: Array<{
+    rowNumber: number;
+    data: BulkUserRowDto;
+    errors: string[];
+    isValid: boolean;
+  }>;
+}
+
+export interface BulkUserImportResult {
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+  errors: Array<{ row: number; message: string }>;
+  created?: Array<{
+    row: number;
+    fullName: string;
+    loginEmail: string;
+    recipientEmail: string;
+    userType: 'parent' | 'staff';
+    roles: string;
+  }>;
+}
+
 export interface TemplateColumnsResponse {
   columns: Array<{ key: string; label: string; example: string }>;
 }
@@ -112,5 +152,41 @@ export const bulkImportApi = {
     const data = (res as ApiResponse<SubjectTemplateHelpResponse>).data;
     if (data) return data;
     return res as unknown as SubjectTemplateHelpResponse;
+  },
+
+  async previewUsers(file: File): Promise<BulkUserImportPreview> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<BulkUserImportPreview>(
+      '/api/v1/bulk-import/users/preview',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return (res as ApiResponse<BulkUserImportPreview>).data ?? (res as unknown as BulkUserImportPreview);
+  },
+
+  async validateUsers(rows: BulkUserRowDto[]): Promise<BulkUserImportPreview> {
+    const res = await apiClient.post<BulkUserImportPreview>(
+      '/api/v1/bulk-import/users/validate',
+      { rows },
+    );
+    return (res as ApiResponse<BulkUserImportPreview>).data ?? (res as unknown as BulkUserImportPreview);
+  },
+
+  async importUsers(rows: BulkUserRowDto[]): Promise<BulkUserImportResult> {
+    const res = await apiClient.post<BulkUserImportResult>(
+      '/api/v1/bulk-import/users/import',
+      { rows },
+    );
+    return (res as ApiResponse<BulkUserImportResult>).data ?? (res as unknown as BulkUserImportResult);
+  },
+
+  async getUsersTemplate(): Promise<TemplateColumnsResponse> {
+    const res = await apiClient.post<TemplateColumnsResponse>(
+      '/api/v1/bulk-import/users/template',
+    );
+    const data = (res as ApiResponse<TemplateColumnsResponse>).data;
+    if (data) return data;
+    return res as unknown as TemplateColumnsResponse;
   },
 };

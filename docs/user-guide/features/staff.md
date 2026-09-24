@@ -22,6 +22,7 @@ There is **no separate Staff list page**. Opening **Staff** sends you to **Users
 Use **Users** to:
 
 - Invite and manage staff with teaching or admin roles
+- **Bulk Import** many staff (or parent) accounts from Excel — see [👥 User Roles](user-roles.md) → Bulk import
 - Filter by role and account status
 - Resend invitations when a link has expired
 - Activate or deactivate accounts

@@ -47,7 +47,24 @@ Invited users complete account setup at **`/setup?token=…`** (see Authenticati
 
 ### Actions (edit permission)
 
-Create user, edit roles, activate/deactivate, resend invitation, view linked students for parents.
+Create user, bulk import, edit roles, activate/deactivate, resend invitation, view linked students for parents.
+
+### Bulk import
+
+**Path:** **Users → Bulk Import** (edit permission required)
+
+1. Open **Bulk Import** and download the template (includes an **Allowed Roles** sheet)
+2. Fill rows:
+   - **Full Name** (required)
+   - **Roles** — use exact portal role names from the Allowed Roles sheet (comma-separated for multiple). After upload, fix roles with the **Roles** multiselect in the preview (avoids typos such as “Sub Teacher”)
+   - **Staff:** **Username** + **Invitation Email**
+   - **Parents:** **Email** (login and invitation)
+3. Upload the file, edit the preview if needed, then **Validate**
+4. **Import** creates accounts and sends invitation emails
+
+Do **not** import the **student** role here — use [🎓 Students](students.md) → **Bulk import** for student accounts. Parent and staff roles cannot be mixed on the same row.
+
+**Bulk import missing:** Need **user_management** **Edit** permission.
 
 ---
 
@@ -106,3 +123,5 @@ Parents switch child session from the **header child switcher**, not from **My C
 **Module visible but buttons missing:** Permission is **View**, not **Edit**.
 **Users page hidden:** No **user_management** access.
 **Cannot mix parent and staff on one account:** Create separate users.
+**Bulk Import missing:** Need **user_management** **Edit** permission.
+**Student role rejected on Users import:** Use **Students → Bulk Import** instead.

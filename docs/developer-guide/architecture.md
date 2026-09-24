@@ -253,7 +253,7 @@ Listed by functional area:
 | **StorageModule**              | Supabase storage orchestration         | Storage buckets               |
 | **InvitationsModule**          | Invitation tokens, email, cleanup cron | `invitations`                 |
 | **PushModule**                 | Web push subscriptions                 | `push_subscriptions`          |
-| **BulkImportModule**           | Excel bulk imports                     | Many                          |
+| **BulkImportModule**           | Excel bulk imports (students, users)  | Students, Users               |
 | **SettingsImportModule**       | Settings import                        | Settings tables               |
 | **SystemSettingsModule**       | System-wide key-value config           | `system_settings`             |
 | **SettingsStatusModule**       | Settings readiness checks              | Multiple                      |

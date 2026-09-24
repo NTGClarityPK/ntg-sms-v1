@@ -4,7 +4,9 @@ import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import * as XLSX from 'xlsx';
 import { BulkStudentRowDto } from './dto/bulk-student-row.dto';
+import { BulkUserRowDto } from './dto/bulk-user-row.dto';
 import { StudentsService } from '../students/students.service';
+import { UsersService } from '../users/users.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 type SupabaseClient = ReturnType<SupabaseConfig['getClient']>;
@@ -14,6 +16,46 @@ interface ParsedRow {
   data: BulkStudentRowDto;
   errors: string[];
   isValid: boolean;
+}
+
+interface ParsedUserRow {
+  rowNumber: number;
+  data: BulkUserRowDto;
+  errors: string[];
+  isValid: boolean;
+}
+
+type RoleRef = {
+  id: string;
+  name: string;
+  displayName: string;
+};
+
+type RoleLookup = {
+  byId: Map<string, RoleRef>;
+  byKey: Map<string, RoleRef>;
+};
+
+export interface UserImportPreview {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  rows: ParsedUserRow[];
+}
+
+export interface UserImportResult {
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+  errors: Array<{ row: number; message: string }>;
+  created?: Array<{
+    row: number;
+    fullName: string;
+    loginEmail: string;
+    recipientEmail: string;
+    userType: 'parent' | 'staff';
+    roles: string;
+  }>;
 }
 
 type PlacementRefs = {
@@ -51,6 +93,81 @@ export interface ImportResult {
     parentExpiresAt?: string;
   }>;
 }
+
+const PARENT_ROLE_NAMES = new Set(['parent', 'guardian', 'father', 'mother']);
+
+/**
+ * Spreadsheet headers → BulkUserRowDto field names.
+ */
+const USER_COLUMN_MAP: Record<string, string[]> = {
+  full_name: [
+    'full_name',
+    'Full Name',
+    'full name',
+    'Name',
+    'name',
+    'Display Name',
+    'display_name',
+  ],
+  roles: [
+    'roles',
+    'Roles',
+    'role',
+    'Role',
+    'Role Name',
+    'role_name',
+    'Role Names',
+  ],
+  username: [
+    'username',
+    'Username',
+    'Username (staff)',
+    'Portal Username',
+    'portal_username',
+    'School Username',
+    'Login Username',
+    'login username',
+  ],
+  invitation_email: [
+    'invitation_email',
+    'Invitation Email',
+    'Invitation Email (staff)',
+    'Correspondence Email',
+    'correspondence_email',
+    'Invite Email',
+    'invite email',
+  ],
+  email: [
+    'email',
+    'Email',
+    'Email (parent)',
+    'Email Address',
+    'email_address',
+    'Parent Email',
+    'Login Email',
+  ],
+  phone: [
+    'phone',
+    'Phone',
+    'Phone (optional)',
+    'Phone Number',
+    'phone_number',
+    'mobile',
+    'Mobile',
+  ],
+  date_of_birth: [
+    'date_of_birth',
+    'Date of Birth',
+    'Date of Birth (optional)',
+    'Date Of Birth',
+    'DOB',
+    'dob',
+    'birth_date',
+    'Birth Date',
+  ],
+  gender: ['gender', 'Gender', 'Gender (optional)', 'sex', 'Sex'],
+  address: ['address', 'Address', 'Address (optional)'],
+};
 
 /**
  * Maps spreadsheet headers → DTO field names. Keys are matched case-insensitively after BOM/trim.
@@ -232,6 +349,7 @@ export class BulkImportService {
   constructor(
     private readonly supabaseConfig: SupabaseConfig,
     private readonly studentsService: StudentsService,
+    private readonly usersService: UsersService,
   ) {}
 
   private getClient(): SupabaseClient {
@@ -1358,6 +1476,440 @@ export class BulkImportService {
               message: `Student imported but: ${placement.warnings.join(' ')}`,
             });
           }
+        } catch (err: unknown) {
+          results.failureCount += 1;
+          const message =
+            err instanceof Error ? err.message : 'Unknown error during import';
+          results.errors.push({ row: rowLabel, message });
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+
+    return { data: results };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Users bulk import
+  // ---------------------------------------------------------------------------
+
+  private roleLookupKey(value: string): string {
+    return normalizeLookupValue(value)
+      .toLowerCase()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private roleCompactKey(value: string): string {
+    return this.roleLookupKey(value).replace(/\s+/g, '');
+  }
+
+  private levenshtein(a: string, b: string): number {
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    const rows = a.length + 1;
+    const cols = b.length + 1;
+    const matrix: number[][] = Array.from({ length: rows }, () =>
+      Array.from({ length: cols }, () => 0),
+    );
+    for (let i = 0; i < rows; i++) matrix[i]![0] = i;
+    for (let j = 0; j < cols; j++) matrix[0]![j] = j;
+    for (let i = 1; i < rows; i++) {
+      for (let j = 1; j < cols; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[i]![j] = Math.min(
+          (matrix[i - 1]![j] ?? 0) + 1,
+          (matrix[i]![j - 1] ?? 0) + 1,
+          (matrix[i - 1]![j - 1] ?? 0) + cost,
+        );
+      }
+    }
+    return matrix[a.length]![b.length] ?? Math.max(a.length, b.length);
+  }
+
+  private async loadRoleLookup(supabase: SupabaseClient): Promise<RoleLookup> {
+    const { data, error } = await supabase
+      .from('roles')
+      .select('id, name, display_name');
+    if (error) throw new BadRequestException(error.message);
+
+    const byId = new Map<string, RoleRef>();
+    const byKey = new Map<string, RoleRef>();
+
+    for (const row of (data ?? []) as Array<{
+      id: string;
+      name: string;
+      display_name: string | null;
+    }>) {
+      const ref: RoleRef = {
+        id: row.id,
+        name: (row.name || '').trim(),
+        displayName: (row.display_name || row.name || '').trim(),
+      };
+      byId.set(ref.id, ref);
+      const keys = [ref.name, ref.displayName]
+        .map((k) => this.roleLookupKey(k))
+        .filter(Boolean);
+      for (const key of keys) {
+        if (!byKey.has(key)) byKey.set(key, ref);
+      }
+      // Also index compacted forms (ignore spaces) e.g. "SubjectTeacher"
+      for (const key of keys) {
+        const compact = key.replace(/\s+/g, '');
+        if (compact && !byKey.has(compact)) byKey.set(compact, ref);
+      }
+    }
+
+    return { byId, byKey };
+  }
+
+  private resolveRoleToken(
+    token: string,
+    roles: RoleLookup,
+  ): { ref?: RoleRef; suggestion?: string } {
+    const trimmed = token.trim();
+    if (!trimmed) return {};
+
+    if (isUuid(trimmed)) {
+      const byUuid = roles.byId.get(trimmed);
+      if (byUuid) return { ref: byUuid };
+    }
+
+    const key = this.roleLookupKey(trimmed);
+    const compact = this.roleCompactKey(trimmed);
+    const exact = roles.byKey.get(key) ?? roles.byKey.get(compact);
+    if (exact) return { ref: exact };
+
+    // Unique fuzzy match (typos / abbreviations) against compact keys.
+    let best: RoleRef | undefined;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    let tie = false;
+    for (const ref of roles.byId.values()) {
+      const candidates = [
+        this.roleCompactKey(ref.name),
+        this.roleCompactKey(ref.displayName),
+      ].filter(Boolean);
+      for (const candidate of candidates) {
+        const distance = this.levenshtein(compact, candidate);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = ref;
+          tie = false;
+        } else if (distance === bestDistance && best && best.id !== ref.id) {
+          tie = true;
+        }
+      }
+    }
+
+    // Auto-accept only very close unique typos (e.g. extra/missing letter).
+    const maxAuto =
+      compact.length <= 6 ? 1 : compact.length <= 12 ? 2 : 3;
+    if (best && !tie && bestDistance > 0 && bestDistance <= maxAuto) {
+      return { ref: best };
+    }
+
+    const suggestion =
+      best && !tie && bestDistance <= Math.max(maxAuto + 2, 4)
+        ? best.displayName || best.name
+        : undefined;
+    return { suggestion };
+  }
+
+  private splitRoleTokens(raw: string): string[] {
+    return String(raw ?? '')
+      .split(/[,;|]/)
+      .map((t) => normalizeLookupValue(t))
+      .filter(Boolean);
+  }
+
+  private resolveRolesForRow(
+    dto: BulkUserRowDto,
+    roles: RoleLookup,
+  ): { roleIds: string[]; roleLabels: string[]; errors: string[]; userType?: 'parent' | 'staff' } {
+    const tokens = this.splitRoleTokens(dto.roles);
+    if (tokens.length === 0) {
+      return { roleIds: [], roleLabels: [], errors: ['At least one role is required.'] };
+    }
+
+    const roleIds: string[] = [];
+    const roleLabels: string[] = [];
+    const errors: string[] = [];
+    const seen = new Set<string>();
+
+    for (const token of tokens) {
+      const { ref, suggestion } = this.resolveRoleToken(token, roles);
+      if (!ref) {
+        errors.push(
+          suggestion
+            ? `Role '${token}' not found. Did you mean '${suggestion}'?`
+            : `Role '${token}' not found. Pick a role from the list in the preview.`,
+        );
+        continue;
+      }
+      if ((ref.name || '').trim().toLowerCase() === 'student') {
+        errors.push(
+          `Role 'student' cannot be imported here. Use Students → Bulk Import for student accounts.`,
+        );
+        continue;
+      }
+      if (seen.has(ref.id)) continue;
+      seen.add(ref.id);
+      roleIds.push(ref.id);
+      roleLabels.push(ref.displayName || ref.name);
+    }
+
+    if (errors.length > 0) {
+      return { roleIds, roleLabels, errors };
+    }
+
+    const selectedNames = roleIds
+      .map((id) => roles.byId.get(id)?.name?.trim().toLowerCase() ?? '')
+      .filter(Boolean);
+    const isParent = selectedNames.some((n) => PARENT_ROLE_NAMES.has(n));
+    const isStaff = selectedNames.some((n) => !PARENT_ROLE_NAMES.has(n));
+
+    if (isParent && isStaff) {
+      errors.push(
+        'Parent roles cannot be combined with staff roles. Please choose either parent roles or staff roles.',
+      );
+      return { roleIds, roleLabels, errors };
+    }
+
+    const userType: 'parent' | 'staff' = isParent ? 'parent' : 'staff';
+
+    if (userType === 'parent') {
+      if (!dto.email?.trim()) {
+        errors.push('Email is required for parent users.');
+      }
+    } else {
+      if (!dto.username?.trim()) {
+        errors.push('Username is required for staff users.');
+      }
+      if (!dto.invitation_email?.trim()) {
+        errors.push('Invitation email is required for staff users.');
+      }
+    }
+
+    return { roleIds, roleLabels, errors, userType };
+  }
+
+  private mapUserColumnNames(row: Record<string, unknown>): Record<string, unknown> {
+    const lookup = this.buildHeaderLookup(row);
+    const mapped: Record<string, unknown> = {};
+    for (const [targetField, possibleNames] of Object.entries(USER_COLUMN_MAP)) {
+      for (const name of possibleNames) {
+        let val = lookup.get(name.toLowerCase());
+        if (val !== undefined && val !== '') {
+          if (targetField === 'phone' && typeof val === 'number') {
+            val = String(val);
+          }
+          if (typeof val === 'string') {
+            val = normalizeSpreadsheetString(val);
+          }
+          if (targetField === 'date_of_birth') {
+            val = this.normalizeDate(val) ?? undefined;
+          }
+          if (val !== undefined && val !== '') {
+            mapped[targetField] = val;
+          }
+          break;
+        }
+      }
+    }
+
+    // Staff sheets often label the invitation destination simply as "Email".
+    // If username is present and invitation_email is blank, reuse email as invitation_email.
+    const hasUsername =
+      mapped.username != null && String(mapped.username).trim() !== '';
+    const hasInvitation =
+      mapped.invitation_email != null && String(mapped.invitation_email).trim() !== '';
+    const hasEmail = mapped.email != null && String(mapped.email).trim() !== '';
+    if (hasUsername && !hasInvitation && hasEmail) {
+      mapped.invitation_email = mapped.email;
+      delete mapped.email;
+    }
+
+    return mapped;
+  }
+
+  private async validateUserDto(
+    dto: BulkUserRowDto,
+    roles: RoleLookup,
+  ): Promise<{ dto: BulkUserRowDto; errors: string[] }> {
+    const errors = await validate(dto);
+    const fieldErrors = errors.flatMap((err) =>
+      err.constraints ? Object.values(err.constraints) : [],
+    );
+    const roleResult = this.resolveRolesForRow(dto, roles);
+    return { dto, errors: [...fieldErrors, ...roleResult.errors] };
+  }
+
+  async parseUsersFile(
+    file: Express.Multer.File,
+    _branchId: string,
+  ): Promise<{ data: UserImportPreview }> {
+    const supabase = this.getClient();
+    const roles = await this.loadRoleLookup(supabase);
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rawData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, {
+      defval: '',
+    });
+
+    if (rawData.length === 0) {
+      throw new BadRequestException('File is empty');
+    }
+    if (rawData.length > 5000) {
+      throw new BadRequestException('File exceeds maximum 5000 rows');
+    }
+
+    const parsedRows: ParsedUserRow[] = [];
+
+    for (let i = 0; i < rawData.length; i++) {
+      const rowNumber = i + 2;
+      const mappedRow = this.mapUserColumnNames(rawData[i]!);
+      const dto = plainToInstance(BulkUserRowDto, mappedRow);
+      const { errors: allErrors } = await this.validateUserDto(dto, roles);
+
+      parsedRows.push({
+        rowNumber,
+        data: dto,
+        errors: allErrors,
+        isValid: allErrors.length === 0,
+      });
+    }
+
+    const validRows = parsedRows.filter((r) => r.isValid).length;
+    return {
+      data: {
+        totalRows: rawData.length,
+        validRows,
+        invalidRows: rawData.length - validRows,
+        rows: parsedRows,
+      },
+    };
+  }
+
+  async validateUsersRows(
+    rows: BulkUserRowDto[],
+    _branchId: string,
+  ): Promise<{ data: UserImportPreview }> {
+    const supabase = this.getClient();
+    const roles = await this.loadRoleLookup(supabase);
+    const parsedRows: ParsedUserRow[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const incoming = rows[i]!;
+      const rowNumber = incoming.row_number ?? i + 2;
+      const dto = plainToInstance(BulkUserRowDto, { ...incoming });
+      const { errors: allErrors } = await this.validateUserDto(dto, roles);
+
+      parsedRows.push({
+        rowNumber,
+        data: dto,
+        errors: allErrors,
+        isValid: allErrors.length === 0,
+      });
+    }
+
+    const validRows = parsedRows.filter((r) => r.isValid).length;
+    return {
+      data: {
+        totalRows: parsedRows.length,
+        validRows,
+        invalidRows: parsedRows.length - validRows,
+        rows: parsedRows,
+      },
+    };
+  }
+
+  async importUsers(
+    rows: BulkUserRowDto[],
+    branchId: string,
+    adminUser: CurrentUserPayload,
+    tenantId?: string | null,
+  ): Promise<{ data: UserImportResult }> {
+    const supabase = this.getClient();
+    const roles = await this.loadRoleLookup(supabase);
+    const results: UserImportResult = {
+      totalProcessed: rows.length,
+      successCount: 0,
+      failureCount: 0,
+      errors: [],
+      created: [],
+    };
+
+    if (rows.length === 0) {
+      throw new BadRequestException('No rows to import');
+    }
+
+    const CONCURRENCY = 4;
+    const indices = rows.map((_, i) => i);
+    let cursor = 0;
+
+    const worker = async () => {
+      while (cursor < indices.length) {
+        const idx = indices[cursor]!;
+        cursor += 1;
+        const row = rows[idx]!;
+        const rowLabel = row.row_number ?? idx + 2;
+
+        const dto = plainToInstance(BulkUserRowDto, { ...row });
+        const { errors: validationErrors } = await this.validateUserDto(dto, roles);
+        if (validationErrors.length > 0) {
+          results.failureCount += 1;
+          results.errors.push({
+            row: rowLabel,
+            message: validationErrors.join(' '),
+          });
+          continue;
+        }
+
+        const resolved = this.resolveRolesForRow(dto, roles);
+        if (!resolved.userType || resolved.roleIds.length === 0) {
+          results.failureCount += 1;
+          results.errors.push({
+            row: rowLabel,
+            message: resolved.errors.join(' ') || 'Unable to resolve roles.',
+          });
+          continue;
+        }
+
+        try {
+          const created = await this.usersService.createUser(
+            {
+              fullName: dto.full_name.trim(),
+              roleIds: resolved.roleIds,
+              phone: dto.phone,
+              address: dto.address,
+              dateOfBirth: dto.date_of_birth,
+              gender: dto.gender,
+              email: resolved.userType === 'parent' ? dto.email : undefined,
+              username: resolved.userType === 'staff' ? dto.username : undefined,
+              invitationEmail:
+                resolved.userType === 'staff' ? dto.invitation_email : undefined,
+            },
+            branchId,
+            adminUser,
+            tenantId,
+          );
+
+          results.successCount += 1;
+          results.created?.push({
+            row: rowLabel,
+            fullName: created.fullName,
+            loginEmail: created.email ?? '',
+            recipientEmail:
+              resolved.userType === 'parent'
+                ? (dto.email ?? created.email ?? '')
+                : (dto.invitation_email ?? ''),
+            userType: resolved.userType,
+            roles: resolved.roleLabels.join(', '),
+          });
         } catch (err: unknown) {
           results.failureCount += 1;
           const message =
