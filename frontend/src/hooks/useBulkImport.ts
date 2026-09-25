@@ -86,6 +86,12 @@ export function useBulkUsersImport() {
   });
 }
 
+export function useBulkUsersExport() {
+  return useMutation({
+    mutationFn: () => bulkImportApi.exportUsers(),
+  });
+}
+
 export function useBulkUsersImportTemplate() {
   return useQuery({
     queryKey: ['bulk-import-template', 'users'],

@@ -106,4 +106,13 @@ export class BulkUserRowDto {
   @Transform(({ value }) => emptyToUndefined(value))
   @IsString()
   address?: string;
+
+  /**
+   * Optional status from a previous import results sheet.
+   * Values like `added` / `updated` / `unchanged` are skipped on re-import.
+   */
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  import_status?: string;
 }

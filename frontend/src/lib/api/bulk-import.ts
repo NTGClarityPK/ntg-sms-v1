@@ -97,6 +97,7 @@ export interface BulkUserRowDto {
   date_of_birth?: string;
   gender?: 'male' | 'female';
   address?: string;
+  import_status?: string;
 }
 
 export interface BulkUserImportPreview {
@@ -111,11 +112,34 @@ export interface BulkUserImportPreview {
   }>;
 }
 
+export interface BulkUserImportRowOutcome {
+  row: number;
+  fullName: string;
+  loginEmail?: string;
+  userType?: 'parent' | 'staff';
+  roles?: string;
+  status: 'added' | 'updated' | 'unchanged' | 'failed_insert' | 'failed_update' | 'skipped';
+  reason?: string;
+  recipientEmail?: string;
+}
+
 export interface BulkUserImportResult {
   totalProcessed: number;
   successCount: number;
   failureCount: number;
+  createdCount?: number;
+  updatedCount?: number;
+  unchangedCount?: number;
+  failedInsertCount?: number;
+  failedUpdateCount?: number;
+  skippedCount?: number;
   errors: Array<{ row: number; message: string }>;
+  rowOutcomes?: BulkUserImportRowOutcome[];
+  resultsFile?: {
+    fileName: string;
+    contentBase64: string;
+    mimeType: string;
+  };
   created?: Array<{
     row: number;
     fullName: string;
@@ -244,8 +268,37 @@ export const bulkImportApi = {
     const res = await apiClient.post<BulkUserImportResult>(
       '/api/v1/bulk-import/users/import',
       { rows },
+      { timeout: 300_000 },
     );
     return (res as ApiResponse<BulkUserImportResult>).data ?? (res as unknown as BulkUserImportResult);
+  },
+
+  async exportUsers(): Promise<{
+    fileName: string;
+    contentBase64: string;
+    mimeType: string;
+    rowCount: number;
+  }> {
+    const res = await apiClient.post<{
+      fileName: string;
+      contentBase64: string;
+      mimeType: string;
+      rowCount: number;
+    }>('/api/v1/bulk-import/users/export', {}, { timeout: 180_000 });
+    return (
+      (res as ApiResponse<{
+        fileName: string;
+        contentBase64: string;
+        mimeType: string;
+        rowCount: number;
+      }>).data ??
+      (res as unknown as {
+        fileName: string;
+        contentBase64: string;
+        mimeType: string;
+        rowCount: number;
+      })
+    );
   },
 
   async getUsersTemplate(): Promise<TemplateColumnsResponse> {

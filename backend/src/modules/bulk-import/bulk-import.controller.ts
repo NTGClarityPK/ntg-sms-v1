@@ -17,6 +17,7 @@ import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, type CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { STUDENT_BULK_COLUMN_DEFS } from './student-bulk-columns';
+import { USER_BULK_COLUMN_DEFS } from './user-bulk-columns';
 
 const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -197,54 +198,18 @@ export class BulkImportController {
   downloadUsersTemplate() {
     return {
       data: {
-        columns: [
-          {
-            key: 'full_name',
-            label: 'Full Name',
-            example: 'Sara Ahmed',
-          },
-          {
-            key: 'roles',
-            label: 'Roles',
-            example: 'Subject Teacher',
-          },
-          {
-            key: 'username',
-            label: 'Username (staff)',
-            example: 'sara.ahmed',
-          },
-          {
-            key: 'invitation_email',
-            label: 'Invitation Email (staff, optional)',
-            example: 'sara.personal@example.com',
-          },
-          {
-            key: 'email',
-            label: 'Email (parent)',
-            example: 'parent@example.com',
-          },
-          {
-            key: 'phone',
-            label: 'Phone (optional)',
-            example: '+9647701234567',
-          },
-          {
-            key: 'gender',
-            label: 'Gender (optional)',
-            example: 'female',
-          },
-          {
-            key: 'date_of_birth',
-            label: 'Date of Birth (optional)',
-            example: '1990-05-15',
-          },
-          {
-            key: 'address',
-            label: 'Address (optional)',
-            example: 'Baghdad',
-          },
-        ],
+        columns: USER_BULK_COLUMN_DEFS.map((c) => ({
+          key: c.key,
+          label: c.label,
+          example: c.example,
+        })),
       },
     };
+  }
+
+  @Post('users/export')
+  @ApiOperation({ summary: 'Export branch users as an import-shaped Excel workbook' })
+  async exportUsers(@CurrentBranch() branch: CurrentBranchContext) {
+    return this.bulkImportService.exportUsersForImport(branch.branchId);
   }
 }

@@ -9,7 +9,10 @@ import {
   StudentsService,
   type DeferredInvitationDelivery,
 } from '../students/students.service';
-import { UsersService } from '../users/users.service';
+import {
+  UsersService,
+  type DeferredUserInvitationDelivery,
+} from '../users/users.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { mapWithConcurrency } from '../../common/utils/map-with-concurrency.util';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
@@ -18,6 +21,10 @@ import {
   STUDENT_BULK_COLUMN_DEFS,
   isSkipImportStatus,
 } from './student-bulk-columns';
+import {
+  USER_BULK_COLUMN_DEFS,
+  USER_IMPORT_STATUS_COLUMN,
+} from './user-bulk-columns';
 
 type SupabaseClient = ReturnType<SupabaseConfig['getClient']>;
 
@@ -53,11 +60,34 @@ export interface UserImportPreview {
   rows: ParsedUserRow[];
 }
 
+export interface UserImportRowOutcome {
+  row: number;
+  fullName: string;
+  loginEmail?: string;
+  userType?: 'parent' | 'staff';
+  roles?: string;
+  status: 'added' | 'updated' | 'unchanged' | 'failed_insert' | 'failed_update' | 'skipped';
+  reason?: string;
+  recipientEmail?: string;
+}
+
 export interface UserImportResult {
   totalProcessed: number;
   successCount: number;
   failureCount: number;
+  createdCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  failedInsertCount: number;
+  failedUpdateCount: number;
+  skippedCount: number;
   errors: Array<{ row: number; message: string }>;
+  rowOutcomes: UserImportRowOutcome[];
+  resultsFile?: {
+    fileName: string;
+    contentBase64: string;
+    mimeType: string;
+  };
   created?: Array<{
     row: number;
     fullName: string;
@@ -223,6 +253,14 @@ const USER_COLUMN_MAP: Record<string, string[]> = {
   ],
   gender: ['gender', 'Gender', 'Gender (optional)', 'sex', 'Sex'],
   address: ['address', 'Address', 'Address (optional)'],
+  import_status: [
+    'import_status',
+    'Import Status',
+    'import status',
+    'Status',
+    'Import result',
+    'Import Result',
+  ],
 };
 
 /**
@@ -2615,94 +2653,584 @@ export class BulkImportService {
     adminUser: CurrentUserPayload,
     tenantId?: string | null,
   ): Promise<{ data: UserImportResult }> {
-    const supabase = this.getClient();
-    const roles = await this.loadRoleLookup(supabase);
-    const results: UserImportResult = {
-      totalProcessed: rows.length,
-      successCount: 0,
-      failureCount: 0,
-      errors: [],
-      created: [],
-    };
-
     if (rows.length === 0) {
       throw new BadRequestException('No rows to import');
     }
 
-    const CONCURRENCY = 4;
-    const indices = rows.map((_, i) => i);
-    let cursor = 0;
+    const supabase = this.getClient();
+    const roles = await this.loadRoleLookup(supabase);
 
-    const worker = async () => {
-      while (cursor < indices.length) {
-        const idx = indices[cursor]!;
-        cursor += 1;
-        const row = rows[idx]!;
-        const rowLabel = row.row_number ?? idx + 2;
+    const prepared = rows.map((incoming, i) => {
+      const rowLabel = incoming.row_number ?? i + 2;
+      const dto = plainToInstance(BulkUserRowDto, { ...incoming });
+      return { rowLabel, dto, originalIndex: i };
+    });
 
-        const dto = plainToInstance(BulkUserRowDto, { ...row });
-        const { errors: validationErrors } = await this.validateUserDto(dto, roles);
-        if (validationErrors.length > 0) {
-          results.failureCount += 1;
-          results.errors.push({
-            row: rowLabel,
-            message: validationErrors.join(' '),
-          });
-          continue;
+    const rowOutcomes: UserImportRowOutcome[] = [];
+    const deferredDeliveries: DeferredUserInvitationDelivery[] = [];
+    const sheetStatusByIndex = new Map<number, string>();
+
+    const actionable: typeof prepared = [];
+    for (const item of prepared) {
+      if (isSkipImportStatus(item.dto.import_status)) {
+        const statusLabel = String(item.dto.import_status ?? '').trim() || 'skipped';
+        sheetStatusByIndex.set(item.originalIndex, statusLabel);
+        rowOutcomes.push({
+          row: item.rowLabel,
+          fullName: (item.dto.full_name ?? '').trim(),
+          status: 'skipped',
+          reason: `Skipped (prior status: ${statusLabel})`,
+        });
+      } else {
+        actionable.push(item);
+      }
+    }
+
+    type ActionableValid = {
+      rowLabel: number;
+      dto: BulkUserRowDto;
+      originalIndex: number;
+      loginEmail: string;
+      userType: 'parent' | 'staff';
+      roleIds: string[];
+      roleLabels: string[];
+      existingUserId?: string;
+    };
+    const validActionable: ActionableValid[] = [];
+
+    for (const item of actionable) {
+      const { errors: validationErrors } = await this.validateUserDto(item.dto, roles);
+      if (validationErrors.length > 0) {
+        const reason = validationErrors.join(' ');
+        rowOutcomes.push({
+          row: item.rowLabel,
+          fullName: (item.dto.full_name ?? '').trim(),
+          status: 'failed_insert',
+          reason,
+        });
+        sheetStatusByIndex.set(item.originalIndex, `failed: ${reason}`);
+        continue;
+      }
+
+      const resolved = this.resolveRolesForRow(item.dto, roles);
+      if (!resolved.userType || resolved.roleIds.length === 0) {
+        const reason = resolved.errors.join(' ') || 'Unable to resolve roles.';
+        rowOutcomes.push({
+          row: item.rowLabel,
+          fullName: (item.dto.full_name ?? '').trim(),
+          status: 'failed_insert',
+          reason,
+        });
+        sheetStatusByIndex.set(item.originalIndex, `failed: ${reason}`);
+        continue;
+      }
+
+      let loginEmail = '';
+      try {
+        if (resolved.userType === 'parent') {
+          loginEmail = String(item.dto.email ?? '')
+            .trim()
+            .toLowerCase();
+          if (!loginEmail) {
+            throw new BadRequestException('Email is required for parent users');
+          }
+        } else {
+          loginEmail = await this.usersService.resolveStaffLoginEmail(
+            item.dto.username ?? '',
+            branchId,
+          );
         }
+      } catch (err: unknown) {
+        const reason = err instanceof Error ? err.message : 'Unable to resolve login email';
+        rowOutcomes.push({
+          row: item.rowLabel,
+          fullName: (item.dto.full_name ?? '').trim(),
+          status: 'failed_insert',
+          reason,
+        });
+        sheetStatusByIndex.set(item.originalIndex, `failed: ${reason}`);
+        continue;
+      }
 
-        const resolved = this.resolveRolesForRow(dto, roles);
-        if (!resolved.userType || resolved.roleIds.length === 0) {
-          results.failureCount += 1;
-          results.errors.push({
-            row: rowLabel,
-            message: resolved.errors.join(' ') || 'Unable to resolve roles.',
-          });
-          continue;
+      validActionable.push({
+        rowLabel: item.rowLabel,
+        dto: item.dto,
+        originalIndex: item.originalIndex,
+        loginEmail,
+        userType: resolved.userType,
+        roleIds: resolved.roleIds,
+        roleLabels: resolved.roleLabels,
+      });
+    }
+
+    const emailCounts = new Map<string, number[]>();
+    for (const item of validActionable) {
+      const list = emailCounts.get(item.loginEmail) ?? [];
+      list.push(item.rowLabel);
+      emailCounts.set(item.loginEmail, list);
+    }
+    const dupeEmails = new Set(
+      [...emailCounts.entries()].filter(([, labels]) => labels.length > 1).map(([e]) => e),
+    );
+    const afterDupe: ActionableValid[] = [];
+    for (const item of validActionable) {
+      if (dupeEmails.has(item.loginEmail)) {
+        const reason = `Duplicate login identity '${item.loginEmail}' in this import sheet`;
+        rowOutcomes.push({
+          row: item.rowLabel,
+          fullName: item.dto.full_name.trim(),
+          loginEmail: item.loginEmail,
+          userType: item.userType,
+          roles: item.roleLabels.join(', '),
+          status: 'failed_insert',
+          reason,
+        });
+        sheetStatusByIndex.set(item.originalIndex, `failed: ${reason}`);
+      } else {
+        afterDupe.push(item);
+      }
+    }
+
+    const existingByEmail = await this.usersService.findUsersByLoginEmails(
+      branchId,
+      afterDupe.map((i) => i.loginEmail),
+    );
+
+    const toUpdate: ActionableValid[] = [];
+    const toInsert: ActionableValid[] = [];
+    for (const item of afterDupe) {
+      const existing = existingByEmail.get(item.loginEmail);
+      if (existing) {
+        item.existingUserId = existing.userId;
+        toUpdate.push(item);
+      } else {
+        toInsert.push(item);
+      }
+    }
+
+    const UPDATE_CONCURRENCY = 4;
+    type UpdateOutcome =
+      | { ok: true; item: ActionableValid; unchanged: boolean }
+      | { ok: false; item: ActionableValid; error: unknown };
+
+    const updateOutcomes = await mapWithConcurrency(
+      toUpdate,
+      UPDATE_CONCURRENCY,
+      async (item): Promise<UpdateOutcome> => {
+        try {
+          const existing = existingByEmail.get(item.loginEmail)!;
+          const rolesSame =
+            [...existing.roleIds].sort().join(',') ===
+            [...item.roleIds].sort().join(',');
+          const norm = (v: string | null | undefined) =>
+            String(v ?? '')
+              .trim()
+              .toLowerCase();
+          const unchanged =
+            norm(existing.fullName) === norm(item.dto.full_name) &&
+            norm(existing.phone) === norm(item.dto.phone) &&
+            norm(existing.address) === norm(item.dto.address) &&
+            norm(existing.dateOfBirth) === norm(item.dto.date_of_birth) &&
+            norm(existing.gender) === norm(item.dto.gender) &&
+            rolesSame;
+
+          if (unchanged) {
+            return { ok: true, item, unchanged: true };
+          }
+
+          await this.usersService.updateUser(
+            item.existingUserId!,
+            {
+              fullName: item.dto.full_name.trim(),
+              phone: item.dto.phone,
+              address: item.dto.address,
+              dateOfBirth: item.dto.date_of_birth,
+              gender: item.dto.gender,
+              invitationRecipientEmail: item.dto.invitation_email,
+            },
+            branchId,
+            adminUser.email,
+            tenantId,
+          );
+          if (!rolesSame) {
+            await this.usersService.updateUserRoles(
+              item.existingUserId!,
+              { roleIds: item.roleIds },
+              branchId,
+              adminUser.email,
+              tenantId,
+            );
+          }
+          return { ok: true, item, unchanged: false };
+        } catch (error: unknown) {
+          return { ok: false, item, error };
         }
+      },
+    );
 
+    for (const outcome of updateOutcomes) {
+      if (!outcome.ok) {
+        const reason =
+          outcome.error instanceof Error ? outcome.error.message : 'Unknown error during update';
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          fullName: outcome.item.dto.full_name.trim(),
+          loginEmail: outcome.item.loginEmail,
+          userType: outcome.item.userType,
+          roles: outcome.item.roleLabels.join(', '),
+          status: 'failed_update',
+          reason,
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, `failed: ${reason}`);
+        continue;
+      }
+      if (outcome.unchanged) {
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          fullName: outcome.item.dto.full_name.trim(),
+          loginEmail: outcome.item.loginEmail,
+          userType: outcome.item.userType,
+          roles: outcome.item.roleLabels.join(', '),
+          status: 'unchanged',
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, 'unchanged');
+      } else {
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          fullName: outcome.item.dto.full_name.trim(),
+          loginEmail: outcome.item.loginEmail,
+          userType: outcome.item.userType,
+          roles: outcome.item.roleLabels.join(', '),
+          status: 'updated',
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, 'updated');
+      }
+    }
+
+    const INSERT_CONCURRENCY = 3;
+    type InsertOutcome =
+      | {
+          ok: true;
+          item: ActionableValid;
+          created: Awaited<ReturnType<UsersService['createUser']>>;
+        }
+      | { ok: false; item: ActionableValid; error: unknown };
+
+    const insertOutcomes = await mapWithConcurrency(
+      toInsert,
+      INSERT_CONCURRENCY,
+      async (item): Promise<InsertOutcome> => {
         try {
           const created = await this.usersService.createUser(
             {
-              fullName: dto.full_name.trim(),
-              roleIds: resolved.roleIds,
-              phone: dto.phone,
-              address: dto.address,
-              dateOfBirth: dto.date_of_birth,
-              gender: dto.gender,
-              email: resolved.userType === 'parent' ? dto.email : undefined,
-              username: resolved.userType === 'staff' ? dto.username : undefined,
+              fullName: item.dto.full_name.trim(),
+              roleIds: item.roleIds,
+              phone: item.dto.phone,
+              address: item.dto.address,
+              dateOfBirth: item.dto.date_of_birth,
+              gender: item.dto.gender,
+              email: item.userType === 'parent' ? item.dto.email : undefined,
+              username: item.userType === 'staff' ? item.dto.username : undefined,
               invitationEmail:
-                resolved.userType === 'staff' ? dto.invitation_email : undefined,
+                item.userType === 'staff' ? item.dto.invitation_email : undefined,
             },
             branchId,
             adminUser,
             tenantId,
+            {
+              deferInvitationDelivery: true,
+              inviteOnlyWhenRecipientProvided: true,
+            },
           );
-
-          results.successCount += 1;
-          results.created?.push({
-            row: rowLabel,
-            fullName: created.fullName,
-            loginEmail: created.email ?? '',
-            recipientEmail:
-              resolved.userType === 'parent'
-                ? (dto.email ?? created.email ?? '')
-                : (dto.invitation_email ?? ''),
-            userType: resolved.userType,
-            roles: resolved.roleLabels.join(', '),
-          });
-        } catch (err: unknown) {
-          results.failureCount += 1;
-          const message =
-            err instanceof Error ? err.message : 'Unknown error during import';
-          results.errors.push({ row: rowLabel, message });
+          return { ok: true, item, created };
+        } catch (error: unknown) {
+          return { ok: false, item, error };
         }
+      },
+    );
+
+    for (const outcome of insertOutcomes) {
+      if (!outcome.ok) {
+        const reason =
+          outcome.error instanceof Error ? outcome.error.message : 'Unknown error during create';
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          fullName: outcome.item.dto.full_name.trim(),
+          loginEmail: outcome.item.loginEmail,
+          userType: outcome.item.userType,
+          roles: outcome.item.roleLabels.join(', '),
+          status: 'failed_insert',
+          reason,
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, `failed: ${reason}`);
+        continue;
       }
+      if (outcome.created.deferredDeliveries?.length) {
+        deferredDeliveries.push(...outcome.created.deferredDeliveries);
+      }
+      rowOutcomes.push({
+        row: outcome.item.rowLabel,
+        fullName: outcome.item.dto.full_name.trim(),
+        loginEmail: outcome.created.email ?? outcome.item.loginEmail,
+        userType: outcome.item.userType,
+        roles: outcome.item.roleLabels.join(', '),
+        status: 'added',
+        recipientEmail:
+          outcome.item.userType === 'staff'
+            ? outcome.item.dto.invitation_email
+            : outcome.item.dto.email,
+      });
+      sheetStatusByIndex.set(outcome.item.originalIndex, 'added');
+    }
+
+    if (deferredDeliveries.length > 0) {
+      try {
+        await this.usersService.deliverDeferredInvitationEmails(
+          deferredDeliveries,
+          adminUser,
+          branchId,
+        );
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to send invitation emails';
+        rowOutcomes.push({
+          row: 0,
+          fullName: '',
+          status: 'failed_insert',
+          reason: `Invitation emails failed after save: ${message}. Use Resend invitation if needed.`,
+        });
+      }
+    }
+
+    rowOutcomes.sort((a, b) => a.row - b.row);
+
+    const added = rowOutcomes.filter((o) => o.status === 'added');
+    const updated = rowOutcomes.filter((o) => o.status === 'updated');
+    const unchanged = rowOutcomes.filter((o) => o.status === 'unchanged');
+    const failedInserts = rowOutcomes.filter((o) => o.status === 'failed_insert');
+    const failedUpdates = rowOutcomes.filter((o) => o.status === 'failed_update');
+    const skipped = rowOutcomes.filter((o) => o.status === 'skipped');
+
+    const results: UserImportResult = {
+      totalProcessed: prepared.length,
+      createdCount: added.length,
+      updatedCount: updated.length,
+      unchangedCount: unchanged.length,
+      failedInsertCount: failedInserts.length,
+      failedUpdateCount: failedUpdates.length,
+      skippedCount: skipped.length,
+      successCount: added.length + updated.length + unchanged.length,
+      failureCount: failedInserts.length + failedUpdates.length,
+      errors: [...failedInserts, ...failedUpdates].map((o) => ({
+        row: o.row,
+        message: o.reason ?? 'Failed',
+      })),
+      rowOutcomes,
+      created: added.map((o) => ({
+        row: o.row,
+        fullName: o.fullName,
+        loginEmail: o.loginEmail ?? '',
+        recipientEmail: o.recipientEmail ?? '',
+        userType: o.userType ?? 'staff',
+        roles: o.roles ?? '',
+      })),
     };
 
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    if (results.failureCount > 0) {
+      results.resultsFile = await this.buildUserImportResultsWorkbook(
+        prepared,
+        sheetStatusByIndex,
+      );
+    }
 
     return { data: results };
+  }
+
+  async exportUsersForImport(branchId: string): Promise<{
+    data: {
+      fileName: string;
+      contentBase64: string;
+      mimeType: string;
+      rowCount: number;
+    };
+  }> {
+    const rows = await this.loadUsersAsImportRows(branchId);
+    const ExcelJS = require('exceljs') as typeof import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Users');
+    const headers = USER_BULK_COLUMN_DEFS.map((c) => c.label);
+    sheet.addRow(headers);
+    sheet.getRow(1).font = { bold: true };
+
+    for (const row of rows) {
+      sheet.addRow(
+        USER_BULK_COLUMN_DEFS.map((c) => {
+          const v = row[c.key];
+          return v == null ? '' : String(v);
+        }),
+      );
+    }
+
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      data: {
+        fileName: `users-export-${stamp}.xlsx`,
+        contentBase64: buffer.toString('base64'),
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        rowCount: rows.length,
+      },
+    };
+  }
+
+  private async buildUserImportResultsWorkbook(
+    prepared: Array<{ rowLabel: number; dto: BulkUserRowDto; originalIndex: number }>,
+    sheetStatusByIndex: Map<number, string>,
+  ): Promise<{ fileName: string; contentBase64: string; mimeType: string }> {
+    const ExcelJS = require('exceljs') as typeof import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Users');
+    const headers = [
+      ...USER_BULK_COLUMN_DEFS.map((c) => c.label),
+      USER_IMPORT_STATUS_COLUMN.label,
+    ];
+    sheet.addRow(headers);
+    sheet.getRow(1).font = { bold: true };
+
+    const failFill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFFFC7CE' },
+    };
+
+    for (const item of prepared) {
+      const status = sheetStatusByIndex.get(item.originalIndex) ?? '';
+      const values = USER_BULK_COLUMN_DEFS.map((c) => {
+        const raw = (item.dto as unknown as Record<string, unknown>)[c.key];
+        return raw == null ? '' : String(raw);
+      });
+      values.push(status);
+      const excelRow = sheet.addRow(values);
+      if (status.toLowerCase().startsWith('failed')) {
+        excelRow.eachCell((cell) => {
+          cell.fill = failFill;
+        });
+      }
+    }
+
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      fileName: `users-import-results-${stamp}.xlsx`,
+      contentBase64: buffer.toString('base64'),
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+  }
+
+  private async loadUsersAsImportRows(
+    branchId: string,
+  ): Promise<Record<string, string>[]> {
+    const supabase = this.getClient();
+    const { data: branchUsers, error: bErr } = await supabase
+      .from('user_branches')
+      .select('user_id')
+      .eq('branch_id', branchId);
+    if (bErr) throw new BadRequestException(bErr.message);
+    const userIds = [
+      ...new Set(
+        ((branchUsers ?? []) as Array<{ user_id: string }>).map((b) => b.user_id),
+      ),
+    ];
+    if (userIds.length === 0) return [];
+
+    const rolesLookup = await this.loadRoleLookup(supabase);
+    const CHUNK = 100;
+    const out: Record<string, string>[] = [];
+
+    for (let i = 0; i < userIds.length; i += CHUNK) {
+      const chunk = userIds.slice(i, i + CHUNK);
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select(
+          'id, email, full_name, phone, address, date_of_birth, gender, invitation_recipient_email',
+        )
+        .in('id', chunk);
+      if (pErr) throw new BadRequestException(pErr.message);
+
+      const { data: userRoles, error: rErr } = await supabase
+        .from('user_roles')
+        .select('user_id, role_id')
+        .eq('branch_id', branchId)
+        .in('user_id', chunk);
+      if (rErr) throw new BadRequestException(rErr.message);
+
+      const { data: students, error: sErr } = await supabase
+        .from('students')
+        .select('user_id')
+        .eq('branch_id', branchId)
+        .in('user_id', chunk);
+      if (sErr) throw new BadRequestException(sErr.message);
+      const studentUserIds = new Set(
+        ((students ?? []) as Array<{ user_id: string | null }>)
+          .map((s) => s.user_id)
+          .filter((id): id is string => !!id),
+      );
+
+      const roleIdsByUser = new Map<string, string[]>();
+      for (const ur of (userRoles ?? []) as Array<{ user_id: string; role_id: string }>) {
+        const list = roleIdsByUser.get(ur.user_id) ?? [];
+        list.push(ur.role_id);
+        roleIdsByUser.set(ur.user_id, list);
+      }
+
+      for (const p of (profiles ?? []) as Array<{
+        id: string;
+        email: string | null;
+        full_name: string;
+        phone: string | null;
+        address: string | null;
+        date_of_birth: string | null;
+        gender: string | null;
+        invitation_recipient_email: string | null;
+      }>) {
+        if (studentUserIds.has(p.id)) continue;
+        const roleIds = roleIdsByUser.get(p.id) ?? [];
+        if (roleIds.length === 0) continue;
+        const roleNames = roleIds
+          .map((id) => rolesLookup.byId.get(id)?.name ?? '')
+          .map((n) => n.toLowerCase());
+        if (roleNames.includes('student')) continue;
+        const parentUser = roleNames.some((n) => PARENT_ROLE_NAMES.has(n));
+        const roleLabels = roleIds.map(
+          (id) =>
+            rolesLookup.byId.get(id)?.displayName ||
+            rolesLookup.byId.get(id)?.name ||
+            id,
+        );
+
+        const email = (p.email ?? '').trim().toLowerCase();
+        const username = parentUser ? '' : email ? extractUsernameFromEmail(email) : '';
+        const invite =
+          !parentUser && p.invitation_recipient_email
+            ? p.invitation_recipient_email
+            : '';
+
+        out.push({
+          full_name: p.full_name ?? '',
+          roles: roleLabels.join(', '),
+          username: parentUser ? '' : username,
+          invitation_email: invite,
+          email: parentUser ? email : '',
+          phone: p.phone ?? '',
+          gender: p.gender ?? '',
+          date_of_birth: p.date_of_birth ?? '',
+          address: p.address ?? '',
+        });
+      }
+    }
+
+    out.sort((a, b) => a.full_name.localeCompare(b.full_name));
+    return out;
   }
 }

@@ -17,6 +17,34 @@ import { InvitationsService } from '../invitations/invitations.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { SubscriptionService } from '../subscription/subscription.service';
 
+/** Invitation email payload deferred until a bulk batch commits. */
+export type DeferredUserInvitationDelivery = {
+  invitation: {
+    id: string;
+    token: string;
+    user_id: string;
+    recipient_email: string;
+    invitation_type: 'student' | 'parent' | 'parent_account' | 'staff';
+    created_by: string;
+    created_at: string;
+    expires_at: string;
+    used_at: string | null;
+  };
+  recipientName: string;
+  loginEmail: string;
+};
+
+export type CreateUserOptions = {
+  deferInvitationDelivery?: boolean;
+  /**
+   * Staff: invite only when invitationEmail is set.
+   * Parent: invite only when email is set AND this flag is false… for bulk we pass true and
+   * skip parent invites unless invitationEmail-style — parents use `email` as login; with this
+   * flag true, parent invites are also skipped (admin can Resend). Prevents rate limits on large imports.
+   */
+  inviteOnlyWhenRecipientProvided?: boolean;
+};
+
 type ProfileRow = {
   id: string;
   full_name: string;
@@ -544,8 +572,13 @@ export class UsersService {
     branchId: string,
     adminUser: CurrentUserPayload,
     tenantId?: string | null,
-  ): Promise<UserDto> {
+    options?: CreateUserOptions,
+  ): Promise<UserDto & { deferredDeliveries?: DeferredUserInvitationDelivery[]; invitationSkipped?: boolean }> {
     const supabase = this.supabaseConfig.getClient();
+    const deferInvitationDelivery = options?.deferInvitationDelivery === true;
+    const inviteOnlyWhenRecipientProvided =
+      options?.inviteOnlyWhenRecipientProvided === true;
+    const deferredDeliveries: DeferredUserInvitationDelivery[] = [];
 
     if (!input.roleIds || input.roleIds.length === 0) {
       throw new BadRequestException('Role is required');
@@ -607,9 +640,17 @@ export class UsersService {
       if (userType === 'parent') return resolvedLoginEmail;
       const raw = (input.invitationEmail ?? '').trim();
       // Optional for staff — blank means send setup link to the school login email
-      // (same pattern as student invitations).
+      // (same pattern as student invitations) unless inviteOnlyWhenRecipientProvided.
       if (!raw) return resolvedLoginEmail;
       return this.normalizeLoginEmail(raw);
+    })();
+
+    const staffHasExplicitInvite = !!(input.invitationEmail ?? '').trim();
+    const shouldCreateInvitation = (() => {
+      if (!inviteOnlyWhenRecipientProvided) return true;
+      if (userType === 'staff') return staffHasExplicitInvite;
+      // Parents in bulk: skip auto-invite to avoid rate limits; use Resend from Users list.
+      return false;
     })();
 
     const {
@@ -685,41 +726,197 @@ export class UsersService {
         await this.ensureStaffForUser(user.id, branchId);
       }
 
-      const invitationType = userType === 'parent' ? 'parent_account' : 'staff';
-      const recipientName =
-        userType === 'parent'
-          ? this.nameFromEmail(invitationRecipientEmail)
-          : input.fullName;
+      if (shouldCreateInvitation) {
+        const invitationType = userType === 'parent' ? 'parent_account' : 'staff';
+        const recipientName =
+          userType === 'parent'
+            ? this.nameFromEmail(invitationRecipientEmail)
+            : input.fullName;
 
-      const inv = await this.invitationsService.createInvitation({
-        userId: user.id,
-        recipientEmail: invitationRecipientEmail,
-        invitationType,
-        createdByUserId: adminUser.id,
-      });
+        const inv = await this.invitationsService.createInvitation({
+          userId: user.id,
+          recipientEmail: invitationRecipientEmail,
+          invitationType,
+          createdByUserId: adminUser.id,
+        });
 
-      await this.invitationsService.sendInvitationEmail({
-        invitation: inv,
-        recipientName,
-        loginEmail: resolvedLoginEmail,
-        userEmailForAudit: adminUser.email,
-        branchId,
-      });
+        if (deferInvitationDelivery) {
+          deferredDeliveries.push({
+            invitation: inv,
+            recipientName,
+            loginEmail: resolvedLoginEmail,
+          });
+        } else {
+          await this.invitationsService.sendInvitationEmail({
+            invitation: inv,
+            recipientName,
+            loginEmail: resolvedLoginEmail,
+            userEmailForAudit: adminUser.email,
+            branchId,
+          });
+        }
 
-      // Persist latest invitation destination for UI/status fallback without extra joins.
-      await supabase
-        .from('profiles')
-        .update({
-          invitation_recipient_email: invitationRecipientEmail,
-          invitation_sent_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+        // Persist latest invitation destination for UI/status fallback without extra joins.
+        await supabase
+          .from('profiles')
+          .update({
+            invitation_recipient_email: invitationRecipientEmail,
+            invitation_sent_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+      }
 
-      return this.getUserById(user.id, branchId);
+      const dto = await this.getUserById(user.id, branchId);
+      return {
+        ...dto,
+        deferredDeliveries: deferInvitationDelivery ? deferredDeliveries : undefined,
+        invitationSkipped: !shouldCreateInvitation,
+      };
     } catch (error) {
       await supabase.auth.admin.deleteUser(user.id);
       throw error;
+    }
+  }
+
+  async deliverDeferredInvitationEmails(
+    deliveries: DeferredUserInvitationDelivery[],
+    adminUser: CurrentUserPayload,
+    branchId: string,
+  ): Promise<void> {
+    for (const d of deliveries) {
+      await this.invitationsService.sendInvitationEmail({
+        invitation: d.invitation,
+        recipientName: d.recipientName,
+        loginEmail: d.loginEmail,
+        userEmailForAudit: adminUser.email,
+        branchId,
+      });
+    }
+  }
+
+  /** Public helper: username → school login email for the branch tenant. */
+  async resolveStaffLoginEmail(username: string, branchId: string): Promise<string> {
+    const domain = await this.getTenantDomainForBranch(branchId);
+    return this.normalizeLoginEmail(this.buildLoginEmail(username, domain));
+  }
+
+  /**
+   * Batch lookup of existing users in a branch by login emails (profiles.email).
+   */
+  async findUsersByLoginEmails(
+    branchId: string,
+    loginEmails: string[],
+  ): Promise<
+    Map<
+      string,
+      {
+        userId: string;
+        loginEmail: string;
+        fullName: string;
+        phone: string | null;
+        address: string | null;
+        dateOfBirth: string | null;
+        gender: string | null;
+        roleIds: string[];
+      }
+    >
+  > {
+    const result = new Map<
+      string,
+      {
+        userId: string;
+        loginEmail: string;
+        fullName: string;
+        phone: string | null;
+        address: string | null;
+        dateOfBirth: string | null;
+        gender: string | null;
+        roleIds: string[];
+      }
+    >();
+    const emails = [
+      ...new Set(
+        loginEmails
+          .map((e) => this.normalizeLoginEmail(e))
+          .filter((e) => e.length > 0),
+      ),
+    ];
+    if (emails.length === 0) return result;
+
+    const supabase = this.supabaseConfig.getClient();
+    const CHUNK = 100;
+    for (let i = 0; i < emails.length; i += CHUNK) {
+      const chunk = emails.slice(i, i + CHUNK);
+      const { data: profiles, error: profileErr } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, phone, address, date_of_birth, gender')
+        .in('email', chunk);
+      throwIfDbError(profileErr);
+      const profileRows = (profiles ?? []) as Array<{
+        id: string;
+        email: string | null;
+        full_name: string;
+        phone: string | null;
+        address: string | null;
+        date_of_birth: string | null;
+        gender: string | null;
+      }>;
+      if (profileRows.length === 0) continue;
+
+      const userIds = profileRows.map((p) => p.id);
+      const { data: branches, error: bErr } = await supabase
+        .from('user_branches')
+        .select('user_id')
+        .eq('branch_id', branchId)
+        .in('user_id', userIds);
+      throwIfDbError(bErr);
+      const inBranch = new Set(
+        ((branches ?? []) as Array<{ user_id: string }>).map((b) => b.user_id),
+      );
+
+      const { data: roles, error: rErr } = await supabase
+        .from('user_roles')
+        .select('user_id, role_id')
+        .eq('branch_id', branchId)
+        .in('user_id', userIds);
+      throwIfDbError(rErr);
+      const rolesByUser = new Map<string, string[]>();
+      for (const row of (roles ?? []) as Array<{ user_id: string; role_id: string }>) {
+        const list = rolesByUser.get(row.user_id) ?? [];
+        list.push(row.role_id);
+        rolesByUser.set(row.user_id, list);
+      }
+
+      for (const p of profileRows) {
+        if (!p.email || !inBranch.has(p.id)) continue;
+        const loginEmail = this.normalizeLoginEmail(p.email);
+        result.set(loginEmail, {
+          userId: p.id,
+          loginEmail,
+          fullName: p.full_name,
+          phone: p.phone,
+          address: p.address,
+          dateOfBirth: p.date_of_birth,
+          gender: p.gender,
+          roleIds: rolesByUser.get(p.id) ?? [],
+        });
+      }
+    }
+    return result;
+  }
+
+  async purgeImportedUserAccount(userId: string, branchId: string): Promise<void> {
+    const supabase = this.supabaseConfig.getClient();
+    try {
+      await supabase.from('invitations').delete().eq('user_id', userId);
+      await supabase.from('user_roles').delete().eq('user_id', userId).eq('branch_id', branchId);
+      await supabase.from('user_branches').delete().eq('user_id', userId).eq('branch_id', branchId);
+      await supabase.from('staff').delete().eq('user_id', userId).eq('branch_id', branchId);
+      await supabase.from('profiles').delete().eq('id', userId);
+      await supabase.auth.admin.deleteUser(userId);
+    } catch {
+      // best-effort
     }
   }
 

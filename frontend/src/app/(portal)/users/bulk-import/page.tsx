@@ -19,6 +19,8 @@ import {
   MultiSelect,
   Divider,
   Loader,
+  Modal,
+  ScrollArea,
   useComputedColorScheme,
   useMantineTheme,
 } from '@mantine/core';
@@ -28,13 +30,26 @@ import {
   useBulkUsersImport,
   useBulkUsersImportTemplate,
   useBulkUsersImportValidate,
+  useBulkUsersExport,
 } from '@/hooks/useBulkImport';
 import { useRoles } from '@/hooks/useRoles';
 import { notifications } from '@mantine/notifications';
 import * as XLSX from 'xlsx';
 import type { BulkUserImportPreview, BulkUserImportResult, BulkUserRowDto } from '@/hooks/useBulkImport';
 import type { Role } from '@/types/permissions';
-import { modals } from '@mantine/modals';
+
+function downloadBase64File(fileName: string, contentBase64: string, mimeType: string): void {
+  const binary = atob(contentBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function roleMatchKey(value: string): string {
   return String(value ?? '')
@@ -95,12 +110,14 @@ export default function BulkImportUsersPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<BulkUserImportPreview | null>(null);
   const [lastImportResult, setLastImportResult] = useState<BulkUserImportResult | null>(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [isValidated, setIsValidated] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
 
   const previewMutation = useBulkUsersImportPreview();
   const importMutation = useBulkUsersImport();
   const validateMutation = useBulkUsersImportValidate();
+  const exportMutation = useBulkUsersExport();
   const { data: templateData } = useBulkUsersImportTemplate();
   const { data: rolesResponse } = useRoles();
 
@@ -182,10 +199,11 @@ export default function BulkImportUsersPage() {
 
   const handleImport = async () => {
     if (!preview) return;
-    const validRows = preview.rows
-      .filter((r) => r.isValid && r.data.full_name?.trim() && r.data.roles?.trim())
-      .map((r) => ({ ...r.data, row_number: r.rowNumber }));
-    if (validRows.length === 0) {
+    const rowsToImport = preview.rows.map((r) => ({
+      ...r.data,
+      row_number: r.rowNumber,
+    }));
+    if (rowsToImport.length === 0) {
       notifications.show({
         title: t('bulkNoValidRows'),
         message: t('bulkNoValidRowsMessage'),
@@ -194,61 +212,9 @@ export default function BulkImportUsersPage() {
       return;
     }
     try {
-      const result = await importMutation.mutateAsync(validRows);
+      const result = await importMutation.mutateAsync(rowsToImport);
       setLastImportResult(result);
-      notifications.show({
-        title: t('bulkImportComplete'),
-        message:
-          result.errors.length > 0
-            ? t('bulkImportCompletePartial', {
-                successCount: result.successCount,
-                failureCount: result.failureCount,
-              })
-            : t('bulkImportCompleteSuccess', { successCount: result.successCount }),
-        color: result.failureCount === 0 ? 'green' : 'yellow',
-        icon: <IconCheck size={16} />,
-      });
-
-      if ((result.created?.length ?? 0) > 0) {
-        modals.open({
-          title: t('bulkInvitationsSent'),
-          size: 'xl',
-          centered: true,
-          children: (
-            <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-              <Stack gap="sm">
-                {result.created!.map((c) => (
-                  <Paper key={`${c.row}-${c.loginEmail}`} withBorder p="md">
-                    <Group justify="space-between" align="flex-start">
-                      <div>
-                        <Text fw={600}>
-                          {t('bulkCreatedRowLabel', { row: c.row, name: c.fullName })}
-                        </Text>
-                        {c.loginEmail && (
-                          <Text size="sm" c="dimmed">
-                            {t('bulkLoginLabel', { email: c.loginEmail })}
-                          </Text>
-                        )}
-                        <Text size="sm" c="dimmed">
-                          {t('bulkRolesLabel', { roles: c.roles })}
-                        </Text>
-                      </div>
-                      <Badge color={c.userType === 'parent' ? 'blue' : 'green'}>
-                        {c.userType === 'parent' ? t('bulkUserTypeParent') : t('bulkUserTypeStaff')}
-                      </Badge>
-                    </Group>
-                    <Divider my="sm" />
-                    <Text size="sm">
-                      <strong>{t('bulkRecipientEmail')}:</strong> {c.recipientEmail}
-                    </Text>
-                  </Paper>
-                ))}
-              </Stack>
-            </div>
-          ),
-        });
-      }
-
+      setStatusModalOpen(true);
       setFile(null);
       setPreview(null);
       setIsValidated(false);
@@ -262,6 +228,37 @@ export default function BulkImportUsersPage() {
         icon: <IconX size={16} />,
       });
     }
+  };
+
+  const handleExportUsers = async () => {
+    try {
+      const file = await exportMutation.mutateAsync();
+      downloadBase64File(file.fileName, file.contentBase64, file.mimeType);
+      notifications.show({
+        title: t('bulkExportComplete'),
+        message: t('bulkExportCompleteMessage', { count: file.rowCount }),
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('bulkExportFailed');
+      notifications.show({
+        title: t('bulkExportFailed'),
+        message,
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    }
+  };
+
+  const handleDownloadResultsFile = () => {
+    const resultsFile = lastImportResult?.resultsFile;
+    if (!resultsFile) return;
+    downloadBase64File(
+      resultsFile.fileName,
+      resultsFile.contentBase64,
+      resultsFile.mimeType,
+    );
   };
 
   const handleDownloadTemplate = () => {
@@ -435,14 +432,25 @@ export default function BulkImportUsersPage() {
       <div className="page-title-bar">
         <Group justify="space-between" w="100%">
           <Title order={1}>{t('bulkImportTitle')}</Title>
-          <Button
-            id="users-bulk-import-download-template"
-            leftSection={<IconDownload size={16} />}
-            variant="light"
-            onClick={handleDownloadTemplate}
-          >
-            {t('downloadTemplate')}
-          </Button>
+          <Group gap="sm">
+            <Button
+              id="users-bulk-import-export"
+              leftSection={<IconDownload size={16} />}
+              variant="default"
+              loading={exportMutation.isPending}
+              onClick={() => void handleExportUsers()}
+            >
+              {t('bulkExportUsers')}
+            </Button>
+            <Button
+              id="users-bulk-import-download-template"
+              leftSection={<IconDownload size={16} />}
+              variant="light"
+              onClick={handleDownloadTemplate}
+            >
+              {t('downloadTemplate')}
+            </Button>
+          </Group>
         </Group>
       </div>
 
@@ -460,28 +468,30 @@ export default function BulkImportUsersPage() {
           {lastImportResult != null && (
             <Paper p="md" withBorder>
               <Stack gap="xs">
-                <Title order={5}>{t('lastImportResult')}</Title>
+                <Group justify="space-between">
+                  <Title order={5}>{t('lastImportResult')}</Title>
+                  <Button size="xs" variant="subtle" onClick={() => setStatusModalOpen(true)}>
+                    {t('bulkViewImportStatus')}
+                  </Button>
+                </Group>
                 <Text size="sm">
-                  {t('bulkUsersImportedSuccess', { count: lastImportResult.successCount })}
-                  {lastImportResult.failureCount > 0 && (
-                    <> {t('bulkRowsFailed', { count: lastImportResult.failureCount })}</>
-                  )}
+                  {t('bulkImportStatusSummary', {
+                    added: lastImportResult.createdCount ?? 0,
+                    updated: lastImportResult.updatedCount ?? 0,
+                    unchanged: lastImportResult.unchangedCount ?? 0,
+                    failedInsert: lastImportResult.failedInsertCount ?? 0,
+                    failedUpdate: lastImportResult.failedUpdateCount ?? 0,
+                  })}
                 </Text>
-                {lastImportResult.successCount > 0 && (
-                  <Text size="xs" c="dimmed">
-                    {t('importedUsersHint')}
-                  </Text>
-                )}
-                {lastImportResult.errors.length > 0 && (
-                  <Alert color="red" title={t('errorsByRow')}>
-                    <Stack gap={4}>
-                      {lastImportResult.errors.map((e, idx) => (
-                        <Text key={idx} size="sm">
-                          {t('rowWithMessage', { row: e.row, message: e.message })}
-                        </Text>
-                      ))}
-                    </Stack>
-                  </Alert>
+                {lastImportResult.resultsFile && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    leftSection={<IconDownload size={14} />}
+                    onClick={handleDownloadResultsFile}
+                  >
+                    {t('bulkDownloadResultsSheet')}
+                  </Button>
                 )}
               </Stack>
             </Paper>
@@ -704,6 +714,84 @@ export default function BulkImportUsersPage() {
           )}
         </Stack>
       </div>
+
+      <Modal
+        opened={statusModalOpen && lastImportResult != null}
+        onClose={() => setStatusModalOpen(false)}
+        title={t('bulkImportStatusTitle')}
+        size="lg"
+        centered
+      >
+        {lastImportResult && (
+          <Stack gap="md">
+            <Text size="sm">
+              {t('bulkStatusAdded', { count: lastImportResult.createdCount ?? 0 })}
+            </Text>
+            <Text size="sm">
+              {t('bulkStatusUpdated', { count: lastImportResult.updatedCount ?? 0 })}
+            </Text>
+            <Text size="sm">
+              {t('bulkStatusUnchanged', { count: lastImportResult.unchangedCount ?? 0 })}
+            </Text>
+            {(lastImportResult.skippedCount ?? 0) > 0 && (
+              <Text size="sm" c="dimmed">
+                {t('bulkStatusSkipped', { count: lastImportResult.skippedCount ?? 0 })}
+              </Text>
+            )}
+            <Divider />
+            <div>
+              <Text size="sm" fw={600} c="red">
+                {t('bulkStatusFailedUpdate', {
+                  count: lastImportResult.failedUpdateCount ?? 0,
+                })}
+              </Text>
+              {(lastImportResult.rowOutcomes ?? [])
+                .filter((o) => o.status === 'failed_update')
+                .map((o) => (
+                  <Text key={`fu-${o.row}`} size="xs" mt={4}>
+                    {t('rowWithMessage', {
+                      row: o.row,
+                      message: `${o.fullName}: ${o.reason ?? ''}`,
+                    })}
+                  </Text>
+                ))}
+            </div>
+            <div>
+              <Text size="sm" fw={600} c="red">
+                {t('bulkStatusFailedInsert', {
+                  count: lastImportResult.failedInsertCount ?? 0,
+                })}
+              </Text>
+              {(lastImportResult.rowOutcomes ?? [])
+                .filter((o) => o.status === 'failed_insert' && o.row > 0)
+                .map((o) => (
+                  <Text key={`fi-${o.row}`} size="xs" mt={4}>
+                    {t('rowWithMessage', {
+                      row: o.row,
+                      message: `${o.fullName}: ${o.reason ?? ''}`,
+                    })}
+                  </Text>
+                ))}
+            </div>
+            {lastImportResult.resultsFile && (
+              <Alert color="orange" title={t('bulkResultsSheetAvailable')}>
+                <Stack gap="sm">
+                  <Text size="sm">{t('bulkResultsSheetHint')}</Text>
+                  <Button
+                    leftSection={<IconDownload size={16} />}
+                    onClick={handleDownloadResultsFile}
+                  >
+                    {t('bulkDownloadResultsSheet')}
+                  </Button>
+                </Stack>
+              </Alert>
+            )}
+            <Group justify="flex-end">
+              <Button onClick={() => setStatusModalOpen(false)}>{t('bulkCloseStatus')}</Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
     </>
   );
 }

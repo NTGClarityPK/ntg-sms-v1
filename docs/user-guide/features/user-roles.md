@@ -55,14 +55,14 @@ Create user, bulk import, edit roles, activate/deactivate, resend invitation, vi
 
 **Path:** **Users → Bulk Import** (edit permission required)
 
-1. Open **Bulk Import** and download the template (includes an **Allowed Roles** sheet)
+1. Open **Bulk Import** — optionally **Export users** (same columns as the template) or download the blank template (includes an **Allowed Roles** sheet)
 2. Fill rows:
    - **Full Name** (required)
-   - **Roles** — use exact portal role names from the Allowed Roles sheet (comma-separated for multiple). After upload, fix roles with the **Roles** multiselect in the preview (avoids typos such as “Sub Teacher”)
-   - **Staff:** **Username** (required) + **Invitation Email** (optional — blank uses the school login email)
-   - **Parents:** **Email** (login and invitation)
-3. Upload the file, edit the preview if needed, then **Validate**
-4. **Import** creates accounts and sends invitation emails
+   - **Roles** — use exact portal role names from the Allowed Roles sheet (comma-separated for multiple). After upload, fix roles with the **Roles** multiselect in the preview
+   - **Staff:** **Username** (required) + **Invitation Email** (optional — leave blank to create without sending an invite)
+   - **Parents:** **Email** (login). Bulk import does **not** auto-send parent invites (use **Resend invitation** from the users list if needed)
+3. Upload, edit the preview if needed, then **Validate**
+4. **Import** upserts by login identity (staff username / parent email): existing users are updated; new ones are created. A status modal shows added / updated / unchanged / failed. On failure, download the results sheet (Import Status column); re-import skips already-succeeded rows
 
 Do **not** import the **student** role here — use [🎓 Students](students.md) → **Bulk import** for student accounts. Parent and staff roles cannot be mixed on the same row.
 
