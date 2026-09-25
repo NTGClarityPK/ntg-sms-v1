@@ -359,6 +359,14 @@ export default function BulkImportStudentsPage() {
   const editableValidCount =
     preview?.rows.filter((r) => r.isValid).length ?? 0;
 
+  const handleCancelImport = () => {
+    setFile(null);
+    setPreview(null);
+    setSelectedYear(null);
+    setIsValidated(false);
+    setShowValidation(false);
+  };
+
   const handleValidate = () => {
     void (async () => {
       if (!preview) return;
@@ -519,6 +527,19 @@ export default function BulkImportStudentsPage() {
                     </Text>
                   </div>
                   <Group gap="sm">
+                    <Button
+                      id="bulk-import-cancel"
+                      color="red"
+                      variant="light"
+                      onClick={handleCancelImport}
+                      disabled={
+                        previewMutation.isPending ||
+                        importMutation.isPending ||
+                        validateMutation.isPending
+                      }
+                    >
+                      {t('bulkCancelImport')}
+                    </Button>
                     <Button
                       id="bulk-import-validate"
                       variant="light"
