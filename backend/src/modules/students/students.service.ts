@@ -74,6 +74,11 @@ export type DeferredInvitationDelivery = {
 export type CreateStudentWithInvitationOptions = {
   /** Create invitation rows but do not send email / in-app message yet. */
   deferInvitationDelivery?: boolean;
+  /**
+   * When true, only create/send an invitation if `invitationRecipientEmail` is provided.
+   * Used by bulk import so blank recipient rows are created without Mailjet / rate-limit pressure.
+   */
+  inviteOnlyWhenRecipientProvided?: boolean;
 };
 
 function normalizeOptionalEmail(email?: string | null): string | null {
@@ -1332,18 +1337,26 @@ export class StudentsService {
     options?: CreateStudentWithInvitationOptions,
   ): Promise<{
     student: StudentDto;
-    studentInvitation: { token: string; recipientEmail: string; invitationType: 'parent' | 'student'; expiresAt: string };
+    studentInvitation?: {
+      token: string;
+      recipientEmail: string;
+      invitationType: 'parent' | 'student';
+      expiresAt: string;
+    };
     parentInvitation?: { token: string; recipientEmail: string; expiresAt: string; parentUserId: string };
     deferredDeliveries?: DeferredInvitationDelivery[];
     /** Auth user id of a parent created in this call (for bulk rollback). */
     createdParentUserId?: string | null;
+    invitationSkipped?: boolean;
   }> {
     const supabase = this.supabaseConfig.getClient();
     const username = extractUsernameFromEmail(adminUser.email);
     const deferInvitationDelivery = options?.deferInvitationDelivery === true;
+    const inviteOnlyWhenRecipientProvided =
+      options?.inviteOnlyWhenRecipientProvided === true;
     const deferredDeliveries: DeferredInvitationDelivery[] = [];
     // If we create a brand-new parent account during this flow and later fail,
-    // we must roll it back to avoid orphan parent records for failed imports.
+    // we must roll back the parent so we do not create parent records for failed imports.
     let createdParentUserId: string | null = null;
 
     await this.assertStudentLimit(branchId);
@@ -1661,112 +1674,130 @@ export class StudentsService {
       }
 
       // Student invitation (scenario 1 or 2)
-      const recipientEmail = (() => {
-        const raw = (input.invitationRecipientEmail ?? '').trim();
-        // Parent invitations must always be a real email address (validated in DTO).
-        if (input.invitationType === 'parent') return this.normalizeLoginEmail(raw);
+      const rawInvitationRecipient = (input.invitationRecipientEmail ?? '').trim();
+      const shouldCreateStudentInvitation =
+        !inviteOnlyWhenRecipientProvided ||
+        rawInvitationRecipient.length > 0 ||
+        input.invitationType === 'parent';
 
-        // Student invitations: allow empty/username; build a valid email using tenant domain.
-        // If raw already looks like an email, normalise it and use as-is.
-        if (raw.includes('@')) return this.normalizeLoginEmail(raw);
-        const fallbackUsername = raw || input.username;
-        return this.normalizeLoginEmail(this.buildLoginEmail(fallbackUsername, tenantDomain));
-      })();
-      const invitationType = input.invitationType;
-      const recipientName =
-        invitationType === 'parent'
-          ? this.nameFromEmail(recipientEmail)
-          : displayName;
-
-      const inv = await this.invitationsService.createInvitation({
-        userId: user.id,
-        recipientEmail,
-        invitationType: invitationType === 'parent' ? 'parent' : 'student',
-        createdByUserId: adminUser.id,
-      });
-
-      if (deferInvitationDelivery) {
-        deferredDeliveries.push({
-          invitation: inv,
-          recipientName,
-          loginEmail: normalizedLoginEmail,
-          studentName: displayName,
-          recipientUserId: user.id,
-          recipientDisplayName: displayName,
-          accountLabel: 'student',
-        });
-        if (parentInvitation?.parentUserId) {
-          // Parent delivery may already be queued above when newly created / expired.
-          // Ensure in-app parent message still has student name when only parent_account was deferred.
-          const parentDelivery = deferredDeliveries.find(
-            (d) =>
-              d.accountLabel === 'parent' &&
-              d.recipientUserId === parentInvitation.parentUserId,
-          );
-          if (parentDelivery) {
-            parentDelivery.studentNameForParent = displayName;
+      let studentInvitation:
+        | {
+            token: string;
+            recipientEmail: string;
+            invitationType: 'parent' | 'student';
+            expiresAt: string;
           }
-        }
-      } else {
-        await this.invitationsService.sendInvitationEmail({
-          invitation: inv,
-          recipientName,
-          loginEmail: normalizedLoginEmail,
-          studentName: displayName,
-          userEmailForAudit: adminUser.email,
-          branchId,
+        | undefined;
+
+      if (shouldCreateStudentInvitation) {
+        const recipientEmail = (() => {
+          const raw = rawInvitationRecipient;
+          // Parent invitations must always be a real email address (validated in DTO).
+          if (input.invitationType === 'parent') return this.normalizeLoginEmail(raw);
+
+          // Student invitations: allow empty/username; build a valid email using tenant domain.
+          // If raw already looks like an email, normalise it and use as-is.
+          if (raw.includes('@')) return this.normalizeLoginEmail(raw);
+          const fallbackUsername = raw || input.username;
+          return this.normalizeLoginEmail(this.buildLoginEmail(fallbackUsername, tenantDomain));
+        })();
+        const invitationType = input.invitationType;
+        const recipientName =
+          invitationType === 'parent'
+            ? this.nameFromEmail(recipientEmail)
+            : displayName;
+
+        const inv = await this.invitationsService.createInvitation({
+          userId: user.id,
+          recipientEmail,
+          invitationType: invitationType === 'parent' ? 'parent' : 'student',
+          createdByUserId: adminUser.id,
         });
-      }
 
-      const studentDto = await this.getStudentById(studentRow.id, branchId);
-
-      // Also send a curated in-app message so admins can see it in Messages.
-      // Student always gets a message; parent only if a parent account is created (registered).
-      if (!deferInvitationDelivery) {
-        try {
-          await this.sendInvitationDetailsMessage({
-            branchId,
-            adminUser,
+        if (deferInvitationDelivery) {
+          deferredDeliveries.push({
+            invitation: inv,
+            recipientName,
+            loginEmail: normalizedLoginEmail,
+            studentName: displayName,
             recipientUserId: user.id,
             recipientDisplayName: displayName,
-            loginEmail: normalizedLoginEmail,
-            inviteEmail: inv.recipient_email,
-            expiresAt: inv.expires_at,
             accountLabel: 'student',
           });
           if (parentInvitation?.parentUserId) {
-            const parentLoginEmail =
-              this.normalizeLoginEmail(input.parentEmail ?? '') || parentInvitation.recipientEmail;
-            const parentName =
-              (input.parentName ?? '').trim() || this.nameFromEmail(parentLoginEmail);
-            await this.sendInvitationDetailsMessage({
-              branchId,
-              adminUser,
-              recipientUserId: parentInvitation.parentUserId,
-              recipientDisplayName: parentName,
-              loginEmail: parentLoginEmail,
-              inviteEmail: parentInvitation.recipientEmail,
-              expiresAt: parentInvitation.expiresAt,
-              accountLabel: 'parent',
-              studentNameForParent: displayName,
-            });
+            const parentDelivery = deferredDeliveries.find(
+              (d) =>
+                d.accountLabel === 'parent' &&
+                d.recipientUserId === parentInvitation.parentUserId,
+            );
+            if (parentDelivery) {
+              parentDelivery.studentNameForParent = displayName;
+            }
           }
-        } catch {
-          // non-fatal
+        } else {
+          await this.invitationsService.sendInvitationEmail({
+            invitation: inv,
+            recipientName,
+            loginEmail: normalizedLoginEmail,
+            studentName: displayName,
+            userEmailForAudit: adminUser.email,
+            branchId,
+          });
         }
-      }
 
-      return {
-        student: studentDto,
-        studentInvitation: {
+        studentInvitation = {
           token: inv.token,
           recipientEmail: inv.recipient_email,
           invitationType,
           expiresAt: inv.expires_at,
-        },
+        };
+
+        // Also send a curated in-app message so admins can see it in Messages.
+        if (!deferInvitationDelivery) {
+          try {
+            await this.sendInvitationDetailsMessage({
+              branchId,
+              adminUser,
+              recipientUserId: user.id,
+              recipientDisplayName: displayName,
+              loginEmail: normalizedLoginEmail,
+              inviteEmail: inv.recipient_email,
+              expiresAt: inv.expires_at,
+              accountLabel: 'student',
+            });
+            if (parentInvitation?.parentUserId) {
+              const parentLoginEmail =
+                this.normalizeLoginEmail(input.parentEmail ?? '') ||
+                parentInvitation.recipientEmail;
+              const parentName =
+                (input.parentName ?? '').trim() || this.nameFromEmail(parentLoginEmail);
+              await this.sendInvitationDetailsMessage({
+                branchId,
+                adminUser,
+                recipientUserId: parentInvitation.parentUserId,
+                recipientDisplayName: parentName,
+                loginEmail: parentLoginEmail,
+                inviteEmail: parentInvitation.recipientEmail,
+                expiresAt: parentInvitation.expiresAt,
+                accountLabel: 'parent',
+                studentNameForParent: displayName,
+              });
+            }
+          } catch {
+            // non-fatal
+          }
+        }
+      }
+
+      const studentDto = await this.getStudentById(studentRow.id, branchId);
+
+      return {
+        student: studentDto,
+        studentInvitation,
         parentInvitation,
         deferredDeliveries: deferInvitationDelivery ? deferredDeliveries : undefined,
         createdParentUserId,
+        invitationSkipped: !shouldCreateStudentInvitation,
       };
     } catch (error) {
       // If we created a *new* parent account during this flow and the student row ultimately failed,

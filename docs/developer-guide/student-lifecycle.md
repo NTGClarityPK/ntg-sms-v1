@@ -75,7 +75,7 @@ sequenceDiagram
 
 Invitation / bulk-import create sets `is_active = true` and `account_status = pending_verification` so new pupils appear in modules immediately while login stays gated.
 
-**Students bulk import (upsert):** Match on portal username → school login email. Existing students are **updated**; new usernames are **created**. Unchanged rows are reported. Per-row failures do not roll back successful rows. Invitation emails are deferred until creates succeed and are not resent on update. Rows with Import Status `added` / `updated` / `unchanged` from a prior results sheet are skipped on re-import. `POST /api/v1/bulk-import/students/export` returns an import-shaped Excel of current branch students.
+**Students bulk import (upsert):** Match on portal username → school login email. Existing students are **updated**; new usernames are **created**. Unchanged rows are reported. Per-row failures do not roll back successful rows. Invitation emails are created/sent **only when Invitation Recipient Email is filled** (blank rows are created system-active without inviting, avoiding rate limits). Rows with Import Status `added` / `updated` / `unchanged` from a prior results sheet are skipped on re-import. `POST /api/v1/bulk-import/students/export` returns an import-shaped Excel of current branch students.
 
 **`student_enrolments` table:**
 

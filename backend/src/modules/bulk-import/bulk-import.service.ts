@@ -1798,7 +1798,7 @@ export class BulkImportService {
             },
             branchId,
             adminUser,
-            { deferInvitationDelivery: true },
+            { deferInvitationDelivery: true, inviteOnlyWhenRecipientProvided: true },
           );
           return { ok: true, item, created };
         } catch (error: unknown) {
@@ -1832,9 +1832,9 @@ export class BulkImportService {
         studentName: name,
         loginEmail: outcome.created.student.email ?? outcome.item.loginEmail,
         status: 'added',
-        recipientEmail: outcome.created.studentInvitation.recipientEmail,
-        invitationType: outcome.created.studentInvitation.invitationType,
-        expiresAt: outcome.created.studentInvitation.expiresAt,
+        recipientEmail: outcome.created.studentInvitation?.recipientEmail,
+        invitationType: outcome.created.studentInvitation?.invitationType,
+        expiresAt: outcome.created.studentInvitation?.expiresAt,
         parentRecipientEmail: outcome.created.parentInvitation?.recipientEmail,
         parentExpiresAt: outcome.created.parentInvitation?.expiresAt,
       });
