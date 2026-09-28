@@ -3,8 +3,6 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import * as XLSX from 'xlsx';
-import { BulkStudentRowDto } from './dto/bulk-student-row.dto';
-import { BulkUserRowDto } from './dto/bulk-user-row.dto';
 import {
   StudentsService,
   type DeferredInvitationDelivery,
@@ -13,6 +11,7 @@ import {
   UsersService,
   type DeferredUserInvitationDelivery,
 } from '../users/users.service';
+import { ParentsService } from '../parents/parents.service';
 import type { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { mapWithConcurrency } from '../../common/utils/map-with-concurrency.util';
 import { extractUsernameFromEmail } from '../../common/utils/audit.utils';
@@ -25,6 +24,15 @@ import {
   USER_BULK_COLUMN_DEFS,
   USER_IMPORT_STATUS_COLUMN,
 } from './user-bulk-columns';
+import {
+  PARENT_ASSOCIATION_BULK_COLUMN_DEFS,
+  PARENT_ASSOCIATION_COLUMN_MAP,
+  PARENT_ASSOCIATION_IMPORT_STATUS_COLUMN,
+  isSkipParentAssociationImportStatus,
+} from './parent-association-bulk-columns';
+import { BulkParentAssociationRowDto } from './dto/bulk-parent-association-row.dto';
+import { BulkStudentRowDto } from './dto/bulk-student-row.dto';
+import { BulkUserRowDto } from './dto/bulk-user-row.dto';
 
 type SupabaseClient = ReturnType<SupabaseConfig['getClient']>;
 
@@ -32,6 +40,8 @@ interface ParsedRow {
   rowNumber: number;
   data: BulkStudentRowDto;
   errors: string[];
+  /** Non-blocking notices (e.g. username cleaned). */
+  warnings?: string[];
   isValid: boolean;
 }
 
@@ -39,6 +49,7 @@ interface ParsedUserRow {
   rowNumber: number;
   data: BulkUserRowDto;
   errors: string[];
+  warnings?: string[];
   isValid: boolean;
 }
 
@@ -492,6 +503,7 @@ export class BulkImportService {
     private readonly supabaseConfig: SupabaseConfig,
     private readonly studentsService: StudentsService,
     private readonly usersService: UsersService,
+    private readonly parentsService: ParentsService,
   ) {}
 
   private getClient(): SupabaseClient {
@@ -660,7 +672,11 @@ export class BulkImportService {
       } else {
         resolvedClassId = refs.classIdByNameLower.get(classRaw.toLowerCase()) ?? null;
       }
-      if (!resolvedClassId) warnings.push(`Class '${row.class_name_or_id}' not found.`);
+      if (!resolvedClassId) {
+        warnings.push(
+          `Class '${row.class_name_or_id}' not found. Use the exact class name from Settings → Academic → Classes.`,
+        );
+      }
     }
 
     if (hasSection) {
@@ -669,7 +685,11 @@ export class BulkImportService {
       } else {
         resolvedSectionId = refs.sectionIdByNameLower.get(sectionRaw.toLowerCase()) ?? null;
       }
-      if (!resolvedSectionId) warnings.push(`Section '${row.section_name_or_id}' not found.`);
+      if (!resolvedSectionId) {
+        warnings.push(
+          `Section '${row.section_name_or_id}' not found. Use the exact section name from Settings → Academic → Sections.`,
+        );
+      }
     }
 
     if (hasTemplate) {
@@ -679,14 +699,18 @@ export class BulkImportService {
         resolvedTemplateId = refs.templateIdByNameLower.get(templateRaw.toLowerCase()) ?? null;
       }
       if (!resolvedTemplateId) {
-        warnings.push(`Subject template '${row.subject_template_name_or_id}' not found.`);
+        warnings.push(
+          `Subject template '${row.subject_template_name_or_id}' not found. Use a name from Settings → Academic → Subject templates (or open the ? help on Bulk Import).`,
+        );
       }
     }
 
     if (resolvedClassId) {
       const requiresTemplate = refs.classHasAnyTemplates.has(resolvedClassId);
       if (requiresTemplate && !hasTemplate) {
-        warnings.push(`Subject template is required for class '${row.class_name_or_id}'.`);
+        warnings.push(
+          `Subject template is required for class '${row.class_name_or_id}'. This class has linked templates — pick one.`,
+        );
       }
     }
 
@@ -694,22 +718,23 @@ export class BulkImportService {
       const linked = refs.classTemplateLinks.has(`${resolvedClassId}::${resolvedTemplateId}`);
       if (!linked) {
         warnings.push(
-          `Subject template '${row.subject_template_name_or_id}' is not linked to class '${row.class_name_or_id}'.`,
+          `Subject template '${row.subject_template_name_or_id}' is not linked to class '${row.class_name_or_id}'. Choose a template that is linked to this class in Settings (class and section were kept).`,
         );
-        resolvedClassId = null;
-        resolvedSectionId = null;
+        // Keep class/section resolved — only clear the invalid template so the admin can fix template alone.
         resolvedTemplateId = null;
       }
-    } else if (resolvedTemplateId) {
-      warnings.push(`Subject template requires a valid class.`);
+    } else if (resolvedTemplateId && !resolvedClassId) {
+      warnings.push(
+        `Subject template '${row.subject_template_name_or_id}' requires a valid Class. Enter Class (and Section if used) together with the template.`,
+      );
       resolvedTemplateId = null;
     }
 
     if ((hasClass && !resolvedClassId) || (hasSection && !resolvedSectionId)) {
       return {
-        classId: null,
-        sectionId: null,
-        subjectTemplateId: null,
+        classId: resolvedClassId,
+        sectionId: resolvedSectionId,
+        subjectTemplateId: resolvedTemplateId,
         warnings,
       };
     }
@@ -778,6 +803,188 @@ export class BulkImportService {
       }
     }
     return extra;
+  }
+
+  /** True when every cell is blank (trailing spare rows in Excel). */
+  private isRawSpreadsheetRowEmpty(row: Record<string, unknown>): boolean {
+    return Object.values(row).every((v) => {
+      if (v == null) return true;
+      if (typeof v === 'string') return v.trim() === '';
+      return false;
+    });
+  }
+
+  private blankToNull(value: string | undefined | null): string | null {
+    if (value == null) return null;
+    const trimmed = String(value).trim();
+    return trimmed === '' ? null : trimmed;
+  }
+
+  private spreadsheetCellToPhoneString(val: unknown): string | undefined {
+    if (val == null || val === '') return undefined;
+    if (typeof val === 'number') {
+      if (!Number.isFinite(val)) return undefined;
+      return Number.isInteger(val) ? String(Math.trunc(val)) : String(val);
+    }
+    const s = String(val).trim();
+    if (!s) return undefined;
+    if (/^\d+(\.\d+)?e[+\-]?\d+$/i.test(s)) {
+      const n = Number(s);
+      if (Number.isFinite(n) && Number.isInteger(n)) return String(Math.trunc(n));
+    }
+    return s;
+  }
+
+  private headerAliasesPresent(
+    lookup: Map<string, unknown>,
+    aliases: string[] | undefined,
+  ): boolean {
+    if (!aliases) return false;
+    return aliases.some((a) => lookup.has(a.toLowerCase()));
+  }
+
+  private assertRequiredStudentHeaders(firstRow: Record<string, unknown>): void {
+    const lookup = this.buildHeaderLookup(firstRow);
+    const missing: string[] = [];
+    if (
+      !this.headerAliasesPresent(lookup, COLUMN_MAP.username) &&
+      !this.headerAliasesPresent(lookup, COLUMN_MAP.legacy_import_email)
+    ) {
+      missing.push('Username');
+    }
+    if (!this.headerAliasesPresent(lookup, COLUMN_MAP.first_name)) missing.push('First Name');
+    if (!this.headerAliasesPresent(lookup, COLUMN_MAP.last_name)) missing.push('Last Name');
+    if (!this.headerAliasesPresent(lookup, COLUMN_MAP.gender)) missing.push('Gender');
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Couldn't find required column(s): ${missing.join(', ')}. Expected headers include Username, First Name, Last Name, and Gender — download the template for the exact labels.`,
+      );
+    }
+  }
+
+  private assertRequiredUserHeaders(firstRow: Record<string, unknown>): void {
+    const lookup = this.buildHeaderLookup(firstRow);
+    const missing: string[] = [];
+    if (!this.headerAliasesPresent(lookup, USER_COLUMN_MAP.full_name)) missing.push('Full Name');
+    if (!this.headerAliasesPresent(lookup, USER_COLUMN_MAP.roles)) missing.push('Roles');
+    const hasStaffIdentity =
+      this.headerAliasesPresent(lookup, USER_COLUMN_MAP.username) ||
+      this.headerAliasesPresent(lookup, USER_COLUMN_MAP.email) ||
+      this.headerAliasesPresent(lookup, USER_COLUMN_MAP.invitation_email);
+    if (!hasStaffIdentity) {
+      missing.push('Username or Email');
+    }
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Couldn't find required column(s): ${missing.join(', ')}. Expected headers include Full Name, Roles, and Username (staff) or Email (parents) — download the template for the exact labels.`,
+      );
+    }
+  }
+
+  private usernameRewriteWarning(
+    rawBeforeTransform: unknown,
+    cleaned: string | undefined,
+  ): string | undefined {
+    if (rawBeforeTransform == null) return undefined;
+    const raw = String(rawBeforeTransform).trim();
+    if (!raw || cleaned == null || cleaned === '') return undefined;
+    if (raw === cleaned) return undefined;
+    const normalised = raw.toLowerCase().replace(/[^a-z0-9._]/g, '');
+    if (normalised === cleaned && raw !== cleaned) {
+      return `Username was cleaned from '${raw}' to '${cleaned}'.`;
+    }
+    if (raw.toLowerCase() !== cleaned) {
+      return `Username was cleaned from '${raw}' to '${cleaned}'.`;
+    }
+    return undefined;
+  }
+
+  private humanizeFieldErrors(
+    errors: Array<{ property: string; constraints?: Record<string, string> }>,
+    labels: Record<string, string>,
+  ): string[] {
+    return errors.flatMap((err) => {
+      const label = labels[err.property] ?? err.property;
+      if (!err.constraints) return [];
+      return Object.entries(err.constraints).map(([key, msg]) => {
+        const lower = String(msg).toLowerCase();
+        if (
+          key === 'isString' ||
+          key === 'isNotEmpty' ||
+          lower.includes('should not be empty') ||
+          lower.includes('must be a string')
+        ) {
+          return `${label} is blank.`;
+        }
+        if (key === 'isEnum' || key === 'isIn') {
+          return `${label} is invalid (${msg}).`;
+        }
+        if (key === 'isEmail' || key === 'matches') {
+          return `${label}: ${msg}`;
+        }
+        return msg;
+      });
+    });
+  }
+
+  private static readonly STUDENT_FIELD_LABELS: Record<string, string> = {
+    username: 'Username',
+    first_name: 'First Name',
+    last_name: 'Last Name',
+    gender: 'Gender',
+    invitation_type: 'Invitation Type',
+    invitation_recipient_email: 'Invitation Recipient Email',
+    phone: 'Phone',
+    address: 'Address',
+    date_of_birth: 'Date of Birth',
+    blood_group: 'Blood Group',
+    medical_notes: 'Medical Notes',
+    admission_date: 'Admission Date',
+    google_account_email: 'Google Account Email',
+    class_name_or_id: 'Class',
+    section_name_or_id: 'Section',
+    subject_template_name_or_id: 'Subject Template',
+    parent_email: 'Parent Email',
+    parent_name: 'Parent Name',
+    parent_phone: 'Parent Phone',
+    parent_relationship: 'Parent Relationship',
+  };
+
+  private static readonly USER_FIELD_LABELS: Record<string, string> = {
+    full_name: 'Full Name',
+    roles: 'Roles',
+    username: 'Username',
+    email: 'Email',
+    invitation_email: 'Invitation Email',
+    phone: 'Phone',
+    address: 'Address',
+    date_of_birth: 'Date of Birth',
+    gender: 'Gender',
+  };
+
+  private async studentHasYearOperationalData(
+    studentId: string,
+    branchId: string,
+    academicYearId: string,
+  ): Promise<boolean> {
+    const supabase = this.getClient();
+    const { count: attCount, error: attErr } = await supabase
+      .from('attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId);
+    if (attErr) throw new BadRequestException(attErr.message);
+    if ((attCount ?? 0) > 0) return true;
+
+    const { count: gradeCount, error: gradeErr } = await supabase
+      .from('student_grades')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .eq('branch_id', branchId)
+      .eq('academic_year_id', academicYearId);
+    if (gradeErr) throw new BadRequestException(gradeErr.message);
+    return (gradeCount ?? 0) > 0;
   }
 
   /** Resolve class by UUID or name (from Settings) for branch. Uses exact match on name/display_name so "Class I" does not match "Class II" or "Class III". */
@@ -1185,12 +1392,18 @@ export class BulkImportService {
       throw new BadRequestException('File exceeds maximum 5000 rows');
     }
 
+    this.assertRequiredStudentHeaders(rawData[0]!);
+
     const parsedRows: ParsedRow[] = [];
 
     for (let i = 0; i < rawData.length; i++) {
       const rowNumber = i + 2;
-      const rawRow = rawData[i];
+      const rawRow = rawData[i]!;
+      if (this.isRawSpreadsheetRowEmpty(rawRow)) {
+        continue;
+      }
       const mappedRow = this.mapColumnNames(rawRow);
+      const rawUsernameBeforeClean = mappedRow.username;
       this.applyUsernameDerivation(mappedRow);
       delete mappedRow.legacy_import_email;
       const rawInviteType = mappedRow.invitation_type;
@@ -1204,11 +1417,18 @@ export class BulkImportService {
         invitation_type: invitationTypeDefaulted,
       });
       const errors = await validate(dto);
-      const fieldErrors = errors.flatMap((err) =>
-        err.constraints ? Object.values(err.constraints) : [],
+      const fieldErrors = this.humanizeFieldErrors(
+        errors,
+        BulkImportService.STUDENT_FIELD_LABELS,
       );
       const extraErrors = this.appendExtraRowValidation(dto);
       const allErrors = [...fieldErrors, ...extraErrors];
+      const warnings: string[] = [];
+      const rewriteWarn = this.usernameRewriteWarning(
+        rawUsernameBeforeClean,
+        dto.username,
+      );
+      if (rewriteWarn) warnings.push(rewriteWarn);
 
       // Validate subject template existence/linking at preview time so users don't find out at commit.
       // Only run placement/template checks if row passed basic shape validation (avoids noisy follow-on errors).
@@ -1256,6 +1476,13 @@ export class BulkImportService {
                 // Safety: no warning but still no template id (shouldn't happen).
                 allErrors.push(`Subject template '${dto.subject_template_name_or_id}' not found.`);
               }
+            } else {
+              const requiredTemplateIssues = (placement.warnings ?? []).filter((w) =>
+                String(w).toLowerCase().includes('subject template is required'),
+              );
+              if (requiredTemplateIssues.length > 0) {
+                allErrors.push(...requiredTemplateIssues);
+              }
             }
           }
         } catch {
@@ -1267,17 +1494,24 @@ export class BulkImportService {
         rowNumber,
         data: dto,
         errors: allErrors,
+        warnings: warnings.length > 0 ? warnings : undefined,
         isValid: allErrors.length === 0,
       });
+    }
+
+    if (parsedRows.length === 0) {
+      throw new BadRequestException(
+        'File has no data rows (only blank rows were found). Fill at least one student row.',
+      );
     }
 
     const validRows = parsedRows.filter((r) => r.isValid).length;
 
     return {
       data: {
-        totalRows: rawData.length,
+        totalRows: parsedRows.length,
         validRows,
-        invalidRows: rawData.length - validRows,
+        invalidRows: parsedRows.length - validRows,
         rows: parsedRows,
       },
     };
@@ -1296,6 +1530,7 @@ export class BulkImportService {
       const rowNumber = incoming.row_number ?? i + 2;
 
       // Rebuild DTO to ensure transforms run consistently (and to avoid trusting client shape).
+      const rawUsernameBeforeClean = incoming.username;
       const dto = plainToInstance(BulkStudentRowDto, {
         ...incoming,
         create_parent_account: incoming.create_parent_account ?? false,
@@ -1303,11 +1538,18 @@ export class BulkImportService {
       });
 
       const errors = await validate(dto);
-      const fieldErrors = errors.flatMap((err) =>
-        err.constraints ? Object.values(err.constraints) : [],
+      const fieldErrors = this.humanizeFieldErrors(
+        errors,
+        BulkImportService.STUDENT_FIELD_LABELS,
       );
       const extraErrors = this.appendExtraRowValidation(dto);
       const allErrors = [...fieldErrors, ...extraErrors];
+      const warnings: string[] = [];
+      const rewriteWarn = this.usernameRewriteWarning(
+        rawUsernameBeforeClean,
+        dto.username,
+      );
+      if (rewriteWarn) warnings.push(rewriteWarn);
 
       if (allErrors.length === 0) {
         const placement = this.resolvePlacementForRowFromRefs(dto, refs);
@@ -1357,6 +1599,7 @@ export class BulkImportService {
         rowNumber,
         data: dto,
         errors: allErrors,
+        warnings: warnings.length > 0 ? warnings : undefined,
         isValid: allErrors.length === 0,
       });
     }
@@ -1379,8 +1622,8 @@ export class BulkImportService {
       for (const name of possibleNames) {
         let val = lookup.get(name.toLowerCase());
         if (val !== undefined && val !== '') {
-          if (targetField === 'phone' && typeof val === 'number') {
-            val = String(val);
+          if (targetField === 'phone' || targetField === 'parent_phone') {
+            val = this.spreadsheetCellToPhoneString(val);
           }
           if (typeof val === 'string') {
             val = normalizeSpreadsheetString(val);
@@ -1531,17 +1774,18 @@ export class BulkImportService {
       dto: BulkStudentRowDto;
       originalIndex: number;
       loginEmail: string;
-      classId?: string;
-      sectionId?: string;
-      subjectTemplateId?: string;
+      classId: string | null;
+      sectionId: string | null;
+      subjectTemplateId: string | null;
       existingStudentId?: string;
     };
     const validActionable: ActionableValid[] = [];
 
     for (const item of actionable) {
       const errors = await validate(item.dto);
-      const fieldErrors = errors.flatMap((err) =>
-        err.constraints ? Object.values(err.constraints) : [],
+      const fieldErrors = this.humanizeFieldErrors(
+        errors,
+        BulkImportService.STUDENT_FIELD_LABELS,
       );
       const allErrors = [...fieldErrors, ...this.appendExtraRowValidation(item.dto)];
 
@@ -1592,9 +1836,9 @@ export class BulkImportService {
             dto: item.dto,
             originalIndex: item.originalIndex,
             loginEmail,
-            classId: placement.classId ?? undefined,
-            sectionId: placement.sectionId ?? undefined,
-            subjectTemplateId: placement.subjectTemplateId ?? undefined,
+            classId: placement.classId ?? null,
+            sectionId: placement.sectionId ?? null,
+            subjectTemplateId: placement.subjectTemplateId ?? null,
           });
           continue;
         }
@@ -1716,7 +1960,17 @@ export class BulkImportService {
 
     const UPDATE_CONCURRENCY = 4;
     type UpdateOutcome =
-      | { ok: true; item: ActionableValid; unchanged: boolean }
+      | {
+          ok: true;
+          item: ActionableValid;
+          unchanged: boolean;
+          deferredDeliveries?: Awaited<
+            ReturnType<StudentsService['ensureParentAccountAndLink']>
+          >['deferredDeliveries'];
+          parentInvitation?: Awaited<
+            ReturnType<StudentsService['ensureParentAccountAndLink']>
+          >['parentInvitation'];
+        }
       | { ok: false; item: ActionableValid; error: unknown };
 
     const updateOutcomes = await mapWithConcurrency(
@@ -1725,31 +1979,87 @@ export class BulkImportService {
       async (item): Promise<UpdateOutcome> => {
         try {
           const snap = snapshots.get(item.existingStudentId!);
-          if (snap && this.isStudentRowUnchanged(item, snap)) {
+          const studentUnchanged = !!(snap && this.isStudentRowUnchanged(item, snap));
+          const wantsParent = item.dto.create_parent_account === true;
+
+          if (studentUnchanged && !wantsParent) {
             return { ok: true, item, unchanged: true };
           }
-          await this.studentsService.updateStudent(
-            item.existingStudentId!,
-            {
-              firstName: item.dto.first_name.trim(),
-              lastName: item.dto.last_name.trim(),
-              phone: item.dto.phone,
-              address: item.dto.address,
-              dateOfBirth: item.dto.date_of_birth,
-              gender: item.dto.gender as 'male' | 'female',
-              classId: item.classId,
-              sectionId: item.sectionId,
-              bloodGroup: item.dto.blood_group,
-              medicalNotes: item.dto.medical_notes,
-              admissionDate: item.dto.admission_date,
-              googleAccountEmail: item.dto.google_account_email,
-              academicYearId,
-              subjectTemplateId: item.subjectTemplateId,
-            },
-            branchId,
-            adminUser.email,
+
+          if (!studentUnchanged) {
+            const placementChanging =
+              (item.classId ?? null) !== (snap?.classId ?? null) ||
+              (item.sectionId ?? null) !== (snap?.sectionId ?? null) ||
+              (item.subjectTemplateId ?? null) !== (snap?.subjectTemplateId ?? null);
+            if (placementChanging) {
+              const blocked = await this.studentHasYearOperationalData(
+                item.existingStudentId!,
+                branchId,
+                academicYearId,
+              );
+              if (blocked) {
+                throw new BadRequestException(
+                  'Cannot change class, section, or subject template because this student already has attendance or assessment grades for this academic year.',
+                );
+              }
+            }
+
+            await this.studentsService.updateStudent(
+              item.existingStudentId!,
+              {
+                firstName: item.dto.first_name.trim(),
+                lastName: item.dto.last_name.trim(),
+                phone: this.blankToNull(item.dto.phone),
+                address: this.blankToNull(item.dto.address),
+                dateOfBirth: this.blankToNull(item.dto.date_of_birth),
+                gender: item.dto.gender as 'male' | 'female',
+                classId: item.classId,
+                sectionId: item.sectionId,
+                bloodGroup: this.blankToNull(item.dto.blood_group),
+                medicalNotes: this.blankToNull(item.dto.medical_notes),
+                admissionDate: this.blankToNull(item.dto.admission_date),
+                googleAccountEmail: this.blankToNull(item.dto.google_account_email),
+                academicYearId,
+                subjectTemplateId: item.subjectTemplateId,
+              },
+              branchId,
+              adminUser.email,
+            );
+          }
+
+          let parentResult: Awaited<
+            ReturnType<StudentsService['ensureParentAccountAndLink']>
+          > | null = null;
+          if (wantsParent) {
+            const displayName =
+              `${item.dto.first_name.trim()} ${item.dto.last_name.trim()}`.trim();
+            parentResult = await this.studentsService.ensureParentAccountAndLink(
+              item.existingStudentId!,
+              displayName,
+              {
+                createParentAccount: true,
+                parentEmail: item.dto.parent_email,
+                parentName: item.dto.parent_name,
+                parentPhone: item.dto.parent_phone,
+                parentRelationship: item.dto.parent_relationship,
+              },
+              branchId,
+              adminUser,
+              { deferInvitationDelivery: true },
+            );
+          }
+
+          const parentChanged = !!(
+            parentResult &&
+            (parentResult.linked || parentResult.parentInvitation)
           );
-          return { ok: true, item, unchanged: false };
+          return {
+            ok: true,
+            item,
+            unchanged: studentUnchanged && !parentChanged,
+            deferredDeliveries: parentResult?.deferredDeliveries,
+            parentInvitation: parentResult?.parentInvitation,
+          };
         } catch (error: unknown) {
           return { ok: false, item, error };
         }
@@ -1772,6 +2082,9 @@ export class BulkImportService {
         sheetStatusByIndex.set(outcome.item.originalIndex, `failed: ${reason}`);
         continue;
       }
+      if (outcome.deferredDeliveries?.length) {
+        deferredDeliveries.push(...outcome.deferredDeliveries);
+      }
       if (outcome.unchanged) {
         rowOutcomes.push({
           row: outcome.item.rowLabel,
@@ -1788,6 +2101,8 @@ export class BulkImportService {
           studentName: name,
           loginEmail: outcome.item.loginEmail,
           status: 'updated',
+          parentRecipientEmail: outcome.parentInvitation?.recipientEmail,
+          parentExpiresAt: outcome.parentInvitation?.expiresAt,
         });
         sheetStatusByIndex.set(outcome.item.originalIndex, 'updated');
       }
@@ -1812,8 +2127,8 @@ export class BulkImportService {
               username: item.dto.username.trim(),
               firstName: item.dto.first_name.trim(),
               lastName: item.dto.last_name.trim(),
-              classId: item.classId,
-              sectionId: item.sectionId,
+              classId: item.classId ?? undefined,
+              sectionId: item.sectionId ?? undefined,
               phone: item.dto.phone,
               address: item.dto.address,
               dateOfBirth: item.dto.date_of_birth,
@@ -1823,7 +2138,7 @@ export class BulkImportService {
               admissionDate: item.dto.admission_date,
               googleAccountEmail: item.dto.google_account_email,
               academicYearId,
-              subjectTemplateId: item.subjectTemplateId,
+              subjectTemplateId: item.subjectTemplateId ?? undefined,
               invitationType: item.dto.invitation_type,
               invitationRecipientEmail: this.sanitizeSingleEmail(
                 item.dto.invitation_recipient_email,
@@ -1975,12 +2290,24 @@ export class BulkImportService {
     sheet.getRow(1).font = { bold: true };
 
     for (const row of rows) {
-      sheet.addRow(
+      const excelRow = sheet.addRow(
         STUDENT_BULK_COLUMN_DEFS.map((c) => {
           const v = row[c.key];
           return v == null ? '' : String(v);
         }),
       );
+      // Keep phones and dates as text so re-import does not corrupt values.
+      STUDENT_BULK_COLUMN_DEFS.forEach((c, idx) => {
+        if (
+          c.key === 'phone' ||
+          c.key === 'parent_phone' ||
+          c.key === 'date_of_birth' ||
+          c.key === 'admission_date'
+        ) {
+          const cell = excelRow.getCell(idx + 1);
+          cell.numFmt = '@';
+        }
+      });
     }
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
@@ -2062,9 +2389,9 @@ export class BulkImportService {
   private isStudentRowUnchanged(
     item: {
       dto: BulkStudentRowDto;
-      classId?: string;
-      sectionId?: string;
-      subjectTemplateId?: string;
+      classId?: string | null;
+      sectionId?: string | null;
+      subjectTemplateId?: string | null;
     },
     snap: StudentImportSnapshot,
   ): boolean {
@@ -2391,7 +2718,7 @@ export class BulkImportService {
   private resolveRoleToken(
     token: string,
     roles: RoleLookup,
-  ): { ref?: RoleRef; suggestion?: string } {
+  ): { ref?: RoleRef; suggestion?: string; fuzzyMatchedFrom?: string } {
     const trimmed = token.trim();
     if (!trimmed) return {};
 
@@ -2430,7 +2757,10 @@ export class BulkImportService {
     const maxAuto =
       compact.length <= 6 ? 1 : compact.length <= 12 ? 2 : 3;
     if (best && !tie && bestDistance > 0 && bestDistance <= maxAuto) {
-      return { ref: best };
+      return {
+        ref: best,
+        fuzzyMatchedFrom: trimmed,
+      };
     }
 
     const suggestion =
@@ -2450,19 +2780,31 @@ export class BulkImportService {
   private resolveRolesForRow(
     dto: BulkUserRowDto,
     roles: RoleLookup,
-  ): { roleIds: string[]; roleLabels: string[]; errors: string[]; userType?: 'parent' | 'staff' } {
+  ): {
+    roleIds: string[];
+    roleLabels: string[];
+    errors: string[];
+    warnings: string[];
+    userType?: 'parent' | 'staff';
+  } {
     const tokens = this.splitRoleTokens(dto.roles);
     if (tokens.length === 0) {
-      return { roleIds: [], roleLabels: [], errors: ['At least one role is required.'] };
+      return {
+        roleIds: [],
+        roleLabels: [],
+        errors: ['At least one role is required.'],
+        warnings: [],
+      };
     }
 
     const roleIds: string[] = [];
     const roleLabels: string[] = [];
     const errors: string[] = [];
+    const warnings: string[] = [];
     const seen = new Set<string>();
 
     for (const token of tokens) {
-      const { ref, suggestion } = this.resolveRoleToken(token, roles);
+      const { ref, suggestion, fuzzyMatchedFrom } = this.resolveRoleToken(token, roles);
       if (!ref) {
         errors.push(
           suggestion
@@ -2477,6 +2819,11 @@ export class BulkImportService {
         );
         continue;
       }
+      if (fuzzyMatchedFrom) {
+        warnings.push(
+          `Role '${fuzzyMatchedFrom}' was matched to '${ref.displayName || ref.name}'.`,
+        );
+      }
       if (seen.has(ref.id)) continue;
       seen.add(ref.id);
       roleIds.push(ref.id);
@@ -2484,7 +2831,7 @@ export class BulkImportService {
     }
 
     if (errors.length > 0) {
-      return { roleIds, roleLabels, errors };
+      return { roleIds, roleLabels, errors, warnings };
     }
 
     const selectedNames = roleIds
@@ -2497,7 +2844,7 @@ export class BulkImportService {
       errors.push(
         'Parent roles cannot be combined with staff roles. Please choose either parent roles or staff roles.',
       );
-      return { roleIds, roleLabels, errors };
+      return { roleIds, roleLabels, errors, warnings };
     }
 
     const userType: 'parent' | 'staff' = isParent ? 'parent' : 'staff';
@@ -2513,7 +2860,7 @@ export class BulkImportService {
       // Invitation email is optional for staff — blank defaults to school login email on create.
     }
 
-    return { roleIds, roleLabels, errors, userType };
+    return { roleIds, roleLabels, errors, warnings, userType };
   }
 
   private mapUserColumnNames(row: Record<string, unknown>): Record<string, unknown> {
@@ -2523,8 +2870,8 @@ export class BulkImportService {
       for (const name of possibleNames) {
         let val = lookup.get(name.toLowerCase());
         if (val !== undefined && val !== '') {
-          if (targetField === 'phone' && typeof val === 'number') {
-            val = String(val);
+          if (targetField === 'phone') {
+            val = this.spreadsheetCellToPhoneString(val);
           }
           if (typeof val === 'string') {
             val = normalizeSpreadsheetString(val);
@@ -2558,13 +2905,18 @@ export class BulkImportService {
   private async validateUserDto(
     dto: BulkUserRowDto,
     roles: RoleLookup,
-  ): Promise<{ dto: BulkUserRowDto; errors: string[] }> {
+  ): Promise<{ dto: BulkUserRowDto; errors: string[]; warnings: string[] }> {
     const errors = await validate(dto);
-    const fieldErrors = errors.flatMap((err) =>
-      err.constraints ? Object.values(err.constraints) : [],
+    const fieldErrors = this.humanizeFieldErrors(
+      errors,
+      BulkImportService.USER_FIELD_LABELS,
     );
     const roleResult = this.resolveRolesForRow(dto, roles);
-    return { dto, errors: [...fieldErrors, ...roleResult.errors] };
+    return {
+      dto,
+      errors: [...fieldErrors, ...roleResult.errors],
+      warnings: roleResult.warnings,
+    };
   }
 
   async parseUsersFile(
@@ -2587,28 +2939,51 @@ export class BulkImportService {
       throw new BadRequestException('File exceeds maximum 5000 rows');
     }
 
+    this.assertRequiredUserHeaders(rawData[0]!);
+
     const parsedRows: ParsedUserRow[] = [];
 
     for (let i = 0; i < rawData.length; i++) {
       const rowNumber = i + 2;
-      const mappedRow = this.mapUserColumnNames(rawData[i]!);
+      const rawRow = rawData[i]!;
+      if (this.isRawSpreadsheetRowEmpty(rawRow)) {
+        continue;
+      }
+      const mappedRow = this.mapUserColumnNames(rawRow);
+      const rawUsernameBeforeClean = mappedRow.username;
       const dto = plainToInstance(BulkUserRowDto, mappedRow);
-      const { errors: allErrors } = await this.validateUserDto(dto, roles);
+      const { errors: allErrors, warnings: roleWarnings } = await this.validateUserDto(
+        dto,
+        roles,
+      );
+      const warnings = [...roleWarnings];
+      const rewriteWarn = this.usernameRewriteWarning(
+        rawUsernameBeforeClean,
+        dto.username,
+      );
+      if (rewriteWarn) warnings.push(rewriteWarn);
 
       parsedRows.push({
         rowNumber,
         data: dto,
         errors: allErrors,
+        warnings: warnings.length > 0 ? warnings : undefined,
         isValid: allErrors.length === 0,
       });
+    }
+
+    if (parsedRows.length === 0) {
+      throw new BadRequestException(
+        'File has no data rows (only blank rows were found). Fill at least one user row.',
+      );
     }
 
     const validRows = parsedRows.filter((r) => r.isValid).length;
     return {
       data: {
-        totalRows: rawData.length,
+        totalRows: parsedRows.length,
         validRows,
-        invalidRows: rawData.length - validRows,
+        invalidRows: parsedRows.length - validRows,
         rows: parsedRows,
       },
     };
@@ -2625,13 +3000,24 @@ export class BulkImportService {
     for (let i = 0; i < rows.length; i++) {
       const incoming = rows[i]!;
       const rowNumber = incoming.row_number ?? i + 2;
+      const rawUsernameBeforeClean = incoming.username;
       const dto = plainToInstance(BulkUserRowDto, { ...incoming });
-      const { errors: allErrors } = await this.validateUserDto(dto, roles);
+      const { errors: allErrors, warnings: roleWarnings } = await this.validateUserDto(
+        dto,
+        roles,
+      );
+      const warnings = [...roleWarnings];
+      const rewriteWarn = this.usernameRewriteWarning(
+        rawUsernameBeforeClean,
+        dto.username,
+      );
+      if (rewriteWarn) warnings.push(rewriteWarn);
 
       parsedRows.push({
         rowNumber,
         data: dto,
         errors: allErrors,
+        warnings: warnings.length > 0 ? warnings : undefined,
         isValid: allErrors.length === 0,
       });
     }
@@ -2842,11 +3228,11 @@ export class BulkImportService {
             item.existingUserId!,
             {
               fullName: item.dto.full_name.trim(),
-              phone: item.dto.phone,
-              address: item.dto.address,
-              dateOfBirth: item.dto.date_of_birth,
+              phone: this.blankToNull(item.dto.phone),
+              address: this.blankToNull(item.dto.address),
+              dateOfBirth: this.blankToNull(item.dto.date_of_birth),
               gender: item.dto.gender,
-              invitationRecipientEmail: item.dto.invitation_email,
+              invitationRecipientEmail: this.blankToNull(item.dto.invitation_email),
             },
             branchId,
             adminUser.email,
@@ -3062,12 +3448,17 @@ export class BulkImportService {
     sheet.getRow(1).font = { bold: true };
 
     for (const row of rows) {
-      sheet.addRow(
+      const excelRow = sheet.addRow(
         USER_BULK_COLUMN_DEFS.map((c) => {
           const v = row[c.key];
           return v == null ? '' : String(v);
         }),
       );
+      USER_BULK_COLUMN_DEFS.forEach((c, idx) => {
+        if (c.key === 'phone' || c.key === 'date_of_birth') {
+          excelRow.getCell(idx + 1).numFmt = '@';
+        }
+      });
     }
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
@@ -3232,5 +3623,833 @@ export class BulkImportService {
 
     out.sort((a, b) => a.full_name.localeCompare(b.full_name));
     return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Parent–student association bulk import (Mapping)
+  // ---------------------------------------------------------------------------
+
+  private static readonly PARENT_ASSOCIATION_FIELD_LABELS: Record<string, string> = {
+    username: 'Username',
+    first_name: 'First Name',
+    last_name: 'Last Name',
+    student_id: 'Student ID',
+    guardian1_email: 'Guardian 1 Email',
+    guardian1_name: 'Guardian 1 Name',
+    guardian1_phone: 'Guardian 1 Phone',
+    guardian1_relationship: 'Guardian 1 Relationship',
+    guardian2_email: 'Guardian 2 Email',
+    guardian2_name: 'Guardian 2 Name',
+    guardian2_phone: 'Guardian 2 Phone',
+    guardian2_relationship: 'Guardian 2 Relationship',
+  };
+
+  private assertRequiredParentAssociationHeaders(firstRow: Record<string, unknown>): void {
+    const lookup = this.buildHeaderLookup(firstRow);
+    if (!this.headerAliasesPresent(lookup, PARENT_ASSOCIATION_COLUMN_MAP.username)) {
+      throw new BadRequestException(
+        "Couldn't find required column(s): Username. Download the template for the exact labels.",
+      );
+    }
+  }
+
+  private mapParentAssociationColumnNames(row: Record<string, unknown>): Record<string, unknown> {
+    const lookup = this.buildHeaderLookup(row);
+    const mapped: Record<string, unknown> = {};
+    for (const [targetField, possibleNames] of Object.entries(PARENT_ASSOCIATION_COLUMN_MAP)) {
+      for (const name of possibleNames) {
+        let val = lookup.get(name.toLowerCase());
+        if (val !== undefined && val !== '') {
+          if (targetField === 'guardian1_phone' || targetField === 'guardian2_phone') {
+            val = this.spreadsheetCellToPhoneString(val);
+          }
+          if (typeof val === 'string') {
+            val = normalizeSpreadsheetString(val);
+          }
+          if (val !== undefined && val !== '') {
+            mapped[targetField] = val;
+          }
+          break;
+        }
+      }
+    }
+    return mapped;
+  }
+
+  private parentAssociationRowBusinessErrors(dto: BulkParentAssociationRowDto): string[] {
+    const errors: string[] = [];
+    const g1Email = (dto.guardian1_email ?? '').trim();
+    const g2Email = (dto.guardian2_email ?? '').trim();
+
+    const g1Extra =
+      !!(dto.guardian1_name || dto.guardian1_phone || dto.guardian1_relationship);
+    const g2Extra =
+      !!(dto.guardian2_name || dto.guardian2_phone || dto.guardian2_relationship);
+
+    if (g1Extra && !g1Email) {
+      errors.push('Guardian 1 Email is required when other Guardian 1 fields are set.');
+    }
+    if (g2Extra && !g2Email) {
+      errors.push('Guardian 2 Email is required when other Guardian 2 fields are set.');
+    }
+    if (g1Email && g2Email && g1Email === g2Email) {
+      errors.push('Guardian 1 and Guardian 2 must use different email addresses.');
+    }
+    return errors;
+  }
+
+  private async validateParentAssociationDto(
+    dto: BulkParentAssociationRowDto,
+  ): Promise<{ errors: string[]; warnings: string[] }> {
+    const fieldErrors = this.humanizeFieldErrors(
+      await validate(dto),
+      BulkImportService.PARENT_ASSOCIATION_FIELD_LABELS,
+    );
+    return {
+      errors: [...fieldErrors, ...this.parentAssociationRowBusinessErrors(dto)],
+      warnings: [],
+    };
+  }
+
+  async parseParentAssociationsFile(
+    file: Express.Multer.File,
+    _branchId: string,
+  ): Promise<{
+    data: {
+      totalRows: number;
+      validRows: number;
+      invalidRows: number;
+      rows: Array<{
+        rowNumber: number;
+        data: BulkParentAssociationRowDto;
+        errors: string[];
+        warnings?: string[];
+        isValid: boolean;
+      }>;
+    };
+  }> {
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rawData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, {
+      defval: '',
+    });
+
+    if (rawData.length === 0) {
+      throw new BadRequestException('File is empty');
+    }
+    if (rawData.length > 5000) {
+      throw new BadRequestException('File exceeds maximum 5000 rows');
+    }
+
+    this.assertRequiredParentAssociationHeaders(rawData[0]!);
+
+    const parsedRows: Array<{
+      rowNumber: number;
+      data: BulkParentAssociationRowDto;
+      errors: string[];
+      warnings?: string[];
+      isValid: boolean;
+    }> = [];
+
+    for (let i = 0; i < rawData.length; i++) {
+      const rowNumber = i + 2;
+      const rawRow = rawData[i]!;
+      if (this.isRawSpreadsheetRowEmpty(rawRow)) continue;
+
+      const mappedRow = this.mapParentAssociationColumnNames(rawRow);
+      const rawUsernameBeforeClean = mappedRow.username;
+      const dto = plainToInstance(BulkParentAssociationRowDto, mappedRow);
+      const { errors, warnings } = await this.validateParentAssociationDto(dto);
+      const allWarnings = [...warnings];
+      const rewriteWarn = this.usernameRewriteWarning(rawUsernameBeforeClean, dto.username);
+      if (rewriteWarn) allWarnings.push(rewriteWarn);
+
+      parsedRows.push({
+        rowNumber,
+        data: dto,
+        errors,
+        warnings: allWarnings.length > 0 ? allWarnings : undefined,
+        isValid: errors.length === 0,
+      });
+    }
+
+    if (parsedRows.length === 0) {
+      throw new BadRequestException(
+        'File has no data rows (only blank rows were found). Fill at least one student row.',
+      );
+    }
+
+    const validRows = parsedRows.filter((r) => r.isValid).length;
+    return {
+      data: {
+        totalRows: parsedRows.length,
+        validRows,
+        invalidRows: parsedRows.length - validRows,
+        rows: parsedRows,
+      },
+    };
+  }
+
+  async validateParentAssociationsRows(
+    rows: BulkParentAssociationRowDto[],
+    _branchId: string,
+  ): Promise<{
+    data: {
+      totalRows: number;
+      validRows: number;
+      invalidRows: number;
+      rows: Array<{
+        rowNumber: number;
+        data: BulkParentAssociationRowDto;
+        errors: string[];
+        warnings?: string[];
+        isValid: boolean;
+      }>;
+    };
+  }> {
+    const parsedRows: Array<{
+      rowNumber: number;
+      data: BulkParentAssociationRowDto;
+      errors: string[];
+      warnings?: string[];
+      isValid: boolean;
+    }> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const incoming = rows[i]!;
+      const rowNumber = incoming.row_number ?? i + 2;
+      const dto = plainToInstance(BulkParentAssociationRowDto, incoming);
+      const { errors, warnings } = await this.validateParentAssociationDto(dto);
+      parsedRows.push({
+        rowNumber,
+        data: dto,
+        errors,
+        warnings: warnings.length > 0 ? warnings : undefined,
+        isValid: errors.length === 0,
+      });
+    }
+
+    const validRows = parsedRows.filter((r) => r.isValid).length;
+    return {
+      data: {
+        totalRows: parsedRows.length,
+        validRows,
+        invalidRows: parsedRows.length - validRows,
+        rows: parsedRows,
+      },
+    };
+  }
+
+  async exportParentAssociationsForImport(branchId: string): Promise<{
+    data: {
+      fileName: string;
+      contentBase64: string;
+      mimeType: string;
+      rowCount: number;
+    };
+  }> {
+    const rows = await this.loadParentAssociationsAsImportRows(branchId);
+    const ExcelJS = require('exceljs') as typeof import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Parent-Student');
+    const headers = PARENT_ASSOCIATION_BULK_COLUMN_DEFS.map((c) => c.label);
+    sheet.addRow(headers);
+    sheet.getRow(1).font = { bold: true };
+
+    for (const row of rows) {
+      const excelRow = sheet.addRow(
+        PARENT_ASSOCIATION_BULK_COLUMN_DEFS.map((c) => {
+          const v = row[c.key];
+          return v == null ? '' : String(v);
+        }),
+      );
+      PARENT_ASSOCIATION_BULK_COLUMN_DEFS.forEach((c, idx) => {
+        if (c.key === 'guardian1_phone' || c.key === 'guardian2_phone') {
+          excelRow.getCell(idx + 1).numFmt = '@';
+        }
+      });
+    }
+
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      data: {
+        fileName: `parent-student-mapping-export-${stamp}.xlsx`,
+        contentBase64: buffer.toString('base64'),
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        rowCount: rows.length,
+      },
+    };
+  }
+
+  private async loadParentAssociationsAsImportRows(
+    branchId: string,
+  ): Promise<Record<string, string>[]> {
+    const supabase = this.getClient();
+    const { data: students, error } = await supabase
+      .from('students')
+      .select('id, user_id, student_id, first_name, last_name')
+      .eq('branch_id', branchId)
+      .order('first_name', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+
+    const studentRows = (students ?? []) as Array<{
+      id: string;
+      user_id: string | null;
+      student_id: string | null;
+      first_name: string | null;
+      last_name: string | null;
+    }>;
+    if (studentRows.length === 0) return [];
+
+    const userIds = studentRows.map((r) => r.user_id).filter((id): id is string => !!id);
+    const emailByUserId = new Map<string, string>();
+    const CHUNK = 100;
+    for (let i = 0; i < userIds.length; i += CHUNK) {
+      const chunk = userIds.slice(i, i + CHUNK);
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', chunk);
+      if (pErr) throw new BadRequestException(pErr.message);
+      for (const p of (profiles ?? []) as Array<{ id: string; email: string | null }>) {
+        if (p.email) emailByUserId.set(p.id, p.email);
+      }
+    }
+
+    const studentIds = studentRows.map((r) => r.id);
+    type LinkRow = {
+      student_id: string;
+      parent_user_id: string;
+      relationship: string;
+      priority: number | null;
+      is_primary: boolean;
+    };
+    const linksByStudent = new Map<string, LinkRow[]>();
+    for (let i = 0; i < studentIds.length; i += CHUNK) {
+      const chunk = studentIds.slice(i, i + CHUNK);
+      const { data: links, error: lErr } = await supabase
+        .from('parent_students')
+        .select('student_id, parent_user_id, relationship, priority, is_primary')
+        .in('student_id', chunk);
+      if (lErr) throw new BadRequestException(lErr.message);
+      for (const link of (links ?? []) as LinkRow[]) {
+        const list = linksByStudent.get(link.student_id) ?? [];
+        list.push(link);
+        linksByStudent.set(link.student_id, list);
+      }
+    }
+
+    const parentUserIds = [
+      ...new Set(
+        [...linksByStudent.values()].flatMap((list) => list.map((l) => l.parent_user_id)),
+      ),
+    ];
+    const parentProfileById = new Map<
+      string,
+      { email: string | null; full_name: string | null; phone: string | null }
+    >();
+    for (let i = 0; i < parentUserIds.length; i += CHUNK) {
+      const chunk = parentUserIds.slice(i, i + CHUNK);
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, phone')
+        .in('id', chunk);
+      if (pErr) throw new BadRequestException(pErr.message);
+      for (const p of (profiles ?? []) as Array<{
+        id: string;
+        email: string | null;
+        full_name: string | null;
+        phone: string | null;
+      }>) {
+        parentProfileById.set(p.id, p);
+      }
+    }
+
+    const sortLinks = (list: LinkRow[]): LinkRow[] =>
+      [...list].sort((a, b) => {
+        const pa = a.priority ?? (a.is_primary ? 1 : 2);
+        const pb = b.priority ?? (b.is_primary ? 1 : 2);
+        return pa - pb;
+      });
+
+    return studentRows.map((s) => {
+      const username = s.user_id
+        ? extractUsernameFromEmail(emailByUserId.get(s.user_id) ?? '')
+        : '';
+      const links = sortLinks(linksByStudent.get(s.id) ?? []);
+      const g1 = links[0];
+      const g2 = links[1];
+      const p1 = g1 ? parentProfileById.get(g1.parent_user_id) : undefined;
+      const p2 = g2 ? parentProfileById.get(g2.parent_user_id) : undefined;
+
+      return {
+        username,
+        first_name: s.first_name ?? '',
+        last_name: s.last_name ?? '',
+        student_id: s.student_id ?? '',
+        guardian1_email: p1?.email ?? '',
+        guardian1_name: p1?.full_name ?? '',
+        guardian1_phone: p1?.phone ?? '',
+        guardian1_relationship: g1?.relationship ?? '',
+        guardian2_email: p2?.email ?? '',
+        guardian2_name: p2?.full_name ?? '',
+        guardian2_phone: p2?.phone ?? '',
+        guardian2_relationship: g2?.relationship ?? '',
+      };
+    });
+  }
+
+  private async getStudentGuardianSnapshot(
+    studentId: string,
+  ): Promise<
+    Array<{
+      parentUserId: string;
+      email: string;
+      relationship: 'father' | 'mother' | 'guardian';
+    }>
+  > {
+    const supabase = this.getClient();
+    const { data: links, error } = await supabase
+      .from('parent_students')
+      .select('parent_user_id, relationship, priority, is_primary')
+      .eq('student_id', studentId);
+    if (error) throw new BadRequestException(error.message);
+    const rows = (links ?? []) as Array<{
+      parent_user_id: string;
+      relationship: 'father' | 'mother' | 'guardian';
+      priority: number | null;
+      is_primary: boolean;
+    }>;
+    if (rows.length === 0) return [];
+
+    const parentIds = rows.map((r) => r.parent_user_id);
+    const { data: profiles, error: pErr } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .in('id', parentIds);
+    if (pErr) throw new BadRequestException(pErr.message);
+    const emailById = new Map(
+      ((profiles ?? []) as Array<{ id: string; email: string | null }>).map((p) => [
+        p.id,
+        (p.email ?? '').trim().toLowerCase(),
+      ]),
+    );
+
+    return rows
+      .map((r) => ({
+        parentUserId: r.parent_user_id,
+        email: emailById.get(r.parent_user_id) ?? '',
+        relationship: r.relationship,
+        priority: r.priority ?? (r.is_primary ? 1 : 2),
+      }))
+      .sort((a, b) => a.priority - b.priority)
+      .map(({ parentUserId, email, relationship }) => ({
+        parentUserId,
+        email,
+        relationship,
+      }));
+  }
+
+  private async applyGuardianSlot(params: {
+    studentId: string;
+    studentDisplayName: string;
+    email?: string;
+    name?: string;
+    phone?: string;
+    relationship?: 'father' | 'mother' | 'guardian';
+    branchId: string;
+    adminUser: CurrentUserPayload;
+    priorLinks: Array<{
+      parentUserId: string;
+      email: string;
+      relationship: 'father' | 'mother' | 'guardian';
+    }>;
+  }): Promise<{
+    createdLink: boolean;
+    updatedRelationship: boolean;
+    deferredDeliveries: DeferredInvitationDelivery[];
+  }> {
+    const email = (params.email ?? '').trim().toLowerCase();
+    if (!email) {
+      return { createdLink: false, updatedRelationship: false, deferredDeliveries: [] };
+    }
+
+    const result = await this.studentsService.ensureParentAccountAndLink(
+      params.studentId,
+      params.studentDisplayName,
+      {
+        createParentAccount: true,
+        parentEmail: email,
+        parentName: params.name,
+        parentPhone: params.phone,
+        parentRelationship: params.relationship ?? 'guardian',
+      },
+      params.branchId,
+      params.adminUser,
+      { deferInvitationDelivery: true },
+    );
+
+    let updatedRelationship = false;
+    if (result.alreadyLinked && result.parentUserId && params.relationship) {
+      const prior = params.priorLinks.find((l) => l.parentUserId === result.parentUserId);
+      if (prior && prior.relationship !== params.relationship) {
+        await this.parentsService.updateParentAssociation(
+          result.parentUserId,
+          params.studentId,
+          { relationship: params.relationship },
+          params.adminUser.email,
+          params.branchId,
+          null,
+        );
+        updatedRelationship = true;
+      }
+    }
+
+    return {
+      createdLink: result.linked,
+      updatedRelationship,
+      deferredDeliveries: result.deferredDeliveries,
+    };
+  }
+
+  async importParentAssociations(
+    rows: BulkParentAssociationRowDto[],
+    branchId: string,
+    adminUser: CurrentUserPayload,
+  ): Promise<{
+    data: {
+      totalProcessed: number;
+      successCount: number;
+      failureCount: number;
+      createdCount: number;
+      updatedCount: number;
+      unchangedCount: number;
+      failedInsertCount: number;
+      failedUpdateCount: number;
+      skippedCount: number;
+      errors: Array<{ row: number; message: string }>;
+      rowOutcomes: Array<{
+        row: number;
+        username: string;
+        studentName: string;
+        status: 'added' | 'updated' | 'unchanged' | 'failed_insert' | 'failed_update' | 'skipped';
+        reason?: string;
+      }>;
+      resultsFile?: { fileName: string; contentBase64: string; mimeType: string };
+    };
+  }> {
+    if (rows.length === 0) {
+      throw new BadRequestException('No rows to import');
+    }
+
+    const prepared = rows.map((incoming, i) => {
+      const rowLabel = incoming.row_number ?? i + 2;
+      const dto = plainToInstance(BulkParentAssociationRowDto, incoming);
+      return { rowLabel, dto, originalIndex: i };
+    });
+
+    const rowOutcomes: Array<{
+      row: number;
+      username: string;
+      studentName: string;
+      status: 'added' | 'updated' | 'unchanged' | 'failed_insert' | 'failed_update' | 'skipped';
+      reason?: string;
+    }> = [];
+    const deferredDeliveries: DeferredInvitationDelivery[] = [];
+    const sheetStatusByIndex = new Map<number, string>();
+
+    const actionable: typeof prepared = [];
+    for (const item of prepared) {
+      if (isSkipParentAssociationImportStatus(item.dto.import_status)) {
+        const statusLabel = String(item.dto.import_status ?? '').trim() || 'skipped';
+        sheetStatusByIndex.set(item.originalIndex, statusLabel);
+        rowOutcomes.push({
+          row: item.rowLabel,
+          username: (item.dto.username ?? '').trim(),
+          studentName: `${item.dto.first_name ?? ''} ${item.dto.last_name ?? ''}`.trim(),
+          status: 'skipped',
+          reason: `Skipped (prior status: ${statusLabel})`,
+        });
+      } else {
+        actionable.push(item);
+      }
+    }
+
+    type ValidItem = (typeof prepared)[number] & { loginEmail: string; studentDbId: string };
+    const toProcess: ValidItem[] = [];
+
+    for (const item of actionable) {
+      const { errors } = await this.validateParentAssociationDto(item.dto);
+      if (errors.length > 0) {
+        rowOutcomes.push({
+          row: item.rowLabel,
+          username: (item.dto.username ?? '').trim(),
+          studentName: `${item.dto.first_name ?? ''} ${item.dto.last_name ?? ''}`.trim(),
+          status: 'failed_update',
+          reason: errors.join('; '),
+        });
+        sheetStatusByIndex.set(item.originalIndex, `failed: ${errors.join('; ')}`);
+        continue;
+      }
+
+      try {
+        const loginEmail = await this.studentsService.resolveLoginEmailForUsername(
+          item.dto.username,
+          branchId,
+        );
+        const found = await this.studentsService.findStudentsByLoginEmails(branchId, [
+          loginEmail,
+        ]);
+        const existing = found.get(loginEmail);
+        if (!existing) {
+          rowOutcomes.push({
+            row: item.rowLabel,
+            username: item.dto.username.trim(),
+            studentName: `${item.dto.first_name ?? ''} ${item.dto.last_name ?? ''}`.trim(),
+            status: 'failed_update',
+            reason: 'Student not found for this username in the current branch.',
+          });
+          sheetStatusByIndex.set(
+            item.originalIndex,
+            'failed: Student not found for this username in the current branch.',
+          );
+          continue;
+        }
+        toProcess.push({
+          ...item,
+          loginEmail,
+          studentDbId: existing.studentId,
+        });
+      } catch (error: unknown) {
+        const reason = error instanceof Error ? error.message : 'Failed to resolve student';
+        rowOutcomes.push({
+          row: item.rowLabel,
+          username: (item.dto.username ?? '').trim(),
+          studentName: `${item.dto.first_name ?? ''} ${item.dto.last_name ?? ''}`.trim(),
+          status: 'failed_update',
+          reason,
+        });
+        sheetStatusByIndex.set(item.originalIndex, `failed: ${reason}`);
+      }
+    }
+
+    const CONCURRENCY = 3;
+    type ProcessOutcome =
+      | {
+          ok: true;
+          item: ValidItem;
+          status: 'added' | 'updated' | 'unchanged';
+          deferredDeliveries: DeferredInvitationDelivery[];
+        }
+      | { ok: false; item: ValidItem; error: unknown; hadPriorLinks: boolean };
+
+    const processOutcomes = await mapWithConcurrency(
+      toProcess,
+      CONCURRENCY,
+      async (item): Promise<ProcessOutcome> => {
+        const displayName =
+          `${item.dto.first_name ?? ''} ${item.dto.last_name ?? ''}`.trim() ||
+          item.dto.username;
+        try {
+          const priorLinks = await this.getStudentGuardianSnapshot(item.studentDbId);
+          const hadPriorLinks = priorLinks.length > 0;
+
+          const g1 = await this.applyGuardianSlot({
+            studentId: item.studentDbId,
+            studentDisplayName: displayName,
+            email: item.dto.guardian1_email,
+            name: item.dto.guardian1_name,
+            phone: item.dto.guardian1_phone,
+            relationship: item.dto.guardian1_relationship,
+            branchId,
+            adminUser,
+            priorLinks,
+          });
+          // Refresh snapshot after g1 so g2 sees new links for max-2 checks via linkChild
+          const afterG1 = await this.getStudentGuardianSnapshot(item.studentDbId);
+          const g2 = await this.applyGuardianSlot({
+            studentId: item.studentDbId,
+            studentDisplayName: displayName,
+            email: item.dto.guardian2_email,
+            name: item.dto.guardian2_name,
+            phone: item.dto.guardian2_phone,
+            relationship: item.dto.guardian2_relationship,
+            branchId,
+            adminUser,
+            priorLinks: afterG1,
+          });
+
+          const createdLinks =
+            (g1.createdLink ? 1 : 0) + (g2.createdLink ? 1 : 0);
+          const updatedRels =
+            (g1.updatedRelationship ? 1 : 0) + (g2.updatedRelationship ? 1 : 0);
+          const hasGuardianInput = !!(
+            (item.dto.guardian1_email ?? '').trim() ||
+            (item.dto.guardian2_email ?? '').trim()
+          );
+
+          let status: 'added' | 'updated' | 'unchanged' = 'unchanged';
+          if (createdLinks > 0 && !hadPriorLinks) status = 'added';
+          else if (createdLinks > 0 || updatedRels > 0) status = 'updated';
+          else if (!hasGuardianInput) status = 'unchanged';
+          else status = 'unchanged';
+
+          return {
+            ok: true,
+            item,
+            status,
+            deferredDeliveries: [
+              ...g1.deferredDeliveries,
+              ...g2.deferredDeliveries,
+            ],
+          };
+        } catch (error: unknown) {
+          const priorLinks = await this.getStudentGuardianSnapshot(item.studentDbId).catch(
+            () => [],
+          );
+          return {
+            ok: false,
+            item,
+            error,
+            hadPriorLinks: priorLinks.length > 0,
+          };
+        }
+      },
+    );
+
+    for (const outcome of processOutcomes) {
+      const name =
+        `${outcome.item.dto.first_name ?? ''} ${outcome.item.dto.last_name ?? ''}`.trim() ||
+        outcome.item.dto.username;
+      if (!outcome.ok) {
+        const reason =
+          outcome.error instanceof Error ? outcome.error.message : 'Unknown error';
+        const status = outcome.hadPriorLinks ? 'failed_update' : 'failed_insert';
+        rowOutcomes.push({
+          row: outcome.item.rowLabel,
+          username: outcome.item.dto.username.trim(),
+          studentName: name,
+          status,
+          reason,
+        });
+        sheetStatusByIndex.set(outcome.item.originalIndex, `failed: ${reason}`);
+        continue;
+      }
+      if (outcome.deferredDeliveries.length) {
+        deferredDeliveries.push(...outcome.deferredDeliveries);
+      }
+      rowOutcomes.push({
+        row: outcome.item.rowLabel,
+        username: outcome.item.dto.username.trim(),
+        studentName: name,
+        status: outcome.status,
+      });
+      sheetStatusByIndex.set(outcome.item.originalIndex, outcome.status);
+    }
+
+    if (deferredDeliveries.length > 0) {
+      try {
+        await this.studentsService.deliverDeferredInvitationEmails(
+          deferredDeliveries,
+          adminUser,
+          branchId,
+        );
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : 'Failed to send invitation emails';
+        rowOutcomes.push({
+          row: 0,
+          username: '',
+          studentName: '',
+          status: 'failed_update',
+          reason: `Invitation emails failed after save: ${message}. Use Resend invitation if needed.`,
+        });
+      }
+    }
+
+    const createdCount = rowOutcomes.filter((o) => o.status === 'added').length;
+    const updatedCount = rowOutcomes.filter((o) => o.status === 'updated').length;
+    const unchangedCount = rowOutcomes.filter((o) => o.status === 'unchanged').length;
+    const failedInsertCount = rowOutcomes.filter((o) => o.status === 'failed_insert').length;
+    const failedUpdateCount = rowOutcomes.filter((o) => o.status === 'failed_update').length;
+    const skippedCount = rowOutcomes.filter((o) => o.status === 'skipped').length;
+    const successCount = createdCount + updatedCount + unchangedCount;
+    const failureCount = failedInsertCount + failedUpdateCount;
+
+    const resultsFile = await this.buildParentAssociationImportResultsWorkbook(
+      prepared,
+      sheetStatusByIndex,
+    );
+
+    return {
+      data: {
+        totalProcessed: rowOutcomes.filter((o) => o.row > 0).length,
+        successCount,
+        failureCount,
+        createdCount,
+        updatedCount,
+        unchangedCount,
+        failedInsertCount,
+        failedUpdateCount,
+        skippedCount,
+        errors: rowOutcomes
+          .filter((o) => o.status === 'failed_insert' || o.status === 'failed_update')
+          .map((o) => ({ row: o.row, message: o.reason ?? 'Failed' })),
+        rowOutcomes,
+        resultsFile,
+      },
+    };
+  }
+
+  private async buildParentAssociationImportResultsWorkbook(
+    prepared: Array<{
+      rowLabel: number;
+      dto: BulkParentAssociationRowDto;
+      originalIndex: number;
+    }>,
+    sheetStatusByIndex: Map<number, string>,
+  ): Promise<{ fileName: string; contentBase64: string; mimeType: string }> {
+    const ExcelJS = require('exceljs') as typeof import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Parent-Student');
+    const headers = [
+      ...PARENT_ASSOCIATION_BULK_COLUMN_DEFS.map((c) => c.label),
+      PARENT_ASSOCIATION_IMPORT_STATUS_COLUMN.label,
+    ];
+    sheet.addRow(headers);
+    sheet.getRow(1).font = { bold: true };
+
+    const failFill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: 'FFFFC7CE' },
+    };
+
+    for (const item of prepared) {
+      const status = sheetStatusByIndex.get(item.originalIndex) ?? '';
+      const values = PARENT_ASSOCIATION_BULK_COLUMN_DEFS.map((c) => {
+        const raw = (item.dto as unknown as Record<string, unknown>)[c.key];
+        return raw == null ? '' : String(raw);
+      });
+      values.push(status);
+      const excelRow = sheet.addRow(values);
+      if (status.toLowerCase().startsWith('failed')) {
+        excelRow.eachCell((cell) => {
+          cell.fill = failFill;
+        });
+      }
+    }
+
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      fileName: `parent-student-mapping-import-results-${stamp}.xlsx`,
+      contentBase64: buffer.toString('base64'),
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
   }
 }

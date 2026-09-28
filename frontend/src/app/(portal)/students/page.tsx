@@ -13,16 +13,19 @@ import {
   Tooltip,
   ActionIcon,
   useMantineTheme,
+  Paper,
 } from '@mantine/core';
-import { IconPlus, IconRefresh, IconSearch, IconUpload } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconSearch, IconUpload, IconUserOff } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue, useMediaQuery } from '@mantine/hooks';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
 import { StudentTable } from '@/components/features/students/StudentTable';
 import { StudentForm } from '@/components/features/students/StudentForm';
-import { useStudents } from '@/hooks/useStudents';
+import { useBulkUpdateStudentStatus, useStudents } from '@/hooks/useStudents';
 import { useFeaturePermission } from '@/hooks/usePermissions';
 import { useCoreLookups } from '@/hooks/useCoreLookups';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -35,6 +38,7 @@ export default function StudentsPage() {
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const tStudents = useTranslations('students');
+  const tCommon = useTranslations('common');
   const { canEdit } = useFeaturePermission('students');
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
@@ -44,10 +48,66 @@ export default function StudentsPage() {
   const [sectionFilter, setSectionFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [deactivateMode, setDeactivateMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const bulkUpdateStatus = useBulkUpdateStudentStatus();
 
   // Reset to page 1 when filters change
   const handleFilterChange = () => {
     setPage(1);
+    setSelectedIds([]);
+  };
+
+  const exitDeactivateMode = () => {
+    setDeactivateMode(false);
+    setSelectedIds([]);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAll = (pageIds: string[], select: boolean) => {
+    setSelectedIds((prev) => {
+      if (select) {
+        const next = new Set(prev);
+        pageIds.forEach((id) => next.add(id));
+        return [...next];
+      }
+      const remove = new Set(pageIds);
+      return prev.filter((id) => !remove.has(id));
+    });
+  };
+
+  const confirmBulkDeactivate = () => {
+    if (selectedIds.length === 0) return;
+    if (selectedIds.length > 100) {
+      notifications.show({
+        title: tStudents('bulkDeactivateConfirmTitle'),
+        message: tStudents('bulkDeactivateMaxSelected'),
+        color: 'yellow',
+      });
+      return;
+    }
+    modals.openConfirmModal({
+      title: tStudents('bulkDeactivateConfirmTitle'),
+      children: (
+        <Text size="sm">
+          {tStudents('bulkDeactivateConfirmMessage', { count: selectedIds.length })}
+        </Text>
+      ),
+      labels: {
+        confirm: tStudents('deactivateSelected'),
+        cancel: tCommon('cancel'),
+      },
+      confirmProps: { color: 'red', id: 'students-bulk-deactivate-confirm' },
+      onConfirm: async () => {
+        await bulkUpdateStatus.mutateAsync({ ids: selectedIds, isActive: false });
+        exitDeactivateMode();
+      },
+    });
   };
 
   const { data: classesData } = useCoreLookups('classes');
@@ -93,6 +153,20 @@ export default function StudentsPage() {
             </Tooltip>
             {canEdit && !isMobile && (
               <>
+                {!deactivateMode ? (
+                  <Button
+                    id="students-btn-deactivate-mode"
+                    variant="light"
+                    color="red"
+                    leftSection={<IconUserOff size={16} />}
+                    onClick={() => {
+                      setDeactivateMode(true);
+                      setSelectedIds([]);
+                    }}
+                  >
+                    {tStudents('deactivate')}
+                  </Button>
+                ) : null}
                 <Button
                   id="students-link-bulk-import"
                   component={Link}
@@ -131,6 +205,22 @@ export default function StudentsPage() {
 
           {canEdit && isMobile && (
             <Stack gap="xs">
+              {!deactivateMode ? (
+                <Button
+                  id="students-btn-deactivate-mode-mobile"
+                  variant="light"
+                  color="red"
+                  leftSection={<IconUserOff size={16} />}
+                  onClick={() => {
+                    setDeactivateMode(true);
+                    setSelectedIds([]);
+                  }}
+                  fullWidth
+                  size="sm"
+                >
+                  {tStudents('deactivate')}
+                </Button>
+              ) : null}
               <Button
                 id="students-link-bulk-import-mobile"
                 component={Link}
@@ -153,6 +243,33 @@ export default function StudentsPage() {
               </Button>
             </Stack>
           )}
+
+          {deactivateMode && canEdit ? (
+            <Paper p="sm" withBorder>
+              <Group justify="space-between" wrap="wrap" gap="sm">
+                <Text size="sm">{tStudents('bulkDeactivateHint')}</Text>
+                <Group gap="sm">
+                  <Button
+                    id="students-btn-deactivate-cancel"
+                    variant="subtle"
+                    onClick={exitDeactivateMode}
+                  >
+                    {tCommon('cancel')}
+                  </Button>
+                  <Button
+                    id="students-btn-deactivate-selected"
+                    color="red"
+                    leftSection={<IconUserOff size={16} />}
+                    disabled={selectedIds.length === 0}
+                    loading={!selectedIds.length ? false : bulkUpdateStatus.isPending}
+                    onClick={confirmBulkDeactivate}
+                  >
+                    {tStudents('deactivateSelectedCount', { count: selectedIds.length })}
+                  </Button>
+                </Group>
+              </Group>
+            </Paper>
+          ) : null}
 
           <Stack gap="sm">
             <TextInput
@@ -267,19 +384,23 @@ export default function StudentsPage() {
                 canEdit={canEdit}
                 students={studentsResponse.data}
                 meta={studentsResponse.meta}
-              onPageChange={setPage}
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSort={(field) => {
-                if (sortBy === field) {
-                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                } else {
-                  setSortBy(field);
-                  setSortOrder('asc');
-                }
-                setPage(1); // Reset to first page when sorting changes
-              }}
-            />
+                onPageChange={setPage}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={(field) => {
+                  if (sortBy === field) {
+                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                  } else {
+                    setSortBy(field);
+                    setSortOrder('asc');
+                  }
+                  setPage(1); // Reset to first page when sorting changes
+                }}
+                selectionMode={deactivateMode}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
+              />
             </>
           )}
         </Stack>
@@ -289,4 +410,3 @@ export default function StudentsPage() {
     </>
   );
 }
-

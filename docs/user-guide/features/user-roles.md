@@ -51,17 +51,25 @@ Invited users complete account setup at **`/setup?token=…`** (see Authenticati
 
 Create user, bulk import, edit roles, activate/deactivate, resend invitation, view linked students for parents.
 
+### Bulk deactivate
+
+1. Click **Deactivate**
+2. Tick the users to deactivate (only **Active** rows are selectable; you cannot select your own account)
+3. Click **Deactivate selected** and confirm
+
+You can set a user back to **Active** from the edit modal.
+
 ### Bulk import
 
 **Path:** **Users → Bulk Import** (edit permission required)
 
-1. Open **Bulk Import** — optionally **Export users** (same columns as the template) or download the blank template (includes an **Allowed Roles** sheet)
-2. Fill rows:
+1. Open **Bulk Import** — optionally **Export users** (same columns as the template) or download the blank template (includes an **Allowed Roles** sheet; phone/date columns are text-formatted)
+2. Fill rows (spare blank rows are ignored; close role spellings may auto-match with a warning):
    - **Full Name** (required)
-   - **Roles** — use exact portal role names from the Allowed Roles sheet (comma-separated for multiple). After upload, fix roles with the **Roles** multiselect in the preview
+   - **Roles** — use portal role names from the Allowed Roles sheet (comma-separated for multiple). After upload, you can also fix roles with the **Roles** multiselect in the preview
    - **Staff:** **Username** (required) + **Invitation Email** (optional — leave blank to create without sending an invite)
    - **Parents:** **Email** (login). Bulk import does **not** auto-send parent invites (use **Resend invitation** from the users list if needed)
-3. Upload, edit the preview if needed, then **Validate**
+3. Upload and edit the preview if needed (edits clear Validated — press **Validate** again). On **update**, blank optional fields clear stored phone, address, date of birth, and invitation email
 4. **Import** upserts by login identity (staff username / parent email): existing users are updated; new ones are created. A status modal shows added / updated / unchanged / failed. On failure, download the results sheet (Import Status column); re-import skips already-succeeded rows
 
 Do **not** import the **student** role here — use [🎓 Students](students.md) → **Bulk import** for student accounts. Parent and staff roles cannot be mixed on the same row.

@@ -18,6 +18,8 @@ import { CurrentBranch, type CurrentBranchContext } from '../../common/decorator
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { STUDENT_BULK_COLUMN_DEFS } from './student-bulk-columns';
 import { USER_BULK_COLUMN_DEFS } from './user-bulk-columns';
+import { PARENT_ASSOCIATION_BULK_COLUMN_DEFS } from './parent-association-bulk-columns';
+import { BulkParentAssociationRowDto } from './dto/bulk-parent-association-row.dto';
 
 const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -211,5 +213,89 @@ export class BulkImportController {
   @ApiOperation({ summary: 'Export branch users as an import-shaped Excel workbook' })
   async exportUsers(@CurrentBranch() branch: CurrentBranchContext) {
     return this.bulkImportService.exportUsersForImport(branch.branchId);
+  }
+
+  @Post('parent-associations/preview')
+  @ApiOperation({ summary: 'Preview parent–student mapping bulk import' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async previewParentAssociationsImport(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentBranch() branch: CurrentBranchContext,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Only Excel (.xlsx, .xls) and CSV files are allowed',
+      );
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      throw new BadRequestException('File size exceeds 10MB limit');
+    }
+    return this.bulkImportService.parseParentAssociationsFile(file, branch.branchId);
+  }
+
+  @Post('parent-associations/validate')
+  @ApiOperation({ summary: 'Validate edited parent–student mapping rows before import' })
+  async validateParentAssociations(
+    @Body() body: { rows: BulkParentAssociationRowDto[] },
+    @CurrentBranch() branch: CurrentBranchContext,
+  ) {
+    if (!body.rows || body.rows.length === 0) {
+      throw new BadRequestException('No rows to validate');
+    }
+    return this.bulkImportService.validateParentAssociationsRows(
+      body.rows,
+      branch.branchId,
+    );
+  }
+
+  @Post('parent-associations/import')
+  @ApiOperation({ summary: 'Execute parent–student mapping bulk import' })
+  async importParentAssociations(
+    @Body() body: { rows: BulkParentAssociationRowDto[] },
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    if (!body.rows || body.rows.length === 0) {
+      throw new BadRequestException('No rows to import');
+    }
+    return this.bulkImportService.importParentAssociations(
+      body.rows,
+      branch.branchId,
+      user,
+    );
+  }
+
+  @Post('parent-associations/template')
+  @ApiOperation({ summary: 'Get parent–student mapping import template metadata' })
+  downloadParentAssociationsTemplate() {
+    return {
+      data: {
+        columns: PARENT_ASSOCIATION_BULK_COLUMN_DEFS.map((c) => ({
+          key: c.key,
+          label: c.label,
+          example: c.example,
+        })),
+      },
+    };
+  }
+
+  @Post('parent-associations/export')
+  @ApiOperation({
+    summary: 'Export branch students with guardian columns for mapping import',
+  })
+  async exportParentAssociations(@CurrentBranch() branch: CurrentBranchContext) {
+    return this.bulkImportService.exportParentAssociationsForImport(branch.branchId);
   }
 }

@@ -1,17 +1,20 @@
 'use client';
 
 import { Group, Title, Skeleton, Stack, Alert, Text, Button, TextInput, MultiSelect, Paper, Chip, Tooltip, ActionIcon } from '@mantine/core';
-import { IconPlus, IconRefresh, IconSearch, IconUpload } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconSearch, IconUpload, IconUserOff } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
 import { UserTable } from '@/components/features/users/UserTable';
 import { UserForm } from '@/components/features/users/UserForm';
-import { useUsers } from '@/hooks/useUsers';
+import { useBulkUpdateUserStatus, useUsers } from '@/hooks/useUsers';
 import { useRoles } from '@/hooks/useRoles';
 import { usePermissions, useFeaturePermission } from '@/hooks/usePermissions';
+import { useAuth } from '@/hooks/useAuth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import type { User } from '@/types/users';
 
@@ -20,8 +23,10 @@ const FETCH_LIMIT = 500; // Fetch all branch users once; filter All/Active/Inact
 
 export default function UsersPage() {
   const t = useTranslations('user');
+  const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const { user: authUser } = useAuth();
   const { isLoading: permissionsLoading } = usePermissions();
   const { canEdit } = useFeaturePermission('user_management');
   const [opened, { open, close }] = useDisclosure(false);
@@ -32,6 +37,9 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<boolean | undefined>(undefined);
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [deactivateMode, setDeactivateMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const bulkUpdateStatus = useBulkUpdateUserStatus();
 
   // Single fetch: all users for branch; filter (All/Active/Inactive, role, search) and sort/paginate client-side
   const usersQuery = useUsers({ limit: FETCH_LIMIT });
@@ -124,7 +132,60 @@ export default function UsersPage() {
     [roles],
   );
 
-  const handleFilterChange = () => setPage(1);
+  const handleFilterChange = () => {
+    setPage(1);
+    setSelectedIds([]);
+  };
+
+  const exitDeactivateMode = () => {
+    setDeactivateMode(false);
+    setSelectedIds([]);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAll = (pageIds: string[], select: boolean) => {
+    setSelectedIds((prev) => {
+      if (select) {
+        const next = new Set(prev);
+        pageIds.forEach((x) => next.add(x));
+        return [...next];
+      }
+      const remove = new Set(pageIds);
+      return prev.filter((id) => !remove.has(id));
+    });
+  };
+
+  const confirmBulkDeactivate = () => {
+    if (selectedIds.length === 0) return;
+    if (selectedIds.length > 100) {
+      notifications.show({
+        title: t('bulkDeactivateConfirmTitle'),
+        message: t('bulkDeactivateMaxSelected'),
+        color: 'yellow',
+      });
+      return;
+    }
+    modals.openConfirmModal({
+      title: t('bulkDeactivateConfirmTitle'),
+      children: (
+        <Text size="sm">{t('bulkDeactivateConfirmMessage', { count: selectedIds.length })}</Text>
+      ),
+      labels: {
+        confirm: t('deactivateSelected'),
+        cancel: tCommon('cancel'),
+      },
+      confirmProps: { color: 'red', id: 'users-bulk-deactivate-confirm' },
+      onConfirm: async () => {
+        await bulkUpdateStatus.mutateAsync({ ids: selectedIds, isActive: false });
+        exitDeactivateMode();
+      },
+    });
+  };
 
   return (
     <>
@@ -146,6 +207,20 @@ export default function UsersPage() {
             </Tooltip>
             {canEdit && (
               <>
+                {!deactivateMode ? (
+                  <Button
+                    id="users-btn-deactivate-mode"
+                    variant="light"
+                    color="red"
+                    leftSection={<IconUserOff size={16} />}
+                    onClick={() => {
+                      setDeactivateMode(true);
+                      setSelectedIds([]);
+                    }}
+                  >
+                    {t('deactivate')}
+                  </Button>
+                ) : null}
                 <Button
                   id="users-link-bulk-import"
                   component={Link}
@@ -181,6 +256,33 @@ export default function UsersPage() {
             </Text>
           </Alert>
         )}
+
+        {deactivateMode && canEdit ? (
+          <Paper p="sm" withBorder>
+            <Group justify="space-between" wrap="wrap" gap="sm">
+              <Text size="sm">{t('bulkDeactivateHint')}</Text>
+              <Group gap="sm">
+                <Button
+                  id="users-btn-deactivate-cancel"
+                  variant="subtle"
+                  onClick={exitDeactivateMode}
+                >
+                  {tCommon('cancel')}
+                </Button>
+                <Button
+                  id="users-btn-deactivate-selected"
+                  color="red"
+                  leftSection={<IconUserOff size={16} />}
+                  disabled={selectedIds.length === 0}
+                  loading={!selectedIds.length ? false : bulkUpdateStatus.isPending}
+                  onClick={confirmBulkDeactivate}
+                >
+                  {t('deactivateSelectedCount', { count: selectedIds.length })}
+                </Button>
+              </Group>
+            </Group>
+          </Paper>
+        ) : null}
 
         <Group>
           <TextInput
@@ -303,6 +405,11 @@ export default function UsersPage() {
                 setPage(1);
               }}
               canEdit={canEdit}
+              selectionMode={deactivateMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              currentUserId={authUser?.id ?? null}
             />
           </>
         )}
@@ -313,4 +420,3 @@ export default function UsersPage() {
     </>
   );
 }
-

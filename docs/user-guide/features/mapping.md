@@ -37,12 +37,29 @@ Filters: search by parent name, email, or student name; filter by parent; filter
 3. Set **Can approve requests** (on by default).
 4. Save.
 
+### Bulk import / export
+
+Editors with **Edit** on parent associations can open **Bulk Import**.
+
+1. **Export mapping data** — one row per student in the branch. Linked students show Guardian 1 / Guardian 2 columns filled (by priority). Unlinked students appear with empty guardian columns.
+2. Or download the blank template and fill **Username** plus guardian emails.
+3. Upload → preview → **Validate** → **Import**.
+
+**Import behaviour (Option B):**
+
+- Match key is student **Username**.
+- Each row may set **Guardian 1** and **Guardian 2** (email required if other guardian fields are set; relationship = father / mother / guardian).
+- Missing parent emails create a parent user, send an invite when needed, then link on Mapping.
+- Existing same-parent links are left in place; relationship can be updated.
+- Maximum **two** guardians per student still applies.
+- Re-import skips rows already marked added / updated / unchanged on a prior results sheet.
+
 **Rules:**
 
 - Maximum **two** guardians per student — a third is blocked (**Maximum 2 guardians reached**).
 - First link = **Primary** (priority 1); second = **Secondary** (priority 2).
 - Duplicate parent–student pairs are rejected.
-- **Edit** only changes **Can approve requests** — not parent, student, relationship, or priority.
+- **Edit** only changes **Can approve requests** — not parent, student, relationship, or priority. (Bulk import can update **relationship** when the same parent is already linked.)
 - Approval access feeds leave and early departure workflows for that child.
 
 ### Remove
@@ -91,6 +108,7 @@ View-only users may still see action buttons; the server rejects mutations witho
 - Add both guardians early so approval and PIN setup work for either parent.
 - Finish Teacher–Class mapping before expecting **My Schedule** or Results class lists to look complete.
 - Prefer Matrix view when staffing a whole year group at once.
+- After campus setup, the school-admin **Next steps after setup** banner stays until at least one Teacher–Class assignment exists — see [⚙️ Settings & Configuration](settings-and-configuration.md).
 
 ---
 

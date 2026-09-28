@@ -242,3 +242,35 @@ export function useDeleteUser() {
   });
 }
 
+export function useBulkUpdateUserStatus() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useMutation({
+    mutationFn: async (input: { ids: string[]; isActive: boolean }) => {
+      const response = await apiClient.patch<{ updatedCount: number; skippedCount: number }>(
+        '/api/v1/users/bulk-status',
+        input,
+      );
+      return response.data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['users', branchId] });
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      notifications.show({
+        title: 'Success',
+        message: `Updated ${result?.updatedCount ?? 0} user(s)`,
+        color: 'green',
+      });
+    },
+    onError: (error: unknown) => {
+      notifications.show({
+        title: 'Error',
+        message: getApiErrorMessage(error, 'Failed to update users'),
+        color: 'red',
+      });
+    },
+  });
+}
+

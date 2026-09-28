@@ -259,6 +259,37 @@ export function useCreateStudentWithInvitation() {
   });
 }
 
+export function useBulkUpdateStudentStatus() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const branchId = user?.currentBranch?.id;
+
+  return useMutation({
+    mutationFn: async (input: { ids: string[]; isActive: boolean }) => {
+      const response = await apiClient.patch<{ updatedCount: number; skippedCount: number }>(
+        '/api/v1/students/bulk-status',
+        input,
+      );
+      return response.data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['students', branchId] });
+      notifications.show({
+        title: 'Success',
+        message: `Updated ${result?.updatedCount ?? 0} student(s)`,
+        color: 'green',
+      });
+    },
+    onError: (error: Error) => {
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'Failed to update students',
+        color: 'red',
+      });
+    },
+  });
+}
+
 export function useUpdateStudent() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

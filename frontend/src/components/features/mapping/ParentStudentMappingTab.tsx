@@ -15,9 +15,10 @@ import {
   ActionIcon,
   Title,
 } from '@mantine/core';
-import { IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconPlus, IconRefresh, IconSearch, IconUpload } from '@tabler/icons-react';
 import { useDisclosure, useDebouncedValue } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { ParentAssociationTable } from '@/components/features/parents/ParentAssociationTable';
@@ -26,6 +27,7 @@ import { useParentAssociations } from '@/hooks/useParentAssociations';
 import { useUsers } from '@/hooks/useUsers';
 import { useStudents } from '@/hooks/useStudents';
 import { useRoles } from '@/hooks/useRoles';
+import { useFeaturePermission } from '@/hooks/usePermissions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 interface ParentStudentMappingTabProps {
@@ -36,6 +38,7 @@ export function ParentStudentMappingTab({ showTitle = false }: ParentStudentMapp
   const t = useTranslations('user');
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const { canEdit } = useFeaturePermission('parent_associations');
   const [opened, { open, close }] = useDisclosure(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -100,13 +103,26 @@ export function ParentStudentMappingTab({ showTitle = false }: ParentStudentMapp
             </ActionIcon>
           </Tooltip>
         </Group>
-        <Button
-          id="parent-associations-btn-create"
-          leftSection={<IconPlus size={16} />}
-          onClick={open}
-        >
-          {t('createAssociation')}
-        </Button>
+        <Group gap="sm">
+          {canEdit && (
+            <Button
+              id="parent-associations-link-bulk-import"
+              component={Link}
+              href="/mapping/parent-student/bulk-import"
+              variant="light"
+              leftSection={<IconUpload size={16} />}
+            >
+              {t('bulkImport')}
+            </Button>
+          )}
+          <Button
+            id="parent-associations-btn-create"
+            leftSection={<IconPlus size={16} />}
+            onClick={open}
+          >
+            {t('createAssociation')}
+          </Button>
+        </Group>
       </Group>
 
       <Stack gap="md" mt="md">

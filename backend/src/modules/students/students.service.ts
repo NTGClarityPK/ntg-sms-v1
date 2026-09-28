@@ -81,6 +81,32 @@ export type CreateStudentWithInvitationOptions = {
   inviteOnlyWhenRecipientProvided?: boolean;
 };
 
+export type EnsureParentAccountInput = {
+  createParentAccount?: boolean;
+  parentEmail?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentRelationship?: 'father' | 'mother' | 'guardian';
+};
+
+export type EnsureParentAccountResult = {
+  /** True when a new parent_students row was created in this call. */
+  linked: boolean;
+  /** True when this parent was already linked to the student. */
+  alreadyLinked: boolean;
+  /** Parent auth user id when create/link ran (null when skipped). */
+  parentUserId: string | null;
+  parentInvitation?: {
+    token: string;
+    recipientEmail: string;
+    expiresAt: string;
+    parentUserId: string;
+  };
+  deferredDeliveries: DeferredInvitationDelivery[];
+  /** Auth user id of a parent created in this call (for rollback). */
+  createdParentUserId: string | null;
+};
+
 function normalizeOptionalEmail(email?: string | null): string | null {
   const raw = (email ?? '').trim().toLowerCase();
   return raw || null;
@@ -1330,6 +1356,208 @@ export class StudentsService {
     }
   }
 
+  /**
+   * Create or reuse a parent account and link them to a student (Mapping → Parent–Student).
+   * Idempotent when the same parent is already linked. Used by create-with-invitation and bulk update.
+   */
+  async ensureParentAccountAndLink(
+    studentId: string,
+    studentDisplayName: string,
+    input: EnsureParentAccountInput,
+    branchId: string,
+    adminUser: CurrentUserPayload,
+    options?: { deferInvitationDelivery?: boolean },
+  ): Promise<EnsureParentAccountResult> {
+    const empty: EnsureParentAccountResult = {
+      linked: false,
+      alreadyLinked: false,
+      parentUserId: null,
+      deferredDeliveries: [],
+      createdParentUserId: null,
+    };
+    if (!input.createParentAccount) {
+      return empty;
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(adminUser.email);
+    const deferInvitationDelivery = options?.deferInvitationDelivery === true;
+    const deferredDeliveries: DeferredInvitationDelivery[] = [];
+    let createdParentUserId: string | null = null;
+
+    const parentEmail = this.normalizeLoginEmail(input.parentEmail ?? '');
+    if (!parentEmail) {
+      throw new BadRequestException('Parent email is required to create a parent account');
+    }
+    const parentName = (input.parentName ?? '').trim() || this.nameFromEmail(parentEmail);
+
+    try {
+      const { data: existingParentUserId } = await supabase.rpc('auth_user_id_by_email', {
+        p_email: parentEmail,
+      });
+
+      let parentUserIdToUse =
+        typeof existingParentUserId === 'string' && existingParentUserId.trim() !== ''
+          ? existingParentUserId.trim()
+          : '';
+      let createdNewParent = false;
+
+      if (!parentUserIdToUse) {
+        const parentTempPassword = this.randomTempPassword();
+        const {
+          data: { user: parentUser },
+          error: parentAuthError,
+        } = await supabase.auth.admin.createUser({
+          email: parentEmail,
+          password: parentTempPassword,
+          email_confirm: true,
+        });
+        if (parentAuthError) throw new BadRequestException(parentAuthError.message);
+        if (!parentUser) throw new BadRequestException('Failed to create parent user');
+        parentUserIdToUse = parentUser.id;
+        createdNewParent = true;
+        createdParentUserId = parentUserIdToUse;
+      }
+
+      const parentProfileUpsertPayload: Record<string, unknown> = {
+        id: parentUserIdToUse,
+        full_name: parentName,
+        avatar_url: null,
+        phone: input.parentPhone ?? null,
+        address: null,
+        date_of_birth: null,
+        gender: null,
+        ...(createdNewParent ? { is_active: false } : {}),
+        current_branch_id: branchId,
+        created_by: username,
+        updated_by: username,
+      };
+
+      const { error: parentProfileError } = await supabase
+        .from('profiles')
+        .upsert(parentProfileUpsertPayload, { onConflict: 'id' });
+      throwIfDbError(parentProfileError);
+
+      const { error: parentBranchError } = await supabase.from('user_branches').upsert(
+        {
+          user_id: parentUserIdToUse,
+          branch_id: branchId,
+          is_primary: false,
+          created_by: username,
+        },
+        { onConflict: 'user_id,branch_id' },
+      );
+      if (parentBranchError) throw new BadRequestException(parentBranchError.message);
+
+      const parentRoleId = await this.getRoleIdByName('parent');
+      if (parentRoleId) {
+        await supabase.from('user_roles').upsert(
+          {
+            user_id: parentUserIdToUse,
+            role_id: parentRoleId,
+            branch_id: branchId,
+            created_by: username,
+          },
+          { onConflict: 'user_id,role_id,branch_id' },
+        );
+      }
+
+      const { data: existingLink, error: existingLinkError } = await supabase
+        .from('parent_students')
+        .select('id')
+        .eq('parent_user_id', parentUserIdToUse)
+        .eq('student_id', studentId)
+        .maybeSingle();
+      throwIfDbError(existingLinkError);
+
+      const alreadyLinked = !!existingLink;
+      let linked = false;
+      if (!alreadyLinked) {
+        await this.parentsService.linkChild(
+          parentUserIdToUse,
+          {
+            studentId,
+            relationship: input.parentRelationship ?? 'guardian',
+            isPrimary: true,
+            canApprove: true,
+          },
+          adminUser.email,
+          branchId,
+          null,
+        );
+        linked = true;
+      }
+
+      const nowIso = new Date().toISOString();
+      const { data: latestParentInv } = await supabase
+        .from('invitations')
+        .select(
+          'id, token, user_id, recipient_email, invitation_type, created_by, created_at, expires_at, used_at',
+        )
+        .eq('user_id', parentUserIdToUse)
+        .eq('invitation_type', 'parent_account')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const latest = latestParentInv as
+        | { expires_at: string; used_at: string | null }
+        | null;
+      const latestIsExpired =
+        !!latest?.expires_at && latest.expires_at < nowIso && latest.used_at == null;
+
+      let parentInvitation: EnsureParentAccountResult['parentInvitation'];
+
+      if (createdNewParent || latestIsExpired) {
+        const parentInv = await this.invitationsService.createInvitation({
+          userId: parentUserIdToUse,
+          recipientEmail: parentEmail,
+          invitationType: 'parent_account',
+          createdByUserId: adminUser.id,
+        });
+        if (deferInvitationDelivery) {
+          deferredDeliveries.push({
+            invitation: parentInv,
+            recipientName: parentName,
+            loginEmail: parentEmail,
+            recipientUserId: parentUserIdToUse,
+            recipientDisplayName: parentName,
+            accountLabel: 'parent',
+            studentNameForParent: studentDisplayName,
+          });
+        } else {
+          await this.invitationsService.sendInvitationEmail({
+            invitation: parentInv,
+            recipientName: parentName,
+            loginEmail: parentEmail,
+            userEmailForAudit: adminUser.email,
+            branchId,
+          });
+        }
+        parentInvitation = {
+          token: parentInv.token,
+          recipientEmail: parentInv.recipient_email,
+          expiresAt: parentInv.expires_at,
+          parentUserId: parentUserIdToUse,
+        };
+      }
+
+      return {
+        linked,
+        alreadyLinked,
+        parentUserId: parentUserIdToUse,
+        parentInvitation,
+        deferredDeliveries,
+        createdParentUserId,
+      };
+    } catch (error) {
+      if (createdParentUserId) {
+        await supabase.auth.admin.deleteUser(createdParentUserId);
+      }
+      throw error;
+    }
+  }
+
   async createStudentWithInvitation(
     input: CreateStudentWithInvitationDto,
     branchId: string,
@@ -1521,156 +1749,25 @@ export class StudentsService {
         | undefined;
 
       if (input.createParentAccount) {
-        const parentEmail = this.normalizeLoginEmail(input.parentEmail ?? '');
-        if (!parentEmail) {
-          throw new BadRequestException('Parent email is required to create a parent account');
-        }
-        const parentName = (input.parentName ?? '').trim() || this.nameFromEmail(parentEmail);
-
-        // If the parent already exists (same email), reuse and just link.
-        const { data: existingParentUserId } = await supabase.rpc('auth_user_id_by_email', {
-          p_email: parentEmail,
-        });
-
-        const parentUserId: string = (() => {
-          if (typeof existingParentUserId === 'string' && existingParentUserId.trim() !== '') {
-            return existingParentUserId.trim();
-          }
-          return '';
-        })();
-
-        let createdNewParent = false;
-        let parentUserIdToUse = parentUserId;
-
-        if (!parentUserIdToUse) {
-          const parentTempPassword = this.randomTempPassword();
-          const {
-            data: { user: parentUser },
-            error: parentAuthError,
-          } = await supabase.auth.admin.createUser({
-            email: parentEmail,
-            password: parentTempPassword,
-            email_confirm: true,
-          });
-          if (parentAuthError) throw new BadRequestException(parentAuthError.message);
-          if (!parentUser) throw new BadRequestException('Failed to create parent user');
-          parentUserIdToUse = parentUser.id;
-          createdNewParent = true;
-          createdParentUserId = parentUserIdToUse;
-        }
-
-        // Ensure parent has profile, branch, role (idempotent)
-        const parentProfileUpsertPayload: Record<string, unknown> = {
-          id: parentUserIdToUse,
-          full_name: parentName,
-          avatar_url: null,
-          phone: input.parentPhone ?? null,
-          address: null,
-          date_of_birth: null,
-          gender: null,
-          // Parents should remain pending until they complete account setup.
-          // Only set `is_active` for newly created parents; do not override existing parents.
-          ...(createdNewParent ? { is_active: false } : {}),
-          current_branch_id: branchId,
-          created_by: username,
-          updated_by: username,
-        };
-
-        const { error: parentProfileError } = await supabase
-          .from('profiles')
-          .upsert(parentProfileUpsertPayload, { onConflict: 'id' });
-        throwIfDbError(parentProfileError);
-
-        const { error: parentBranchError } = await supabase.from('user_branches').upsert(
+        const parentResult = await this.ensureParentAccountAndLink(
+          studentRow.id,
+          displayName,
           {
-            user_id: parentUserIdToUse,
-            branch_id: branchId,
-            is_primary: false,
-            created_by: username,
+            createParentAccount: true,
+            parentEmail: input.parentEmail,
+            parentName: input.parentName,
+            parentPhone: input.parentPhone,
+            parentRelationship: input.parentRelationship,
           },
-          { onConflict: 'user_id,branch_id' },
-        );
-        if (parentBranchError) throw new BadRequestException(parentBranchError.message);
-
-        const parentRoleId = await this.getRoleIdByName('parent');
-        if (parentRoleId) {
-          await supabase.from('user_roles').upsert(
-            {
-              user_id: parentUserIdToUse,
-              role_id: parentRoleId,
-              branch_id: branchId,
-              created_by: username,
-            },
-            { onConflict: 'user_id,role_id,branch_id' },
-          );
-        }
-
-        // Link parent to student
-        await this.parentsService.linkChild(
-          parentUserIdToUse,
-          {
-            studentId: studentRow.id,
-            relationship: input.parentRelationship ?? 'guardian',
-            isPrimary: true,
-            canApprove: true,
-          },
-          adminUser.email,
           branchId,
-          null,
+          adminUser,
+          { deferInvitationDelivery },
         );
-
-        // Parent invitation (self setup) -> only send if:
-        // - we just created the parent, OR
-        // - the latest unused invitation is expired (resend policy)
-        const nowIso = new Date().toISOString();
-        const { data: latestParentInv } = await supabase
-          .from('invitations')
-          .select('id, token, user_id, recipient_email, invitation_type, created_by, created_at, expires_at, used_at')
-          .eq('user_id', parentUserIdToUse)
-          .eq('invitation_type', 'parent_account')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const latest = latestParentInv as
-          | { expires_at: string; used_at: string | null }
-          | null;
-        const latestIsExpired =
-          !!latest?.expires_at && latest.expires_at < nowIso && latest.used_at == null;
-
-        if (createdNewParent || latestIsExpired) {
-          const parentInv = await this.invitationsService.createInvitation({
-            userId: parentUserIdToUse,
-            recipientEmail: parentEmail,
-            invitationType: 'parent_account',
-            createdByUserId: adminUser.id,
-          });
-          if (deferInvitationDelivery) {
-            deferredDeliveries.push({
-              invitation: parentInv,
-              recipientName: parentName,
-              loginEmail: parentEmail,
-              recipientUserId: parentUserIdToUse,
-              recipientDisplayName: parentName,
-              accountLabel: 'parent',
-              studentNameForParent: displayName,
-            });
-          } else {
-            await this.invitationsService.sendInvitationEmail({
-              invitation: parentInv,
-              recipientName: parentName,
-              loginEmail: parentEmail,
-              userEmailForAudit: adminUser.email,
-              branchId,
-            });
-          }
-          parentInvitation = {
-            token: parentInv.token,
-            recipientEmail: parentInv.recipient_email,
-            expiresAt: parentInv.expires_at,
-            parentUserId: parentUserIdToUse,
-          };
+        createdParentUserId = parentResult.createdParentUserId;
+        if (parentResult.deferredDeliveries.length) {
+          deferredDeliveries.push(...parentResult.deferredDeliveries);
         }
+        parentInvitation = parentResult.parentInvitation;
       }
 
       // Student invitation (scenario 1 or 2)
@@ -2106,8 +2203,8 @@ export class StudentsService {
     const updatePayload: {
       first_name?: string;
       last_name?: string;
-      class_id?: string;
-      section_id?: string;
+      class_id?: string | null;
+      section_id?: string | null;
       blood_group?: string | null;
       medical_notes?: string | null;
       admission_date?: string | null;
@@ -2117,8 +2214,6 @@ export class StudentsService {
       updated_by: string;
       academic_year_id?: string | null;
     } = {
-      class_id: input.classId ?? undefined,
-      section_id: input.sectionId ?? undefined,
       blood_group: input.bloodGroup,
       medical_notes: input.medicalNotes,
       admission_date: input.admissionDate,
@@ -2126,6 +2221,12 @@ export class StudentsService {
       updated_at: new Date().toISOString(),
       updated_by: username,
     };
+    if (input.classId !== undefined) {
+      updatePayload.class_id = input.classId;
+    }
+    if (input.sectionId !== undefined) {
+      updatePayload.section_id = input.sectionId;
+    }
     if (input.firstName !== undefined) updatePayload.first_name = input.firstName.trim();
     if (input.lastName !== undefined) updatePayload.last_name = input.lastName.trim();
     if (input.googleAccountEmail !== undefined) {
@@ -2367,6 +2468,90 @@ export class StudentsService {
     }
 
     return results;
+  }
+
+  /**
+   * Bulk activate/deactivate students. Matches single-update status rules:
+   * - Sets students.is_active
+   * - Syncs student_enrolments for the branch active year (pending/link_expired stay roster-active)
+   */
+  async bulkUpdateStatus(
+    ids: string[],
+    isActive: boolean,
+    branchId: string,
+    userEmail: string,
+  ): Promise<{ updatedCount: number; skippedCount: number }> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException('At least one student id is required');
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const username = extractUsernameFromEmail(userEmail);
+    const now = new Date().toISOString();
+    const activeYear = await this.academicYearsService.getActiveForBranch(branchId);
+
+    const { data: rows, error: fetchError } = await supabase
+      .from('students')
+      .select('id, is_active, account_status')
+      .eq('branch_id', branchId)
+      .in('id', uniqueIds);
+    throwIfDbError(fetchError);
+
+    const found = (rows || []) as Array<{
+      id: string;
+      is_active: boolean | null;
+      account_status?: string | null;
+    }>;
+    if (found.length !== uniqueIds.length) {
+      throw new BadRequestException('One or more students were not found in this branch');
+    }
+
+    const toUpdate = found.filter((row) => Boolean(row.is_active ?? true) !== isActive);
+    const skippedCount = found.length - toUpdate.length;
+    if (toUpdate.length === 0) {
+      return { updatedCount: 0, skippedCount };
+    }
+
+    const updateIds = toUpdate.map((row) => row.id);
+    const { error: updateError } = await supabase
+      .from('students')
+      .update({
+        is_active: isActive,
+        updated_at: now,
+        updated_by: username,
+      })
+      .eq('branch_id', branchId)
+      .in('id', updateIds);
+    throwIfDbError(updateError);
+
+    if (activeYear?.id) {
+      // Same rule as updateStudent: pending / link_expired keep enrolment "active" even when deactivated.
+      const enrolmentInactiveIds = isActive
+        ? updateIds
+        : toUpdate
+            .filter((row) => {
+              const status = accountStatusFromRow(row.account_status);
+              return status !== 'pending_verification' && status !== 'link_expired';
+            })
+            .map((row) => row.id);
+
+      if (enrolmentInactiveIds.length > 0) {
+        const { error: enrolError } = await supabase
+          .from('student_enrolments')
+          .update({
+            status: isActive ? 'active' : 'inactive',
+            updated_at: now,
+            updated_by: username,
+          })
+          .eq('branch_id', branchId)
+          .eq('academic_year_id', activeYear.id)
+          .in('student_id', enrolmentInactiveIds);
+        throwIfDbError(enrolError);
+      }
+    }
+
+    return { updatedCount: updateIds.length, skippedCount };
   }
 }
 

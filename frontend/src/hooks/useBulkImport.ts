@@ -7,6 +7,9 @@ import {
   type BulkUserImportPreview,
   type BulkUserImportResult,
   type BulkUserRowDto,
+  type BulkParentAssociationImportPreview,
+  type BulkParentAssociationImportResult,
+  type BulkParentAssociationRowDto,
 } from '@/lib/api/bulk-import';
 import type { SubjectTemplateHelpResponse } from '@/lib/api/bulk-import';
 
@@ -100,6 +103,46 @@ export function useBulkUsersImportTemplate() {
   });
 }
 
+export function useBulkParentAssociationsImportPreview() {
+  return useMutation({
+    mutationFn: (file: File) => bulkImportApi.previewParentAssociations(file),
+  });
+}
+
+export function useBulkParentAssociationsImportValidate() {
+  return useMutation({
+    mutationFn: (rows: BulkParentAssociationRowDto[]) =>
+      bulkImportApi.validateParentAssociations(rows),
+  });
+}
+
+export function useBulkParentAssociationsImport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rows: BulkParentAssociationRowDto[]) =>
+      bulkImportApi.importParentAssociations(rows),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parent-associations'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+}
+
+export function useBulkParentAssociationsExport() {
+  return useMutation({
+    mutationFn: () => bulkImportApi.exportParentAssociations(),
+  });
+}
+
+export function useBulkParentAssociationsImportTemplate() {
+  return useQuery({
+    queryKey: ['bulk-import-template', 'parent-associations'],
+    queryFn: () => bulkImportApi.getParentAssociationsTemplate(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export type {
   BulkImportPreview,
   BulkImportResult,
@@ -107,5 +150,8 @@ export type {
   BulkUserImportPreview,
   BulkUserImportResult,
   BulkUserRowDto,
+  BulkParentAssociationImportPreview,
+  BulkParentAssociationImportResult,
+  BulkParentAssociationRowDto,
   SubjectTemplateHelpResponse,
 };

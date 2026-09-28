@@ -250,11 +250,26 @@ export default function BulkImportStudentsPage() {
       { key: 'parent_phone', label: 'Parent Phone (optional)', example: '+9647709876543' },
       { key: 'parent_relationship', label: 'Parent Relationship (optional)', example: 'guardian' },
     ];
-    const sampleRow: Record<string, string> = {};
-    columns.forEach((col) => {
-      sampleRow[col.label] = col.example;
+    const headers = columns.map((c) => c.label);
+    const examples = columns.map((c) => c.example);
+    const ws = XLSX.utils.aoa_to_sheet([headers, examples]);
+    // Force phone / date columns to text so Excel does not convert them to numbers or serial dates.
+    const textKeys = new Set([
+      'phone',
+      'parent_phone',
+      'date_of_birth',
+      'admission_date',
+    ]);
+    columns.forEach((col, colIndex) => {
+      if (!textKeys.has(col.key)) return;
+      const cellAddress = XLSX.utils.encode_cell({ r: 1, c: colIndex });
+      const cell = ws[cellAddress];
+      if (cell) {
+        cell.t = 's';
+        cell.z = '@';
+        cell.v = String(col.example);
+      }
     });
-    const ws = XLSX.utils.json_to_sheet([sampleRow]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Students');
     XLSX.writeFile(wb, 'students-import-template.xlsx');
@@ -787,6 +802,16 @@ export default function BulkImportStudentsPage() {
                                   fw={500}
                                 >
                                   {row.errors.join(', ')}
+                                </Text>
+                              )}
+                              {(row.warnings?.length ?? 0) > 0 && (
+                                <Text
+                                  size="xs"
+                                  c={computedColorScheme === 'dark' ? 'yellow.3' : 'orange.8'}
+                                  fw={500}
+                                  mt={row.errors.length > 0 ? 4 : 0}
+                                >
+                                  {row.warnings!.join(', ')}
                                 </Text>
                               )}
                             </Table.Td>

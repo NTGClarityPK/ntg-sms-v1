@@ -9,6 +9,7 @@ export interface BulkImportPreview {
     rowNumber: number;
     data: BulkStudentRowDto;
     errors: string[];
+    warnings?: string[];
     isValid: boolean;
   }>;
 }
@@ -108,6 +109,7 @@ export interface BulkUserImportPreview {
     rowNumber: number;
     data: BulkUserRowDto;
     errors: string[];
+    warnings?: string[];
     isValid: boolean;
   }>;
 }
@@ -148,6 +150,63 @@ export interface BulkUserImportResult {
     userType: 'parent' | 'staff';
     roles: string;
   }>;
+}
+
+export interface BulkParentAssociationRowDto {
+  row_number?: number;
+  username: string;
+  first_name?: string;
+  last_name?: string;
+  student_id?: string;
+  guardian1_email?: string;
+  guardian1_name?: string;
+  guardian1_phone?: string;
+  guardian1_relationship?: 'father' | 'mother' | 'guardian';
+  guardian2_email?: string;
+  guardian2_name?: string;
+  guardian2_phone?: string;
+  guardian2_relationship?: 'father' | 'mother' | 'guardian';
+  import_status?: string;
+}
+
+export interface BulkParentAssociationImportPreview {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  rows: Array<{
+    rowNumber: number;
+    data: BulkParentAssociationRowDto;
+    errors: string[];
+    warnings?: string[];
+    isValid: boolean;
+  }>;
+}
+
+export interface BulkParentAssociationImportRowOutcome {
+  row: number;
+  username: string;
+  studentName: string;
+  status: 'added' | 'updated' | 'unchanged' | 'failed_insert' | 'failed_update' | 'skipped';
+  reason?: string;
+}
+
+export interface BulkParentAssociationImportResult {
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+  createdCount?: number;
+  updatedCount?: number;
+  unchangedCount?: number;
+  failedInsertCount?: number;
+  failedUpdateCount?: number;
+  skippedCount?: number;
+  errors: Array<{ row: number; message: string }>;
+  rowOutcomes?: BulkParentAssociationImportRowOutcome[];
+  resultsFile?: {
+    fileName: string;
+    contentBase64: string;
+    mimeType: string;
+  };
 }
 
 export interface TemplateColumnsResponse {
@@ -304,6 +363,86 @@ export const bulkImportApi = {
   async getUsersTemplate(): Promise<TemplateColumnsResponse> {
     const res = await apiClient.post<TemplateColumnsResponse>(
       '/api/v1/bulk-import/users/template',
+    );
+    const data = (res as ApiResponse<TemplateColumnsResponse>).data;
+    if (data) return data;
+    return res as unknown as TemplateColumnsResponse;
+  },
+
+  async previewParentAssociations(
+    file: File,
+  ): Promise<BulkParentAssociationImportPreview> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<BulkParentAssociationImportPreview>(
+      '/api/v1/bulk-import/parent-associations/preview',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return (
+      (res as ApiResponse<BulkParentAssociationImportPreview>).data ??
+      (res as unknown as BulkParentAssociationImportPreview)
+    );
+  },
+
+  async validateParentAssociations(
+    rows: BulkParentAssociationRowDto[],
+  ): Promise<BulkParentAssociationImportPreview> {
+    const res = await apiClient.post<BulkParentAssociationImportPreview>(
+      '/api/v1/bulk-import/parent-associations/validate',
+      { rows },
+    );
+    return (
+      (res as ApiResponse<BulkParentAssociationImportPreview>).data ??
+      (res as unknown as BulkParentAssociationImportPreview)
+    );
+  },
+
+  async importParentAssociations(
+    rows: BulkParentAssociationRowDto[],
+  ): Promise<BulkParentAssociationImportResult> {
+    const res = await apiClient.post<BulkParentAssociationImportResult>(
+      '/api/v1/bulk-import/parent-associations/import',
+      { rows },
+      { timeout: 300_000 },
+    );
+    return (
+      (res as ApiResponse<BulkParentAssociationImportResult>).data ??
+      (res as unknown as BulkParentAssociationImportResult)
+    );
+  },
+
+  async exportParentAssociations(): Promise<{
+    fileName: string;
+    contentBase64: string;
+    mimeType: string;
+    rowCount: number;
+  }> {
+    const res = await apiClient.post<{
+      fileName: string;
+      contentBase64: string;
+      mimeType: string;
+      rowCount: number;
+    }>('/api/v1/bulk-import/parent-associations/export', {}, { timeout: 180_000 });
+    return (
+      (res as ApiResponse<{
+        fileName: string;
+        contentBase64: string;
+        mimeType: string;
+        rowCount: number;
+      }>).data ??
+      (res as unknown as {
+        fileName: string;
+        contentBase64: string;
+        mimeType: string;
+        rowCount: number;
+      })
+    );
+  },
+
+  async getParentAssociationsTemplate(): Promise<TemplateColumnsResponse> {
+    const res = await apiClient.post<TemplateColumnsResponse>(
+      '/api/v1/bulk-import/parent-associations/template',
     );
     const data = (res as ApiResponse<TemplateColumnsResponse>).data;
     if (data) return data;

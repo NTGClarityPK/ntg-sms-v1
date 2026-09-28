@@ -65,11 +65,23 @@ The **setup wizard** is a guided, step-by-step checklist. It walks you through t
 
 Think of it as a “getting started” tour that saves your choices as you go.
 
+### After setup is complete
+
+Once bulk setup or the setup wizard finishes for the campus, **school admins** see a portal-wide **Next steps after setup** banner. It points to the essentials still missing:
+
+- [👥 Users & Roles](user-roles.md) bulk import — until at least one other person appears under Users
+- [🎓 Students](students.md) bulk import — until the campus has students
+- [🔗 Mapping](mapping.md) → **Teacher–class** — until at least one teacher is mapped to a class/subject
+
+Optional tips under the same banner cover default roles (adjust under **Settings → Permissions**) and fee setup when your plan includes fees (**Settings → Fee settings**).
+
+Each essential line drops off as that area gains data. The whole banner disappears once teacher–class mapping has at least one assignment. You can dismiss it for the current browser session; it returns on the next visit until mapping is done.
+
 ### Copy settings from another campus
 
 If your school already has another campus set up, and you are a **school admin** on more than one campus, you may see **Copy settings from other branch**. That copies structure from the campus you already configured, instead of building everything from scratch.
 
-### If you do not see the banner
+### If you do not see the first-time setup banner
 
 Open **Sidebar → Settings** and configure the sections below in a sensible order. The **Tips** section at the end of this page suggests a practical sequence.
 
@@ -282,6 +294,7 @@ See [👥 User Roles](user-roles.md).
 - Lock academic years only after promotion decisions are complete.
 - Change fee templates before generating next month’s challans.
 - Sensible first-pass order if you are configuring by hand: **Business Info** → **Academic** (year, then subjects/classes/sections/levels) → **Schedule** → assessments → **Permissions** → fees and other modules as needed.
+- After first-time setup, follow the **Next steps after setup** banner (users → students → teacher–class mapping) before day-to-day work.
 
 ---
 

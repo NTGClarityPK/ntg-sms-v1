@@ -308,6 +308,9 @@ export class ParentsService {
     if (input.canApprove !== undefined) {
       updateData.can_approve = input.canApprove;
     }
+    if (input.relationship !== undefined) {
+      updateData.relationship = input.relationship;
+    }
 
     // Update if there are changes
     if (Object.keys(updateData).length > 0) {

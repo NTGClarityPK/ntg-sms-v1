@@ -1146,5 +1146,65 @@ export class UsersService {
       .eq('id', userId);
     throwIfDbError(error);
   }
+
+  /**
+   * Bulk activate/deactivate users in a branch (same as edit-form isActive toggle).
+   */
+  async bulkUpdateStatus(
+    ids: string[],
+    isActive: boolean,
+    branchId: string,
+    actorUserId?: string,
+  ): Promise<{ updatedCount: number; skippedCount: number }> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException('At least one user id is required');
+    }
+    if (!isActive && actorUserId && uniqueIds.includes(actorUserId)) {
+      throw new BadRequestException('You cannot deactivate your own account');
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const now = new Date().toISOString();
+
+    const { data: branchLinks, error: branchErr } = await supabase
+      .from('user_branches')
+      .select('user_id')
+      .eq('branch_id', branchId)
+      .in('user_id', uniqueIds);
+    throwIfDbError(branchErr);
+
+    const inBranch = new Set(
+      ((branchLinks || []) as Array<{ user_id: string }>).map((r) => r.user_id),
+    );
+    if (inBranch.size !== uniqueIds.length) {
+      throw new BadRequestException('One or more users were not found in this branch');
+    }
+
+    const { data: profiles, error: fetchError } = await supabase
+      .from('profiles')
+      .select('id, is_active')
+      .in('id', uniqueIds);
+    throwIfDbError(fetchError);
+
+    const found = (profiles || []) as Array<{ id: string; is_active: boolean | null }>;
+    const toUpdate = found.filter((row) => Boolean(row.is_active ?? true) !== isActive);
+    const skippedCount = uniqueIds.length - toUpdate.length;
+    if (toUpdate.length === 0) {
+      return { updatedCount: 0, skippedCount };
+    }
+
+    const updateIds = toUpdate.map((row) => row.id);
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        is_active: isActive,
+        updated_at: now,
+      })
+      .in('id', updateIds);
+    throwIfDbError(updateError);
+
+    return { updatedCount: updateIds.length, skippedCount };
+  }
 }
 

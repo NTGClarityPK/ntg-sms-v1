@@ -12,47 +12,50 @@ export class UpdateStudentDto {
 
   @IsOptional()
   @IsString()
-  phone?: string;
+  phone?: string | null;
 
   @IsOptional()
   @IsString()
-  address?: string;
+  address?: string | null;
 
   @IsOptional()
   @IsString()
-  dateOfBirth?: string;
+  dateOfBirth?: string | null;
 
   @IsOptional()
   @IsString()
   gender?: 'male' | 'female';
 
   @IsOptional()
+  @ValidateIf((_, v) => v != null && v !== '')
   @IsUUID()
-  classId?: string;
+  classId?: string | null;
 
   @IsOptional()
+  @ValidateIf((_, v) => v != null && v !== '')
   @IsUUID()
-  sectionId?: string;
+  sectionId?: string | null;
 
   @IsOptional()
   @IsString()
-  bloodGroup?: string;
+  bloodGroup?: string | null;
 
   @IsOptional()
   @IsString()
-  medicalNotes?: string;
+  medicalNotes?: string | null;
 
   @IsOptional()
   @IsString()
-  admissionDate?: string;
+  admissionDate?: string | null;
 
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
   @IsOptional()
+  @ValidateIf((_, v) => v != null && v !== '')
   @IsUUID()
-  subjectTemplateId?: string;
+  subjectTemplateId?: string | null;
 
   @IsOptional()
   @IsUUID()

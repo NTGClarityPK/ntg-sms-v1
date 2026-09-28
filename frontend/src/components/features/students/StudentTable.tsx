@@ -20,6 +20,7 @@ import {
   Alert,
   Divider,
   Paper,
+  Checkbox,
 } from '@mantine/core';
 import { IconEdit, IconChevronUp, IconChevronDown, IconMailForward, IconUsers, IconPhone, IconUser, IconMail } from '@tabler/icons-react';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
@@ -110,9 +111,27 @@ interface StudentTableProps {
   sortOrder?: 'asc' | 'desc';
   onSort?: (field: string) => void;
   canEdit?: boolean;
+  /** When true, shows row checkboxes for bulk deactivate (active students only). */
+  selectionMode?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
+  /** Select or deselect the given page ids (`select` true = add, false = remove). */
+  onToggleSelectAll?: (pageIds: string[], select: boolean) => void;
 }
 
-export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: StudentTableProps) {
+export function StudentTable({
+  students,
+  meta,
+  onPageChange,
+  sortBy,
+  sortOrder,
+  onSort,
+  canEdit = true,
+  selectionMode = false,
+  selectedIds = [],
+  onToggleSelect,
+  onToggleSelectAll,
+}: StudentTableProps) {
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('students');
@@ -137,6 +156,14 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
 
   const needsReinviteFlow = (s: Student | null) =>
     Boolean(s && (s.accountStatus === 'link_expired' || !s.userId));
+
+  const selectableIds = selectionMode
+    ? students.filter((s) => s.isActive).map((s) => s.id)
+    : [];
+  const allSelectableSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.includes(id));
+  const someSelectableSelected =
+    selectableIds.some((id) => selectedIds.includes(id)) && !allSelectableSelected;
 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student);
@@ -212,6 +239,20 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
         <Table striped highlightOnHover style={{ minWidth: 960 }}>
           <Table.Thead>
             <Table.Tr>
+              {selectionMode ? (
+                <Table.Th style={{ width: 40 }}>
+                  <Checkbox
+                    id="students-select-all"
+                    checked={allSelectableSelected}
+                    indeterminate={someSelectableSelected}
+                    disabled={selectableIds.length === 0}
+                    onChange={() =>
+                      onToggleSelectAll?.(selectableIds, !allSelectableSelected)
+                    }
+                    aria-label={t('selectAll')}
+                  />
+                </Table.Th>
+              ) : null}
               <SortableHeader field="studentId">{t('studentId')}</SortableHeader>
               <SortableHeader field="firstName">{t('firstName')}</SortableHeader>
               <SortableHeader field="lastName">{t('lastName')}</SortableHeader>
@@ -226,7 +267,7 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
           <Table.Tbody>
             {students.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={9}>
+                <Table.Td colSpan={selectionMode ? 10 : 9}>
                   <Text c="dimmed" ta="center" py="md">
                     {t('noStudentsFound')}
                   </Text>
@@ -235,6 +276,17 @@ export function StudentTable({ students, meta, onPageChange, sortBy, sortOrder, 
             ) : (
               students.map((student) => (
                 <Table.Tr key={student.id}>
+                  {selectionMode ? (
+                    <Table.Td>
+                      <Checkbox
+                        id={`students-select-${student.id}`}
+                        checked={selectedIds.includes(student.id)}
+                        disabled={!student.isActive}
+                        onChange={() => onToggleSelect?.(student.id)}
+                        aria-label={t('selectStudent')}
+                      />
+                    </Table.Td>
+                  ) : null}
                   <Table.Td>
                     <Text fw={500} size={isMobile ? 'sm' : 'md'}>
                       {student.studentId}

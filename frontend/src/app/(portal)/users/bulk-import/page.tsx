@@ -277,17 +277,26 @@ export default function BulkImportUsersPage() {
       { key: 'date_of_birth', label: 'Date of Birth (optional)', example: '1990-05-15' },
       { key: 'address', label: 'Address (optional)', example: 'Baghdad' },
     ];
-    const sampleRow: Record<string, string> = {};
-    columns.forEach((col) => {
-      sampleRow[col.label] = col.example;
-    });
     const sampleRole =
       roleOptions.find((r) => r.label.toLowerCase().includes('subject'))?.label ??
       roleOptions[0]?.label;
-    if (sampleRole && sampleRow.Roles !== undefined) {
-      sampleRow.Roles = sampleRole;
-    }
-    const ws = XLSX.utils.json_to_sheet([sampleRow]);
+    const headers = columns.map((c) => c.label);
+    const examples = columns.map((c) => {
+      if (c.key === 'roles' && sampleRole) return sampleRole;
+      return c.example;
+    });
+    const ws = XLSX.utils.aoa_to_sheet([headers, examples]);
+    const textKeys = new Set(['phone', 'date_of_birth']);
+    columns.forEach((col, colIndex) => {
+      if (!textKeys.has(col.key)) return;
+      const cellAddress = XLSX.utils.encode_cell({ r: 1, c: colIndex });
+      const cell = ws[cellAddress];
+      if (cell) {
+        cell.t = 's';
+        cell.z = '@';
+        cell.v = String(examples[colIndex] ?? '');
+      }
+    });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Users');
     const roleSheetRows = importableRoles.map((r) => ({
@@ -714,6 +723,19 @@ export default function BulkImportUsersPage() {
                                   {row.errors.map((err, i) => (
                                     <Text key={i} size="xs" c="red">
                                       {err}
+                                    </Text>
+                                  ))}
+                                  {(row.warnings ?? []).map((w, i) => (
+                                    <Text key={`w-${i}`} size="xs" c="orange">
+                                      {w}
+                                    </Text>
+                                  ))}
+                                </Stack>
+                              ) : (row.warnings?.length ?? 0) > 0 ? (
+                                <Stack gap={2}>
+                                  {row.warnings!.map((w, i) => (
+                                    <Text key={i} size="xs" c="orange">
+                                      {w}
                                     </Text>
                                   ))}
                                 </Stack>

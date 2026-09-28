@@ -21,6 +21,8 @@ interface QueryTeacherAssignmentsParams {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  /** When `false`, the query does not run. Defaults to true. */
+  enabled?: boolean;
 }
 
 export function useTeacherAssignments(params?: QueryTeacherAssignmentsParams) {
@@ -48,7 +50,7 @@ export function useTeacherAssignments(params?: QueryTeacherAssignmentsParams) {
       );
       return response;
     },
-    enabled: !!branchId,
+    enabled: !!branchId && params?.enabled !== false,
     staleTime: 2 * 60 * 1000, // 2 minutes - teacher assignments don't change frequently
   });
 }

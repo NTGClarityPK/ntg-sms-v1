@@ -12,15 +12,15 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  phone?: string;
+  phone?: string | null;
 
   @IsOptional()
   @IsString()
-  address?: string;
+  address?: string | null;
 
   @IsOptional()
   @IsString()
-  dateOfBirth?: string;
+  dateOfBirth?: string | null;
 
   @IsOptional()
   @IsIn(['male', 'female'])

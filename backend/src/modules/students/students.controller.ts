@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Body,
   Param,
   Query,
@@ -22,6 +23,7 @@ import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { CreateStudentWithInvitationDto } from './dto/create-student-with-invitation.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { BulkStudentStatusDto } from './dto/bulk-student-status.dto';
 import { ReinviteStudentDto } from './dto/reinvite-student.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
@@ -133,6 +135,22 @@ export class StudentsController {
   ) {
     await this.ensureFeatureEditAccess(user, branch.branchId, 'students');
     const data = await this.studentsService.bulkImport(input.students, branch.branchId, user.email);
+    return { data };
+  }
+
+  @Patch('bulk-status')
+  async bulkUpdateStatus(
+    @Body() input: BulkStudentStatusDto,
+    @CurrentBranch() branch: { branchId: string },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'students');
+    const data = await this.studentsService.bulkUpdateStatus(
+      input.ids,
+      input.isActive,
+      branch.branchId,
+      user.email,
+    );
     return { data };
   }
 

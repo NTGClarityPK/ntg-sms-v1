@@ -14,6 +14,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { StorageWarningBanner } from './StorageWarningBanner';
 import { SetupBanner } from './SetupBanner';
+import { PostSetupChecklistBanner } from './PostSetupChecklistBanner';
 import { ConnectionIndicator } from '@/components/common/ConnectionIndicator';
 import { SupportFloatingButton } from '@/components/features/support/SupportFloatingButton';
 
@@ -111,6 +112,7 @@ export function AppShell({ children }: AppShellProps) {
           <ConnectionIndicator />
           <StorageWarningBanner />
           <SetupBanner />
+          <PostSetupChecklistBanner />
           {children}
           <SupportFloatingButton />
         </MantineAppShell.Main>

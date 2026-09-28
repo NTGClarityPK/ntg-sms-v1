@@ -18,6 +18,7 @@ import {
   CopyButton,
   Alert,
   Skeleton,
+  Checkbox,
 } from '@mantine/core';
 import { IconEdit, IconChevronUp, IconChevronDown, IconMailForward } from '@tabler/icons-react';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
@@ -43,9 +44,30 @@ interface UserTableProps {
   sortOrder?: 'asc' | 'desc';
   onSort?: (field: string) => void;
   canEdit?: boolean;
+  /** When true, shows row checkboxes for bulk deactivate (active users only). */
+  selectionMode?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
+  /** Select or deselect the given page ids (`select` true = add, false = remove). */
+  onToggleSelectAll?: (pageIds: string[], select: boolean) => void;
+  /** Current signed-in user id — cannot be selected for deactivate. */
+  currentUserId?: string | null;
 }
 
-export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort, canEdit = true }: UserTableProps) {
+export function UserTable({
+  users,
+  meta,
+  onPageChange,
+  sortBy,
+  sortOrder,
+  onSort,
+  canEdit = true,
+  selectionMode = false,
+  selectedIds = [],
+  onToggleSelect,
+  onToggleSelectAll,
+  currentUserId = null,
+}: UserTableProps) {
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   const t = useTranslations('user');
@@ -83,6 +105,17 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
     return 'staff';
   };
   const isParentUser = (u: User) => invitationTypeForUser(u) === 'parent_account';
+
+  const isSelectableForDeactivate = (u: User) =>
+    u.isActive && u.id !== currentUserId;
+
+  const selectableIds = selectionMode
+    ? users.filter(isSelectableForDeactivate).map((u) => u.id)
+    : [];
+  const allSelectableSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.includes(id));
+  const someSelectableSelected =
+    selectableIds.some((id) => selectedIds.includes(id)) && !allSelectableSelected;
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);
@@ -189,6 +222,20 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
         <Table striped highlightOnHover style={{ minWidth: 800 }}>
           <Table.Thead>
             <Table.Tr>
+              {selectionMode ? (
+                <Table.Th style={{ width: 40 }}>
+                  <Checkbox
+                    id="users-select-all"
+                    checked={allSelectableSelected}
+                    indeterminate={someSelectableSelected}
+                    disabled={selectableIds.length === 0}
+                    onChange={() =>
+                      onToggleSelectAll?.(selectableIds, !allSelectableSelected)
+                    }
+                    aria-label={t('selectAll')}
+                  />
+                </Table.Th>
+              ) : null}
               <SortableHeader field="fullName">{t('name')}</SortableHeader>
               <SortableHeader field="email">{t('loginEmail')}</SortableHeader>
               <SortableHeader field="roles">{t('roles')}</SortableHeader>
@@ -199,6 +246,17 @@ export function UserTable({ users, meta, onPageChange, sortBy, sortOrder, onSort
           <Table.Tbody>
             {users.map((user) => (
               <Table.Tr key={user.id}>
+                {selectionMode ? (
+                  <Table.Td>
+                    <Checkbox
+                      id={`users-select-${user.id}`}
+                      checked={selectedIds.includes(user.id)}
+                      disabled={!isSelectableForDeactivate(user)}
+                      onChange={() => onToggleSelect?.(user.id)}
+                      aria-label={t('selectUser')}
+                    />
+                  </Table.Td>
+                ) : null}
                 <Table.Td>
                   <Group gap={6} wrap="nowrap">
                     <Text fw={500}>{user.fullName}</Text>

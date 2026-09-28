@@ -28,6 +28,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserRolesDto } from './dto/update-user-roles.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
+import { BulkUserStatusDto } from './dto/bulk-user-status.dto';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
 @ApiTags('Users')
@@ -102,6 +103,23 @@ export class UsersController {
   ) {
     await this.usersService.updatePreferences(user.id, dto);
     return { data: { success: true } };
+  }
+
+  @Patch('bulk-status')
+  @UseGuards(JwtAuthGuard, BranchGuard)
+  async bulkUpdateStatus(
+    @Body() input: BulkUserStatusDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    await this.ensureFeatureEditAccess(user, branch.branchId, 'user_management');
+    const data = await this.usersService.bulkUpdateStatus(
+      input.ids,
+      input.isActive,
+      branch.branchId,
+      user.id,
+    );
+    return { data };
   }
 
   @Get(':id')
