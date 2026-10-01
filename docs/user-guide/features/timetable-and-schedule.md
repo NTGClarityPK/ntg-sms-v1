@@ -62,6 +62,7 @@ Teacher substitution display: see [🔄 Teacher Substitution](teacher-substituti
 - Configure [timing templates and subject templates](settings-and-configuration.md) before generating grids.
 - Generate from template after **Mapping → Teacher–Class** is complete.
 - Copy from a pilot section when rolling out a new year group.
+- Period start/end times must sit inside the class **school hours** from the timing template; Alma blocks times outside that range.
 
 ---
 
@@ -69,6 +70,7 @@ Teacher substitution display: see [🔄 Teacher Substitution](teacher-substituti
 
 **Empty timetable:** No slots — run generate or copy; confirm active academic year.
 **Generate fails / no day framework:** Assign a **timing template** to the class under **Settings → Schedule**.
+**Cannot save a period (school hours):** The time range is outside the timing template window — adjust the times or update school hours in **Settings → Schedule**.
 **Teacher sees one section only:** Expected for class teachers without admin timetable scope.
 **Parent timetable wrong child:** Use the selector on **Children Timetable**.
 **No Subject Template Assigned (student view):** Set the optional subject template on the student, or create templates under **Settings → Academic**.

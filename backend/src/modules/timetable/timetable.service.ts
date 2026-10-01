@@ -782,6 +782,43 @@ export class TimetableService {
 
     const sectionRow = classSection as { id: string; class_id: string };
 
+    // Enforce school hours when a timing template is assigned to this class
+    const { data: timingAssignment, error: timingAssignError } = await supabase
+      .from('class_timing_assignments')
+      .select('timing_template_id')
+      .eq('class_id', sectionRow.class_id)
+      .maybeSingle();
+    throwIfDbError(timingAssignError);
+    if (timingAssignment?.timing_template_id) {
+      const { data: timingTemplate, error: timingTemplateError } = await supabase
+        .from('timing_templates')
+        .select('start_time, end_time')
+        .eq('id', timingAssignment.timing_template_id)
+        .maybeSingle();
+      throwIfDbError(timingTemplateError);
+      if (timingTemplate) {
+        const schoolStart = clockTimeToMinutes(
+          (timingTemplate as { start_time: string }).start_time,
+        );
+        const schoolEnd = clockTimeToMinutes(
+          (timingTemplate as { end_time: string }).end_time,
+        );
+        const slotStart = clockTimeToMinutes(input.startTime);
+        const slotEnd = clockTimeToMinutes(input.endTime);
+        if (slotStart < schoolStart || slotEnd > schoolEnd) {
+          const startLabel = String(
+            (timingTemplate as { start_time: string }).start_time,
+          ).slice(0, 5);
+          const endLabel = String(
+            (timingTemplate as { end_time: string }).end_time,
+          ).slice(0, 5);
+          throw new BadRequestException(
+            `Period must be within school hours (${startLabel} – ${endLabel})`,
+          );
+        }
+      }
+    }
+
     let existingStampedTemplateId: string | null | undefined;
     if (input.id) {
       const { data: stampPeek, error: stampErr } = await supabase

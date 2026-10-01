@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Select, Button, Stack, Group, TextInput, Alert, Text, Paper } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
@@ -18,6 +18,20 @@ import { useSubjectTemplate } from '@/hooks/useSubjectTemplates';
 import { useSchoolDays } from '@/hooks/useScheduleSettings';
 import { MultiSelect } from '@mantine/core';
 import { useTranslations } from 'next-intl';
+
+function parseHmToMinutes(time: string): number | null {
+  if (!time) return null;
+  const [hours, minutes] = time.slice(0, 5).split(':').map(Number);
+  if (
+    hours === undefined ||
+    minutes === undefined ||
+    Number.isNaN(hours) ||
+    Number.isNaN(minutes)
+  ) {
+    return null;
+  }
+  return hours * 60 + minutes;
+}
 
 const createSlotSchema = (t: (key: string) => string) =>
   z
@@ -50,10 +64,9 @@ const createSlotSchema = (t: (key: string) => string) =>
     )
     .refine(
       (data) => {
-        const start = data.startTime.split(':').map(Number);
-        const end = data.endTime.split(':').map(Number);
-        const startMinutes = start[0]! * 60 + start[1]!;
-        const endMinutes = end[0]! * 60 + end[1]!;
+        const startMinutes = parseHmToMinutes(data.startTime);
+        const endMinutes = parseHmToMinutes(data.endTime);
+        if (startMinutes === null || endMinutes === null) return false;
         return startMinutes < endMinutes;
       },
       {
@@ -134,6 +147,14 @@ function SlotEditPopoverContent({
   // useSubjectTemplate returns SubjectTemplate as query data (already unwrapped)
   const subjectTemplate = templateData;
 
+  const schoolHoursLabel = useMemo(() => {
+    if (!templateInfo?.startTime || !templateInfo?.endTime) return null;
+    return {
+      start: templateInfo.startTime.slice(0, 5),
+      end: templateInfo.endTime.slice(0, 5),
+    };
+  }, [templateInfo?.startTime, templateInfo?.endTime]);
+
   const assignments = assignmentsData?.data || [];
   const subjects = (subjectsData as { data?: Array<{ id: string; name: string }> })?.data || [];
   const staffResponse = staffData as
@@ -174,6 +195,29 @@ function SlotEditPopoverContent({
     },
     validate: zodResolver(createSlotSchema(t)),
   });
+
+  const schoolHoursError = useMemo(() => {
+    if (!schoolHoursLabel || !templateInfo) return null;
+    const startMinutes = parseHmToMinutes(form.values.startTime);
+    const endMinutes = parseHmToMinutes(form.values.endTime);
+    if (startMinutes === null || endMinutes === null) return null;
+    if (startMinutes >= endMinutes) return null;
+
+    const schoolStart = parseHmToMinutes(templateInfo.startTime);
+    const schoolEnd = parseHmToMinutes(templateInfo.endTime);
+    if (schoolStart === null || schoolEnd === null) return null;
+
+    if (startMinutes < schoolStart || endMinutes > schoolEnd) {
+      return t('validationOutsideSchoolHours', schoolHoursLabel);
+    }
+    return null;
+  }, [
+    form.values.startTime,
+    form.values.endTime,
+    schoolHoursLabel,
+    templateInfo,
+    t,
+  ]);
 
   // When subject has exactly one assigned teacher, fix that teacher (no dropdown)
   const selectedSubjectAssignmentsForEffect = form.values.subjectId
@@ -265,6 +309,8 @@ function SlotEditPopoverContent({
   }, [form.values.startTime, form.values.endTime, form.values.staffId, form.values.slotType, opened]);
 
   const handleSubmit = async (values: typeof form.values) => {
+    if (schoolHoursError) return;
+
     const daysToCreate = isEdit
       ? [dayOfWeek] // When editing, only update the current day
       : [dayOfWeek, ...values.additionalDays.map((d) => Number(d))]; // When creating, include additional days
@@ -474,24 +520,47 @@ function SlotEditPopoverContent({
               {...form.getInputProps('periodNumber')}
             />
 
-            <Group gap="xs">
+            <Group gap="xs" align="flex-start">
               <TextInput
+                id="timetable-slot-start-time"
                 label={t('startTime')}
                 type="time"
                 size="xs"
                 required
                 style={{ flex: 1 }}
+                min={schoolHoursLabel?.start}
+                max={schoolHoursLabel?.end}
                 {...form.getInputProps('startTime')}
+                error={schoolHoursError ? true : form.errors.startTime}
               />
               <TextInput
+                id="timetable-slot-end-time"
                 label={t('endTime')}
                 type="time"
                 size="xs"
                 required
                 style={{ flex: 1 }}
+                min={schoolHoursLabel?.start}
+                max={schoolHoursLabel?.end}
                 {...form.getInputProps('endTime')}
+                error={schoolHoursError ? true : form.errors.endTime}
               />
             </Group>
+
+            {schoolHoursError ? (
+              <Alert
+                id="timetable-slot-school-hours-error"
+                icon={<IconAlertCircle size={16} />}
+                color="red"
+                p="xs"
+              >
+                <Text size="xs">{schoolHoursError}</Text>
+              </Alert>
+            ) : schoolHoursLabel ? (
+              <Text size="xs" c="dimmed">
+                {t('schoolHoursHint', schoolHoursLabel)}
+              </Text>
+            ) : null}
 
             {!isEdit && dayOptions.length > 0 && (
               <MultiSelect
@@ -526,8 +595,8 @@ function SlotEditPopoverContent({
               <Button
                 type="submit"
                 size="xs"
-                loading={createOrUpdate.isPending}
-                disabled={isCheckingConflict}
+                loading={!schoolHoursError && createOrUpdate.isPending}
+                disabled={isCheckingConflict || !!schoolHoursError}
               >
                 {isEdit ? t('update') : t('create')}
               </Button>

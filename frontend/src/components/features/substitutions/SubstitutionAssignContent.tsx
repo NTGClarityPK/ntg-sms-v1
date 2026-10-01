@@ -246,7 +246,12 @@ export function SubstitutionAssignContent() {
               {t('affectedPeriods')}
             </Text>
             {result.affectedSlots.length === 0 ? (
-              <Text c="dimmed">{t('noSuggestions')}</Text>
+              <Alert color="yellow" id="substitution-no-affected-periods">
+                <Stack gap={4}>
+                  <Text fw={600}>{t('noAffectedPeriodsTitle')}</Text>
+                  <Text size="sm">{t('noAffectedPeriodsBody')}</Text>
+                </Stack>
+              </Alert>
             ) : (
               <List size="sm">
                 {result.affectedSlots.map((slot) => (
@@ -264,41 +269,22 @@ export function SubstitutionAssignContent() {
             )}
           </Card>
 
-          <Text fw={600}>{t('suggestedSubstitutes')}</Text>
-          <Text size="sm" c="dimmed">
-            {t('assignHint')}
-          </Text>
-          {result.suggested.length === 0 && result.others.length === 0 ? (
-            <Alert color="yellow">{t('noSuggestions')}</Alert>
-          ) : (
-            <Stack gap="sm">
-              {result.suggested.map((c) => (
-                <SubstituteRow
-                  key={c.staffId}
-                  candidate={c}
-                  selectedId={selectedSubstituteId}
-                  onSelect={handleSelectSubstitute}
-                  onAssignNow={runAssign}
-                  assigning={assignMutation.isPending}
-                  t={t}
-                  colors={colors}
-                />
-              ))}
-            </Stack>
-          )}
-
-          {result.others.length > 0 ? (
+          {result.affectedSlots.length > 0 ? (
             <>
-              <Button
-                id="substitution-toggle-others"
-                variant="subtle"
-                onClick={() => setOthersOpen((o) => !o)}
-              >
-                {t('otherAvailableTeachers')}
-              </Button>
-              <Collapse in={othersOpen}>
+              <Text fw={600}>{t('suggestedSubstitutes')}</Text>
+              <Text size="sm" c="dimmed">
+                {t('assignHint')}
+              </Text>
+              {result.suggested.length === 0 && result.others.length === 0 ? (
+                <Alert color="yellow" id="substitution-no-free-substitutes">
+                  <Stack gap={4}>
+                    <Text fw={600}>{t('noFreeSubstitutesTitle')}</Text>
+                    <Text size="sm">{t('noFreeSubstitutesBody')}</Text>
+                  </Stack>
+                </Alert>
+              ) : (
                 <Stack gap="sm">
-                  {result.others.map((c) => (
+                  {result.suggested.map((c) => (
                     <SubstituteRow
                       key={c.staffId}
                       candidate={c}
@@ -311,11 +297,39 @@ export function SubstitutionAssignContent() {
                     />
                   ))}
                 </Stack>
-              </Collapse>
+              )}
+
+              {result.others.length > 0 ? (
+                <>
+                  <Button
+                    id="substitution-toggle-others"
+                    variant="subtle"
+                    onClick={() => setOthersOpen((o) => !o)}
+                  >
+                    {t('otherAvailableTeachers')}
+                  </Button>
+                  <Collapse in={othersOpen}>
+                    <Stack gap="sm">
+                      {result.others.map((c) => (
+                        <SubstituteRow
+                          key={c.staffId}
+                          candidate={c}
+                          selectedId={selectedSubstituteId}
+                          onSelect={handleSelectSubstitute}
+                          onAssignNow={runAssign}
+                          assigning={assignMutation.isPending}
+                          t={t}
+                          colors={colors}
+                        />
+                      ))}
+                    </Stack>
+                  </Collapse>
+                </>
+              ) : null}
             </>
           ) : null}
 
-          {selectedSubstituteId ? (
+          {selectedSubstituteId && slotIds.length > 0 ? (
             <Paper
               ref={confirmBarRef}
               withBorder

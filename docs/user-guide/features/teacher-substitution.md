@@ -27,6 +27,8 @@ Permissions are set under **Settings → Permissions** (`teacher_substitution`).
 
 ### Quick substitute (today)
 
+Use this section on its own for same-day cover.
+
 1. Choose the **absent teacher** and **absence reason** (sick leave, casual leave, emergency, other).
 2. Click **Find substitute**.
 3. On the assign screen, pick a cover teacher (see below).
@@ -34,7 +36,9 @@ Permissions are set under **Settings → Permissions** (`teacher_substitution`).
 
 ### Planned leave (date range)
 
-1. Select the same absent teacher and reason.
+Use this section on its own for multi-day leave — it has **its own** teacher, reason, and date fields.
+
+1. Select the absent teacher and reason in the Planned leave card.
 2. Choose a **leave date range** (e.g. 1–10 May).
 3. Click **Schedule substitutes**.
 4. The system finds the same timetable periods on **each school day** in that range (matching day of week). Assign substitutes the same way as for a single day.
@@ -104,7 +108,8 @@ You see your upcoming cover: date, period, class, and who you are covering for. 
 ## Tips
 
 - Prefer **Assign & notify** for a single clear choice; use **Select** only when you want to confirm at the bottom.
-- If no substitutes appear, the absent teacher may have no classes that day, or everyone else is already busy.
+- If you see **No class periods to cover**, the absent teacher is not assigned to any class periods on those dates — set them on the **Timetable** first.
+- If you see **No free substitutes**, periods exist but every other teacher is busy at those times (or already marked absent).
 - You cannot assign the absent teacher as their own substitute.
 - The system blocks assigning someone who is already teaching that slot or is marked absent.
 

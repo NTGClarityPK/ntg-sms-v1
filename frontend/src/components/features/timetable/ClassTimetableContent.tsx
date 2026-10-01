@@ -306,7 +306,7 @@ export function ClassTimetableContent({
   }));
 
   const handleReplicateDay = async () => {
-    if (!classSectionId || !sourceDay || targetDays.length === 0) {
+    if (!classSectionId || sourceDay === null || targetDays.length === 0) {
       notifications.show({
         title: t('error'),
         message: t('pleaseSelectSourceAndTarget'),
@@ -709,7 +709,7 @@ export function ClassTimetableContent({
             <Button
               onClick={handleReplicateDay}
               loading={replicateDayMutation.isPending}
-              disabled={!sourceDay || targetDays.length === 0}
+              disabled={sourceDay === null || targetDays.length === 0}
             >
               {t('copy')}
             </Button>
