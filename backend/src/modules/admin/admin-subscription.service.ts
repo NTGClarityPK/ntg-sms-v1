@@ -207,17 +207,11 @@ export class AdminSubscriptionService {
     await this.requireTenant(tenantId);
     await this.subscriptionService.ensureSubscriptionForTenant(tenantId);
 
-    if (dto.paidTrial && dto.accessStartsAt) {
-      throw new BadRequestException(
-        'paidTrial and accessStartsAt are mutually exclusive',
-      );
-    }
-    if (dto.paidTrial && (dto.paidTrialDays === null || dto.paidTrialDays === undefined)) {
-      throw new BadRequestException('paidTrialDays is required when paidTrial is true');
-    }
     if (!dto.paidTrial && dto.paidTrialDays !== null && dto.paidTrialDays !== undefined) {
       throw new BadRequestException('paidTrialDays must be null when paidTrial is false');
     }
+
+    const paidTrialDays = this.resolvePaidTrialDays(dto);
 
     const addonMonthly = (
       enabled: boolean | null,
@@ -257,9 +251,7 @@ export class AdminSubscriptionService {
         dto.googleClassroomMonthly,
       ),
       enterprise_paid_trial_enabled: dto.paidTrial,
-      enterprise_paid_trial_duration_days: dto.paidTrial
-        ? dto.paidTrialDays
-        : null,
+      enterprise_paid_trial_duration_days: paidTrialDays,
       enterprise_pre_trial_setup_fee: dto.preTrialSetupFee ?? 0,
       enterprise_post_trial_setup_fee: dto.postTrialSetupFee ?? 0,
       enterprise_access_starts_at: dto.accessStartsAt,
@@ -315,6 +307,31 @@ export class AdminSubscriptionService {
     throwIfDbError(error);
 
     return { cleared: true };
+  }
+
+  /**
+   * Reach Trial UI often sends paidTrialDays=null and uses trial start →
+   * planned subscription start (accessStartsAt) as the trial window.
+   */
+  private resolvePaidTrialDays(dto: PutEnterpriseOfferDto): number | null {
+    if (!dto.paidTrial) return null;
+
+    if (dto.paidTrialDays != null && dto.paidTrialDays >= 1) {
+      return dto.paidTrialDays;
+    }
+
+    if (dto.trialStartsAt && dto.accessStartsAt) {
+      const start = new Date(dto.trialStartsAt).getTime();
+      const end = new Date(dto.accessStartsAt).getTime();
+      if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+        const days = Math.max(1, Math.round((end - start) / 86_400_000));
+        return days;
+      }
+    }
+
+    throw new BadRequestException(
+      'paidTrialDays is required for a trial offer (or provide trialStartsAt and accessStartsAt so duration can be derived)',
+    );
   }
 
   private async requireTenant(tenantId: string): Promise<{

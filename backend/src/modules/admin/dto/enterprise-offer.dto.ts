@@ -110,7 +110,12 @@ export class PutEnterpriseOfferDto {
   @IsBoolean()
   paidTrial!: boolean;
 
-  @ValidateIf((o: PutEnterpriseOfferDto) => o.paidTrial === true)
+  /**
+   * Reach Ops often sends `null` for Trial and encodes length via
+   * trialStartsAt → accessStartsAt (planned convert). Accept null;
+   * service derives days when needed.
+   */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
   @Type(() => Number)
   @IsNumber()
   @Min(1)
