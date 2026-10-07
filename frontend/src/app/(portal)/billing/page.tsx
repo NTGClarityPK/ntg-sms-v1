@@ -25,9 +25,14 @@ import {
 } from '@/lib/subscription/plan-transition';
 import {
   buildPlanLimitRows,
+  enterpriseOfferAction,
+  formatOfferLimit,
   getIncludedFeatureLabels,
   getPlanPriceDisplay,
   mapTransitionToAction,
+  type PlanActionType,
+  type PlanLimitDisplay,
+  type PlanPriceDisplay,
 } from '@/lib/subscription/billing-plan-display';
 import { BillingCycleToggle } from '@/components/subscription/BillingCycleToggle';
 import { BillingPlanCard } from '@/components/subscription/BillingPlanCard';
@@ -321,6 +326,10 @@ export default function BillingPage() {
                   (subscription.planId !== 'enterprise' ||
                     subscription.enterprisePricing.offerChanged),
               )}
+              applyLoading={acceptEnterprise.isPending}
+              onApplyOffer={() => {
+                void handleEnterpriseAction();
+              }}
             />
 
             {subscription.pendingPlanId && (
@@ -378,20 +387,98 @@ export default function BillingPage() {
               {planCards.map((plan) => {
                 const planId = plan.id;
                 const config = plansById.get(planId);
-                const limits = config
-                  ? buildPlanLimitRows(config.limits, t('unlimited'))
-                  : [];
-                const priceDisplay = getPlanPriceDisplay(plan, cycle, priceLabels);
-                const transition = subscription
-                  ? classifyTransition(
-                      subscription.planId,
-                      subscription.billingCycle,
-                      planId,
-                      cycle,
-                    )
-                  : 'noop';
-                const action = mapTransitionToAction(transition);
-                const isCurrentPlan = subscription.planId === planId;
+                const pricing = subscription.enterprisePricing;
+                const offerLimits = subscription.enterpriseOfferLimits;
+                const offerFeatures = subscription.enterpriseFeatures;
+                const hasPendingOffer = Boolean(
+                  pricing?.enabled && pricing.price && pricing.price > 0,
+                );
+
+                let limits =
+                  config != null
+                    ? buildPlanLimitRows(config.limits, t('unlimited'))
+                    : ([] as PlanLimitDisplay[]);
+                let priceDisplay: PlanPriceDisplay = getPlanPriceDisplay(
+                  plan,
+                  cycle,
+                  priceLabels,
+                );
+                let features = getIncludedFeatureLabels(plan);
+                let action: PlanActionType = mapTransitionToAction(
+                  subscription
+                    ? classifyTransition(
+                        subscription.planId,
+                        subscription.billingCycle,
+                        planId,
+                        cycle,
+                      )
+                    : 'noop',
+                );
+
+                // Enterprise card must show Ops offer terms + accept CTA (not marketing $0)
+                if (planId === 'enterprise' && hasPendingOffer) {
+                  priceDisplay = {
+                    mainPrice: `$${Number(pricing!.price).toLocaleString('en-US', {
+                      maximumFractionDigits: 0,
+                    })}`,
+                    periodSuffix: pricing!.durationMonths
+                      ? `/ ${pricing!.durationMonths} ${t('months')}`
+                      : '',
+                    isCustom: false,
+                    subline: pricing!.paidTrialEnabled
+                      ? t('paidTrialOfferBlurb', {
+                          days: String(pricing!.paidTrialDurationDays ?? ''),
+                        })
+                      : undefined,
+                  };
+                  limits = [
+                    {
+                      labelKey: 'branches',
+                      display: formatOfferLimit(
+                        offerLimits?.branches,
+                        t('unlimited'),
+                      ),
+                    },
+                    {
+                      labelKey: 'students',
+                      display: formatOfferLimit(
+                        offerLimits?.students,
+                        t('unlimited'),
+                      ),
+                    },
+                    {
+                      labelKey: 'storage',
+                      display: formatOfferLimit(
+                        offerLimits?.storageGb,
+                        t('unlimited'),
+                        'gb',
+                      ),
+                    },
+                  ];
+                  features = [
+                    offerFeatures?.fees ? t('addonFees') : null,
+                    offerFeatures?.library ? t('addonLibrary') : null,
+                    offerFeatures?.behavioural ? t('addonBehavioural') : null,
+                    offerFeatures?.uniformInventory ? t('addonInventory') : null,
+                    offerFeatures?.whiteLabel ? t('addonWhiteLabel') : null,
+                    offerFeatures?.googleClassroom ? t('addonGoogleClassroom') : null,
+                  ].filter((x): x is string => Boolean(x));
+                  if (features.length === 0) {
+                    features = [t('enterpriseOfferReady')];
+                  }
+                  action = enterpriseOfferAction({
+                    planId: subscription.planId,
+                    offerEnabled: pricing?.enabled,
+                    offerPrice: pricing?.price,
+                    offerChanged: pricing?.offerChanged,
+                    paidTrialEnabled: pricing?.paidTrialEnabled,
+                    inPaidTrial: pricing?.inPaidTrial,
+                  });
+                }
+
+                const isCurrentPlan =
+                  subscription.planId === planId &&
+                  !(planId === 'enterprise' && pricing?.offerChanged);
 
                 return (
                   <Grid.Col key={plan.name} span={{ base: 12, sm: 6, md: 3 }}>
@@ -400,7 +487,7 @@ export default function BillingPage() {
                       planName={plan.name}
                       price={priceDisplay}
                       limits={limits}
-                      features={getIncludedFeatureLabels(plan)}
+                      features={features}
                       action={action}
                       isCurrentPlan={isCurrentPlan}
                       limitsTitle={t('limitsSection')}
@@ -410,6 +497,9 @@ export default function BillingPage() {
                         downgrade: t('downgrade'),
                         select: t('select'),
                         contactSales: t('contactSales'),
+                        startTrial: t('startTrial'),
+                        applyNewTerms: t('applyNewTerms'),
+                        subscribeEnterprise: t('subscribeEnterprise'),
                       }}
                       loading={
                         (changePlan.isPending && changePlan.variables?.planId === planId) ||

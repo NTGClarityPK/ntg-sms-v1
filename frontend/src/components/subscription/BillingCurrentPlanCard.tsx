@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Box, Card, Group, Stack, Text } from '@mantine/core';
+import { Badge, Box, Button, Card, Group, Stack, Text } from '@mantine/core';
 import { IconCalendar } from '@tabler/icons-react';
 import { useTranslations } from 'next-intl';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -18,11 +18,15 @@ function formatBillingDate(iso: string): string {
 type BillingCurrentPlanCardProps = {
   subscription: Subscription;
   showNewOffer?: boolean;
+  onApplyOffer?: () => void;
+  applyLoading?: boolean;
 };
 
 export function BillingCurrentPlanCard({
   subscription,
   showNewOffer = false,
+  onApplyOffer,
+  applyLoading = false,
 }: BillingCurrentPlanCardProps) {
   const t = useTranslations('billing');
   const colors = useThemeColors();
@@ -117,6 +121,21 @@ export function BillingCurrentPlanCard({
             {formatBillingDate(subscription.currentPeriodEnd)}
           </Text>
         </Group>
+
+        {showNewOffer && onApplyOffer && (
+          <Button
+            id="billing-apply-new-offer"
+            mt="md"
+            loading={applyLoading}
+            disabled={applyLoading}
+            onClick={onApplyOffer}
+          >
+            {subscription.enterprisePricing?.paidTrialEnabled &&
+            subscription.planId !== 'enterprise'
+              ? t('startTrial')
+              : t('applyNewTerms')}
+          </Button>
+        )}
       </Box>
     </Card>
   );

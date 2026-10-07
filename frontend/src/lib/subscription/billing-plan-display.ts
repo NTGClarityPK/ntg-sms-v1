@@ -134,7 +134,10 @@ export type PlanActionType =
   | 'upgrade'
   | 'downgrade'
   | 'select'
-  | 'contact-sales';
+  | 'contact-sales'
+  | 'start-trial'
+  | 'apply-terms'
+  | 'subscribe-enterprise';
 
 export function mapTransitionToAction(type: PlanTransitionType): PlanActionType {
   switch (type) {
@@ -151,6 +154,40 @@ export function mapTransitionToAction(type: PlanTransitionType): PlanActionType 
     default:
       return 'select';
   }
+}
+
+/** Enterprise card CTA when an Ops offer is pending / changed. */
+export function enterpriseOfferAction(input: {
+  planId: string;
+  offerEnabled?: boolean;
+  offerPrice?: number | null;
+  offerChanged?: boolean;
+  paidTrialEnabled?: boolean;
+  inPaidTrial?: boolean;
+}): PlanActionType {
+  if (!input.offerEnabled || !input.offerPrice || input.offerPrice <= 0) {
+    return 'contact-sales';
+  }
+  if (input.paidTrialEnabled && !input.inPaidTrial && input.planId !== 'enterprise') {
+    return 'start-trial';
+  }
+  if (input.planId === 'enterprise' && input.offerChanged) {
+    return 'apply-terms';
+  }
+  if (input.planId !== 'enterprise') {
+    return input.paidTrialEnabled ? 'start-trial' : 'subscribe-enterprise';
+  }
+  return 'subscribe-enterprise';
+}
+
+export function formatOfferLimit(
+  value: number | null | undefined,
+  unlimitedLabel: string,
+  unit?: 'gb',
+): string {
+  if (value === null || value === undefined) return unlimitedLabel;
+  if (unit === 'gb') return `${value} GB`;
+  return String(value);
 }
 
 export function getIncludedFeatureLabels(plan: MarketingPlanRow): string[] {

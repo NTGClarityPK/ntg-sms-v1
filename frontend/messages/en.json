@@ -3190,7 +3190,16 @@
     "offerUpdatedNote": "Your Enterprise offer was updated. Current limits and features stay in effect until you apply the new terms.",
     "startTrial": "Start trial",
     "applyNewTerms": "Apply new terms",
-    "subscribeEnterprise": "Subscribe"
+    "subscribeEnterprise": "Subscribe",
+    "months": "months",
+    "paidTrialOfferBlurb": "{days}-day paid trial available on this offer",
+    "enterpriseOfferReady": "Ops offer ready — review limits and add-ons above",
+    "addonFees": "Fees",
+    "addonLibrary": "Library",
+    "addonBehavioural": "Behavioural",
+    "addonInventory": "Uniform inventory",
+    "addonWhiteLabel": "White label",
+    "addonGoogleClassroom": "Google Classroom"
   },
   "substitution": {
     "title": "Substitution",

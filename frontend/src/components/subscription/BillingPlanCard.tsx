@@ -32,6 +32,9 @@ type BillingPlanCardProps = {
     downgrade: string;
     select: string;
     contactSales: string;
+    startTrial?: string;
+    applyNewTerms?: string;
+    subscribeEnterprise?: string;
   };
   loading?: boolean;
   disabled?: boolean;
@@ -64,7 +67,13 @@ export function BillingPlanCard({
         ? actionLabels.downgrade
         : action === 'contact-sales'
           ? actionLabels.contactSales
-          : actionLabels.select;
+          : action === 'start-trial'
+            ? (actionLabels.startTrial ?? actionLabels.select)
+            : action === 'apply-terms'
+              ? (actionLabels.applyNewTerms ?? actionLabels.select)
+              : action === 'subscribe-enterprise'
+                ? (actionLabels.subscribeEnterprise ?? actionLabels.select)
+                : actionLabels.select;
 
   return (
     <Card

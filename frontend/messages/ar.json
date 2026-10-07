@@ -3993,7 +3993,16 @@
     "offerUpdatedNote": "تم تحديث عرض المؤسسة. تبقى حدودك وميزاتك الحالية سارية حتى تطبق الشروط الجديدة.",
     "startTrial": "بدء التجربة",
     "applyNewTerms": "تطبيق الشروط الجديدة",
-    "subscribeEnterprise": "اشترك"
+    "subscribeEnterprise": "اشترك",
+    "months": "أشهر",
+    "paidTrialOfferBlurb": "تجربة مدفوعة لمدة {days} يوم متاحة في هذا العرض",
+    "enterpriseOfferReady": "عرض Ops جاهز — راجع الحدود والإضافات أعلاه",
+    "addonFees": "الرسوم",
+    "addonLibrary": "المكتبة",
+    "addonBehavioural": "السلوك",
+    "addonInventory": "مخزون الزي",
+    "addonWhiteLabel": "العلامة البيضاء",
+    "addonGoogleClassroom": "Google Classroom"
   },
   "substitution": {
     "title": "الإحلال",
