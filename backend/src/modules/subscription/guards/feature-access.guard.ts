@@ -8,7 +8,6 @@ import { Reflector } from '@nestjs/core';
 import type { CurrentBranchContext } from '../../../common/decorators/current-branch.decorator';
 import type { CurrentUserPayload } from '../../../common/decorators/current-user.decorator';
 import type { PlanFeatures } from '../plan-config';
-import { parsePlanId, planHasFeature } from '../plan-config';
 import { SubscriptionService } from '../subscription.service';
 import { SubscriptionFeatureForbiddenException } from '../subscription.errors';
 
@@ -35,13 +34,11 @@ export class FeatureAccessGuard implements CanActivate {
       user?: CurrentUserPayload;
       branch?: CurrentBranchContext;
     }>();
-    const user = request.user;
     const tenantId = request.branch?.tenantId;
     if (!tenantId) return false;
 
-    const subscription = await this.subscriptionService.getByTenantId(tenantId);
-    const planId = parsePlanId(subscription.planId);
-    if (!planId || !planHasFeature(planId, requiredFeature)) {
+    const { features } = await this.subscriptionService.getResolvedFeatures(tenantId);
+    if (!features[requiredFeature]) {
       throw new SubscriptionFeatureForbiddenException(requiredFeature);
     }
     return true;

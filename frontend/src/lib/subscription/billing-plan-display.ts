@@ -15,7 +15,7 @@ export type MarketingPlanRow = {
 };
 
 export type PlanLimitDisplay = {
-  labelKey: 'branches' | 'students' | 'staff' | 'classes';
+  labelKey: 'branches' | 'students' | 'storage';
   display: string;
 };
 
@@ -52,21 +52,28 @@ export function buildPlanLimitRows(
   limits: {
     branches: number;
     students: number;
-    staff: number;
-    classes: number;
+    storageMB: number;
   },
   unlimitedLabel: string,
 ): PlanLimitDisplay[] {
-  const rows: Array<{ labelKey: PlanLimitDisplay['labelKey']; value: number }> = [
-    { labelKey: 'branches', value: limits.branches },
-    { labelKey: 'students', value: limits.students },
-    { labelKey: 'staff', value: limits.staff },
-    { labelKey: 'classes', value: limits.classes },
+  const storageDisplay =
+    limits.storageMB === -1
+      ? unlimitedLabel
+      : limits.storageMB >= 1024
+        ? `${(limits.storageMB / 1024).toFixed(limits.storageMB % 1024 === 0 ? 0 : 1)} GB`
+        : `${limits.storageMB} MB`;
+
+  return [
+    {
+      labelKey: 'branches',
+      display: formatLimitValue(limits.branches, unlimitedLabel),
+    },
+    {
+      labelKey: 'students',
+      display: formatLimitValue(limits.students, unlimitedLabel),
+    },
+    { labelKey: 'storage', display: storageDisplay },
   ];
-  return rows.map(({ labelKey, value }) => ({
-    labelKey,
-    display: formatLimitValue(value, unlimitedLabel),
-  }));
 }
 
 export type PlanPriceLabelFormatters = {

@@ -28,6 +28,7 @@ Canonical examples live in `backend/.env.example`. Never commit real `.env` file
 | `*_JOB_ENABLED` flags | No | Background jobs (invitations expiry, substitution reminders, tenant deletion, late fees, subscription end-of-period) |
 | `REACH_API_KEY` | No* | Reach Support API key (same secret as Reach `SUPPORT_ALMA_API_KEY`; *required for `/api/v1/support/*`) |
 | `REACH_BASE_URL` | No* | Reach API origin, no trailing slash or `/api` suffix (*required for support routes) |
+| `ADMIN_API_KEY` | No* | Inbound Ops Alma admin API (`x-api-key`). Reach stores the matching value as `ALMA_PROD_ADMIN_API_KEY` (or staging equivalent). *Required for `/api/v1/admin/*`. Returns 503 if unset. |
 
 ## Frontend (`frontend/.env.local`)
 

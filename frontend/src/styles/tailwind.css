@@ -11,3 +11,19 @@
     text-decoration: none;
   }
 }
+
+@keyframes alma-new-offer-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new-offer-badge-pulse {
+    animation: none !important;
+  }
+}

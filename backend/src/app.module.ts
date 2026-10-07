@@ -54,6 +54,7 @@ import { PromotionPlacementModule } from './modules/promotion-placement/promotio
 import { SetupWizardModule } from './modules/setup-wizard/setup-wizard.module';
 import { FeesModule } from './modules/fees/fees.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { IdCardsModule } from './modules/id-cards/id-cards.module';
 import { DataExportModule } from './modules/data-export/data-export.module';
 import { SubstitutionsModule } from './modules/substitutions/substitutions.module';
@@ -117,6 +118,7 @@ import { SupportModule } from './modules/support/support.module';
     SetupWizardModule,
     FeesModule,
     SubscriptionModule,
+    AdminModule,
     IdCardsModule,
     DataExportModule,
     SubstitutionsModule,

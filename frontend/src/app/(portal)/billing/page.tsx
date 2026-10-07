@@ -36,6 +36,7 @@ import { BillingCurrentPlanCard } from '@/components/subscription/BillingCurrent
 import { BillingUsageCard } from '@/components/subscription/BillingUsageCard';
 import {
   subscriptionKeys,
+  useAcceptEnterpriseOffer,
   useChangePlan,
   useClearPendingPlanChange,
   useConfirmCheckout,
@@ -62,6 +63,7 @@ export default function BillingPage() {
     useSubscriptionUsage(true);
   const { data: planConfigs } = useSubscriptionPlans();
   const changePlan = useChangePlan();
+  const acceptEnterprise = useAcceptEnterpriseOffer();
   const clearPending = useClearPendingPlanChange();
   const confirmCheckout = useConfirmCheckout();
   const paymentHandledRef = useRef(false);
@@ -145,8 +147,7 @@ export default function BillingPage() {
     () => ({
       branches: t('branches'),
       students: t('students'),
-      staff: t('staff'),
-      classes: t('classes'),
+      storage: t('storage'),
     }),
     [t],
   );
@@ -170,9 +171,57 @@ export default function BillingPage() {
 
   const isLoading = subLoading || usageLoading;
 
+  const handleEnterpriseAction = async () => {
+    const pricing = subscription?.enterprisePricing;
+    if (!pricing?.enabled || !pricing.price) {
+      window.open('/contact', '_blank');
+      return;
+    }
+    try {
+      const mode = pricing.paidTrialEnabled && !pricing.inPaidTrial
+        ? 'start_trial'
+        : pricing.offerChanged && subscription?.planId === 'enterprise'
+          ? 'apply_terms'
+          : 'subscribe';
+      const result = await acceptEnterprise.mutateAsync(mode);
+      switch (result.type) {
+        case 'upgrade':
+          notifications.show({
+            message:
+              mode === 'start_trial'
+                ? t('enterpriseTrialStarted')
+                : mode === 'apply_terms'
+                  ? t('enterpriseTermsApplied')
+                  : t('enterpriseSubscribed'),
+            color: 'green',
+          });
+          void refetchUsage();
+          break;
+        case 'downgrade-scheduled':
+          notifications.show({
+            message: t('planDowngraded', {
+              date: result.effectiveDate
+                ? new Date(result.effectiveDate).toLocaleDateString()
+                : '',
+            }),
+            color: 'yellow',
+          });
+          break;
+        case 'checkout_required':
+          notifications.show({ message: t('enterprisePaymentRequired'), color: 'yellow' });
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      const { title, message } = getSubscriptionChangePlanErrorMessage(error, t);
+      notifications.show({ title, message, color: 'red' });
+    }
+  };
+
   const handlePlanChange = async (planId: PlanId) => {
     if (planId === 'enterprise') {
-      window.open('/contact', '_blank');
+      await handleEnterpriseAction();
       return;
     }
     try {
@@ -265,7 +314,14 @@ export default function BillingPage() {
           <Alert color="red">{(subError as Error).message}</Alert>
         ) : (
           <>
-            <BillingCurrentPlanCard subscription={subscription} />
+            <BillingCurrentPlanCard
+              subscription={subscription}
+              showNewOffer={Boolean(
+                subscription.enterprisePricing?.enabled &&
+                  (subscription.planId !== 'enterprise' ||
+                    subscription.enterprisePricing.offerChanged),
+              )}
+            />
 
             {subscription.pendingPlanId && (
               <Alert
@@ -356,10 +412,11 @@ export default function BillingPage() {
                         contactSales: t('contactSales'),
                       }}
                       loading={
-                        changePlan.isPending && changePlan.variables?.planId === planId
+                        (changePlan.isPending && changePlan.variables?.planId === planId) ||
+                        (planId === 'enterprise' && acceptEnterprise.isPending)
                       }
                       onAction={() => {
-                        if (planId === 'enterprise' || action === 'contact-sales') {
+                        if (action === 'contact-sales' && planId !== 'enterprise') {
                           window.open('/contact', '_blank');
                           return;
                         }

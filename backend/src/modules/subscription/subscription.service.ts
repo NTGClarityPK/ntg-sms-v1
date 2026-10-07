@@ -14,11 +14,9 @@ import { SupabaseConfig } from '../../common/config/supabase.config';
 import {
   BillingCycle,
   canDowngrade,
-  exceedsLimit,
   getPlanConfig,
   listPlanConfigs,
   parsePlanId,
-  planHasFeature,
   PlanId,
   type PlanFeatures,
   type PlanLimits,
@@ -41,8 +39,18 @@ import { SubscriptionInvoiceService } from './subscription-invoice.service';
 import { SubscriptionStripeService } from './subscription-stripe.service';
 import { isStripeConfigured } from './stripe-config';
 import { calculateSubscriptionInvoiceAmount } from './plan-pricing';
+import {
+  clearEnterpriseSnapshotPatch,
+  ENTERPRISE_SELECT_COLUMNS,
+  enterpriseOfferDiffersFromActiveTerms,
+  resolvePlanFeatures,
+  resolvePlanLimits,
+  snapshotFromOffer,
+  toNum,
+  type EnterpriseSubscriptionFields,
+} from './enterprise-terms';
 
-type SubscriptionRow = {
+type SubscriptionRow = EnterpriseSubscriptionFields & {
   id: string;
   tenant_id: string;
   plan_id: string;
@@ -94,21 +102,199 @@ export class SubscriptionService {
   }
 
   async getByTenantId(tenantId: string): Promise<SubscriptionDto> {
+    const row = await this.fetchSubscriptionRow(tenantId);
+    return this.mapSubscription(row);
+  }
+
+  async fetchSubscriptionRow(tenantId: string): Promise<SubscriptionRow> {
     const supabase = this.supabaseConfig.getClient();
     const { data, error } = await supabase
       .from('subscriptions')
-      .select(
-        'id, tenant_id, plan_id, billing_cycle, status, current_period_start, current_period_end, trial_ends_at, pending_plan_id, pending_billing_cycle, cancelled_at, notes',
-      )
+      .select(ENTERPRISE_SELECT_COLUMNS)
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
     throwIfDbError(error);
     if (!data) {
       await this.ensureSubscriptionForTenant(tenantId);
-      return this.getByTenantId(tenantId);
+      return this.fetchSubscriptionRow(tenantId);
     }
-    return this.mapSubscription(data as SubscriptionRow);
+    return data as unknown as SubscriptionRow;
+  }
+
+  async getResolvedFeatures(tenantId: string): Promise<{
+    planId: PlanId;
+    features: PlanFeatures;
+  }> {
+    const row = await this.fetchSubscriptionRow(tenantId);
+    const planId = parsePlanId(row.plan_id) ?? PlanId.FREE;
+    return { planId, features: resolvePlanFeatures(planId, row) };
+  }
+
+  async getPortalSubscriptionDetail(tenantId: string): Promise<Record<string, unknown>> {
+    const row = await this.fetchSubscriptionRow(tenantId);
+    const planId = parsePlanId(row.plan_id) ?? PlanId.FREE;
+    const features = resolvePlanFeatures(planId, row);
+    const limits = resolvePlanLimits(planId, row);
+    const offerEnabled = Boolean(row.enterprise_enabled);
+    const offerChanged = enterpriseOfferDiffersFromActiveTerms(row);
+
+    return {
+      ...this.mapSubscription(row),
+      planFeatures: features,
+      planLimits: limits,
+      setupFeePaidUsd: toNum(row.setup_fee_paid_usd) ?? 0,
+      firstSubscriptionStartDate: row.first_subscription_start_date,
+      accessStartsAt: row.access_starts_at,
+      enterprisePricing: {
+        enabled: offerEnabled,
+        price: toNum(row.enterprise_price),
+        durationMonths: row.enterprise_duration_months,
+        currentPrice: toNum(row.current_enterprise_price),
+        currentDurationMonths: row.current_enterprise_duration_months,
+        setupFee: toNum(row.enterprise_setup_fee) ?? 0,
+        paidTrialEnabled: Boolean(row.enterprise_paid_trial_enabled),
+        paidTrialDurationDays: row.enterprise_paid_trial_duration_days,
+        preTrialSetupFee: toNum(row.enterprise_pre_trial_setup_fee) ?? 0,
+        postTrialSetupFee: toNum(row.enterprise_post_trial_setup_fee) ?? 0,
+        inPaidTrial: Boolean(row.enterprise_in_paid_trial),
+        offerChanged,
+        accessStartsAt: row.enterprise_access_starts_at,
+      },
+      enterpriseOfferLimits: {
+        branches: row.enterprise_branches_limit,
+        students: row.enterprise_students_limit,
+        storageGb: toNum(row.enterprise_storage_gb_limit),
+      },
+      enterpriseLimits: {
+        branches: row.current_enterprise_branches_limit,
+        students: row.current_enterprise_students_limit,
+        storageGb: toNum(row.current_enterprise_storage_gb_limit),
+      },
+      enterpriseFeatures: {
+        fees: Boolean(row.enterprise_fees_enabled),
+        library: Boolean(row.enterprise_library_enabled),
+        behavioural: Boolean(row.enterprise_behavioural_enabled),
+        uniformInventory: Boolean(row.enterprise_uniform_inventory_enabled),
+        whiteLabel: Boolean(row.enterprise_white_label_enabled),
+        googleClassroom: Boolean(row.enterprise_google_classroom_enabled),
+      },
+    };
+  }
+
+  /**
+   * Accept Ops enterprise offer (trial / subscribe / apply new terms).
+   */
+  async acceptEnterpriseOffer(
+    tenantId: string,
+    mode: 'start_trial' | 'subscribe' | 'apply_terms',
+  ): Promise<ChangePlanResultDto> {
+    const row = await this.fetchSubscriptionRow(tenantId);
+    if (!row.enterprise_enabled || !toNum(row.enterprise_price)) {
+      throw new BadRequestException('No enterprise offer is available');
+    }
+
+    const setupList =
+      mode === 'start_trial'
+        ? (toNum(row.enterprise_pre_trial_setup_fee) ?? 0)
+        : mode === 'subscribe' && row.enterprise_paid_trial_enabled
+          ? (toNum(row.enterprise_post_trial_setup_fee) ?? 0)
+          : (toNum(row.enterprise_setup_fee) ?? 0);
+    const paid = toNum(row.setup_fee_paid_usd) ?? 0;
+    const due = Math.max(0, setupList - paid);
+
+    const currentPrice = toNum(row.current_enterprise_price);
+    const offerPrice = toNum(row.enterprise_price) ?? 0;
+    if (
+      mode === 'apply_terms' &&
+      currentPrice !== null &&
+      offerPrice < currentPrice
+    ) {
+      const supabase = this.supabaseConfig.getClient();
+      await supabase
+        .from('subscriptions')
+        .update({
+          pending_plan_id: PlanId.ENTERPRISE,
+          pending_billing_cycle: BillingCycle.MONTHLY,
+        })
+        .eq('tenant_id', tenantId);
+      return {
+        type: 'downgrade-scheduled',
+        message: 'Enterprise term downgrade scheduled for end of billing period',
+        effectiveDate: row.current_period_end,
+        subscription: await this.getByTenantId(tenantId),
+      };
+    }
+
+    if (due > 0 && isStripeConfigured()) {
+      return {
+        type: 'checkout_required',
+        message: 'Payment required to accept enterprise offer',
+        checkoutUrl: undefined,
+      };
+    }
+
+    return this.applyEnterpriseAcceptance(tenantId, mode, setupList);
+  }
+
+  async applyEnterpriseAcceptance(
+    tenantId: string,
+    mode: 'start_trial' | 'subscribe' | 'apply_terms',
+    setupListPrice = 0,
+  ): Promise<ChangePlanResultDto> {
+    const row = await this.fetchSubscriptionRow(tenantId);
+    const now = new Date();
+    const durationMonths = row.enterprise_duration_months ?? 12;
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + durationMonths);
+
+    const paidSoFar = toNum(row.setup_fee_paid_usd) ?? 0;
+    const newWatermark = Math.max(paidSoFar, setupListPrice);
+
+    const trialDays = row.enterprise_paid_trial_duration_days ?? 14;
+    const trialEnds =
+      mode === 'start_trial'
+        ? new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+
+    const patch: Record<string, unknown> = {
+      ...snapshotFromOffer(row),
+      plan_id: PlanId.ENTERPRISE,
+      billing_cycle: BillingCycle.MONTHLY,
+      status: mode === 'start_trial' ? 'trial' : 'active',
+      current_period_start: now.toISOString(),
+      current_period_end: periodEnd.toISOString(),
+      trial_ends_at: trialEnds,
+      enterprise_in_paid_trial: mode === 'start_trial',
+      pending_plan_id: null,
+      pending_billing_cycle: null,
+      setup_fee_paid_usd: newWatermark,
+    };
+
+    if (!row.first_subscription_start_date) {
+      patch.first_subscription_start_date = now.toISOString().slice(0, 10);
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .update(patch)
+      .eq('tenant_id', tenantId)
+      .select(ENTERPRISE_SELECT_COLUMNS)
+      .single();
+    throwIfDbError(error);
+    if (!data) throw new BadRequestException('Failed to accept enterprise offer');
+
+    return {
+      type: 'upgrade',
+      message:
+        mode === 'start_trial'
+          ? 'Enterprise trial started'
+          : mode === 'apply_terms'
+            ? 'Enterprise terms applied'
+            : 'Enterprise subscription activated',
+      subscription: this.mapSubscription(data as unknown as SubscriptionRow),
+    };
   }
 
   async ensureSubscriptionForTenant(tenantId: string): Promise<void> {
@@ -281,29 +467,49 @@ export class SubscriptionService {
     const now = new Date();
     const periodEnd = this.calculatePeriodEnd(now, targetCycle);
     const supabase = this.supabaseConfig.getClient();
+    const current = await this.fetchSubscriptionRow(tenantId);
+
+    const leavingEnterprise =
+      current.plan_id === PlanId.ENTERPRISE && targetPlan !== PlanId.ENTERPRISE;
+
+    const enteringEnterpriseFromPending =
+      targetPlan === PlanId.ENTERPRISE &&
+      current.enterprise_enabled &&
+      toNum(current.enterprise_price) !== null;
+
+    const updatePatch: Record<string, unknown> = {
+      plan_id: targetPlan,
+      billing_cycle: targetCycle,
+      current_period_start: now.toISOString(),
+      current_period_end: periodEnd.toISOString(),
+      pending_plan_id: null,
+      pending_billing_cycle: null,
+      status: 'active',
+    };
+
+    if (leavingEnterprise) {
+      Object.assign(updatePatch, clearEnterpriseSnapshotPatch());
+    } else if (enteringEnterpriseFromPending) {
+      Object.assign(updatePatch, snapshotFromOffer(current));
+      if (!current.first_subscription_start_date) {
+        updatePatch.first_subscription_start_date = now
+          .toISOString()
+          .slice(0, 10);
+      }
+    }
 
     const { data, error } = await supabase
       .from('subscriptions')
-      .update({
-        plan_id: targetPlan,
-        billing_cycle: targetCycle,
-        current_period_start: now.toISOString(),
-        current_period_end: periodEnd.toISOString(),
-        pending_plan_id: null,
-        pending_billing_cycle: null,
-        status: 'active',
-      })
+      .update(updatePatch)
       .eq('tenant_id', tenantId)
-      .select(
-        'id, tenant_id, plan_id, billing_cycle, status, current_period_start, current_period_end, trial_ends_at, pending_plan_id, pending_billing_cycle, cancelled_at, notes',
-      )
+      .select(ENTERPRISE_SELECT_COLUMNS)
       .single();
 
     throwIfDbError(error);
     if (!data) throw new BadRequestException('Failed to upgrade plan');
 
-    const row = data as SubscriptionRow;
-    if (!options?.skipInvoiceCreation) {
+    const row = data as unknown as SubscriptionRow;
+    if (!options?.skipInvoiceCreation && targetPlan !== PlanId.ENTERPRISE) {
       const usage = await this.getUsageWithLimits(tenantId, true);
       await this.subscriptionInvoiceService.ensurePeriodInvoice({
         tenantId,
@@ -333,11 +539,7 @@ export class SubscriptionService {
     const { allowed, reasons } = canDowngrade(targetPlan, {
       branches: usagePayload.usage.branchesUsed,
       students: usagePayload.usage.studentsUsed,
-      staff: usagePayload.usage.staffUsed,
-      classes: usagePayload.usage.classesUsed,
       storageMB: usagePayload.usage.storageUsedMb,
-      monthlyReports: usagePayload.usage.reportsThisMonth,
-      monthlySMS: usagePayload.usage.smsThisMonth,
     });
     if (!allowed) {
       throw new DowngradeNotAllowedException(reasons);
@@ -352,9 +554,7 @@ export class SubscriptionService {
         pending_billing_cycle: targetCycle,
       })
       .eq('tenant_id', tenantId)
-      .select(
-        'id, tenant_id, plan_id, billing_cycle, status, current_period_start, current_period_end, trial_ends_at, pending_plan_id, pending_billing_cycle, cancelled_at, notes',
-      )
+      .select(ENTERPRISE_SELECT_COLUMNS)
       .single();
 
     throwIfDbError(error);
@@ -364,7 +564,7 @@ export class SubscriptionService {
       type: 'downgrade-scheduled',
       message: `Downgrade to ${targetPlan} scheduled for end of billing period`,
       effectiveDate: subscription.currentPeriodEnd,
-      subscription: this.mapSubscription(data as SubscriptionRow),
+      subscription: this.mapSubscription(data as unknown as SubscriptionRow),
     };
   }
 
@@ -387,23 +587,17 @@ export class SubscriptionService {
     if (refresh) {
       await this.syncUsage(tenantId);
     }
-    const subscription = await this.getByTenantId(tenantId);
-    const planId = parsePlanId(subscription.planId) ?? PlanId.FREE;
-    const limits = getPlanConfig(planId).limits;
+    const row = await this.fetchSubscriptionRow(tenantId);
+    const planId = parsePlanId(row.plan_id) ?? PlanId.FREE;
+    const limits = resolvePlanLimits(planId, row);
 
     const supabase = this.supabaseConfig.getClient();
-    const { data: subRow } = await supabase
-      .from('subscriptions')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .single();
-
     const { data: usageRow, error } = await supabase
       .from('subscription_usage')
       .select(
         'branches_used, students_used, staff_used, classes_used, storage_used_mb, reports_this_month, sms_this_month, last_reset_at',
       )
-      .eq('subscription_id', subRow?.id ?? '')
+      .eq('subscription_id', row.id)
       .maybeSingle();
 
     throwIfDbError(error);
@@ -531,20 +725,22 @@ export class SubscriptionService {
     proposedValue: number,
     _userRoles?: string[],
   ): Promise<void> {
-    const subscription = await this.getByTenantId(tenantId);
-    const planId = parsePlanId(subscription.planId) ?? PlanId.FREE;
-    if (!exceedsLimit(planId, metric, proposedValue)) return;
+    // Only enforce branches / students / storage per product decision
+    if (metric !== 'branches' && metric !== 'students' && metric !== 'storageMB') {
+      return;
+    }
 
-    const limit = getPlanConfig(planId).limits[metric];
+    const row = await this.fetchSubscriptionRow(tenantId);
+    const planId = parsePlanId(row.plan_id) ?? PlanId.FREE;
+    const limits = resolvePlanLimits(planId, row);
+    const limit = limits[metric];
+    if (limit === -1 || proposedValue <= limit) return;
+
     const usage = await this.getUsageWithLimits(tenantId, true);
-    const usedMap: Record<keyof PlanLimits, number> = {
+    const usedMap: Record<'branches' | 'students' | 'storageMB', number> = {
       branches: usage.usage.branchesUsed,
       students: usage.usage.studentsUsed,
-      staff: usage.usage.staffUsed,
-      classes: usage.usage.classesUsed,
       storageMB: usage.usage.storageUsedMb,
-      monthlyReports: usage.usage.reportsThisMonth,
-      monthlySMS: usage.usage.smsThisMonth,
     };
     throw new SubscriptionLimitForbiddenException(metric, limit, usedMap[metric]);
   }
@@ -554,9 +750,8 @@ export class SubscriptionService {
     feature: keyof PlanFeatures,
     _userRoles?: string[],
   ): Promise<void> {
-    const subscription = await this.getByTenantId(tenantId);
-    const planId = parsePlanId(subscription.planId) ?? PlanId.FREE;
-    if (!planHasFeature(planId, feature)) {
+    const { features } = await this.getResolvedFeatures(tenantId);
+    if (!features[feature]) {
       throw new SubscriptionFeatureForbiddenException(feature);
     }
   }

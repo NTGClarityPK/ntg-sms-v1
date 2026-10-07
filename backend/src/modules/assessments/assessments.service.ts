@@ -694,6 +694,22 @@ export class AssessmentsService {
   ): Promise<AssessmentDto> {
     const supabase = this.supabaseConfig.getClient();
 
+    if (tenantId) {
+      const { data: tenantLock } = await supabase
+        .from('tenants')
+        .select('assessments_creation_locked')
+        .eq('id', tenantId)
+        .maybeSingle();
+      if (
+        (tenantLock as { assessments_creation_locked?: boolean } | null)
+          ?.assessments_creation_locked
+      ) {
+        throw new ForbiddenException(
+          'Assessment creation is locked for this school. Contact support.',
+        );
+      }
+    }
+
     const MATERIALS_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB total for materials
     if (input.draftId) {
       const draftTotal = await this.getDraftTotalSizeBytes(input.draftId, branchId);

@@ -27,13 +27,18 @@ import { LinkAssessmentGoogleDto } from './dto/link-assessment.dto';
 import { QuerySyncHistoryDto } from './dto/query-sync-history.dto';
 import { UpdateGoogleWorkspaceSettingsDto } from './dto/update-settings.dto';
 import { GoogleWorkspaceService } from './google-workspace.service';
+import {
+  FeatureAccessGuard,
+  RequiresFeature,
+} from '../subscription/guards/feature-access.guard';
 
 const FEATURE_CODE = 'google_classroom_integration';
 const ADMIN_ROLES = new Set(['school_admin', 'principal']);
 
 @ApiTags('Google Workspace')
 @Controller('api/v1/google-workspace')
-@UseGuards(JwtAuthGuard, BranchGuard)
+@UseGuards(JwtAuthGuard, BranchGuard, FeatureAccessGuard)
+@RequiresFeature('hasGoogleClassroom')
 export class GoogleWorkspaceController {
   constructor(
     private readonly googleWorkspaceService: GoogleWorkspaceService,

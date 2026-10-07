@@ -3982,7 +3982,18 @@
     "invoiceStatus_open": "مفتوحة",
     "invoiceStatus_paid": "مدفوعة",
     "invoiceStatus_void": "ملغاة",
-    "invoiceStatus_uncollectible": "غير قابلة للتحصيل"
+    "invoiceStatus_uncollectible": "غير قابلة للتحصيل",
+    "newOffer": "عرض جديد",
+    "newOfferBadge": "عرض جديد",
+    "enterpriseTrialStarted": "بدأت فترة تجربة المؤسسة",
+    "enterpriseTermsApplied": "تم تطبيق شروط المؤسسة",
+    "enterpriseSubscribed": "تم تفعيل اشتراك المؤسسة",
+    "enterprisePaymentRequired": "يلزم الدفع لقبول عرض المؤسسة. تواصل مع الدعم إذا لم يتوفر الدفع الإلكتروني.",
+    "inPaidTrial": "أنت حالياً في فترة تجربة مدفوعة للمؤسسة.",
+    "offerUpdatedNote": "تم تحديث عرض المؤسسة. تبقى حدودك وميزاتك الحالية سارية حتى تطبق الشروط الجديدة.",
+    "startTrial": "بدء التجربة",
+    "applyNewTerms": "تطبيق الشروط الجديدة",
+    "subscribeEnterprise": "اشترك"
   },
   "substitution": {
     "title": "الإحلال",

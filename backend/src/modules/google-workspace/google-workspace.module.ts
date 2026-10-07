@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SupabaseConfig } from '../../common/config/supabase.config';
 import { RubricsModule } from '../rubrics/rubrics.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 import { GoogleWorkspaceController } from './google-workspace.controller';
 import { GoogleWorkspaceOAuthController } from './google-workspace-oauth.controller';
 import { GoogleWorkspaceService } from './google-workspace.service';
@@ -11,7 +12,7 @@ import { GradePullService } from './services/grade-pull.service';
 import { TokenEncryptionService } from './services/token-encryption.service';
 
 @Module({
-  imports: [ConfigModule, RubricsModule],
+  imports: [ConfigModule, RubricsModule, SubscriptionModule],
   controllers: [GoogleWorkspaceController, GoogleWorkspaceOAuthController],
   providers: [
     GoogleWorkspaceService,

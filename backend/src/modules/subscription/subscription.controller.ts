@@ -45,17 +45,36 @@ export class SubscriptionController {
 
   @Get('current-plan')
   async getCurrentPlanId(@CurrentBranch() branch: CurrentBranchContext) {
-    const subscription = await this.subscriptionService.getByTenantId(
+    const resolved = await this.subscriptionService.getResolvedFeatures(
       this.requireTenantId(branch),
     );
-    return { data: { planId: subscription.planId } };
+    return {
+      data: {
+        planId: resolved.planId,
+        features: resolved.features,
+      },
+    };
   }
 
   @Get()
   @UseGuards(SchoolAdminGuard)
   async getSubscription(@CurrentBranch() branch: CurrentBranchContext) {
-    const data = await this.subscriptionService.getByTenantId(this.requireTenantId(branch));
+    const data = await this.subscriptionService.getPortalSubscriptionDetail(
+      this.requireTenantId(branch),
+    );
     return { data };
+  }
+
+  @Post('accept-enterprise')
+  @UseGuards(SchoolAdminGuard)
+  acceptEnterprise(
+    @CurrentBranch() branch: CurrentBranchContext,
+    @Body() body: { mode?: 'start_trial' | 'subscribe' | 'apply_terms' },
+  ) {
+    return this.subscriptionService.acceptEnterpriseOffer(
+      this.requireTenantId(branch),
+      body.mode ?? 'subscribe',
+    ).then((data) => ({ data }));
   }
 
   @Get('invoices')

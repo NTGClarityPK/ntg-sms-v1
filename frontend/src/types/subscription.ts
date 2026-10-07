@@ -14,6 +14,14 @@ export interface Subscription {
   pendingBillingCycle?: BillingCycle;
   cancelledAt?: string;
   notes?: string;
+  planFeatures?: PlanFeatures;
+  enterprisePricing?: EnterprisePricing;
+  enterpriseOfferLimits?: EnterpriseLimits;
+  enterpriseLimits?: EnterpriseLimits;
+  enterpriseFeatures?: EnterpriseAddonFlags;
+  setupFeePaidUsd?: number;
+  firstSubscriptionStartDate?: string | null;
+  accessStartsAt?: string | null;
 }
 
 export interface SubscriptionUsage {
@@ -50,6 +58,38 @@ export interface PlanFeatures {
   hasBehavioralTracking: boolean;
   hasLibraryManagement: boolean;
   hasInventoryManagement: boolean;
+  hasGoogleClassroom: boolean;
+}
+
+export interface EnterprisePricing {
+  enabled: boolean;
+  price: number | null;
+  durationMonths: number | null;
+  currentPrice: number | null;
+  currentDurationMonths: number | null;
+  setupFee: number;
+  paidTrialEnabled: boolean;
+  paidTrialDurationDays: number | null;
+  preTrialSetupFee: number;
+  postTrialSetupFee: number;
+  inPaidTrial: boolean;
+  offerChanged: boolean;
+  accessStartsAt: string | null;
+}
+
+export interface EnterpriseAddonFlags {
+  fees: boolean;
+  library: boolean;
+  behavioural: boolean;
+  uniformInventory: boolean;
+  whiteLabel: boolean;
+  googleClassroom: boolean;
+}
+
+export interface EnterpriseLimits {
+  branches: number | null;
+  students: number | null;
+  storageGb: number | null;
 }
 
 export interface PlanConfig {

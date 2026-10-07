@@ -3179,7 +3179,18 @@
     "invoiceStatus_open": "OPEN",
     "invoiceStatus_paid": "PAID",
     "invoiceStatus_void": "VOID",
-    "invoiceStatus_uncollectible": "UNCOLLECTIBLE"
+    "invoiceStatus_uncollectible": "UNCOLLECTIBLE",
+    "newOffer": "New offer",
+    "newOfferBadge": "New offer",
+    "enterpriseTrialStarted": "Enterprise trial started",
+    "enterpriseTermsApplied": "Enterprise terms applied",
+    "enterpriseSubscribed": "Enterprise subscription activated",
+    "enterprisePaymentRequired": "Payment is required to accept this Enterprise offer. Contact support if Stripe checkout is unavailable.",
+    "inPaidTrial": "You are currently on an Enterprise paid trial.",
+    "offerUpdatedNote": "Your Enterprise offer was updated. Current limits and features stay in effect until you apply the new terms.",
+    "startTrial": "Start trial",
+    "applyNewTerms": "Apply new terms",
+    "subscribeEnterprise": "Subscribe"
   },
   "substitution": {
     "title": "Substitution",

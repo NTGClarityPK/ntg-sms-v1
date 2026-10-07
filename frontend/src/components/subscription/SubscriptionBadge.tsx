@@ -33,7 +33,12 @@ export function SubscriptionBadge() {
 
   const planId = subscription.planId as PlanId;
   const label = planDisplayName(planId);
-  const isEnterprise = planId === 'enterprise';
+  const pricing = subscription.enterprisePricing;
+  const hasEnterpriseOffer = Boolean(
+    pricing?.enabled && (planId !== 'enterprise' || pricing.offerChanged),
+  );
+  const showAction = hasEnterpriseOffer || planId !== 'enterprise';
+  const actionLabel = hasEnterpriseOffer ? t('newOffer') : t('upgrade');
 
   return (
     <UnstyledButton
@@ -63,7 +68,7 @@ export function SubscriptionBadge() {
           </Text>
         </Group>
 
-        {!isEnterprise && (
+        {showAction && (
           <>
             <Box
               style={{
@@ -80,7 +85,13 @@ export function SubscriptionBadge() {
               px="sm"
               align="center"
               justify="center"
-              style={{ flexShrink: 0 }}
+              style={{
+                flexShrink: 0,
+                animation: hasEnterpriseOffer
+                  ? 'alma-new-offer-pulse 2.4s ease-in-out infinite'
+                  : undefined,
+              }}
+              className={hasEnterpriseOffer ? 'new-offer-badge-pulse' : undefined}
             >
               <IconSparkles size={14} color="#fff" stroke={1.75} />
               <Text
@@ -90,7 +101,7 @@ export function SubscriptionBadge() {
                 lh={1}
                 style={{ letterSpacing: '0.04em', textTransform: 'uppercase' }}
               >
-                {t('upgrade')}
+                {actionLabel}
               </Text>
             </Group>
           </>

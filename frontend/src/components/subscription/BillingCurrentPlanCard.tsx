@@ -17,9 +17,13 @@ function formatBillingDate(iso: string): string {
 
 type BillingCurrentPlanCardProps = {
   subscription: Subscription;
+  showNewOffer?: boolean;
 };
 
-export function BillingCurrentPlanCard({ subscription }: BillingCurrentPlanCardProps) {
+export function BillingCurrentPlanCard({
+  subscription,
+  showNewOffer = false,
+}: BillingCurrentPlanCardProps) {
   const t = useTranslations('billing');
   const colors = useThemeColors();
 
@@ -45,36 +49,64 @@ export function BillingCurrentPlanCard({ subscription }: BillingCurrentPlanCardP
       shadow="xs"
     >
       <Box pos="relative">
-        <Badge
-          id="billing-current-plan-status-badge"
-          size="lg"
-          radius="xl"
-          variant="filled"
-          styles={{
-            root: {
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              backgroundColor: colors.primary,
-              color: '#fff',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.03em',
-              paddingLeft: 16,
-              paddingRight: 16,
-            },
-          }}
+        <Group
+          gap="xs"
+          style={{ position: 'absolute', top: 0, right: 0 }}
+          wrap="wrap"
+          justify="flex-end"
         >
-          {t(statusKey)}
-        </Badge>
+          {showNewOffer && (
+            <Badge
+              id="billing-new-offer-badge"
+              size="lg"
+              radius="xl"
+              variant="light"
+              color="blue"
+              style={{
+                animation: 'alma-new-offer-pulse 2.4s ease-in-out infinite',
+              }}
+            >
+              {t('newOfferBadge')}
+            </Badge>
+          )}
+          <Badge
+            id="billing-current-plan-status-badge"
+            size="lg"
+            radius="xl"
+            variant="filled"
+            styles={{
+              root: {
+                backgroundColor: colors.primary,
+                color: '#fff',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+                paddingLeft: 16,
+                paddingRight: 16,
+              },
+            }}
+          >
+            {t(statusKey)}
+          </Badge>
+        </Group>
 
-        <Stack gap={4} pr={{ base: 0, xs: 120 }}>
+        <Stack gap={4} pr={{ base: 0, xs: 160 }}>
           <Text fw={700} size="lg" lh={1.3}>
             {planTitle}
           </Text>
           <Text size="sm" fw={500}>
             {t('planStatusActive')}
           </Text>
+          {subscription.enterprisePricing?.inPaidTrial && (
+            <Text size="sm" c="dimmed">
+              {t('inPaidTrial')}
+            </Text>
+          )}
+          {showNewOffer && subscription.enterprisePricing?.offerChanged && (
+            <Text size="sm" c="dimmed">
+              {t('offerUpdatedNote')}
+            </Text>
+          )}
         </Stack>
 
         <Group gap={8} mt="lg" wrap="nowrap" align="center">

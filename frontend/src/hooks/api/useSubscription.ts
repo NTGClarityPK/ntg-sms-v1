@@ -202,10 +202,14 @@ export function useSubscriptionFeatures() {
   return useQuery({
     queryKey: [...subscriptionKeys.all, 'features', branchId],
     queryFn: async () => {
-      const [plansRes, planRes] = await Promise.all([
-        apiClient.get<PlanConfig[]>('/api/v1/subscription/plans'),
-        apiClient.get<{ planId: PlanId }>('/api/v1/subscription/current-plan'),
-      ]);
+      const planRes = await apiClient.get<{
+        planId: PlanId;
+        features: PlanConfig['features'];
+      }>('/api/v1/subscription/current-plan');
+      if (planRes.data?.features) {
+        return planRes.data.features;
+      }
+      const plansRes = await apiClient.get<PlanConfig[]>('/api/v1/subscription/plans');
       const plans = plansRes.data;
       const planId = planRes.data?.planId ?? 'free';
       const current = plans.find((p) => p.id === planId) ?? plans[0];
@@ -213,5 +217,21 @@ export function useSubscriptionFeatures() {
     },
     enabled: !!branchId,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useAcceptEnterpriseOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (mode: 'start_trial' | 'subscribe' | 'apply_terms') => {
+      const res = await apiClient.post<ChangePlanResult>(
+        '/api/v1/subscription/accept-enterprise',
+        { mode },
+      );
+      return res.data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: subscriptionKeys.all });
+    },
   });
 }
