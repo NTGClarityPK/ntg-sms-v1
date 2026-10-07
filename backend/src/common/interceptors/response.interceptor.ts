@@ -41,8 +41,23 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
       // Non-blocking
     }
 
+    // Ops Alma / Reach admin API expects flat JSON (not { data: ... }) for
+    // assessments-lock, subscription detail, delete, etc. List tenants already
+    // returns { data: [...] } which passes through.
+    const reqPath =
+      (context.switchToHttp().getRequest() as { path?: string; url?: string })
+        ?.path ??
+      (context.switchToHttp().getRequest() as { url?: string })?.url ??
+      '';
+    const isAdminOps =
+      typeof reqPath === 'string' && reqPath.includes('/api/v1/admin');
+
     return next.handle().pipe(
       map((data) => {
+        if (isAdminOps) {
+          return data as Response<T>;
+        }
+
         // If data already has the correct format, return as is
         if (data && typeof data === 'object' && 'data' in data) {
           return data as Response<T>;

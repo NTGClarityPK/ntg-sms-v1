@@ -93,12 +93,26 @@ const BRANCH_DELETE_ORDER: string[] = [
   'levels',
 ];
 
+/**
+ * Tenant-scoped rows with NO ACTION / leftover after branch deletes.
+ * Must clear before deleting tenants (subjects_tenant_id_fkey etc.).
+ */
 const TENANT_DELETE_ORDER: string[] = [
   'school_data_export_logs',
   'subscription_invoices',
   'billing_payment_events',
   'subscriptions',
   'academic_years',
+  'assessment_types',
+  'grade_templates',
+  'subjects',
+  'classes',
+  'sections',
+  'levels',
+  'public_holidays',
+  'timing_templates',
+  'school_days',
+  'subject_templates',
   'api_hits',
 ];
 
@@ -160,13 +174,27 @@ export class AdminTenantDeleteService {
       }
     }
 
+    // Clear RESTRICT children of subjects before tenant-scoped subject delete
+    try {
+      const cleared = await this.clearSubjectRestrictChildren(supabase, tenantId);
+      if (cleared.assessments > 0) summary.subjectAssessments = cleared.assessments;
+      if (cleared.mappings > 0) summary.subjectMappings = cleared.mappings;
+    } catch (e) {
+      throw new BadRequestException(
+        `Failed clearing subject dependents: ${e instanceof Error ? e.message : 'unknown'}`,
+      );
+    }
+
+    // Tenant-scoped NO ACTION FKs — do not swallow errors (blocks tenant delete)
     for (const table of TENANT_DELETE_ORDER) {
       try {
         const n = await this.deleteEq(supabase, table, 'tenant_id', tenantId);
         if (n > 0) summary[table] = n;
       } catch (e) {
-        warnings.push(
-          `${table}: ${e instanceof Error ? e.message : 'delete failed'}`,
+        const msg = e instanceof Error ? e.message : 'delete failed';
+        warnings.push(`${table}: ${msg}`);
+        throw new BadRequestException(
+          `Failed while clearing ${table} for tenant delete: ${msg}`,
         );
       }
     }
@@ -222,5 +250,39 @@ export class AdminTenantDeleteService {
       .eq(column, value);
     if (error) throw new Error(error.message);
     return count ?? 0;
+  }
+
+  /** assessments.subject_id and google mappings are RESTRICT — must go before subjects */
+  private async clearSubjectRestrictChildren(
+    supabase: SupabaseClient,
+    tenantId: string,
+  ): Promise<{ assessments: number; mappings: number }> {
+    const { data: subjects, error } = await supabase
+      .from('subjects')
+      .select('id')
+      .eq('tenant_id', tenantId);
+    if (error) throw new Error(error.message);
+    const subjectIds = (subjects ?? []).map((s) => (s as { id: string }).id);
+    if (subjectIds.length === 0) return { assessments: 0, mappings: 0 };
+
+    let assessments = 0;
+    let mappings = 0;
+    for (let i = 0; i < subjectIds.length; i += CHUNK) {
+      const batch = subjectIds.slice(i, i + CHUNK);
+      const { error: aErr, count: aCount } = await supabase
+        .from('assessments')
+        .delete({ count: 'exact' })
+        .in('subject_id', batch);
+      if (aErr) throw new Error(aErr.message);
+      assessments += aCount ?? 0;
+
+      const { error: mErr, count: mCount } = await supabase
+        .from('google_classroom_course_mappings')
+        .delete({ count: 'exact' })
+        .in('subject_id', batch);
+      if (mErr) throw new Error(mErr.message);
+      mappings += mCount ?? 0;
+    }
+    return { assessments, mappings };
   }
 }
