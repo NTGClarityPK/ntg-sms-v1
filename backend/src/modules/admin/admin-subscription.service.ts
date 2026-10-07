@@ -6,12 +6,18 @@ import {
 } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../../common/config/supabase.config';
-import { BillingCycle, PlanId, storageMbToGb } from '../subscription/plan-config';
+import {
+  BillingCycle,
+  parsePlanId,
+  PlanId,
+  storageMbToGb,
+} from '../subscription/plan-config';
 import {
   clearEnterpriseOfferPatch,
   ENTERPRISE_SELECT_COLUMNS,
   enterpriseOfferDiffersFromActiveTerms,
   hasActiveEnterpriseSnapshot,
+  resolvePlanLimits,
   toNum,
   type EnterpriseSubscriptionFields,
 } from '../subscription/enterprise-terms';
@@ -54,61 +60,113 @@ export class AdminSubscriptionService {
     throwIfDbError(error);
 
     const needle = q?.trim().toLowerCase();
-    const rows = (tenants ?? []).filter((t) => {
-      if (!needle) return true;
-      const row = t as {
-        name: string;
-        code: string | null;
-        email: string | null;
-      };
-      return (
-        row.name.toLowerCase().includes(needle) ||
-        (row.code ?? '').toLowerCase().includes(needle) ||
-        (row.email ?? '').toLowerCase().includes(needle)
-      );
-    }).slice(0, 200);
-    const result: Record<string, unknown>[] = [];
+    const rows = (tenants ?? [])
+      .filter((t) => {
+        if (!needle) return true;
+        const row = t as {
+          name: string;
+          code: string | null;
+          email: string | null;
+        };
+        return (
+          row.name.toLowerCase().includes(needle) ||
+          (row.code ?? '').toLowerCase().includes(needle) ||
+          (row.email ?? '').toLowerCase().includes(needle)
+        );
+      })
+      .slice(0, 200) as Array<{
+      id: string;
+      name: string;
+      code: string;
+      domain: string | null;
+      email: string | null;
+      assessments_creation_locked: boolean | null;
+    }>;
 
-    for (const t of rows) {
-      const tenant = t as {
+    if (rows.length === 0) {
+      return { data: [] };
+    }
+
+    const tenantIds = rows.map((t) => t.id);
+
+    // Batch: subscriptions + usage (avoid N+1 — was timing out Reach Ops)
+    const { data: subsData, error: subsError } = await supabase
+      .from('subscriptions')
+      .select(ENTERPRISE_SELECT_COLUMNS)
+      .in('tenant_id', tenantIds);
+    throwIfDbError(subsError);
+
+    const subs = (subsData ?? []) as unknown as Array<
+      EnterpriseSubscriptionFields & {
         id: string;
-        name: string;
-        code: string;
-        domain: string | null;
-        email: string | null;
-        assessments_creation_locked: boolean | null;
-      };
+        tenant_id: string;
+        plan_id: string;
+        billing_cycle: string;
+        status: string;
+        current_period_start: string;
+        current_period_end: string;
+      }
+    >;
+    const subByTenant = new Map(subs.map((s) => [s.tenant_id, s]));
+    const subscriptionIds = subs.map((s) => s.id);
 
-      await this.subscriptionService.ensureSubscriptionForTenant(tenant.id);
-      const usage = await this.subscriptionService.getUsageWithLimits(tenant.id, false);
-      const subRow = await this.fetchSubscriptionRow(tenant.id);
+    const usageBySubId = new Map<
+      string,
+      {
+        branches_used: number;
+        students_used: number;
+        storage_used_mb: number;
+      }
+    >();
+    if (subscriptionIds.length > 0) {
+      const { data: usageData, error: usageError } = await supabase
+        .from('subscription_usage')
+        .select(
+          'subscription_id, branches_used, students_used, storage_used_mb',
+        )
+        .in('subscription_id', subscriptionIds);
+      throwIfDbError(usageError);
+      for (const u of usageData ?? []) {
+        const row = u as {
+          subscription_id: string;
+          branches_used: number;
+          students_used: number;
+          storage_used_mb: number;
+        };
+        usageBySubId.set(row.subscription_id, row);
+      }
+    }
 
-      result.push({
+    const result: Record<string, unknown>[] = rows.map((tenant) => {
+      const subRow = subByTenant.get(tenant.id) ?? null;
+      const planId = parsePlanId(subRow?.plan_id ?? '') ?? PlanId.FREE;
+      const limits = resolvePlanLimits(planId, subRow);
+      const usage = subRow ? usageBySubId.get(subRow.id) : undefined;
+
+      return {
         id: tenant.id,
         name: tenant.name,
         ownerName: null,
         ownerEmail: tenant.email,
-        planId: subRow?.plan_id ?? usage.planId,
+        planId: subRow?.plan_id ?? planId,
         planStatus: subRow?.status ?? null,
         enterpriseInPaidTrial: Boolean(subRow?.enterprise_in_paid_trial),
         subscriptionStart: toDateOnly(subRow?.current_period_start),
         firstSubscriptionStartDate: subRow?.first_subscription_start_date ?? null,
-        trialStartedAt: toDateOnly(subRow?.enterprise_trial_starts_at ?? subRow?.trial_ends_at),
+        trialStartedAt: toDateOnly(
+          subRow?.enterprise_trial_starts_at ?? subRow?.trial_ends_at,
+        ),
         billingCycle: toAdminBillingCycle(subRow?.billing_cycle),
-        branchesUsed: usage.usage.branchesUsed,
-        branchesLimit:
-          usage.limits.branches === -1 ? null : usage.limits.branches,
-        studentsUsed: usage.usage.studentsUsed,
-        studentsLimit:
-          usage.limits.students === -1 ? null : usage.limits.students,
-        storageGbUsed: storageMbToGb(usage.usage.storageUsedMb),
+        branchesUsed: usage?.branches_used ?? 0,
+        branchesLimit: limits.branches === -1 ? null : limits.branches,
+        studentsUsed: usage?.students_used ?? 0,
+        studentsLimit: limits.students === -1 ? null : limits.students,
+        storageGbUsed: storageMbToGb(usage?.storage_used_mb ?? 0),
         storageGbLimit:
-          usage.limits.storageMB === -1
-            ? null
-            : storageMbToGb(usage.limits.storageMB),
+          limits.storageMB === -1 ? null : storageMbToGb(limits.storageMB),
         assessmentsCreationLocked: Boolean(tenant.assessments_creation_locked),
-      });
-    }
+      };
+    });
 
     return { data: result };
   }
