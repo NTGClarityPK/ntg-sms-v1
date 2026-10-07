@@ -152,6 +152,16 @@ export class AdminTenantDeleteService {
     const branchIds = (branches ?? []).map((b) => (b as { id: string }).id);
     summary.branches = branchIds.length;
 
+    // profiles.current_branch_id / current_student_id block branch & student deletes
+    try {
+      await this.nullProfileFks(supabase, tenantId, branchIds);
+      summary.profilesFksCleared = 'ok';
+    } catch (e) {
+      throw new BadRequestException(
+        `Failed clearing profile branch/student FKs: ${e instanceof Error ? e.message : 'unknown'}`,
+      );
+    }
+
     for (const table of BRANCH_DELETE_ORDER) {
       try {
         const n = await this.deleteIn(supabase, table, 'branch_id', branchIds);
@@ -250,6 +260,39 @@ export class AdminTenantDeleteService {
       .eq(column, value);
     if (error) throw new Error(error.message);
     return count ?? 0;
+  }
+
+  private async nullProfileFks(
+    supabase: SupabaseClient,
+    _tenantId: string,
+    branchIds: string[],
+  ): Promise<void> {
+    if (branchIds.length === 0) return;
+
+    for (let i = 0; i < branchIds.length; i += CHUNK) {
+      const batch = branchIds.slice(i, i + CHUNK);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ current_branch_id: null })
+        .in('current_branch_id', batch);
+      if (error) throw new Error(error.message);
+    }
+
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('id')
+      .in('branch_id', branchIds);
+    if (studentsError) throw new Error(studentsError.message);
+    const studentIds = (students ?? []).map((s) => (s as { id: string }).id);
+
+    for (let i = 0; i < studentIds.length; i += CHUNK) {
+      const batch = studentIds.slice(i, i + CHUNK);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ current_student_id: null })
+        .in('current_student_id', batch);
+      if (error) throw new Error(error.message);
+    }
   }
 
   /** assessments.subject_id and google mappings are RESTRICT — must go before subjects */
