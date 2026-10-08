@@ -15,6 +15,10 @@ import {
   calculateSubscriptionInvoiceAmount,
   type InvoiceLineItem,
 } from './plan-pricing';
+import {
+  formatEnterpriseAcceptInvoiceNotes,
+  type EnterpriseAcceptMode,
+} from './enterprise-terms';
 import { SubscriptionInvoicePdfService } from './subscription-invoice-pdf.service';
 import type {
   InvoiceStatus,
@@ -44,10 +48,11 @@ type InvoiceRow = {
   paid_at: string | null;
   pending_upgrade_plan_id: string | null;
   pending_upgrade_billing_cycle: string | null;
+  notes: string | null;
 };
 
 const INVOICE_SELECT =
-  'id, tenant_id, subscription_id, invoice_number, plan_id, billing_cycle, period_start, period_end, amount_cents, currency, status, payment_provider, line_items, stripe_invoice_id, hosted_invoice_url, pdf_storage_path, issued_at, due_at, paid_at, pending_upgrade_plan_id, pending_upgrade_billing_cycle';
+  'id, tenant_id, subscription_id, invoice_number, plan_id, billing_cycle, period_start, period_end, amount_cents, currency, status, payment_provider, line_items, stripe_invoice_id, hosted_invoice_url, pdf_storage_path, issued_at, due_at, paid_at, pending_upgrade_plan_id, pending_upgrade_billing_cycle, notes';
 
 function throwIfDbError(error: PostgrestError | null): void {
   if (error) throw new BadRequestException(error.message);
@@ -222,6 +227,123 @@ export class SubscriptionInvoiceService {
     throwIfDbError(error);
     if (!inserted) {
       throw new BadRequestException('Failed to create upgrade invoice');
+    }
+
+    await this.generateAndStorePdf(inserted as InvoiceRow);
+
+    const { data: refreshed } = await supabase
+      .from('subscription_invoices')
+      .select(INVOICE_SELECT)
+      .eq('id', (inserted as InvoiceRow).id)
+      .single();
+
+    return this.mapInvoice((refreshed ?? inserted) as InvoiceRow);
+  }
+
+  /**
+   * Open invoice for Enterprise offer acceptance (setup-fee due via Stripe Checkout).
+   */
+  async createPendingEnterpriseAcceptInvoice(input: {
+    tenantId: string;
+    subscriptionId: string;
+    mode: EnterpriseAcceptMode;
+    amountCents: number;
+    setupListPrice: number;
+    periodStart: Date;
+    periodEnd: Date;
+  }): Promise<SubscriptionInvoiceDto> {
+    if (input.amountCents <= 0) {
+      throw new BadRequestException('Enterprise accept has no payable amount');
+    }
+
+    const supabase = this.supabaseConfig.getClient();
+    const notes = formatEnterpriseAcceptInvoiceNotes(
+      input.mode,
+      input.setupListPrice,
+    );
+    const idempotencyKey = [
+      'enterprise-accept',
+      input.tenantId,
+      input.mode,
+      String(input.amountCents),
+      String(Math.round(input.setupListPrice * 100)),
+    ].join(':');
+
+    const { data: existingByKey } = await supabase
+      .from('subscription_invoices')
+      .select(INVOICE_SELECT)
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+
+    if (existingByKey) {
+      const existing = existingByKey as InvoiceRow;
+      if (existing.status === 'open' || existing.status === 'paid') {
+        return this.mapInvoice(existing);
+      }
+    }
+
+    const { data: existingOpen } = await supabase
+      .from('subscription_invoices')
+      .select(INVOICE_SELECT)
+      .eq('tenant_id', input.tenantId)
+      .eq('status', 'open')
+      .eq('pending_upgrade_plan_id', PlanId.ENTERPRISE)
+      .eq('notes', notes)
+      .eq('amount_cents', input.amountCents)
+      .maybeSingle();
+
+    if (existingOpen) {
+      return this.mapInvoice(existingOpen as InvoiceRow);
+    }
+
+    const issuedAt = new Date();
+    const dueAt = new Date(issuedAt);
+    dueAt.setDate(dueAt.getDate() + 14);
+    const invoiceNumber = await this.generateInvoiceNumber(input.tenantId);
+    const modeLabel =
+      input.mode === 'start_trial'
+        ? 'Enterprise trial setup'
+        : input.mode === 'apply_terms'
+          ? 'Enterprise terms setup'
+          : 'Enterprise subscription setup';
+
+    const lineItems: InvoiceLineItem[] = [
+      {
+        description: modeLabel,
+        quantity: 1,
+        unitAmountCents: input.amountCents,
+        amountCents: input.amountCents,
+      },
+    ];
+
+    const { data: inserted, error } = await supabase
+      .from('subscription_invoices')
+      .insert({
+        tenant_id: input.tenantId,
+        subscription_id: input.subscriptionId,
+        invoice_number: invoiceNumber,
+        plan_id: PlanId.ENTERPRISE,
+        billing_cycle: BillingCycle.MONTHLY,
+        period_start: input.periodStart.toISOString(),
+        period_end: input.periodEnd.toISOString(),
+        amount_cents: input.amountCents,
+        currency: 'USD',
+        status: 'open',
+        payment_provider: 'stripe',
+        line_items: lineItems,
+        issued_at: issuedAt.toISOString(),
+        due_at: dueAt.toISOString(),
+        idempotency_key: idempotencyKey,
+        pending_upgrade_plan_id: PlanId.ENTERPRISE,
+        pending_upgrade_billing_cycle: BillingCycle.MONTHLY,
+        notes,
+      })
+      .select(INVOICE_SELECT)
+      .single();
+
+    throwIfDbError(error);
+    if (!inserted) {
+      throw new BadRequestException('Failed to create enterprise accept invoice');
     }
 
     await this.generateAndStorePdf(inserted as InvoiceRow);

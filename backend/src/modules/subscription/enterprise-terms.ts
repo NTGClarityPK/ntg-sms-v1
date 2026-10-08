@@ -303,3 +303,40 @@ export const ENTERPRISE_SELECT_COLUMNS = [
   'setup_fee_paid_usd',
   'first_subscription_start_date',
 ].join(', ');
+
+export type EnterpriseAcceptMode = 'start_trial' | 'subscribe' | 'apply_terms';
+
+/** Stored on subscription_invoices.notes for Stripe fulfill → applyEnterpriseAcceptance. */
+export function formatEnterpriseAcceptInvoiceNotes(
+  mode: EnterpriseAcceptMode,
+  setupListPrice: number,
+): string {
+  return `enterprise_accept|mode=${mode}|setupList=${setupListPrice}`;
+}
+
+export function parseEnterpriseAcceptInvoiceNotes(
+  notes: string | null | undefined,
+): { mode: EnterpriseAcceptMode; setupListPrice: number } | null {
+  if (!notes || !notes.startsWith('enterprise_accept|')) return null;
+  const parts = Object.fromEntries(
+    notes
+      .split('|')
+      .slice(1)
+      .map((part) => {
+        const idx = part.indexOf('=');
+        if (idx < 0) return [part, ''];
+        return [part.slice(0, idx), part.slice(idx + 1)];
+      }),
+  );
+  const mode = parts.mode as EnterpriseAcceptMode | undefined;
+  if (
+    mode !== 'start_trial' &&
+    mode !== 'subscribe' &&
+    mode !== 'apply_terms'
+  ) {
+    return null;
+  }
+  const setupListPrice = Number(parts.setupList);
+  if (!Number.isFinite(setupListPrice) || setupListPrice < 0) return null;
+  return { mode, setupListPrice };
+}

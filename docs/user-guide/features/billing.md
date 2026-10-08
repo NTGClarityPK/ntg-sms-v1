@@ -25,7 +25,7 @@ Modules that are not on the current plan (for example Fees on **Free**, or Libra
 
 ## 🏢 Enterprise offers
 
-When Ops Alma sends an Enterprise offer, school admins see a pulsing **New offer** cue in the header and on the Billing current-plan card. The Enterprise plan card shows negotiated price, limits, and add-ons. Accept with **Start trial**, **Subscribe**, or **Apply new terms** as appropriate. Until you accept, live features stay on your current plan.
+When Ops Alma sends an Enterprise offer, school admins see a pulsing **New offer** cue in the header and on the Billing current-plan card. The Enterprise plan card shows negotiated price, limits, and add-ons. Accept with **Start trial**, **Subscribe**, or **Apply new terms** as appropriate. If a setup fee is still due, Alma opens Stripe Checkout; after payment the offer becomes live. Until you accept, live features stay on your current plan.
 
 Enterprise paid add-ons (negotiated): Fees, Library, Behavioural, Uniform Inventory, White label, Google Classroom.
 
@@ -60,6 +60,8 @@ If **Pay now** is missing, online payments may be off for this deployment — co
 
 **Features disappeared after a plan change:** Check entitlements on this page; contact support if unexpected.
 
-**New offer but modules still locked:** Accept the offer on the Enterprise card — pending Ops offers do not unlock features until accepted.
+**New offer but modules still locked:** Accept the offer on the Enterprise card — pending Ops offers do not unlock features until accepted. If a setup fee is due, complete Stripe Checkout first.
+
+**Apply / Start trial asks for payment though Stripe is on:** That is expected when setup fee remains unpaid — you should be redirected to Stripe Checkout. If you only see a toast and no redirect, contact support (checkout session failed to create).
 
 **Related:** [💵 Fee Management](fee-management.md) (student challans — separate from Alma subscription billing).

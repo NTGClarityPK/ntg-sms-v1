@@ -213,7 +213,14 @@ export default function BillingPage() {
           });
           break;
         case 'checkout_required':
-          notifications.show({ message: t('enterprisePaymentRequired'), color: 'yellow' });
+          if (result.checkoutUrl) {
+            window.location.href = result.checkoutUrl;
+          } else {
+            notifications.show({
+              message: t('enterprisePaymentRequired'),
+              color: 'yellow',
+            });
+          }
           break;
         default:
           break;

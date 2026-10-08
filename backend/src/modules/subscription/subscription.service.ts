@@ -43,6 +43,7 @@ import {
   clearEnterpriseSnapshotPatch,
   ENTERPRISE_SELECT_COLUMNS,
   enterpriseOfferDiffersFromActiveTerms,
+  parseEnterpriseAcceptInvoiceNotes,
   resolvePlanFeatures,
   resolvePlanLimits,
   snapshotFromOffer,
@@ -227,11 +228,13 @@ export class SubscriptionService {
     }
 
     if (due > 0 && isStripeConfigured()) {
-      return {
-        type: 'checkout_required',
-        message: 'Payment required to accept enterprise offer',
-        checkoutUrl: undefined,
-      };
+      return this.subscriptionStripeService.createEnterpriseAcceptCheckout(
+        tenantId,
+        mode,
+        due,
+        setupList,
+        row.enterprise_duration_months ?? 12,
+      );
     }
 
     return this.applyEnterpriseAcceptance(tenantId, mode, setupList);
@@ -419,7 +422,7 @@ export class SubscriptionService {
     const { data: invoice, error } = await supabase
       .from('subscription_invoices')
       .select(
-        'id, tenant_id, pending_upgrade_plan_id, pending_upgrade_billing_cycle, status',
+        'id, tenant_id, pending_upgrade_plan_id, pending_upgrade_billing_cycle, status, notes',
       )
       .eq('id', invoiceId)
       .eq('tenant_id', tenantId)
@@ -431,7 +434,26 @@ export class SubscriptionService {
     const row = invoice as {
       pending_upgrade_plan_id: string | null;
       pending_upgrade_billing_cycle: string | null;
+      notes: string | null;
     };
+
+    const enterpriseAccept = parseEnterpriseAcceptInvoiceNotes(row.notes);
+    if (enterpriseAccept) {
+      if (!row.pending_upgrade_plan_id) return;
+      await this.applyEnterpriseAcceptance(
+        tenantId,
+        enterpriseAccept.mode,
+        enterpriseAccept.setupListPrice,
+      );
+      await supabase
+        .from('subscription_invoices')
+        .update({
+          pending_upgrade_plan_id: null,
+          pending_upgrade_billing_cycle: null,
+        })
+        .eq('id', invoiceId);
+      return;
+    }
 
     const targetPlan = parsePlanId(row.pending_upgrade_plan_id ?? '');
     const targetCycle = row.pending_upgrade_billing_cycle as BillingCycle | null;

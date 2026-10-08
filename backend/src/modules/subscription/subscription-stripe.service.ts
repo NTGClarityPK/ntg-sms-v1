@@ -162,6 +162,114 @@ export class SubscriptionStripeService {
     };
   }
 
+  async createEnterpriseAcceptCheckout(
+    tenantId: string,
+    mode: 'start_trial' | 'subscribe' | 'apply_terms',
+    amountDueUsd: number,
+    setupListPrice: number,
+    durationMonths: number,
+  ): Promise<ChangePlanResultDto> {
+    const supabase = this.supabaseConfig.getClient();
+    const stripe = this.getStripe();
+
+    const amountCents = Math.round(amountDueUsd * 100);
+    if (amountCents <= 0) {
+      throw new BadRequestException('Enterprise accept has no payable amount');
+    }
+
+    const subscription = await this.subscriptionService.getByTenantId(tenantId);
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + Math.max(1, durationMonths));
+
+    const invoice =
+      await this.subscriptionInvoiceService.createPendingEnterpriseAcceptInvoice({
+        tenantId,
+        subscriptionId: subscription.id,
+        mode,
+        amountCents,
+        setupListPrice,
+        periodStart: now,
+        periodEnd,
+      });
+
+    if (invoice.status === 'paid') {
+      await this.subscriptionService.fulfillPaidUpgradeInvoice(
+        tenantId,
+        invoice.id,
+      );
+      return {
+        type: 'upgrade',
+        message: 'Enterprise offer accepted',
+        subscription: await this.subscriptionService.getByTenantId(tenantId),
+      };
+    }
+
+    const customerId = await this.getOrCreateStripeCustomer(tenantId);
+    const frontendUrl = getFrontendUrl();
+    const currency = (invoice.currency || 'USD').toLowerCase();
+    const modeLabel =
+      mode === 'start_trial'
+        ? 'Enterprise trial setup'
+        : mode === 'apply_terms'
+          ? 'Enterprise terms setup'
+          : 'Enterprise subscription setup';
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency,
+            product_data: {
+              name: `${invoice.invoiceNumber} — ${modeLabel}`,
+              description: `Setup fee due for Alma Enterprise (${mode.split('_').join(' ')})`,
+            },
+            unit_amount: invoice.amountCents,
+          },
+          quantity: 1,
+        },
+      ],
+      payment_method_types: ['card'],
+      success_url: `${frontendUrl}/billing?payment=success&upgrade=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}/billing?payment=cancelled&upgrade=1`,
+      metadata: {
+        tenantId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        checkoutType: 'enterprise_accept',
+        acceptMode: mode,
+        setupListPrice: String(setupListPrice),
+        targetPlan: PlanId.ENTERPRISE,
+        targetBillingCycle: BillingCycle.MONTHLY,
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+    });
+
+    if (!session.url) {
+      throw new BadRequestException('Failed to create Stripe checkout session');
+    }
+
+    const { error: updateError } = await supabase
+      .from('subscription_invoices')
+      .update({
+        stripe_checkout_session_id: session.id,
+        payment_provider: 'stripe',
+      })
+      .eq('id', invoice.id)
+      .eq('tenant_id', tenantId);
+
+    throwIfDbError(updateError);
+
+    return {
+      type: 'checkout_required',
+      message: 'Complete payment to accept your Enterprise offer',
+      checkoutUrl: session.url,
+      sessionId: session.id,
+    };
+  }
+
   private calculatePeriodEnd(start: Date, cycle: BillingCycle): Date {
     const end = new Date(start);
     if (cycle === BillingCycle.YEARLY) {
