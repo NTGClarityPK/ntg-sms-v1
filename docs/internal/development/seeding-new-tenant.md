@@ -1,6 +1,7 @@
 > **Ops note (2026-08):** Tenant-specific ABC / Raqqa seed scripts were removed.
 > Prefer general scripts under `backend/src/scripts/`:
 > - `delete-tenant-cleanly.ts` — hard-delete one tenant by code/id
+> - `delete-tenants-bulk.ts` — hard-delete many tenants (wraps the single script; `--codes` / `--file` / `--all-except`; dry-run by default)
 > - `seed-demo-tenant.ts` — **factory wipe + lean reseed** on one or more branches (see below)
 > - `seed-attendance.ts` — mark/refresh attendance for any tenant (`--tenant-code=…`)
 > - `seed-assessments.ts` — quizzes + marks (`--tenant-code=…`, `--date` / `--days` / `--from`/`--to`, or `--year-schedule` for a full AY plan)

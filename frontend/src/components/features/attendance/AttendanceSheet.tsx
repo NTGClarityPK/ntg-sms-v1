@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Paper,
@@ -17,12 +17,19 @@ import {
   Divider,
   SimpleGrid,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { IconAlertCircle, IconDeviceFloppy, IconSearch } from '@tabler/icons-react';
 import { useDebouncedValue } from '@mantine/hooks';
 import type { Attendance } from '@/types/attendance';
 import { StudentRow } from './StudentRow';
+import { SyncStatusBar } from './SyncStatusBar';
 import { useBulkMarkAttendance } from '@/hooks/useAttendance';
+import type {
+  AttendanceSyncState,
+  PersistMarkInput,
+} from '@/hooks/useOfflineAttendance';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { upsertOutbox } from '@/lib/offline/attendance-outbox';
 
 interface AttendanceSheetProps {
   classSectionId: string;
@@ -31,6 +38,14 @@ interface AttendanceSheetProps {
   isLoading: boolean;
   className: string;
   sectionName: string;
+  isOnline: boolean;
+  dbAvailable: boolean;
+  syncState: AttendanceSyncState;
+  errorStudentIds: Set<string>;
+  isFlushing: boolean;
+  persistMark: (input: PersistMarkInput) => Promise<boolean>;
+  flush: () => Promise<{ synced: number; failed: number }>;
+  retryFailed: () => Promise<{ synced: number; failed: number }>;
 }
 
 export function AttendanceSheet({
@@ -40,6 +55,14 @@ export function AttendanceSheet({
   isLoading,
   className,
   sectionName,
+  isOnline,
+  dbAvailable,
+  syncState,
+  errorStudentIds,
+  isFlushing,
+  persistMark,
+  flush,
+  retryFailed,
 }: AttendanceSheetProps) {
   const t = useTranslations('attendance');
   const [localAttendance, setLocalAttendance] = useState<Attendance[]>([]);
@@ -49,6 +72,7 @@ export function AttendanceSheet({
   const [bulkExitTime, setBulkExitTime] = useState('');
   const [applyEntryToAll, setApplyEntryToAll] = useState(true);
   const [applyExitToAll, setApplyExitToAll] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const bulkMarkMutation = useBulkMarkAttendance();
   const notifyColors = useThemeColors();
 
@@ -73,12 +97,10 @@ export function AttendanceSheet({
     return `${left} — ${right}`;
   }, [className, sectionName]);
 
-  // Sync local state with prop changes
   useEffect(() => {
     setLocalAttendance(attendance);
   }, [attendance]);
 
-  // Filter students by search query
   const filteredAttendance = useMemo(() => {
     if (!debouncedSearch.trim()) {
       return localAttendance;
@@ -92,9 +114,22 @@ export function AttendanceSheet({
     );
   }, [localAttendance, debouncedSearch]);
 
+  const queueMark = useCallback(
+    (row: Attendance) => {
+      void persistMark({
+        studentId: row.studentId,
+        status: row.status,
+        entryTime: row.entryTime ?? null,
+        exitTime: row.exitTime ?? null,
+        notes: row.notes ?? null,
+      });
+    },
+    [persistMark],
+  );
+
   const handleStatusChange = (studentId: string, status: Attendance['status']) => {
-    setLocalAttendance((prev) =>
-      prev.map((a) => {
+    setLocalAttendance((prev) => {
+      const next = prev.map((a) => {
         if (a.studentId !== studentId) return a;
         if (status === 'present' || status === 'late') {
           return {
@@ -104,9 +139,27 @@ export function AttendanceSheet({
           };
         }
         return { ...a, status, entryTime: undefined, exitTime: undefined };
-      }),
-    );
+      });
+      const updated = next.find((a) => a.studentId === studentId);
+      if (updated) queueMark(updated);
+      return next;
+    });
   };
+
+  const persistMany = useCallback(
+    (rows: Attendance[]) => {
+      for (const row of rows) {
+        void persistMark({
+          studentId: row.studentId,
+          status: row.status,
+          entryTime: row.entryTime ?? null,
+          exitTime: row.exitTime ?? null,
+          notes: row.notes ?? null,
+        });
+      }
+    },
+    [persistMark],
+  );
 
   const applyBulkEntry = () => {
     if (!bulkEntryTime.trim()) return;
@@ -120,9 +173,13 @@ export function AttendanceSheet({
             .map((a) => a.studentId),
     );
     if (targetIds.size === 0) return;
-    setLocalAttendance((prev) =>
-      prev.map((a) => (targetIds.has(a.studentId) ? { ...a, entryTime: bulkEntryTime } : a)),
-    );
+    setLocalAttendance((prev) => {
+      const next = prev.map((a) =>
+        targetIds.has(a.studentId) ? { ...a, entryTime: bulkEntryTime } : a,
+      );
+      persistMany(next.filter((a) => targetIds.has(a.studentId)));
+      return next;
+    });
   };
 
   const applyBulkExit = () => {
@@ -137,9 +194,13 @@ export function AttendanceSheet({
             .map((a) => a.studentId),
     );
     if (targetIds.size === 0) return;
-    setLocalAttendance((prev) =>
-      prev.map((a) => (targetIds.has(a.studentId) ? { ...a, exitTime: bulkExitTime } : a)),
-    );
+    setLocalAttendance((prev) => {
+      const next = prev.map((a) =>
+        targetIds.has(a.studentId) ? { ...a, exitTime: bulkExitTime } : a,
+      );
+      persistMany(next.filter((a) => targetIds.has(a.studentId)));
+      return next;
+    });
   };
 
   const handleTimeChange = (
@@ -147,38 +208,95 @@ export function AttendanceSheet({
     field: 'entryTime' | 'exitTime',
     value: string,
   ) => {
-    setLocalAttendance((prev) =>
-      prev.map((a) =>
+    setLocalAttendance((prev) => {
+      const next = prev.map((a) =>
         a.studentId === studentId ? { ...a, [field]: value } : a,
-      ),
-    );
-  };
-
-  const handleNotesChange = (studentId: string, notes: string) => {
-    setLocalAttendance((prev) =>
-      prev.map((a) => (a.studentId === studentId ? { ...a, notes } : a)),
-    );
-  };
-
-  const handleSave = async () => {
-    if (bulkMarkMutation.isPending) return;
-
-    const records = localAttendance.map((a) => ({
-      studentId: a.studentId,
-      status: a.status,
-      entryTime: a.entryTime,
-      exitTime: a.exitTime,
-      notes: a.notes,
-    }));
-
-    await bulkMarkMutation.mutateAsync({
-      classSectionId,
-      date,
-      records,
+      );
+      const updated = next.find((a) => a.studentId === studentId);
+      if (updated) queueMark(updated);
+      return next;
     });
   };
 
-  // CRITICAL: Use isLoading || !attendance pattern as per mistakes.md
+  const handleNotesChange = (studentId: string, notes: string) => {
+    setLocalAttendance((prev) => {
+      const next = prev.map((a) => (a.studentId === studentId ? { ...a, notes } : a));
+      const updated = next.find((a) => a.studentId === studentId);
+      if (updated) queueMark(updated);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (isSaving || bulkMarkMutation.isPending || isFlushing) return;
+    setIsSaving(true);
+    try {
+      // Ensure full sheet is in the outbox before flush / online fallback
+      if (dbAvailable) {
+        await Promise.all(
+          localAttendance.map((a) =>
+            upsertOutbox({
+              classSectionId,
+              date,
+              studentId: a.studentId,
+              status: a.status,
+              entryTime: a.entryTime ?? null,
+              exitTime: a.exitTime ?? null,
+              notes: a.notes ?? null,
+            }),
+          ),
+        );
+      }
+
+      if (!isOnline) {
+        notifications.show({
+          title: t('savedLocallyTitle'),
+          message: t('savedLocallyMessage'),
+          color: notifyColors.warning,
+        });
+        return;
+      }
+
+      if (!dbAvailable) {
+        // Degraded path: classic online-only bulk save
+        await bulkMarkMutation.mutateAsync({
+          classSectionId,
+          date,
+          records: localAttendance.map((a) => ({
+            studentId: a.studentId,
+            status: a.status,
+            entryTime: a.entryTime,
+            exitTime: a.exitTime,
+            notes: a.notes,
+          })),
+        });
+        return;
+      }
+
+      const result = await flush();
+      if (result.failed > 0) {
+        notifications.show({
+          title: t('syncPartialTitle'),
+          message: t('syncPartialMessage', {
+            synced: result.synced,
+            failed: result.failed,
+          }),
+          color: notifyColors.warning,
+        });
+      } else {
+        notifications.show({
+          title: t('saveSuccessTitle'),
+          message: t('saveSuccessMessage'),
+          color: notifyColors.success,
+        });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveBusy = isSaving || isFlushing || bulkMarkMutation.isPending;
+
   if (isLoading || !attendance) {
     return (
       <Paper withBorder p="xl">
@@ -204,15 +322,28 @@ export function AttendanceSheet({
   return (
     <Paper withBorder p="md">
       <Stack gap="md">
+        <SyncStatusBar
+          isOnline={isOnline}
+          syncState={syncState}
+          isFlushing={isFlushing}
+          onRetry={() => {
+            void retryFailed();
+          }}
+          dbAvailable={dbAvailable}
+        />
+
         <Group justify="space-between" mb="md">
           <Text fw={500} size="lg">
             {className} - {sectionName}
           </Text>
           <Button
+            id="attendance-save"
             leftSection={<IconDeviceFloppy size={18} />}
-            onClick={handleSave}
-            loading={bulkMarkMutation.isPending}
-            disabled={bulkMarkMutation.isPending || isLoading}
+            onClick={() => {
+              void handleSave();
+            }}
+            loading={!isLoading && saveBusy}
+            disabled={isLoading}
           >
             {t('saveAttendance')}
           </Button>
@@ -231,6 +362,7 @@ export function AttendanceSheet({
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <Stack gap="xs">
                 <TextInput
+                  id="attendance-bulk-entry-time"
                   type="time"
                   label={t('entryTime')}
                   value={bulkEntryTime}
@@ -241,17 +373,24 @@ export function AttendanceSheet({
                 />
                 <Group gap="sm" wrap="nowrap" align="center">
                   <Checkbox
+                    id="attendance-bulk-entry-apply-all"
                     checked={applyEntryToAll}
                     onChange={(e) => setApplyEntryToAll(e.currentTarget.checked)}
                     label={t('bulkApplyToAll')}
                   />
-                  <Button size="xs" variant="light" onClick={applyBulkEntry}>
+                  <Button
+                    id="attendance-bulk-apply-entry"
+                    size="xs"
+                    variant="light"
+                    onClick={applyBulkEntry}
+                  >
                     {t('bulkApplyEntry')}
                   </Button>
                 </Group>
               </Stack>
               <Stack gap="xs">
                 <TextInput
+                  id="attendance-bulk-exit-time"
                   type="time"
                   label={t('exitTime')}
                   value={bulkExitTime}
@@ -262,11 +401,17 @@ export function AttendanceSheet({
                 />
                 <Group gap="sm" wrap="nowrap" align="center">
                   <Checkbox
+                    id="attendance-bulk-exit-apply-all"
                     checked={applyExitToAll}
                     onChange={(e) => setApplyExitToAll(e.currentTarget.checked)}
                     label={t('bulkApplyToAll')}
                   />
-                  <Button size="xs" variant="light" onClick={applyBulkExit}>
+                  <Button
+                    id="attendance-bulk-apply-exit"
+                    size="xs"
+                    variant="light"
+                    onClick={applyBulkExit}
+                  >
                     {t('bulkApplyExit')}
                   </Button>
                 </Group>
@@ -278,6 +423,7 @@ export function AttendanceSheet({
         <Divider />
 
         <TextInput
+          id="attendance-student-search"
           placeholder={t('searchByStudentNameOrId')}
           leftSection={<IconSearch size={16} />}
           value={searchQuery}
@@ -323,6 +469,7 @@ export function AttendanceSheet({
                   <StudentRow
                     key={record.studentId}
                     attendance={record}
+                    syncError={errorStudentIds.has(record.studentId)}
                     onStatusChange={(status) => handleStatusChange(record.studentId, status)}
                     onTimeChange={(field, value) =>
                       handleTimeChange(record.studentId, field, value)
@@ -338,6 +485,3 @@ export function AttendanceSheet({
     </Paper>
   );
 }
-
-
-

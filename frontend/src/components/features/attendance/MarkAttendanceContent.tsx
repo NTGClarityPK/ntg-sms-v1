@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Group, Select, Button, Stack, Paper, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { IconCalendar, IconX } from '@tabler/icons-react';
-import { useAttendanceByClassAndDate } from '@/hooks/useAttendance';
+import { useOfflineAttendance } from '@/hooks/useOfflineAttendance';
 import { useClassSections } from '@/hooks/useClassSections';
 import { AttendanceSheet } from '@/components/features/attendance/AttendanceSheet';
 import { AttendanceStats } from '@/components/features/attendance/AttendanceStats';
@@ -40,10 +40,19 @@ export function MarkAttendanceContent() {
 
   const dateString = selectedDate ? selectedDate.toISOString().split('T')[0] : null;
 
-  const { data: attendanceData, isLoading: isLoadingAttendance } =
-    useAttendanceByClassAndDate(selectedClassSectionId, dateString);
+  const {
+    attendance,
+    isLoading: isLoadingAttendance,
+    isOnline,
+    dbAvailable,
+    syncState,
+    errorStudentIds,
+    isFlushing,
+    persistMark,
+    flush,
+    retryFailed,
+  } = useOfflineAttendance(selectedClassSectionId, dateString);
 
-  const attendance = attendanceData || [];
   const selectedClassSection = classSections.find((cs) => cs.id === selectedClassSectionId);
 
   return (
@@ -61,6 +70,7 @@ export function MarkAttendanceContent() {
         <Stack gap="md">
           <Group grow>
             <Select
+              id="attendance-class-section"
               label={t('classSection')}
               placeholder={t('selectClassSection')}
               data={classSections
@@ -82,6 +92,7 @@ export function MarkAttendanceContent() {
               searchable
             />
             <DatePickerInput
+              id="attendance-date"
               label={t('date')}
               placeholder={t('selectDate')}
               value={selectedDate}
@@ -93,6 +104,7 @@ export function MarkAttendanceContent() {
           {selectedClassSectionId && dateString && (
             <Group>
               <Button
+                id="attendance-clear-selection"
                 variant="subtle"
                 leftSection={<IconX size={16} />}
                 onClick={() => {
@@ -117,6 +129,14 @@ export function MarkAttendanceContent() {
             isLoading={isLoadingAttendance}
             className={selectedClassSection?.className || ''}
             sectionName={selectedClassSection?.sectionName || ''}
+            isOnline={isOnline}
+            dbAvailable={dbAvailable}
+            syncState={syncState}
+            errorStudentIds={errorStudentIds}
+            isFlushing={isFlushing}
+            persistMark={persistMark}
+            flush={flush}
+            retryFailed={retryFailed}
           />
         </>
       )}

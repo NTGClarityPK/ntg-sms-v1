@@ -31,6 +31,16 @@ Teachers typically see class sections they teach or own (class teacher scope).
 
 Marking **Absent** can create a linked absence record on the leaves side (status **absent** — not the same as an approved leave request).
 
+### Weak or no internet
+
+Attendance marking works offline on the device. After you sign in online, NTG Alma quietly prepares **today’s** class lists for teachers who mark attendance, so you can open Attendance and mark even if the signal drops.
+
+- Each tap is saved on the phone immediately.
+- A small status bar shows when you are offline, syncing, or when a mark failed to sync.
+- When internet returns, pending marks sync automatically. You can also tap **Save** or **Retry**.
+- Students added to the class after the list was prepared will not appear until you are online again.
+- If you never signed in online that day (or storage is blocked), open the class once online first.
+
 ---
 
 ## 🕒 History
@@ -52,6 +62,7 @@ Parents review their linked children’s attendance for selected dates.
 ## 💡 Tips & Best Practices
 
 - Apply bulk entry/exit times when the whole class arrives together.
+- Sign in online before a lesson in a weak-signal classroom so today’s class lists can prepare in the background.
 - Export history before month-end for records.
 
 ---
@@ -61,3 +72,5 @@ Parents review their linked children’s attendance for selected dates.
 **Mark tab missing:** Need teacher role + attendance **Edit**.
 **Child tab missing:** Parent role only — students use other views if offered.
 **Excused on reports but not when marking:** Excused is applied via other workflows (e.g. authorised early departure), not the P/A/L grid.
+**Empty class while offline:** Sign in online first (wait a short moment), or open that class online once, then try again offline.
+**Warning icon on a student:** That mark failed to sync — use **Retry** when online.

@@ -268,7 +268,20 @@
     "class": "الصف",
     "section": "الشعبة",
     "statusColumn": "الحالة",
-    "markedByColumn": "سجّله"
+    "markedByColumn": "سجّله",
+    "offlineSavingLocally": "لا يوجد اتصال بالإنترنت — يتم حفظ العلامات على هذا الجهاز",
+    "offlineDbUnavailable": "التخزين دون اتصال غير متاح — يتطلب الحفظ اتصالاً بالإنترنت",
+    "syncingCount": "جارٍ مزامنة {count} سجل…",
+    "syncFailedCount": "فشلت مزامنة {count} سجل — ستُعاد المحاولة",
+    "syncRetry": "إعادة المحاولة",
+    "allSaved": "تم الحفظ بالكامل",
+    "studentSyncError": "فشلت مزامنة هذه العلامة",
+    "savedLocallyTitle": "تم الحفظ على هذا الجهاز",
+    "savedLocallyMessage": "ستُزامن الحضور عند عودة الاتصال",
+    "syncPartialTitle": "مزامنة جزئية",
+    "syncPartialMessage": "تم حفظ {synced} وفشل {failed} — استخدم إعادة المحاولة للبقية",
+    "saveSuccessTitle": "نجاح",
+    "saveSuccessMessage": "تم تسجيل الحضور بنجاح"
   },
   "auth": {
     "signIn": "تسجيل الدخول",

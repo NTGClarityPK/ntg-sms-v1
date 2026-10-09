@@ -13,7 +13,7 @@ import {
   Popover,
   ActionIcon,
 } from '@mantine/core';
-import { IconNotes } from '@tabler/icons-react';
+import { IconNotes, IconAlertTriangle } from '@tabler/icons-react';
 import type { Attendance, AttendanceStatus } from '@/types/attendance';
 import { displayStudentId } from '@/lib/utils/student-display';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -23,6 +23,7 @@ interface StudentRowProps {
   onStatusChange: (status: AttendanceStatus) => void;
   onTimeChange: (field: 'entryTime' | 'exitTime', value: string) => void;
   onNotesChange: (notes: string) => void;
+  syncError?: boolean;
 }
 
 export function StudentRow({
@@ -30,6 +31,7 @@ export function StudentRow({
   onStatusChange,
   onTimeChange,
   onNotesChange,
+  syncError = false,
 }: StudentRowProps) {
   const t = useTranslations('attendance');
   const [entryTime, setEntryTime] = useState(attendance.entryTime || '');
@@ -81,9 +83,19 @@ export function StudentRow({
               .slice(0, 2)}
           </Avatar>
           <div style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
-            <Text fw={500} size="sm" lineClamp={1}>
-              {attendance.studentName}
-            </Text>
+            <Group gap={4} wrap="nowrap" align="center">
+              <Text fw={500} size="sm" lineClamp={1} style={{ minWidth: 0 }}>
+                {attendance.studentName}
+              </Text>
+              {syncError && (
+                <IconAlertTriangle
+                  size={14}
+                  color={notifyColors.error}
+                  title={t('studentSyncError')}
+                  style={{ flexShrink: 0 }}
+                />
+              )}
+            </Group>
             <Text size="xs" c="dimmed" lineClamp={1}>
               {displayStudentId(attendance.studentIdNumber, attendance.studentId)}
             </Text>

@@ -26,7 +26,7 @@ Detailed guides for each module of the NTG Alma portal. One page per feature.
 
 | Feature | What it covers |
 | --- | --- |
-| [✅ Attendance](attendance.md) | Mark / Child / History tabs; P/A/L; Excel export |
+| [✅ Attendance](attendance.md) | Mark / Child / History tabs; P/A/L; offline taps; Excel export |
 | [📝 Assessments](assessments.md) | Create modes, grades, schedule PDF; My Assessments |
 | [📐 Rubrics](rubrics.md) | Presets under Integrations; Grade Entry criterion scores |
 | [🏫 Google Classroom](google-classroom.md) | Read-only grade and rubric sync |

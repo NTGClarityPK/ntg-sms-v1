@@ -38,7 +38,7 @@ Teacher taps Present/Absent/...
   If offline → stay pending; flush later on reconnect / focus
 ```
 
-Roster for the day is also cached in IndexedDB so the student list still appears when offline (after the teacher has opened that class online at least once).
+Roster for the day is also cached in IndexedDB so the student list still appears when offline. Teachers with attendance edit get **today’s** class-teacher sections warmed in the background after portal login (capped, low concurrency); opening a class online still refreshes the cache.
 
 ---
 

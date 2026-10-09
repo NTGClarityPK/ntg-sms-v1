@@ -14,5 +14,6 @@
 
 * [🏫 Google Classroom](modules/google-classroom.md)
 * [💳 Billing & Subscription](modules/billing.md)
+* [✅ Attendance](modules/attendance.md)
 * [📐 Rubrics](modules/rubrics.md)
 * [🎧 Reach Support](modules/reach-support.md)

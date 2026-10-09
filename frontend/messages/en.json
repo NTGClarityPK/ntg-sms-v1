@@ -256,7 +256,20 @@
     "class": "Class",
     "section": "Section",
     "statusColumn": "Status",
-    "markedByColumn": "Marked by"
+    "markedByColumn": "Marked by",
+    "offlineSavingLocally": "No internet — taps are saving on this device",
+    "offlineDbUnavailable": "Offline storage unavailable — Save requires an internet connection",
+    "syncingCount": "Syncing {count} records…",
+    "syncFailedCount": "{count} records failed to sync — will retry",
+    "syncRetry": "Retry",
+    "allSaved": "All saved",
+    "studentSyncError": "Failed to sync this mark",
+    "savedLocallyTitle": "Saved on this device",
+    "savedLocallyMessage": "Attendance will sync when you are back online",
+    "syncPartialTitle": "Partially synced",
+    "syncPartialMessage": "{synced} saved, {failed} failed — use Retry for the rest",
+    "saveSuccessTitle": "Success",
+    "saveSuccessMessage": "Attendance marked successfully"
   },
   "auth": {
     "signIn": "Sign in",
