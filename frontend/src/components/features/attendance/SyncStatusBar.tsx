@@ -13,6 +13,7 @@ interface SyncStatusBarProps {
   isFlushing: boolean;
   onRetry: () => void;
   dbAvailable: boolean;
+  lastErrorMessage?: string | null;
 }
 
 export function SyncStatusBar({
@@ -21,6 +22,7 @@ export function SyncStatusBar({
   isFlushing,
   onRetry,
   dbAvailable,
+  lastErrorMessage,
 }: SyncStatusBarProps) {
   const t = useTranslations('attendance');
   const colors = useThemeColors();
@@ -89,18 +91,24 @@ export function SyncStatusBar({
     return (
       <Box
         px="sm"
-        py={4}
+        py={6}
         style={{
           minHeight: 32,
-          maxHeight: 40,
           borderRadius: 'var(--mantine-radius-sm)',
           background: 'var(--mantine-color-red-light)',
         }}
       >
-        <Group gap="xs" wrap="nowrap" justify="space-between" h={24}>
-          <Group gap="xs" wrap="nowrap">
-            <IconAlertTriangle size={14} color={colors.error} />
-            <Text size="xs">{t('syncFailedCount', { count: errors })}</Text>
+        <Group gap="xs" wrap="nowrap" justify="space-between" align="flex-start">
+          <Group gap="xs" wrap="nowrap" align="flex-start" style={{ flex: 1, minWidth: 0 }}>
+            <IconAlertTriangle size={14} color={colors.error} style={{ marginTop: 2, flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <Text size="xs">{t('syncFailedCount', { count: errors })}</Text>
+              {lastErrorMessage ? (
+                <Text size="xs" c="dimmed" lineClamp={2} title={lastErrorMessage}>
+                  {lastErrorMessage}
+                </Text>
+              ) : null}
+            </div>
           </Group>
           <Button
             id="attendance-sync-retry"
@@ -109,6 +117,7 @@ export function SyncStatusBar({
             color="red"
             onClick={onRetry}
             loading={isFlushing}
+            style={{ flexShrink: 0 }}
           >
             {t('syncRetry')}
           </Button>

@@ -11,6 +11,7 @@ import { AttendanceSheet } from '@/components/features/attendance/AttendanceShee
 import { AttendanceStats } from '@/components/features/attendance/AttendanceStats';
 import { useMyStaff } from '@/hooks/useStaff';
 import { useAuth } from '@/hooks/useAuth';
+import { localDateString } from '@/lib/offline/attendance-roster-warmup';
 import type { User } from '@/types/auth';
 import '@mantine/dates/styles.css';
 
@@ -38,7 +39,7 @@ export function MarkAttendanceContent() {
   });
   const classSections = classSectionsData?.data || [];
 
-  const dateString = selectedDate ? selectedDate.toISOString().split('T')[0] : null;
+  const dateString = selectedDate ? localDateString(selectedDate) : null;
 
   const {
     attendance,
@@ -47,6 +48,7 @@ export function MarkAttendanceContent() {
     dbAvailable,
     syncState,
     errorStudentIds,
+    lastSyncErrorMessage,
     isFlushing,
     persistMark,
     flush,
@@ -133,6 +135,7 @@ export function MarkAttendanceContent() {
             dbAvailable={dbAvailable}
             syncState={syncState}
             errorStudentIds={errorStudentIds}
+            lastSyncErrorMessage={lastSyncErrorMessage}
             isFlushing={isFlushing}
             persistMark={persistMark}
             flush={flush}

@@ -52,6 +52,12 @@ export function resetAttendanceDbAvailability(): void {
   attendanceDbAvailable = null;
 }
 
+function normalizeOptionalText(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export async function upsertOutbox(input: UpsertOutboxInput): Promise<string | null> {
   try {
     const db = await getOfflineDB();
@@ -61,16 +67,22 @@ export async function upsertOutbox(input: UpsertOutboxInput): Promise<string | n
       input.studentId,
     ]);
 
+    const entryTime = normalizeOptionalText(input.entryTime);
+    const exitTime = normalizeOptionalText(input.exitTime);
+    const notes = normalizeOptionalText(input.notes);
+
     const now = Date.now();
     if (existing) {
       const updated: AttendanceOutboxRecord = {
         ...existing,
         status: input.status,
-        entryTime: input.entryTime ?? null,
-        exitTime: input.exitTime ?? null,
-        notes: input.notes ?? null,
+        entryTime,
+        exitTime,
+        notes,
         syncStatus: 'pending',
         errorMessage: null,
+        // Keep attemptCount so we don't reset a failing record forever on re-tap;
+        // Retry button is the explicit reset path.
         updatedAt: now,
       };
       await db.put(STORE_ATTENDANCE_OUTBOX, updated);
@@ -84,9 +96,9 @@ export async function upsertOutbox(input: UpsertOutboxInput): Promise<string | n
       studentId: input.studentId,
       date: input.date,
       status: input.status,
-      entryTime: input.entryTime ?? null,
-      exitTime: input.exitTime ?? null,
-      notes: input.notes ?? null,
+      entryTime,
+      exitTime,
+      notes,
       syncStatus: 'pending',
       errorMessage: null,
       createdAt: now,
@@ -106,9 +118,11 @@ export async function getPendingRecords(): Promise<AttendanceOutboxRecord[]> {
   try {
     const db = await getOfflineDB();
     const all = await db.getAll(STORE_ATTENDANCE_OUTBOX);
+    // Include "syncing" so a crashed/aborted flush cannot leave rows stuck forever.
     return all.filter(
       (r) =>
         r.syncStatus === 'pending' ||
+        r.syncStatus === 'syncing' ||
         (r.syncStatus === 'error' && r.attemptCount < MAX_AUTO_RETRY_ATTEMPTS),
     );
   } catch {

@@ -227,6 +227,13 @@ export function useOfflineAttendance(
     return ids;
   }, [outboxRows]);
 
+  const lastSyncErrorMessage = useMemo(() => {
+    const withMessage = outboxRows.find(
+      (r) => r.syncStatus === 'error' && r.errorMessage && r.errorMessage.trim().length > 0,
+    );
+    return withMessage?.errorMessage ?? null;
+  }, [outboxRows]);
+
   const isLoading =
     (!!classSectionId && !!date && onlineQuery.isLoading && !cachedRecords) || isLoadingCache;
 
@@ -292,6 +299,7 @@ export function useOfflineAttendance(
     usingCacheOnly,
     syncState,
     errorStudentIds,
+    lastSyncErrorMessage,
     isFlushing,
     persistMark,
     flush,

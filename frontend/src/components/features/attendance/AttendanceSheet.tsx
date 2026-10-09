@@ -42,10 +42,11 @@ interface AttendanceSheetProps {
   dbAvailable: boolean;
   syncState: AttendanceSyncState;
   errorStudentIds: Set<string>;
+  lastSyncErrorMessage?: string | null;
   isFlushing: boolean;
   persistMark: (input: PersistMarkInput) => Promise<boolean>;
-  flush: () => Promise<{ synced: number; failed: number }>;
-  retryFailed: () => Promise<{ synced: number; failed: number }>;
+  flush: () => Promise<{ synced: number; failed: number; lastErrorMessage?: string }>;
+  retryFailed: () => Promise<{ synced: number; failed: number; lastErrorMessage?: string }>;
 }
 
 export function AttendanceSheet({
@@ -59,6 +60,7 @@ export function AttendanceSheet({
   dbAvailable,
   syncState,
   errorStudentIds,
+  lastSyncErrorMessage,
   isFlushing,
   persistMark,
   flush,
@@ -228,10 +230,10 @@ export function AttendanceSheet({
   };
 
   const handleSave = async () => {
-    if (isSaving || bulkMarkMutation.isPending || isFlushing) return;
+    if (isSaving || bulkMarkMutation.isPending) return;
     setIsSaving(true);
     try {
-      // Ensure full sheet is in the outbox before flush / online fallback
+      // Queue current sheet into the outbox, then flush (waits if a flush is already running).
       if (dbAvailable) {
         await Promise.all(
           localAttendance.map((a) =>
@@ -240,9 +242,9 @@ export function AttendanceSheet({
               date,
               studentId: a.studentId,
               status: a.status,
-              entryTime: a.entryTime ?? null,
-              exitTime: a.exitTime ?? null,
-              notes: a.notes ?? null,
+              entryTime: a.entryTime?.trim() ? a.entryTime : null,
+              exitTime: a.exitTime?.trim() ? a.exitTime : null,
+              notes: a.notes?.trim() ? a.notes : null,
             }),
           ),
         );
@@ -265,9 +267,9 @@ export function AttendanceSheet({
           records: localAttendance.map((a) => ({
             studentId: a.studentId,
             status: a.status,
-            entryTime: a.entryTime,
-            exitTime: a.exitTime,
-            notes: a.notes,
+            entryTime: a.entryTime?.trim() ? a.entryTime : undefined,
+            exitTime: a.exitTime?.trim() ? a.exitTime : undefined,
+            notes: a.notes?.trim() ? a.notes : undefined,
           })),
         });
         return;
@@ -277,10 +279,18 @@ export function AttendanceSheet({
       if (result.failed > 0) {
         notifications.show({
           title: t('syncPartialTitle'),
-          message: t('syncPartialMessage', {
-            synced: result.synced,
-            failed: result.failed,
-          }),
+          message:
+            result.lastErrorMessage ||
+            t('syncPartialMessage', {
+              synced: result.synced,
+              failed: result.failed,
+            }),
+          color: notifyColors.warning,
+        });
+      } else if (result.synced === 0 && result.lastErrorMessage) {
+        notifications.show({
+          title: t('syncPartialTitle'),
+          message: result.lastErrorMessage,
           color: notifyColors.warning,
         });
       } else {
@@ -326,8 +336,23 @@ export function AttendanceSheet({
           isOnline={isOnline}
           syncState={syncState}
           isFlushing={isFlushing}
+          lastErrorMessage={lastSyncErrorMessage}
           onRetry={() => {
-            void retryFailed();
+            void (async () => {
+              const result = await retryFailed();
+              if (result.failed > 0 || result.lastErrorMessage) {
+                notifications.show({
+                  title: t('syncPartialTitle'),
+                  message:
+                    result.lastErrorMessage ||
+                    t('syncPartialMessage', {
+                      synced: result.synced,
+                      failed: result.failed,
+                    }),
+                  color: notifyColors.warning,
+                });
+              }
+            })();
           }}
           dbAvailable={dbAvailable}
         />
