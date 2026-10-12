@@ -13,6 +13,8 @@ import {
 } from './attendance-outbox';
 
 const SYNCED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** After this many soft failures, surface a hard error so the UI stops spinning forever. */
+const MAX_SOFT_FAILS = 3;
 
 export interface SyncResult {
   synced: number;
@@ -21,8 +23,14 @@ export interface SyncResult {
 }
 
 let syncInProgress = false;
-/** Resolvers waiting for the in-flight flush to finish (Save must not no-op). */
 let syncWaiters: Array<() => void> = [];
+/** Soft-fail counters keyed by localId — reset on success. */
+const softFailCounts = new Map<string, number>();
+let lastFlushErrorMessage: string | null = null;
+
+export function getLastFlushErrorMessage(): string | null {
+  return lastFlushErrorMessage;
+}
 
 function isOnline(): boolean {
   return typeof navigator === 'undefined' ? true : navigator.onLine;
@@ -35,28 +43,13 @@ function groupByClassDate(
   for (const record of records) {
     const key = `${record.classSectionId}|${record.date}`;
     const existing = map.get(key);
-    if (existing) {
-      existing.push(record);
-    } else {
-      map.set(key, [record]);
-    }
+    if (existing) existing.push(record);
+    else map.set(key, [record]);
   }
   return map;
 }
 
-function isUnauthorizedError(error: unknown): boolean {
-  if (error instanceof AxiosError) {
-    return error.response?.status === 401;
-  }
-  if (error && typeof error === 'object' && 'response' in error) {
-    const response = (error as { response?: { status?: number } }).response;
-    return response?.status === 401;
-  }
-  return false;
-}
-
-function isTransientError(error: unknown): boolean {
-  if (isUnauthorizedError(error)) return true;
+function isOfflineOrNetworkError(error: unknown): boolean {
   if (error && typeof error === 'object' && 'isOfflineError' in error) {
     if ((error as { isOfflineError?: boolean }).isOfflineError) return true;
   }
@@ -88,12 +81,10 @@ function errorMessageFromUnknown(error: unknown): string {
   return 'Sync failed';
 }
 
-/** Normalise optional time fields for the bulk API (omit blanks). */
 function cleanTime(value: string | null | undefined): string | undefined {
   if (value == null) return undefined;
   const trimmed = value.trim();
   if (!trimmed) return undefined;
-  // Accept HH:MM or HH:MM:SS from inputs / Postgres
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
     const parts = trimmed.split(':');
     const hh = parts[0]?.padStart(2, '0') ?? '00';
@@ -135,13 +126,20 @@ async function waitForSyncSlot(): Promise<void> {
   });
 }
 
+/**
+ * Push pending outbox rows to POST /api/v1/attendance/bulk.
+ * Simple rules:
+ * - Only one flush at a time
+ * - Network/offline → leave pending (soft), after a few soft fails → error
+ * - Any other API error → mark error immediately (show message + Retry)
+ */
 export async function flushOutbox(): Promise<SyncResult> {
-  // If a flush is already running, wait for it then run again so Save/Retry never no-op.
   while (syncInProgress) {
     await waitForSyncSlot();
   }
   if (!isOnline()) {
-    return { synced: 0, failed: 0, lastErrorMessage: 'No internet connection' };
+    lastFlushErrorMessage = 'No internet connection';
+    return { synced: 0, failed: 0, lastErrorMessage: lastFlushErrorMessage };
   }
 
   syncInProgress = true;
@@ -150,13 +148,12 @@ export async function flushOutbox(): Promise<SyncResult> {
   let lastErrorMessage: string | undefined;
 
   try {
-    // Dedupe + recover stale "syncing" happens inside getPendingRecords.
     const pending = await getPendingRecords();
     if (pending.length === 0) {
+      lastFlushErrorMessage = null;
       return { synced: 0, failed: 0 };
     }
 
-    // One row per student/day only (guard against any leftover duplicates).
     const uniqueByStudentDay = new Map<string, AttendanceOutboxRecord>();
     for (const row of pending) {
       const key = `${row.classSectionId}|${row.date}|${row.studentId}`;
@@ -166,7 +163,6 @@ export async function flushOutbox(): Promise<SyncResult> {
       }
     }
     const uniquePending = Array.from(uniqueByStudentDay.values());
-
     const localIds = uniquePending.map((r) => r.localId);
     await markAsSyncing(localIds);
 
@@ -197,26 +193,45 @@ export async function flushOutbox(): Promise<SyncResult> {
           const server = byStudent.get(local.studentId);
           const serverId = server?.id && server.id.length > 0 ? server.id : local.localId;
           await markAsSynced(local.localId, serverId);
+          softFailCounts.delete(local.localId);
           synced += 1;
         }
       } catch (error) {
-        if (isTransientError(error)) {
-          // Soft fail: keep pending so Retry / reconnect can succeed without burning attempts.
-          await revertSyncingToPending(groupIds);
-          lastErrorMessage = errorMessageFromUnknown(error);
+        const message = errorMessageFromUnknown(error);
+        lastErrorMessage = message;
+        lastFlushErrorMessage = message;
+
+        if (isOfflineOrNetworkError(error)) {
+          // Soft fail a few times, then hard-error so the spinner cannot loop forever.
+          let escalate = false;
+          for (const id of groupIds) {
+            const next = (softFailCounts.get(id) ?? 0) + 1;
+            softFailCounts.set(id, next);
+            if (next >= MAX_SOFT_FAILS) escalate = true;
+          }
+          if (escalate) {
+            for (const local of group) {
+              await markAsError(local.localId, message);
+              softFailCounts.delete(local.localId);
+              failed += 1;
+            }
+          } else {
+            await revertSyncingToPending(groupIds);
+          }
           continue;
         }
 
-        const message = errorMessageFromUnknown(error);
-        lastErrorMessage = message;
+        // Real API/validation/auth errors — fail fast with a visible message.
         for (const local of group) {
           await markAsError(local.localId, message);
+          softFailCounts.delete(local.localId);
           failed += 1;
         }
       }
     }
 
     await clearSyncedRecords(SYNCED_RETENTION_MS);
+    if (failed === 0 && synced > 0) lastFlushErrorMessage = null;
     return { synced, failed, lastErrorMessage };
   } finally {
     syncInProgress = false;
@@ -228,6 +243,7 @@ export async function retryFailedAndFlush(
   classSectionId?: string,
   date?: string,
 ): Promise<SyncResult> {
+  softFailCounts.clear();
   await resetErrorRecordsForRetry(classSectionId, date);
   return flushOutbox();
 }

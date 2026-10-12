@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Group, Text, Button, Loader, Box } from '@mantine/core';
-import { IconCloudCheck, IconAlertTriangle, IconWifiOff } from '@tabler/icons-react';
+import { IconCloudCheck, IconAlertTriangle, IconWifiOff, IconCloudUpload } from '@tabler/icons-react';
 import type { AttendanceSyncState } from '@/hooks/useOfflineAttendance';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -27,26 +27,26 @@ export function SyncStatusBar({
   const t = useTranslations('attendance');
   const colors = useThemeColors();
   const [showAllSaved, setShowAllSaved] = useState(false);
-  const [hadPending, setHadPending] = useState(false);
+  const [hadActivity, setHadActivity] = useState(false);
 
   const { pending, syncing, errors } = syncState;
-  const isBusy = isFlushing || syncing > 0 || pending > 0;
+  const activelySyncing = isFlushing || syncing > 0;
 
   useEffect(() => {
-    if (pending > 0 || syncing > 0 || errors > 0) {
-      setHadPending(true);
+    if (pending > 0 || syncing > 0 || errors > 0 || isFlushing) {
+      setHadActivity(true);
       setShowAllSaved(false);
       return;
     }
-    if (hadPending && isOnline && errors === 0 && pending === 0 && syncing === 0) {
+    if (hadActivity && isOnline) {
       setShowAllSaved(true);
       const timer = setTimeout(() => {
         setShowAllSaved(false);
-        setHadPending(false);
+        setHadActivity(false);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [pending, syncing, errors, isOnline, hadPending]);
+  }, [pending, syncing, errors, isFlushing, isOnline, hadActivity]);
 
   if (!dbAvailable) {
     return (
@@ -55,7 +55,6 @@ export function SyncStatusBar({
         py={4}
         style={{
           minHeight: 32,
-          maxHeight: 40,
           borderRadius: 'var(--mantine-radius-sm)',
           background: 'var(--mantine-color-yellow-light)',
         }}
@@ -74,14 +73,17 @@ export function SyncStatusBar({
         py={4}
         style={{
           minHeight: 32,
-          maxHeight: 40,
           borderRadius: 'var(--mantine-radius-sm)',
           background: 'var(--mantine-color-yellow-light)',
         }}
       >
         <Group gap="xs" wrap="nowrap" h={24}>
           <IconWifiOff size={14} color={colors.warning} />
-          <Text size="xs">{t('offlineSavingLocally')}</Text>
+          <Text size="xs">
+            {pending > 0
+              ? t('offlinePendingCount', { count: pending })
+              : t('offlineSavingLocally')}
+          </Text>
         </Group>
       </Box>
     );
@@ -126,24 +128,55 @@ export function SyncStatusBar({
     );
   }
 
-  if (isBusy) {
-    const count = pending + syncing;
+  // Only spin while a flush is actually in flight — not merely because rows are pending.
+  if (activelySyncing) {
+    const count = Math.max(syncing, pending, 1);
     return (
       <Box
         px="sm"
         py={4}
         style={{
           minHeight: 32,
-          maxHeight: 40,
           borderRadius: 'var(--mantine-radius-sm)',
           background: 'var(--mantine-color-blue-light)',
         }}
       >
         <Group gap="xs" wrap="nowrap" h={24}>
           <Loader size={12} />
-          <Text size="xs">
-            {count > 0 ? t('syncingCount', { count }) : t('syncingInProgress')}
-          </Text>
+          <Text size="xs">{t('syncingCount', { count })}</Text>
+        </Group>
+      </Box>
+    );
+  }
+
+  if (pending > 0) {
+    return (
+      <Box
+        px="sm"
+        py={4}
+        style={{
+          minHeight: 32,
+          borderRadius: 'var(--mantine-radius-sm)',
+          background: 'var(--mantine-color-blue-light)',
+        }}
+      >
+        <Group gap="xs" wrap="nowrap" justify="space-between" h={24}>
+          <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+            <IconCloudUpload size={14} color={colors.info} style={{ flexShrink: 0 }} />
+            <Text size="xs" lineClamp={1}>
+              {t('pendingSyncCount', { count: pending })}
+            </Text>
+          </Group>
+          <Button
+            id="attendance-sync-now"
+            size="compact-xs"
+            variant="light"
+            onClick={onRetry}
+            loading={isFlushing}
+            style={{ flexShrink: 0 }}
+          >
+            {t('syncNow')}
+          </Button>
         </Group>
       </Box>
     );
@@ -156,7 +189,6 @@ export function SyncStatusBar({
         py={4}
         style={{
           minHeight: 32,
-          maxHeight: 40,
           borderRadius: 'var(--mantine-radius-sm)',
           background: 'var(--mantine-color-green-light)',
         }}

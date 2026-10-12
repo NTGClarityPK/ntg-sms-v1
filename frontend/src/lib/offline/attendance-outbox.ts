@@ -10,7 +10,7 @@ import {
 const MAX_AUTO_RETRY_ATTEMPTS = 5;
 const ROSTER_TTL_MS = 24 * 60 * 60 * 1000;
 /** Syncing rows older than this are treated as abandoned and returned to pending. */
-const STALE_SYNCING_MS = 60_000;
+const STALE_SYNCING_MS = 15_000;
 
 export type { AttendanceOutboxRecord, AttendanceRosterCacheRecord };
 

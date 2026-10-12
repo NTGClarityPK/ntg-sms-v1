@@ -14,7 +14,11 @@ import {
   upsertOutbox,
   type AttendanceOutboxRecord,
 } from '@/lib/offline/attendance-outbox';
-import { flushOutbox, retryFailedAndFlush } from '@/lib/offline/attendance-sync';
+import {
+  flushOutbox,
+  getLastFlushErrorMessage,
+  retryFailedAndFlush,
+} from '@/lib/offline/attendance-sync';
 
 export interface AttendanceSyncState {
   pending: number;
@@ -177,29 +181,20 @@ export function useOfflineAttendance(
     [isOnline, dbAvailable, refreshOutbox, queryClient, branchId],
   );
 
-  // Flush on reconnect (debounced 2s) and on focus/visibility
+  // Flush on reconnect only — do NOT flush on every focus/visibility change
+  // (that caused an endless "Syncing…" spinner when the API soft-failed).
   useEffect(() => {
     const flushOnOnline = () => {
       if (onlineFlushTimerRef.current) clearTimeout(onlineFlushTimerRef.current);
       onlineFlushTimerRef.current = setTimeout(() => {
         scheduleFlush(0);
-      }, 2000);
-    };
-
-    const flushOnFocus = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      if (!navigator.onLine) return;
-      scheduleFlush(500);
+      }, 1500);
     };
 
     window.addEventListener('online', flushOnOnline);
-    window.addEventListener('focus', flushOnFocus);
-    document.addEventListener('visibilitychange', flushOnFocus);
 
     return () => {
       window.removeEventListener('online', flushOnOnline);
-      window.removeEventListener('focus', flushOnFocus);
-      document.removeEventListener('visibilitychange', flushOnFocus);
       if (onlineFlushTimerRef.current) clearTimeout(onlineFlushTimerRef.current);
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
     };
@@ -231,8 +226,8 @@ export function useOfflineAttendance(
     const withMessage = outboxRows.find(
       (r) => r.syncStatus === 'error' && r.errorMessage && r.errorMessage.trim().length > 0,
     );
-    return withMessage?.errorMessage ?? null;
-  }, [outboxRows]);
+    return withMessage?.errorMessage ?? getLastFlushErrorMessage();
+  }, [outboxRows, isFlushing]);
 
   const isLoading =
     (!!classSectionId && !!date && onlineQuery.isLoading && !cachedRecords) || isLoadingCache;
