@@ -35,6 +35,7 @@ Marking **Absent** can create a linked absence record on the leaves side (status
 
 Attendance marking works offline on the device. After you sign in online, NTG Alma quietly prepares **today’s** class lists for teachers who mark attendance, so you can open Attendance and mark even if the signal drops.
 
+- If the connection drops, the app stays open — other sidebar items are dimmed; **Attendance** stays available.
 - Each tap is saved on the phone immediately.
 - A small status bar shows when you are offline, syncing, or when a mark failed to sync.
 - When internet returns, pending marks sync automatically. You can also tap **Save** or **Retry**.

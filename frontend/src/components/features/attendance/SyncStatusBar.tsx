@@ -141,7 +141,9 @@ export function SyncStatusBar({
       >
         <Group gap="xs" wrap="nowrap" h={24}>
           <Loader size={12} />
-          <Text size="xs">{t('syncingCount', { count })}</Text>
+          <Text size="xs">
+            {count > 0 ? t('syncingCount', { count }) : t('syncingInProgress')}
+          </Text>
         </Group>
       </Box>
     );

@@ -77,6 +77,7 @@ export function BranchGuard({ children }: BranchGuardProps) {
   // Auto-select first branch if user has branches but no current branch selected
   useEffect(() => {
     const autoSelectBranch = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       if (
         !isLoading &&
         !isSelectingBranch &&

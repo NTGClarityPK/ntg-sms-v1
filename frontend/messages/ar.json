@@ -272,6 +272,7 @@
     "offlineSavingLocally": "لا يوجد اتصال بالإنترنت — يتم حفظ العلامات على هذا الجهاز",
     "offlineDbUnavailable": "التخزين دون اتصال غير متاح — يتطلب الحفظ اتصالاً بالإنترنت",
     "syncingCount": "جارٍ مزامنة {count} سجل…",
+    "syncingInProgress": "جارٍ المزامنة…",
     "syncFailedCount": "فشلت مزامنة {count} سجل — ستُعاد المحاولة",
     "syncRetry": "إعادة المحاولة",
     "allSaved": "تم الحفظ بالكامل",
@@ -1301,6 +1302,7 @@
     "certificates": "الشهادات",
     "myCertificates": "شهاداتي",
     "planLockedTooltip": "قم بترقية خطتك للوصول إلى هذه الميزة",
+    "offlineLockedTooltip": "متاح عند عودة الاتصال. الحضور يعمل دون اتصال.",
     "support": "الدعم"
   },
   "idCards": {

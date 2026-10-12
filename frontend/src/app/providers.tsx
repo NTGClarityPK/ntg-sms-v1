@@ -84,6 +84,8 @@ function GlobalClientBootRecovery() {
     };
 
     const reloadOnce = () => {
+      // Offline: never hard-reload — that destroys the portal shell used for attendance.
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       try {
         if (window.sessionStorage.getItem(onceKey) === '1') return;
         window.sessionStorage.setItem(onceKey, '1');

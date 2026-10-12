@@ -93,8 +93,21 @@ export function useAuth() {
       }
       try {
         const { data } = await supabase.auth.getSession();
-        applyHasSession(!!data.session?.access_token);
+        if (data.session?.access_token) {
+          applyHasSession(true);
+          return;
+        }
+        // Offline with persisted user: keep queries/UI alive without kicking to login.
+        if (typeof navigator !== 'undefined' && !navigator.onLine && useAuthStore.getState().user) {
+          applyHasSession(true);
+          return;
+        }
+        applyHasSession(false);
       } catch {
+        if (typeof navigator !== 'undefined' && !navigator.onLine && useAuthStore.getState().user) {
+          applyHasSession(true);
+          return;
+        }
         applyHasSession(false);
       }
     })();
@@ -130,6 +143,10 @@ export function useAuth() {
       const isNetwork =
         err?.code === 'ERR_NETWORK' ||
         err?.message === 'Network Error';
+      const isOffline =
+        Boolean((err as { isOfflineError?: boolean })?.isOfflineError) ||
+        (typeof err?.message === 'string' &&
+          err.message.toLowerCase().includes('no internet'));
 
       const status = err?.response?.status;
       const bodyMsg =
@@ -142,6 +159,8 @@ export function useAuth() {
         typeof bodyMsg === 'string' &&
         bodyMsg.toLowerCase().includes('no token provided');
 
+      // Offline: do not retry /auth/me — use persisted store user instead.
+      if (isOffline) return false;
       // If the user is logged out, do not loop retries.
       if (isNoToken401 && hasSessionRef.current === false) return false;
       if (isNoToken401) return failureCount < 5;
@@ -234,12 +253,20 @@ export function useAuth() {
 
   const resolvedUser = useMemo(() => (user as User | undefined) ?? storeUser ?? undefined, [user, storeUser]);
 
+  const isOfflineAuthError = Boolean(
+    error &&
+      ((typeof navigator !== 'undefined' && !navigator.onLine) ||
+        Boolean((error as { isOfflineError?: boolean }).isOfflineError) ||
+        (error instanceof Error && error.message.toLowerCase().includes('no internet'))),
+  );
+
   return {
     user: resolvedUser,
     // When we don't yet know session state, treat as loading.
-    isLoading: hasSession === null ? true : isLoading,
-    isAuthenticated: !!resolvedUser && !error,
-    error,
+    isLoading: hasSession === null ? true : isLoading && !resolvedUser,
+    // Offline /auth/me failures must not mark the user logged out.
+    isAuthenticated: !!resolvedUser && (!error || isOfflineAuthError),
+    error: isOfflineAuthError ? null : error,
     refetch,
   };
 }

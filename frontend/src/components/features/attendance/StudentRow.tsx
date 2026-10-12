@@ -47,17 +47,16 @@ export function StudentRow({
   }, [attendance]);
 
   const handleStatusChange = (value: AttendanceStatus) => {
+    // Parent handleStatusChange already persists status + entry/exit times in one outbox write.
+    // Only update local display here — calling onTimeChange would race a second upsert and duplicate rows.
     onStatusChange(value);
     if (value === 'present' || value === 'late') {
       const now = new Date();
       const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       setEntryTime(timeString);
-      onTimeChange('entryTime', timeString);
     } else {
       setEntryTime('');
       setExitTime('');
-      onTimeChange('entryTime', '');
-      onTimeChange('exitTime', '');
     }
   };
 

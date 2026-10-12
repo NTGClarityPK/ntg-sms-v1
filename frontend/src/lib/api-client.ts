@@ -353,6 +353,11 @@ class ApiClient {
             // "No token provided" means the request went out without a token (e.g. session not
             // ready yet or race on page load) – do NOT logout so the user isn’t kicked out unnecessarily.
           if (!isNoToken && typeof window !== 'undefined') {
+            // Never wipe the session / hard-redirect while offline — keep the portal
+            // shell alive for attendance (same idea as Resto offline POS).
+            if (!window.navigator.onLine) {
+              return Promise.reject(error);
+            }
             try {
               const {
                 data: { session },

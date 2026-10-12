@@ -150,15 +150,27 @@ export async function flushOutbox(): Promise<SyncResult> {
   let lastErrorMessage: string | undefined;
 
   try {
+    // Dedupe + recover stale "syncing" happens inside getPendingRecords.
     const pending = await getPendingRecords();
     if (pending.length === 0) {
       return { synced: 0, failed: 0 };
     }
 
-    const localIds = pending.map((r) => r.localId);
+    // One row per student/day only (guard against any leftover duplicates).
+    const uniqueByStudentDay = new Map<string, AttendanceOutboxRecord>();
+    for (const row of pending) {
+      const key = `${row.classSectionId}|${row.date}|${row.studentId}`;
+      const existing = uniqueByStudentDay.get(key);
+      if (!existing || row.updatedAt >= existing.updatedAt) {
+        uniqueByStudentDay.set(key, row);
+      }
+    }
+    const uniquePending = Array.from(uniqueByStudentDay.values());
+
+    const localIds = uniquePending.map((r) => r.localId);
     await markAsSyncing(localIds);
 
-    const groups = groupByClassDate(pending);
+    const groups = groupByClassDate(uniquePending);
 
     for (const group of groups.values()) {
       const classSectionId = group[0]?.classSectionId;

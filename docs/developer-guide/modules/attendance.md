@@ -35,6 +35,18 @@ Safe limits:
 - Once per branch+date+staff session
 - Does **not** warm school-wide lists for admins
 
+### Offline portal shell
+
+While offline, the portal stays alive as an SPA (same idea as Resto offline POS):
+
+- `reloadOnOnline: false` / `cacheOnFrontEndNav: false` in `frontend/next.config.js`
+- Sidebar: only **Attendance** stays clickable; other items are disabled
+- `OfflinePortalGuard` soft-`replace`s non-attendance routes to `/attendance` (no hard reload)
+- Auth/API: do not clear session or redirect to login while offline if a cached user exists
+- Notifications realtime is paused while offline
+
+Whitelist: `frontend/src/lib/offline/offline-nav.ts`
+
 ### Key files
 
 | File | Role |

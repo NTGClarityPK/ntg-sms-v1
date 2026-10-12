@@ -10,4 +10,6 @@ export interface NavItem {
   showCondition?: () => boolean;
   /** True when the role may see the item but the current plan does not include it. */
   planLocked?: boolean;
+  /** True when offline and this href is outside the offline whitelist (Attendance only). */
+  offlineLocked?: boolean;
 }

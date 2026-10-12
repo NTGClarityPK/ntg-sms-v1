@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { NotificationsRealtimeSubscription } from '@/components/layout/NotificationsRealtimeSubscription';
 import { PortalServiceWorkerRegistration } from '@/components/common/PortalServiceWorkerRegistration';
 import { AttendanceRosterWarmup } from '@/components/common/AttendanceRosterWarmup';
+import { OfflinePortalGuard } from '@/components/common/OfflinePortalGuard';
 import { useLocaleSync } from '@/hooks/useLocaleSync';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +15,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     <AuthGuard>
       <BranchGuard>
         <PortalServiceWorkerRegistration />
+        <OfflinePortalGuard />
         <AttendanceRosterWarmup />
         <NotificationsRealtimeSubscription />
         <AppShell>{children}</AppShell>

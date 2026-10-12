@@ -6,9 +6,18 @@ import { Skeleton, Container, Stack } from '@mantine/core';
 import { useAuth } from '@/hooks/useAuth';
 import { getSessionWithRetry, isLogoutInProgress } from '@/lib/auth';
 import { supabase } from '@/lib/supabase/client';
+import { useAuthStore } from '@/lib/store/auth-store';
 
 interface AuthGuardProps {
   children: React.ReactNode;
+}
+
+function hasCachedPortalUser(): boolean {
+  return Boolean(useAuthStore.getState().user);
+}
+
+function isBrowserOffline(): boolean {
+  return typeof navigator !== 'undefined' && !navigator.onLine;
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
@@ -20,6 +29,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const redirectToLogin = () => {
     if (typeof window === 'undefined') return;
     if (window.location.pathname.startsWith('/login')) return;
+    // Never hard-kick while offline if we still have a cached portal user —
+    // that tears down the shell and breaks attendance offline mode.
+    if (isBrowserOffline() && hasCachedPortalUser()) return;
     window.location.replace('/login');
   };
 
@@ -35,10 +47,26 @@ export function AuthGuard({ children }: AuthGuardProps) {
       try {
         const session = await getSessionWithRetry({ attempts: 3, delayMs: 50 });
         const nextHasSession = !!session?.access_token;
-        setHasSession(nextHasSession);
+        if (nextHasSession) {
+          setHasSession(true);
+          setCheckingSession(false);
+          return;
+        }
+        // Offline: keep shell alive using persisted auth store (Resto-style).
+        if (isBrowserOffline() && hasCachedPortalUser()) {
+          setHasSession(true);
+          setCheckingSession(false);
+          return;
+        }
+        setHasSession(false);
         setCheckingSession(false);
-        if (!nextHasSession) redirectToLogin();
+        redirectToLogin();
       } catch {
+        if (isBrowserOffline() && hasCachedPortalUser()) {
+          setHasSession(true);
+          setCheckingSession(false);
+          return;
+        }
         setHasSession(false);
         setCheckingSession(false);
         redirectToLogin();
@@ -52,9 +80,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event !== 'SIGNED_OUT' && session?.access_token) return;
-      setHasSession(false);
-      setCheckingSession(false);
-      redirectToLogin();
+      // Offline TOKEN_REFRESHED failures can surface oddly — only hard-kick on real sign-out.
+      if (event === 'SIGNED_OUT') {
+        setHasSession(false);
+        setCheckingSession(false);
+        redirectToLogin();
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -74,4 +105,3 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   return <>{children}</>;
 }
-

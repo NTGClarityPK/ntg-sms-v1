@@ -57,6 +57,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useSubscriptionFeatures } from '@/hooks/api/useSubscription';
+import { isNavHrefAllowedOffline } from '@/lib/offline/offline-nav';
 import type { PlanFeatures } from '@/types/subscription';
 import { useStudentSessionStore } from '@/lib/store/student-session-store';
 import type { ThemeConfig } from '@/lib/theme/themeConfig';
@@ -686,7 +687,12 @@ export function Sidebar({
   }).map((item) => {
     const subFeature = subscriptionNavFeatures[item.href];
     const planLocked = Boolean(subFeature && (!planFeatures || !planFeatures[subFeature]));
-    return planLocked ? { ...item, planLocked: true } : item;
+    const offlineLocked = !isOnline && !isNavHrefAllowedOffline(item.href);
+    return {
+      ...item,
+      ...(planLocked ? { planLocked: true } : {}),
+      ...(offlineLocked ? { offlineLocked: true } : {}),
+    };
   });
 
   const dashboardItem = navItems.find((item) => item.href === '/dashboard');
@@ -766,12 +772,16 @@ export function Sidebar({
   const renderNavItem = (item: NavItem) => {
     const active = isActive(item.href);
     const planLocked = Boolean(item.planLocked);
-    const tooltipLabel = planLocked
-      ? tNav('planLockedTooltip')
-      : tNav(item.key);
+    const offlineLocked = Boolean(item.offlineLocked);
+    const navDisabled = planLocked || offlineLocked;
+    const tooltipLabel = offlineLocked
+      ? tNav('offlineLockedTooltip')
+      : planLocked
+        ? tNav('planLockedTooltip')
+        : tNav(item.key);
     
     // Apply active styling ONLY when collapsed (like RMS)
-    const shouldShowActive = effectiveCollapsed && active && !planLocked;
+    const shouldShowActive = effectiveCollapsed && active && !navDisabled;
     
     const content = (
       <Button
@@ -781,13 +791,13 @@ export function Sidebar({
         variant="subtle"
         size="md"
         fullWidth={!effectiveCollapsed}
-        disabled={planLocked}
+        disabled={navDisabled}
         leftSection={effectiveCollapsed ? undefined : <item.icon size={NAV_ICON_SIZE} />}
         className="nav-item-button"
-        data-active={active && !planLocked}
+        data-active={active && !navDisabled}
         data-collapsed={effectiveCollapsed}
         onClick={() => {
-          if (planLocked) return;
+          if (navDisabled) return;
           router.push(item.href);
           onMobileClose?.();
         }}
@@ -798,7 +808,7 @@ export function Sidebar({
           color: shouldShowActive 
             ? navbarConfig?.activeTextColor 
             : navButtonConfig?.textColor || navbarConfig?.textColor,
-          opacity: planLocked ? 0.55 : 1,
+          opacity: navDisabled ? 0.35 : 1,
         }}
         styles={{
           root: {
@@ -817,7 +827,7 @@ export function Sidebar({
       </Button>
     );
 
-    if (effectiveCollapsed || planLocked) {
+    if (effectiveCollapsed || navDisabled) {
       return (
         <Tooltip key={item.href} label={tooltipLabel} position="right" withArrow>
           <Box style={{ display: 'inline-block', width: '100%' }}>{content}</Box>

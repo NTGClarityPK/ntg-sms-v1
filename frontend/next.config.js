@@ -58,6 +58,11 @@ const pwaConfig = withPWA({
   skipWaiting: true,
   clientsClaim: true,
   cleanupOutdatedCaches: true,
+  // Do NOT hard-reload when connectivity returns — that tears down the portal shell
+  // and breaks offline attendance (Resto-style: keep SPA alive).
+  reloadOnOnline: false,
+  // Soft client navigations must not race document caching.
+  cacheOnFrontEndNav: false,
   // Keep runtime caching disabled (don't intercept app navigations like /login).
   // Note: @ducanh2912/next-pwa reads runtimeCaching from workboxOptions.
   workboxOptions: {

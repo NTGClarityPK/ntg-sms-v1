@@ -39,6 +39,7 @@ interface FlyoutNavLinkProps {
   navActiveBackground?: string;
   navActiveTextColor?: string;
   planLocked?: boolean;
+  offlineLocked?: boolean;
   lockedTooltip?: string;
   onPick: () => void;
 }
@@ -54,21 +55,23 @@ function FlyoutNavLink({
   navActiveBackground,
   navActiveTextColor,
   planLocked = false,
+  offlineLocked = false,
   lockedTooltip,
   onPick,
 }: FlyoutNavLinkProps) {
   const theme = useMantineTheme();
   const [hovered, setHovered] = useState(false);
+  const navDisabled = planLocked || offlineLocked;
 
-  const backgroundColor = active && !planLocked
+  const backgroundColor = active && !navDisabled
     ? navActiveBackground ?? 'transparent'
-    : hovered && !planLocked
+    : hovered && !navDisabled
       ? hoverBg
       : 'transparent';
 
-  const color = active && !planLocked
+  const color = active && !navDisabled
     ? navActiveTextColor ?? defaultFg
-    : hovered && !planLocked
+    : hovered && !navDisabled
       ? hoverFg
       : defaultFg;
 
@@ -77,12 +80,12 @@ function FlyoutNavLink({
       id={`flyout-nav-${item.href.slice(1).replace(/\//g, '-')}`}
       type="button"
       className="nav-item-button"
-      data-active={active && !planLocked}
+      data-active={active && !navDisabled}
       data-collapsed={false}
-      disabled={planLocked}
-      aria-current={active && !planLocked ? 'page' : undefined}
+      disabled={navDisabled}
+      aria-current={active && !navDisabled ? 'page' : undefined}
       onClick={() => {
-        if (planLocked) return;
+        if (navDisabled) return;
         onPick();
       }}
       onMouseEnter={() => setHovered(true)}
@@ -90,8 +93,8 @@ function FlyoutNavLink({
       style={{
         backgroundColor,
         color,
-        fontWeight: active && !planLocked ? 600 : 400,
-        opacity: planLocked ? 0.55 : 1,
+        fontWeight: active && !navDisabled ? 600 : 400,
+        opacity: navDisabled ? 0.35 : 1,
         width: '100%',
       }}
       styles={{
@@ -115,7 +118,7 @@ function FlyoutNavLink({
     </UnstyledButton>
   );
 
-  if (planLocked && lockedTooltip) {
+  if (navDisabled && lockedTooltip) {
     return (
       <Tooltip label={lockedTooltip} position="right" withArrow>
         <Box style={{ width: '100%' }}>{button}</Box>
@@ -386,9 +389,14 @@ export function CollapsedNavGroupPopover({
                 navActiveBackground={navActiveBackground}
                 navActiveTextColor={navActiveTextColor}
                 planLocked={item.planLocked}
-                lockedTooltip={tNav('planLockedTooltip')}
+                offlineLocked={item.offlineLocked}
+                lockedTooltip={
+                  item.offlineLocked
+                    ? tNav('offlineLockedTooltip')
+                    : tNav('planLockedTooltip')
+                }
                 onPick={() => {
-                  if (item.planLocked) return;
+                  if (item.planLocked || item.offlineLocked) return;
                   router.push(item.href);
                   onOpenChange(false);
                   onNavigate?.();
@@ -420,10 +428,17 @@ export function CollapsedNavDashboardButton({
   const palette = useCollapsedRailPalette();
   const isRtl = useLocale() === 'ar';
 
+  const tNav = useTranslations('navigation');
   const active = pathMatchesRoute(pathname, item.href);
   const tooltipSide = isRtl ? 'left' : 'right';
+  const navDisabled = Boolean(item.planLocked || item.offlineLocked);
+  const tooltipLabel = item.offlineLocked
+    ? tNav('offlineLockedTooltip')
+    : item.planLocked
+      ? tNav('planLockedTooltip')
+      : label;
 
-  const base = active
+  const base = active && !navDisabled
     ? {
         backgroundColor: alpha(palette.primary, 0.12),
         color: palette.primary,
@@ -433,18 +448,21 @@ export function CollapsedNavDashboardButton({
     : {
         backgroundColor: 'transparent',
         color: palette.inactiveIcon,
+        opacity: navDisabled ? 0.35 : 1,
       };
 
   return (
-    <Tooltip label={label} position={tooltipSide} withArrow>
+    <Tooltip label={tooltipLabel} position={tooltipSide} withArrow>
       <UnstyledButton
         className="nav-item-button"
         id={`nav-link-${item.href.slice(1).replace(/\//g, '-')}`}
         type="button"
         aria-label={label}
-        data-active={active}
+        data-active={active && !navDisabled}
         data-collapsed={true}
+        disabled={navDisabled}
         onClick={() => {
+          if (navDisabled) return;
           router.push(item.href);
           onNavigate?.();
         }}
@@ -459,12 +477,14 @@ export function CollapsedNavDashboardButton({
             borderRadius: theme.radius.sm,
             transition: 'background-color 120ms ease, color 120ms ease',
             ...base,
-            '&:hover': {
-              backgroundColor: active
-                ? alpha(palette.primary, 0.16)
-                : palette.inactiveHoverBg,
-              color: active ? palette.primary : palette.inactiveHoverIcon,
-            },
+            '&:hover': navDisabled
+              ? undefined
+              : {
+                  backgroundColor: active
+                    ? alpha(palette.primary, 0.16)
+                    : palette.inactiveHoverBg,
+                  color: active ? palette.primary : palette.inactiveHoverIcon,
+                },
           },
         }}
       >

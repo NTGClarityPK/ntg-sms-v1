@@ -260,6 +260,7 @@
     "offlineSavingLocally": "No internet — taps are saving on this device",
     "offlineDbUnavailable": "Offline storage unavailable — Save requires an internet connection",
     "syncingCount": "Syncing {count} records…",
+    "syncingInProgress": "Syncing…",
     "syncFailedCount": "{count} records failed to sync — will retry",
     "syncRetry": "Retry",
     "allSaved": "All saved",
@@ -1278,6 +1279,7 @@
     "settings": "Settings",
     "billing": "Billing",
     "planLockedTooltip": "Upgrade your plan to access this feature",
+    "offlineLockedTooltip": "Available when you are back online. Attendance still works offline.",
     "support": "Support"
   },
   "notification": {

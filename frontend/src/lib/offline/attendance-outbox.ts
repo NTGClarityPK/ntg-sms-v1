@@ -9,6 +9,8 @@ import {
 
 const MAX_AUTO_RETRY_ATTEMPTS = 5;
 const ROSTER_TTL_MS = 24 * 60 * 60 * 1000;
+/** Syncing rows older than this are treated as abandoned and returned to pending. */
+const STALE_SYNCING_MS = 60_000;
 
 export type { AttendanceOutboxRecord, AttendanceRosterCacheRecord };
 
@@ -33,7 +35,14 @@ function rosterCacheKey(classSectionId: string, date: string): string {
   return `${classSectionId}:${date}`;
 }
 
+function outboxDedupeKey(r: Pick<AttendanceOutboxRecord, 'classSectionId' | 'date' | 'studentId'>): string {
+  return `${r.classSectionId}|${r.date}|${r.studentId}`;
+}
+
 let attendanceDbAvailable: boolean | null = null;
+
+/** Serialize upserts per student/day so parallel taps cannot create duplicates. */
+const upsertLocks = new Map<string, Promise<string | null>>();
 
 export async function isAttendanceDbAvailable(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
@@ -58,67 +67,179 @@ function normalizeOptionalText(value: string | null | undefined): string | null 
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export async function upsertOutbox(input: UpsertOutboxInput): Promise<string | null> {
+/**
+ * Keep the newest row per class+date+student; delete the rest.
+ * Fixes historical duplicates from parallel upsert races.
+ */
+export async function dedupeOutboxRecords(
+  classSectionId?: string,
+  date?: string,
+): Promise<number> {
   try {
     const db = await getOfflineDB();
-    const existing = await db.getFromIndex(STORE_ATTENDANCE_OUTBOX, 'by-class-date-student', [
+    const all = await db.getAll(STORE_ATTENDANCE_OUTBOX);
+    const scoped = all.filter((r) => {
+      if (classSectionId && r.classSectionId !== classSectionId) return false;
+      if (date && r.date !== date) return false;
+      return true;
+    });
+
+    const bestByKey = new Map<string, AttendanceOutboxRecord>();
+    const toDelete: string[] = [];
+
+    for (const row of scoped) {
+      const key = outboxDedupeKey(row);
+      const existing = bestByKey.get(key);
+      if (!existing) {
+        bestByKey.set(key, row);
+        continue;
+      }
+      // Prefer newest updatedAt; if tie, prefer non-synced over synced, then pending over syncing.
+      const rowScore = row.updatedAt;
+      const existingScore = existing.updatedAt;
+      if (rowScore >= existingScore) {
+        toDelete.push(existing.localId);
+        bestByKey.set(key, row);
+      } else {
+        toDelete.push(row.localId);
+      }
+    }
+
+    if (toDelete.length === 0) return 0;
+    const tx = db.transaction(STORE_ATTENDANCE_OUTBOX, 'readwrite');
+    await Promise.all(toDelete.map((id) => tx.store.delete(id)));
+    await tx.done;
+    return toDelete.length;
+  } catch {
+    resetAttendanceDbAvailability();
+    return 0;
+  }
+}
+
+/** Move abandoned "syncing" rows back to pending so the UI cannot spin forever. */
+export async function recoverStaleSyncingRecords(): Promise<number> {
+  try {
+    const db = await getOfflineDB();
+    const all = await db.getAll(STORE_ATTENDANCE_OUTBOX);
+    const cutoff = Date.now() - STALE_SYNCING_MS;
+    const stale = all.filter((r) => r.syncStatus === 'syncing' && r.updatedAt < cutoff);
+    if (stale.length === 0) return 0;
+    const tx = db.transaction(STORE_ATTENDANCE_OUTBOX, 'readwrite');
+    await Promise.all(
+      stale.map((r) =>
+        tx.store.put({
+          ...r,
+          syncStatus: 'pending',
+          errorMessage: null,
+          updatedAt: Date.now(),
+        }),
+      ),
+    );
+    await tx.done;
+    return stale.length;
+  } catch {
+    resetAttendanceDbAvailability();
+    return 0;
+  }
+}
+
+async function upsertOutboxUnlocked(input: UpsertOutboxInput): Promise<string | null> {
+  const db = await getOfflineDB();
+
+  // Prefer index lookup; fall back to scan so we still dedupe if the index is missing/stale.
+  let existing =
+    (await db.getFromIndex(STORE_ATTENDANCE_OUTBOX, 'by-class-date-student', [
       input.classSectionId,
       input.date,
       input.studentId,
-    ]);
+    ])) ?? undefined;
 
-    const entryTime = normalizeOptionalText(input.entryTime);
-    const exitTime = normalizeOptionalText(input.exitTime);
-    const notes = normalizeOptionalText(input.notes);
-
-    const now = Date.now();
-    if (existing) {
-      const updated: AttendanceOutboxRecord = {
-        ...existing,
-        status: input.status,
-        entryTime,
-        exitTime,
-        notes,
-        syncStatus: 'pending',
-        errorMessage: null,
-        // Keep attemptCount so we don't reset a failing record forever on re-tap;
-        // Retry button is the explicit reset path.
-        updatedAt: now,
-      };
-      await db.put(STORE_ATTENDANCE_OUTBOX, updated);
-      return updated.localId;
+  if (!existing) {
+    const all = await db.getAll(STORE_ATTENDANCE_OUTBOX);
+    const matches = all.filter(
+      (r) =>
+        r.classSectionId === input.classSectionId &&
+        r.date === input.date &&
+        r.studentId === input.studentId,
+    );
+    if (matches.length > 0) {
+      matches.sort((a, b) => b.updatedAt - a.updatedAt);
+      existing = matches[0];
+      // Delete extras immediately
+      if (matches.length > 1) {
+        const tx = db.transaction(STORE_ATTENDANCE_OUTBOX, 'readwrite');
+        await Promise.all(matches.slice(1).map((m) => tx.store.delete(m.localId)));
+        await tx.done;
+      }
     }
+  }
 
-    const localId = generateLocalId();
-    const record: AttendanceOutboxRecord = {
-      localId,
-      classSectionId: input.classSectionId,
-      studentId: input.studentId,
-      date: input.date,
+  const entryTime = normalizeOptionalText(input.entryTime);
+  const exitTime = normalizeOptionalText(input.exitTime);
+  const notes = normalizeOptionalText(input.notes);
+  const now = Date.now();
+
+  if (existing) {
+    const updated: AttendanceOutboxRecord = {
+      ...existing,
       status: input.status,
       entryTime,
       exitTime,
       notes,
       syncStatus: 'pending',
       errorMessage: null,
-      createdAt: now,
       updatedAt: now,
-      attemptCount: 0,
-      serverRecordId: null,
     };
-    await db.put(STORE_ATTENDANCE_OUTBOX, record);
-    return localId;
-  } catch {
-    resetAttendanceDbAvailability();
-    return null;
+    await db.put(STORE_ATTENDANCE_OUTBOX, updated);
+    return updated.localId;
   }
+
+  const localId = generateLocalId();
+  const record: AttendanceOutboxRecord = {
+    localId,
+    classSectionId: input.classSectionId,
+    studentId: input.studentId,
+    date: input.date,
+    status: input.status,
+    entryTime,
+    exitTime,
+    notes,
+    syncStatus: 'pending',
+    errorMessage: null,
+    createdAt: now,
+    updatedAt: now,
+    attemptCount: 0,
+    serverRecordId: null,
+  };
+  await db.put(STORE_ATTENDANCE_OUTBOX, record);
+  return localId;
+}
+
+export async function upsertOutbox(input: UpsertOutboxInput): Promise<string | null> {
+  const key = `${input.classSectionId}|${input.date}|${input.studentId}`;
+  const previous = upsertLocks.get(key) ?? Promise.resolve(null);
+  const next = previous
+    .catch(() => null)
+    .then(() => upsertOutboxUnlocked(input))
+    .catch(() => {
+      resetAttendanceDbAvailability();
+      return null;
+    })
+    .finally(() => {
+      if (upsertLocks.get(key) === next) {
+        upsertLocks.delete(key);
+      }
+    });
+  upsertLocks.set(key, next);
+  return next;
 }
 
 export async function getPendingRecords(): Promise<AttendanceOutboxRecord[]> {
   try {
+    await recoverStaleSyncingRecords();
+    await dedupeOutboxRecords();
     const db = await getOfflineDB();
     const all = await db.getAll(STORE_ATTENDANCE_OUTBOX);
-    // Include "syncing" so a crashed/aborted flush cannot leave rows stuck forever.
     return all.filter(
       (r) =>
         r.syncStatus === 'pending' ||
@@ -136,6 +257,8 @@ export async function getOutboxForClassDate(
   date: string,
 ): Promise<AttendanceOutboxRecord[]> {
   try {
+    await recoverStaleSyncingRecords();
+    await dedupeOutboxRecords(classSectionId, date);
     const db = await getOfflineDB();
     const all = await db.getAll(STORE_ATTENDANCE_OUTBOX);
     return all.filter((r) => r.classSectionId === classSectionId && r.date === date);
@@ -149,12 +272,18 @@ export async function markAsSyncing(localIds: string[]): Promise<void> {
   if (localIds.length === 0) return;
   try {
     const db = await getOfflineDB();
+    const now = Date.now();
     const tx = db.transaction(STORE_ATTENDANCE_OUTBOX, 'readwrite');
     await Promise.all(
       localIds.map(async (id) => {
         const record = await tx.store.get(id);
         if (!record) return;
-        await tx.store.put({ ...record, syncStatus: 'syncing', errorMessage: null });
+        await tx.store.put({
+          ...record,
+          syncStatus: 'syncing',
+          errorMessage: null,
+          updatedAt: now,
+        });
       }),
     );
     await tx.done;
@@ -168,13 +297,32 @@ export async function markAsSynced(localId: string, serverRecordId: string): Pro
     const db = await getOfflineDB();
     const record = await db.get(STORE_ATTENDANCE_OUTBOX, localId);
     if (!record) return;
-    await db.put(STORE_ATTENDANCE_OUTBOX, {
-      ...record,
-      syncStatus: 'synced',
-      serverRecordId,
-      errorMessage: null,
-      updatedAt: Date.now(),
-    });
+
+    // Mark this row synced; delete any leftover duplicates for the same student/day.
+    const all = await db.getAll(STORE_ATTENDANCE_OUTBOX);
+    const siblings = all.filter(
+      (r) =>
+        r.classSectionId === record.classSectionId &&
+        r.date === record.date &&
+        r.studentId === record.studentId,
+    );
+    const now = Date.now();
+    const tx = db.transaction(STORE_ATTENDANCE_OUTBOX, 'readwrite');
+    await Promise.all(
+      siblings.map((r) => {
+        if (r.localId === localId) {
+          return tx.store.put({
+            ...r,
+            syncStatus: 'synced',
+            serverRecordId,
+            errorMessage: null,
+            updatedAt: now,
+          });
+        }
+        return tx.store.delete(r.localId);
+      }),
+    );
+    await tx.done;
   } catch {
     resetAttendanceDbAvailability();
   }
@@ -221,10 +369,11 @@ export async function resetErrorRecordsForRetry(
   date?: string,
 ): Promise<void> {
   try {
+    await dedupeOutboxRecords(classSectionId, date);
     const db = await getOfflineDB();
     const all = await db.getAll(STORE_ATTENDANCE_OUTBOX);
     const targets = all.filter((r) => {
-      if (r.syncStatus !== 'error') return false;
+      if (r.syncStatus !== 'error' && r.syncStatus !== 'syncing') return false;
       if (classSectionId && r.classSectionId !== classSectionId) return false;
       if (date && r.date !== date) return false;
       return true;

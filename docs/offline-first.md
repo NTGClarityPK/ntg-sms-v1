@@ -40,6 +40,15 @@ Teacher taps Present/Absent/...
 
 Roster for the day is also cached in IndexedDB so the student list still appears when offline. Teachers with attendance edit get **today’s** class-teacher sections warmed in the background after portal login (capped, low concurrency); opening a class online still refreshes the cache.
 
+### Offline portal navigation
+
+While offline, keep the portal SPA alive (do not hard-reload on reconnect):
+
+- Whitelist: `/attendance` (+ subpaths) — see `frontend/src/lib/offline/offline-nav.ts`
+- Other sidebar items disabled; soft redirect to `/attendance` if on another page
+- PWA: `reloadOnOnline: false`, `cacheOnFrontEndNav: false`
+- Do not logout / hard-redirect to login on offline auth/API failures when a cached user exists
+
 ---
 
 ## Scope (keep small)
