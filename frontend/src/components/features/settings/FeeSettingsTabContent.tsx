@@ -76,6 +76,8 @@ export function FeeSettingsTabContent() {
       bankBranchCode: '',
       paymentInstructions: '',
       footerText: '',
+      lateFeesEnabled: false,
+      lateFeeTemplateId: null as string | null,
     },
   });
 
@@ -90,10 +92,36 @@ export function FeeSettingsTabContent() {
       bankBranchCode: s.bankBranchCode ?? '',
       paymentInstructions: s.paymentInstructions ?? '',
       footerText: s.footerText ?? '',
+      lateFeesEnabled: !!s.lateFeesEnabled,
+      lateFeeTemplateId: s.lateFeeTemplateId ?? null,
     });
     challanForm.resetDirty();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challanSettingsQuery.data]);
+
+  const feeTemplateOptions = useMemo(() => {
+    return ((templates ?? []) as FeeTemplate[])
+      .filter((tpl) => tpl.type === 'Fee' && tpl.isActive)
+      .map((tpl) => ({ value: tpl.id, label: tpl.name }));
+  }, [templates]);
+
+  const selectedLateFeeTemplate = useMemo(() => {
+    const id = challanForm.values.lateFeeTemplateId;
+    if (!id) return null;
+    return ((templates ?? []) as FeeTemplate[]).find((tpl) => tpl.id === id) ?? null;
+  }, [challanForm.values.lateFeeTemplateId, templates]);
+
+  const lateFeePreview = useMemo(() => {
+    const metric = selectedLateFeeTemplate?.metrics?.[0];
+    if (!metric) return null;
+    if (metric.amountType === 'Percentage') {
+      return tFees('settings.lateFees.previewPercentage', { amount: metric.amount });
+    }
+    return tFees('settings.lateFees.previewAbsolute', {
+      amount: Number(metric.amount).toLocaleString(),
+      currency: selectedLateFeeTemplate?.currencyCode ?? '',
+    });
+  }, [selectedLateFeeTemplate, tFees]);
 
   const assignForm = useForm({
     initialValues: {
@@ -195,6 +223,14 @@ export function FeeSettingsTabContent() {
             <Button
               id="settings-fees-challan-settings-save"
               onClick={async () => {
+                if (challanForm.values.lateFeesEnabled && !challanForm.values.lateFeeTemplateId) {
+                  notifications.show({
+                    title: tFees('settings.challanSettings.saveErrorTitle'),
+                    message: tFees('settings.lateFees.packagePlaceholder'),
+                    color: 'red',
+                  });
+                  return;
+                }
                 try {
                   await upsertChallanSettings.mutateAsync({
                     challanTemplate: challanForm.values.challanTemplate,
@@ -204,6 +240,8 @@ export function FeeSettingsTabContent() {
                     bankBranchCode: challanForm.values.bankBranchCode.trim() || null,
                     paymentInstructions: challanForm.values.paymentInstructions.trim() || null,
                     footerText: challanForm.values.footerText.trim() || null,
+                    lateFeesEnabled: challanForm.values.lateFeesEnabled,
+                    lateFeeTemplateId: challanForm.values.lateFeeTemplateId,
                   });
                   notifications.show({
                     title: tCommon('save'),
@@ -219,12 +257,8 @@ export function FeeSettingsTabContent() {
                   });
                 }
               }}
-              loading={upsertChallanSettings.isPending}
-              disabled={
-                upsertChallanSettings.isPending ||
-                challanSettingsQuery.isLoading ||
-                !challanForm.isDirty()
-              }
+              loading={upsertChallanSettings.isPending && challanForm.isDirty()}
+              disabled={challanSettingsQuery.isLoading || !challanForm.isDirty()}
             >
               {tCommon('save')}
             </Button>
@@ -305,6 +339,100 @@ export function FeeSettingsTabContent() {
               />
             </Skeleton>
           </Stack>
+        </Stack>
+      </Paper>
+
+      {/* Late fees settings */}
+      <Paper withBorder radius="md" p="md" mb="md" mt="md">
+        <Stack gap="sm">
+          <Group justify="space-between" wrap="wrap">
+            <Stack gap={2}>
+              <Group gap="sm">
+                <Text fw={700}>{tFees('settings.lateFees.title')}</Text>
+                <Badge
+                  id="settings-fees-late-fees-badge"
+                  variant="light"
+                  color={challanForm.values.lateFeesEnabled ? 'green' : 'gray'}
+                >
+                  {challanForm.values.lateFeesEnabled
+                    ? tFees('settings.lateFees.badgeOn')
+                    : tFees('settings.lateFees.badgeOff')}
+                </Badge>
+              </Group>
+              <Text size="sm" c="dimmed">
+                {tFees('settings.lateFees.description')}
+              </Text>
+            </Stack>
+            <Button
+              id="settings-fees-late-fees-save"
+              onClick={async () => {
+                if (challanForm.values.lateFeesEnabled && !challanForm.values.lateFeeTemplateId) {
+                  notifications.show({
+                    title: tFees('settings.challanSettings.saveErrorTitle'),
+                    message: tFees('settings.lateFees.packagePlaceholder'),
+                    color: 'red',
+                  });
+                  return;
+                }
+                try {
+                  await upsertChallanSettings.mutateAsync({
+                    challanTemplate: challanForm.values.challanTemplate,
+                    bankName: challanForm.values.bankName.trim() || null,
+                    accountTitle: challanForm.values.accountTitle.trim() || null,
+                    accountNumber: challanForm.values.accountNumber.trim() || null,
+                    bankBranchCode: challanForm.values.bankBranchCode.trim() || null,
+                    paymentInstructions: challanForm.values.paymentInstructions.trim() || null,
+                    footerText: challanForm.values.footerText.trim() || null,
+                    lateFeesEnabled: challanForm.values.lateFeesEnabled,
+                    lateFeeTemplateId: challanForm.values.lateFeeTemplateId,
+                  });
+                  notifications.show({
+                    title: tCommon('save'),
+                    message: tFees('settings.challanSettings.saved'),
+                    color: 'green',
+                  });
+                  challanForm.resetDirty();
+                } catch (e) {
+                  notifications.show({
+                    title: tFees('settings.challanSettings.saveErrorTitle'),
+                    message:
+                      e instanceof Error ? e.message : tFees('settings.challanSettings.saveErrorMessage'),
+                    color: 'red',
+                  });
+                }
+              }}
+              loading={upsertChallanSettings.isPending && challanForm.isDirty()}
+              disabled={challanSettingsQuery.isLoading || !challanForm.isDirty()}
+            >
+              {tCommon('save')}
+            </Button>
+          </Group>
+
+          <Checkbox
+            id="settings-fees-late-fees-enabled"
+            label={tFees('settings.lateFees.enable')}
+            disabled={challanSettingsQuery.isLoading || upsertChallanSettings.isPending}
+            {...challanForm.getInputProps('lateFeesEnabled', { type: 'checkbox' })}
+          />
+
+          <Select
+            id="settings-fees-late-fees-template"
+            label={tFees('settings.lateFees.package')}
+            description={tFees('settings.lateFees.packageDescription')}
+            placeholder={tFees('settings.lateFees.packagePlaceholder')}
+            data={feeTemplateOptions}
+            searchable
+            clearable
+            disabled={challanSettingsQuery.isLoading || upsertChallanSettings.isPending}
+            value={challanForm.values.lateFeeTemplateId}
+            onChange={(v) => challanForm.setFieldValue('lateFeeTemplateId', v)}
+          />
+
+          {lateFeePreview ? (
+            <Text size="sm" c="dimmed" id="settings-fees-late-fees-preview">
+              {tFees('settings.lateFees.previewLabel')}: {lateFeePreview}
+            </Text>
+          ) : null}
         </Stack>
       </Paper>
 

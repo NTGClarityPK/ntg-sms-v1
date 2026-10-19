@@ -44,6 +44,49 @@ export interface FeeChallanSettings {
   bankBranchCode: string | null;
   paymentInstructions: string | null;
   footerText: string | null;
+  lateFeesEnabled?: boolean;
+  lateFeeTemplateId?: string | null;
+}
+
+export type LateFeeListStatus = 'all' | 'active' | 'waived';
+
+export interface LateFeeListItem {
+  id: string;
+  challanId: string;
+  studentName: string;
+  classSectionLabel: string;
+  billingMonth: string;
+  dueDate: string;
+  daysOverdue: number | null;
+  lateFeeAmount: number;
+  appliedAt: string;
+  waived: boolean;
+  waivedReason: string | null;
+  waivedAt: string | null;
+  canWaive: boolean;
+}
+
+export interface LateFeeListMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  summary: {
+    activeCount: number;
+    activeAmount: number;
+    waivedThisMonthCount: number;
+    waivedThisMonthAmount: number;
+    lateFeesConfigured: boolean;
+  };
+}
+
+export interface LateFeeListFilters {
+  month?: string;
+  classSectionId?: string;
+  status?: LateFeeListStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface FeeChallanGenerateResult {

@@ -145,9 +145,16 @@ export function MyFeesTab(props: { mode: Mode }) {
                             <Text size="sm">{Number(c.payableAmount).toLocaleString()}</Text>
                           </Table.Td>
                           <Table.Td>
-                            <Badge variant="light" color={badge.color}>
-                              {badge.label}
-                            </Badge>
+                            <Group gap={6} wrap="wrap">
+                              <Badge variant="light" color={badge.color}>
+                                {badge.label}
+                              </Badge>
+                              {c.includesLateFee ? (
+                                <Badge variant="light" color="orange" id={`my-fees-late-fee-badge-${c.id}`}>
+                                  {tFees('myFees.includesLateFee')}
+                                </Badge>
+                              ) : null}
+                            </Group>
                           </Table.Td>
                           <Table.Td>
                             <Group gap="xs" justify="flex-end" wrap="nowrap">

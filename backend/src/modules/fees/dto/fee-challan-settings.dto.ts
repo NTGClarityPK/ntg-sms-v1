@@ -1,4 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class FeeChallanSettingsDto {
   id!: string;
@@ -10,6 +11,8 @@ export class FeeChallanSettingsDto {
   bankBranchCode!: string | null;
   paymentInstructions!: string | null;
   footerText!: string | null;
+  lateFeesEnabled!: boolean;
+  lateFeeTemplateId!: string | null;
   createdAt!: string;
   updatedAt!: string;
 
@@ -46,5 +49,18 @@ export class UpsertFeeChallanSettingsDto {
   @IsOptional()
   @IsString()
   footerText?: string | null;
-}
 
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  lateFeesEnabled?: boolean;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
+  @IsUUID()
+  lateFeeTemplateId?: string | null;
+}

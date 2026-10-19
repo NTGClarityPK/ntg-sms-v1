@@ -9,6 +9,9 @@ import type {
   FeeStudentTemplatesResponse,
   FeeChallanSettings,
   FeeTemplate,
+  LateFeeListFilters,
+  LateFeeListItem,
+  LateFeeListMeta,
 } from '@/types/fees';
 import { notifications } from '@mantine/notifications';
 
@@ -99,6 +102,8 @@ export function useFeeChallanSettings() {
           bankBranchCode: null,
           paymentInstructions: null,
           footerText: null,
+          lateFeesEnabled: false,
+          lateFeeTemplateId: null,
         }
       );
     },
@@ -511,6 +516,7 @@ export type MyPendingChallanRow = {
   dueDate: string;
   status: string;
   pdfUrl: string | null;
+  includesLateFee?: boolean;
 };
 
 export function useMyPendingFeeChallans(params: { mode: 'parent' | 'student' }) {
@@ -687,6 +693,45 @@ export function useDeleteFeeMetricExclusion() {
     onSuccess: async (_data, variables) => {
       await qc.invalidateQueries({ queryKey: ['fees', 'students', variables.studentId, 'templates'] });
       notifications.show({ title: 'Success', message: 'Metric re-included', color: 'green' });
+    },
+  });
+}
+
+export function useLateFees(params: LateFeeListFilters = {}) {
+  return useQuery({
+    queryKey: ['fees', 'late-fees', params],
+    queryFn: async () => {
+      const response = await apiClient.get<LateFeeListItem[]>('/api/v1/fees/late-fees', {
+        params: {
+          month: params.month || undefined,
+          classSectionId: params.classSectionId || undefined,
+          status: params.status ?? 'all',
+          search: params.search || undefined,
+          page: params.page ?? 1,
+          limit: params.limit ?? 20,
+        },
+      });
+      return response as { data: LateFeeListItem[]; meta: LateFeeListMeta };
+    },
+    staleTime: 1000 * 15,
+  });
+}
+
+export function useWaiveLateFee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; reason: string }) => {
+      const response = await apiClient.put<{ success: boolean }>(`/api/v1/fees/late-fees/${input.id}/waive`, {
+        reason: input.reason,
+      });
+      return response.data;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['fees', 'late-fees'] }),
+        qc.invalidateQueries({ queryKey: ['fees', 'challans'] }),
+        qc.invalidateQueries({ queryKey: ['fees', 'payments'] }),
+      ]);
     },
   });
 }

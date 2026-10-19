@@ -6,9 +6,9 @@ Short guide for fee packages, monthly fee bills (challans), cash at the desk, an
 
 | Who | Where | What |
 | --- | --- | --- |
-| School admin / Principal | **Fees** → **Monthly bills** / **Payment history** | Create bills, mark cash paid, review proofs, export |
+| School admin / Principal | **Fees** → **Monthly bills** / **Payment history** / **Late fees** | Create bills, mark cash paid, review proofs, export, waive late fees |
 | Parents / students | **Fees** (My Fees) | Download fee bill PDF, submit bank proof, view receipts |
-| School admin / Principal | **Settings → Fee settings** | Bank details, fee packages, bill PDF style |
+| School admin / Principal | **Settings → Fee settings** | Bank details, fee packages, bill PDF style, late fee enable + package |
 | School admin / Principal | **Reports → Fee reports** (or **Fees → Payment history → Overdue**) | Collected / pending / under review / overdue |
 
 Fee Management requires the school plan feature **Fee management** (Starter and above; not on Free). On plans without it, **Fees** stays visible in the sidebar but is disabled; hovering shows an upgrade message. **Settings → Fee settings** is hidden.
@@ -54,6 +54,17 @@ When more than one fee package could apply, the **most specific** wins: Individu
 You can **Edit** a fee package later (name, amounts, due-by day of month, etc.). Changes apply to **new** monthly bills; existing bills keep what they already had.
 
 If only one fee package applies, monthly generation confirms without an extra choice screen.
+
+### Late fees setup
+
+Under **Late fees** on the same settings page:
+
+1. Create (or pick) an active **Fee** package whose first line item is the late charge (flat amount or %).
+2. Select that package as the **Late fee package**.
+3. Turn on **Enable late fees for this branch**.
+4. Save bill / fee settings.
+
+When enabled, overnight processing adds the late charge once to each unpaid bill that is past its due date (and has no payment under review). The office manages charges on **Fees → Late fees**.
 
 ---
 
@@ -101,6 +112,25 @@ Use **Generate** on a student row for mid-month joins or temporary changes:
 
 ---
 
+## ⏱️ Late fees (admin)
+
+**Path:** **Fees → Late fees**
+
+Lists late charges applied to overdue unpaid bills.
+
+| Element | Purpose |
+| --- | --- |
+| Summary chips | Active count/amount; waived this month |
+| Filters | Month, class, status (All / Active / Waived), student search |
+| **View bill** | Open the fee bill PDF |
+| **Waive** | Remove the late charge (requires a reason). Only while the bill is still pending payment |
+
+Parents and students see an **Includes late fee** badge on My Fees when a late charge is still active. The bill PDF line shows `Late fee (N days overdue)`.
+
+If late fees are not configured, the tab shows a link to **Settings → Fee settings**.
+
+---
+
 ## 💳 Part 3: Payment history (admin)
 
 **Path:** **Fees → Payment history**
@@ -135,7 +165,7 @@ On **Fees**, parents and students see:
 
 | Tab | Actions |
 | --- | --- |
-| **Fee payment** | Pending challans — **Download PDF**, **Submit proof** (disabled while Under review) |
+| **Fee payment** | Pending challans — **Download PDF**, **Submit proof** (disabled while Under review); **Includes late fee** badge when applicable |
 | **Payment history** | Past payments — **Receipt** when verified |
 
 Submit proof fields: payment date, amount paid, method (Bank transfer / Cash), bank name, transaction reference, proof file (PNG / JPEG / PDF). Parents with several children see a **Student** column.
@@ -167,6 +197,10 @@ School admin / principal; requires Fee management plan feature.
 
 **Fees missing from the sidebar:** Check plan includes Fee management, and your role is allowed.
 
-**Cannot mark paid:** Upload proof as parent, then verify under **Payment history** — there is no manual “Mark as Paid”.
+**Cannot mark paid:** On **Monthly bills**, use **Mark as paid** for cash at the desk. For bank transfer, the parent uploads proof and staff verifies under **Payment history**.
 
 **Submit proof disabled:** Challan is already **Under review** — wait for staff to verify or reject.
+
+**Late fees not applying:** Confirm **Enable late fees** and a late fee package are saved in **Fee settings**, the bill is unpaid and past due, and overnight processing is running for the environment.
+
+**Cannot waive late fee:** Waive is only available while the bill is **Pending payment** (not under review or verified).

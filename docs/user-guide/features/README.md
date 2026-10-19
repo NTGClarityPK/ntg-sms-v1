@@ -52,7 +52,7 @@ Detailed guides for each module of the NTG Alma portal. One page per feature.
 
 | Feature | What it covers |
 | --- | --- |
-| [💵 Fee Management](fee-management.md) | Templates, challans, proof review, My Fees |
+| [💵 Fee Management](fee-management.md) | Templates, challans, proof review, late fees, My Fees |
 | [💳 Billing & Subscription](billing.md) | School-admin plans, usage, Stripe Pay now |
 | [🏆 Certificates](certificates.md) | Seven types, issue wizard, Settings on Certificates page |
 | [🪪 ID Cards](id-cards.md) | Generate / Students / Staff; draft→issued; ZIP |

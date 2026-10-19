@@ -1,9 +1,8 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class WaiveLateFeeDto {
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(1000)
-  reason?: string;
+  reason!: string;
 }
-

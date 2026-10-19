@@ -1631,8 +1631,67 @@
       "challans": "Monthly bills",
       "assignments": "Template assignments",
       "payments": "Payment history",
+      "lateFees": "Late fees",
       "feePayment": "Fee payment",
       "paymentHistory": "Payment history"
+    },
+    "lateFees": {
+      "notConfiguredTitle": "Late fees not configured",
+      "notConfiguredMessage": "Enable late fees and choose a fee package in Fee settings before overnight charges can apply.",
+      "openSettings": "Open Fee settings",
+      "chips": {
+        "active": "Active: {count} ({amount})",
+        "waivedThisMonth": "Waived this month: {count} ({amount})"
+      },
+      "filters": {
+        "month": "Month",
+        "monthPlaceholder": "All months",
+        "class": "Class",
+        "classPlaceholder": "All",
+        "status": "Status",
+        "statusAll": "All",
+        "statusActive": "Active",
+        "statusWaived": "Waived",
+        "search": "Search student",
+        "searchPlaceholder": "Search…"
+      },
+      "table": {
+        "student": "Student",
+        "class": "Class",
+        "month": "Bill month",
+        "dueDate": "Due date",
+        "daysOverdue": "Days overdue",
+        "amount": "Late fee",
+        "appliedOn": "Applied on",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "badges": {
+        "active": "Active",
+        "waived": "Waived"
+      },
+      "daysOverdue": "{count} days",
+      "viewBill": "View bill",
+      "empty": "No late fees match these filters.",
+      "loadErrorTitle": "Failed to load late fees",
+      "loadErrorMessage": "Please try again.",
+      "pdfErrorTitle": "Could not open PDF",
+      "pdfErrorMessage": "Please try again.",
+      "waive": {
+        "button": "Waive",
+        "title": "Waive late fee",
+        "summary": "Waive {amount} late fee for {student} ({days} days overdue).",
+        "reason": "Reason",
+        "reasonPlaceholder": "e.g. Principal approved, first offence",
+        "cancel": "Cancel",
+        "confirm": "Waive late fee",
+        "reasonRequiredTitle": "Reason required",
+        "reasonRequiredMessage": "Enter a reason before waiving.",
+        "successTitle": "Late fee waived",
+        "successMessage": "The late fee was removed from the bill.",
+        "errorTitle": "Could not waive",
+        "errorMessage": "Please try again."
+      }
     },
     "myFees": {
       "noAccess": "You do not have access to fees.",
@@ -1641,6 +1700,7 @@
       "historyLoadErrorTitle": "Failed to load payments",
       "historyLoadErrorMessage": "Please try again.",
       "noGeneratedChallans": "No generated challans yet.",
+      "includesLateFee": "Includes late fee",
       "download": "Download PDF",
       "pdfPreparing": "Preparing PDF…",
       "pdfEnsureErrorTitle": "Could not open PDF",
@@ -1964,6 +2024,19 @@
         "branchCode": "Branch code",
         "paymentInstructions": "Payment instructions",
         "footerNoticeText": "Footer text"
+      },
+      "lateFees": {
+        "title": "Late fees",
+        "description": "Charge overdue unpaid bills overnight using a fee package. Office can waive charges on Fees → Late fees.",
+        "badgeOn": "Late fees: On",
+        "badgeOff": "Late fees: Off",
+        "enable": "Enable late fees for this branch",
+        "package": "Late fee package",
+        "packageDescription": "Choose an active Fee package. The first line item is used as the late charge (flat or %).",
+        "packagePlaceholder": "Select package…",
+        "previewLabel": "Charge preview",
+        "previewAbsolute": "{amount} {currency}",
+        "previewPercentage": "{amount}% of unpaid bill"
       },
       "loading": "Loading…",
       "errorLoading": "Failed to load fee packages.",

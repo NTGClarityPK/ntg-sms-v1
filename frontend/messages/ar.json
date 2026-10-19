@@ -1631,8 +1631,67 @@
       "challans": "الفواتير الشهرية",
       "assignments": "تعيينات القوالب",
       "payments": "سجل المدفوعات",
+      "lateFees": "الرسوم المتأخرة",
       "feePayment": "دفع الرسوم",
       "paymentHistory": "سجل المدفوعات"
+    },
+    "lateFees": {
+      "notConfiguredTitle": "الرسوم المتأخرة غير مُعدّة",
+      "notConfiguredMessage": "فعّل الرسوم المتأخرة واختر حزمة رسوم في إعدادات الرسوم قبل تطبيق الرسوم الليلية.",
+      "openSettings": "فتح إعدادات الرسوم",
+      "chips": {
+        "active": "نشطة: {count} ({amount})",
+        "waivedThisMonth": "مُعفاة هذا الشهر: {count} ({amount})"
+      },
+      "filters": {
+        "month": "الشهر",
+        "monthPlaceholder": "كل الأشهر",
+        "class": "الصف",
+        "classPlaceholder": "الكل",
+        "status": "الحالة",
+        "statusAll": "الكل",
+        "statusActive": "نشطة",
+        "statusWaived": "مُعفاة",
+        "search": "بحث عن طالب",
+        "searchPlaceholder": "بحث…"
+      },
+      "table": {
+        "student": "الطالب",
+        "class": "الصف",
+        "month": "شهر الفاتورة",
+        "dueDate": "تاريخ الاستحقاق",
+        "daysOverdue": "أيام التأخير",
+        "amount": "الرسوم المتأخرة",
+        "appliedOn": "تاريخ التطبيق",
+        "status": "الحالة",
+        "actions": "الإجراءات"
+      },
+      "badges": {
+        "active": "نشطة",
+        "waived": "مُعفاة"
+      },
+      "daysOverdue": "{count} أيام",
+      "viewBill": "عرض الفاتورة",
+      "empty": "لا توجد رسوم متأخرة تطابق هذه المرشحات.",
+      "loadErrorTitle": "فشل تحميل الرسوم المتأخرة",
+      "loadErrorMessage": "يرجى المحاولة مرة أخرى.",
+      "pdfErrorTitle": "تعذّر فتح PDF",
+      "pdfErrorMessage": "يرجى المحاولة مرة أخرى.",
+      "waive": {
+        "button": "إعفاء",
+        "title": "إعفاء الرسوم المتأخرة",
+        "summary": "إعفاء رسوم متأخرة بمبلغ {amount} لـ {student} ({days} أيام تأخير).",
+        "reason": "السبب",
+        "reasonPlaceholder": "مثال: موافقة المدير، المخالفة الأولى",
+        "cancel": "إلغاء",
+        "confirm": "إعفاء الرسوم المتأخرة",
+        "reasonRequiredTitle": "السبب مطلوب",
+        "reasonRequiredMessage": "أدخل سبباً قبل الإعفاء.",
+        "successTitle": "تم إعفاء الرسوم المتأخرة",
+        "successMessage": "تمت إزالة الرسوم المتأخرة من الفاتورة.",
+        "errorTitle": "تعذّر الإعفاء",
+        "errorMessage": "يرجى المحاولة مرة أخرى."
+      }
     },
     "myFees": {
       "noAccess": "ليس لديك صلاحية الوصول إلى الرسوم.",
@@ -1641,6 +1700,7 @@
       "historyLoadErrorTitle": "فشل تحميل المدفوعات",
       "historyLoadErrorMessage": "يرجى المحاولة مرة أخرى.",
       "noGeneratedChallans": "لا توجد قسائم مُنشأة بعد.",
+      "includesLateFee": "تتضمن رسوماً متأخرة",
       "download": "تنزيل PDF",
       "pdfPreparing": "جارٍ تجهيز PDF…",
       "pdfEnsureErrorTitle": "تعذّر فتح PDF",
@@ -1964,6 +2024,19 @@
         "branchCode": "رمز الفرع",
         "paymentInstructions": "تعليمات الدفع",
         "footerNoticeText": "نص التذييل"
+      },
+      "lateFees": {
+        "title": "الرسوم المتأخرة",
+        "description": "احتساب رسوم على الفواتير غير المدفوعة المتأخرة ليلاً باستخدام حزمة رسوم. يمكن للمكتب الإعفاء من صفحة الرسوم → الرسوم المتأخرة.",
+        "badgeOn": "الرسوم المتأخرة: مفعّلة",
+        "badgeOff": "الرسوم المتأخرة: متوقفة",
+        "enable": "تفعيل الرسوم المتأخرة لهذا الفرع",
+        "package": "حزمة الرسوم المتأخرة",
+        "packageDescription": "اختر حزمة رسوم نشطة. يُستخدم أول بند كرسوم التأخير (مبلغ ثابت أو نسبة مئوية).",
+        "packagePlaceholder": "اختر الحزمة…",
+        "previewLabel": "معاينة الرسوم",
+        "previewAbsolute": "{amount} {currency}",
+        "previewPercentage": "{amount}% من الفاتورة غير المدفوعة"
       },
       "loading": "جارٍ التحميل…",
       "errorLoading": "فشل تحميل قوالب الرسوم.",

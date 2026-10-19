@@ -1106,6 +1106,18 @@ export class ChallanService {
     return { data: (data ?? []) as any[] };
   }
 
+  private async getActiveLateFeeChallanIds(challanIds: string[]): Promise<Set<string>> {
+    if (challanIds.length === 0) return new Set();
+    const supabase = this.supabaseConfig.getClient();
+    const { data, error } = await supabase
+      .from('fee_late_fee_applications')
+      .select('challan_id')
+      .in('challan_id', challanIds)
+      .eq('waived', false);
+    throwIfDbError(error);
+    return new Set(((data ?? []) as Array<{ challan_id: string }>).map((r) => r.challan_id));
+  }
+
   async listMyStudentsPending(
     parentUserId: string,
     branchId: string,
@@ -1120,6 +1132,7 @@ export class ChallanService {
       dueDate: string;
       status: string;
       pdfUrl: string | null;
+      includesLateFee: boolean;
     }>;
   }> {
     const supabase = this.supabaseConfig.getClient();
@@ -1165,30 +1178,31 @@ export class ChallanService {
       .order('due_date', { ascending: true });
     throwIfDbError(cErr);
 
+    const challanRows = (challans ?? []) as Array<{
+      id: string;
+      challan_number: string;
+      student_id: string;
+      month: string;
+      payable_amount: number;
+      due_date: string;
+      status: string;
+      pdf_url: string | null;
+    }>;
+    const lateFeeChallanIds = await this.getActiveLateFeeChallanIds(challanRows.map((c) => c.id));
+
     return {
-      data: (challans ?? []).map((c) => {
-        const row = c as {
-          id: string;
-          challan_number: string;
-          student_id: string;
-          month: string;
-          payable_amount: number;
-          due_date: string;
-          status: string;
-          pdf_url: string | null;
-        };
-        return {
-          id: row.id,
-          challanNumber: row.challan_number,
-          studentId: row.student_id,
-          studentName: nameById.get(row.student_id) ?? '—',
-          month: row.month,
-          payableAmount: Number(row.payable_amount),
-          dueDate: row.due_date,
-          status: row.status,
-          pdfUrl: row.pdf_url,
-        };
-      }),
+      data: challanRows.map((row) => ({
+        id: row.id,
+        challanNumber: row.challan_number,
+        studentId: row.student_id,
+        studentName: nameById.get(row.student_id) ?? '—',
+        month: row.month,
+        payableAmount: Number(row.payable_amount),
+        dueDate: row.due_date,
+        status: row.status,
+        pdfUrl: row.pdf_url,
+        includesLateFee: lateFeeChallanIds.has(row.id),
+      })),
     };
   }
 
@@ -1206,6 +1220,7 @@ export class ChallanService {
       dueDate: string;
       status: string;
       pdfUrl: string | null;
+      includesLateFee: boolean;
     }>;
   }> {
     const supabase = this.supabaseConfig.getClient();
@@ -1229,30 +1244,31 @@ export class ChallanService {
       .order('due_date', { ascending: true });
     throwIfDbError(cErr);
 
+    const studentChallanRows = (challans ?? []) as Array<{
+      id: string;
+      challan_number: string;
+      student_id: string;
+      month: string;
+      payable_amount: number;
+      due_date: string;
+      status: string;
+      pdf_url: string | null;
+    }>;
+    const lateFeeChallanIds = await this.getActiveLateFeeChallanIds(studentChallanRows.map((c) => c.id));
+
     return {
-      data: (challans ?? []).map((c) => {
-        const row = c as {
-          id: string;
-          challan_number: string;
-          student_id: string;
-          month: string;
-          payable_amount: number;
-          due_date: string;
-          status: string;
-          pdf_url: string | null;
-        };
-        return {
-          id: row.id,
-          challanNumber: row.challan_number,
-          studentId: row.student_id,
-          studentName,
-          month: row.month,
-          payableAmount: Number(row.payable_amount),
-          dueDate: row.due_date,
-          status: row.status,
-          pdfUrl: row.pdf_url,
-        };
-      }),
+      data: studentChallanRows.map((row) => ({
+        id: row.id,
+        challanNumber: row.challan_number,
+        studentId: row.student_id,
+        studentName,
+        month: row.month,
+        payableAmount: Number(row.payable_amount),
+        dueDate: row.due_date,
+        status: row.status,
+        pdfUrl: row.pdf_url,
+        includesLateFee: lateFeeChallanIds.has(row.id),
+      })),
     };
   }
 

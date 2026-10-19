@@ -1,13 +1,12 @@
-import { Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { BranchGuard } from '../../common/guards/branch.guard';
 import { CurrentBranch, type CurrentBranchContext } from '../../common/decorators/current-branch.decorator';
 import { CurrentUser, type CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { LateFeeService } from './late-fee.service';
-import { Body } from '@nestjs/common';
 import { WaiveLateFeeDto } from './dto/waive-late-fee.dto';
-import { ForbiddenException } from '@nestjs/common';
+import { QueryLateFeesDto } from './dto/query-late-fees.dto';
 import { FeatureAccessGuard, RequiresFeature } from '../subscription/guards/feature-access.guard';
 
 @ApiTags('Fees')
@@ -23,10 +22,21 @@ export class LateFeeController {
     throw new ForbiddenException('Only school admin can manage late fees');
   }
 
+  @Get()
+  async list(
+    @Query() query: QueryLateFeesDto,
+    @CurrentBranch() branch: CurrentBranchContext,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    this.ensureFeesAdmin(user);
+    return this.lateFeeService.list(branch.branchId, query);
+  }
+
+  /** Backwards-compatible alias for older clients. */
   @Get('recent')
   async recent(@CurrentBranch() branch: CurrentBranchContext, @CurrentUser() user: CurrentUserPayload) {
     this.ensureFeesAdmin(user);
-    return this.lateFeeService.listRecent(branch.branchId);
+    return this.lateFeeService.list(branch.branchId, { page: 1, limit: 100, status: 'all', sortOrder: 'desc' });
   }
 
   @Put(':id/waive')
@@ -37,7 +47,11 @@ export class LateFeeController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     this.ensureFeesAdmin(user);
-    return this.lateFeeService.waive({ lateFeeId: id, reason: body.reason, waivedBy: user.id, branchId: branch.branchId });
+    return this.lateFeeService.waive({
+      lateFeeId: id,
+      reason: body.reason,
+      waivedBy: user.id,
+      branchId: branch.branchId,
+    });
   }
 }
-

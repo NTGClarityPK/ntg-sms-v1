@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Tabs, Title, Text } from '@mantine/core';
 import { PaymentsTab } from '@/components/fees/PaymentsTab';
 import { ChallansTab } from '@/components/fees/ChallansTab';
+import { LateFeesTab } from '@/components/fees/LateFeesTab';
 import { MyFeesTab } from '@/components/fees/MyFeesTab';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudentSessionStore } from '@/lib/store/student-session-store';
@@ -54,12 +55,18 @@ export default function FeesPage() {
               <Tabs.Tab value="payments" id="fees-tab-payments">
                 {t('tabs.payments')}
               </Tabs.Tab>
+              <Tabs.Tab value="late-fees" id="fees-tab-late-fees">
+                {t('tabs.lateFees')}
+              </Tabs.Tab>
             </Tabs.List>
             <Tabs.Panel value="challans" pt="md">
               <ChallansTab />
             </Tabs.Panel>
             <Tabs.Panel value="payments" pt="md">
               <PaymentsTab />
+            </Tabs.Panel>
+            <Tabs.Panel value="late-fees" pt="md">
+              <LateFeesTab />
             </Tabs.Panel>
           </Tabs>
         ) : isStudent ? (
